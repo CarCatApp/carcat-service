@@ -32,8 +32,9 @@ import java.util.Optional;
  *   <li>Next service: when Hyper sends {@code nextServiceDate} / {@code nextServiceMileage} on the
  *       matched line, those values are applied as-is. Otherwise {@code lastService + intervalKm/intervalMonth}
  *       from the percentage template is used.</li>
- *   <li>Webhook ingest/update: percentages are refreshed only when the visit is at least as recent as
- *       all other visits on the car (date &gt;= max existing date and mileage &gt;= max existing mileage).</li>
+ *   <li>Webhook ingest/update: each matched service line updates its percentage only when that line is
+ *       the latest Hyper record for the same {@code universalServiceId} across all visits (a newer visit
+ *       for another service does not block sync).</li>
  *   <li>Unmatched / never-serviced records are skipped silently (no error).</li>
  * </ul>
  */
@@ -57,59 +58,17 @@ public class HyperPercentageSyncService {
         if (visit == null) {
             return;
         }
-        if (!isEligibleForPercentageSync(car, visit)) {
-            log.info("Skipping percentage sync — visit is older than existing visits | carId={}, recordId={}, date={}, mileage={}",
-                    car.getCarId(), visit.getHyperRecordId(), visit.getLastServiceDate(), visit.getLastServiceMileage());
-            return;
-        }
         syncInternal(car, List.of(visit), true);
-    }
-
-    /**
-     * Returns {@code true} when the visit is recent enough to refresh percentages.
-     * Skips when another visit has a newer date or higher mileage (backfilled historical visits).
-     */
-    boolean isEligibleForPercentageSync(Car car, Visit candidate) {
-        LocalDate maxOtherDate = null;
-        Integer maxOtherMileage = null;
-
-        for (Visit other : visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)) {
-            if (isSameVisit(other, candidate)) {
-                continue;
-            }
-            LocalDate otherDate = other.getLastServiceDate();
-            if (otherDate != null && (maxOtherDate == null || otherDate.isAfter(maxOtherDate))) {
-                maxOtherDate = otherDate;
-            }
-            Integer otherMileage = other.getLastServiceMileage();
-            if (otherMileage != null && (maxOtherMileage == null || otherMileage > maxOtherMileage)) {
-                maxOtherMileage = otherMileage;
-            }
-        }
-
-        LocalDate candidateDate = candidate.getLastServiceDate();
-        Integer candidateMileage = candidate.getLastServiceMileage();
-
-        if (maxOtherDate != null && candidateDate != null && candidateDate.isBefore(maxOtherDate)) {
-            return false;
-        }
-        if (maxOtherMileage != null && candidateMileage != null && candidateMileage < maxOtherMileage) {
-            return false;
-        }
-        return true;
-    }
-
-    private boolean isSameVisit(Visit a, Visit b) {
-        if (a.getId() != null && Objects.equals(a.getId(), b.getId())) {
-            return true;
-        }
-        return a.getHyperRecordId() != null && Objects.equals(a.getHyperRecordId(), b.getHyperRecordId());
     }
 
     private void syncInternal(Car car, List<Visit> visits, boolean forceReapply) {
         if (visits == null || visits.isEmpty()) {
             return;
         }
+
+        List<Visit> allVisits = forceReapply
+                ? visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)
+                : visits;
 
         List<Percentage> percentages = percentageRepository.findAllByCarId(car.getCarId());
         for (Percentage percentage : percentages) {
@@ -122,6 +81,19 @@ public class HyperPercentageSyncService {
                 continue;
             }
             HyperServiceMatch match = matchOpt.get();
+
+            if (forceReapply) {
+                Optional<HyperServiceMatch> globalBest = findLatestMatch(percentage.getServiceNameEn(), allVisits);
+                if (globalBest.isEmpty() || !isSameServiceLine(globalBest.get(), match)) {
+                    log.info(
+                            "Skipping percentage sync — a newer line exists for this service | carId={}, nameEn={}, recordId={}",
+                            car.getCarId(),
+                            percentage.getServiceNameEn(),
+                            recordIdOf(match.visit())
+                    );
+                    continue;
+                }
+            }
 
             if (!hasUsableData(match)) {
                 continue;
@@ -143,6 +115,18 @@ public class HyperPercentageSyncService {
             log.info("Synced percentage from Hyper | carId={}, nameEn={}, percentageId={}, recordId={}, forced={}",
                     car.getCarId(), percentage.getServiceNameEn(), percentage.getId(), matchedRecordId, forceReapply);
         }
+    }
+
+    private boolean isSameServiceLine(HyperServiceMatch a, HyperServiceMatch b) {
+        if (!Objects.equals(recordIdOf(a.visit()), recordIdOf(b.visit()))) {
+            return false;
+        }
+        String aUniversal = a.line().getUniversalServiceId();
+        String bUniversal = b.line().getUniversalServiceId();
+        if (aUniversal != null && bUniversal != null) {
+            return aUniversal.trim().equalsIgnoreCase(bUniversal.trim());
+        }
+        return Objects.equals(a.line().getServiceCode(), b.line().getServiceCode());
     }
 
     private Optional<HyperServiceMatch> findLatestMatch(String nameEn, List<Visit> visits) {
