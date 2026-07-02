@@ -53,14 +53,13 @@ public class WebhookAuthResponseWriter {
             jsonBytes = fallbackJson(body).getBytes(StandardCharsets.UTF_8);
         }
 
-        response.reset();
+        String json = new String(jsonBytes, StandardCharsets.UTF_8);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setContentLength(jsonBytes.length);
         response.setHeader(AUTH_ERROR_HEADER, errorCode);
-        response.getOutputStream().write(jsonBytes);
-        response.getOutputStream().flush();
+        response.getWriter().write(json);
+        response.getWriter().flush();
     }
 
     private static String fallbackJson(WebhookAuthErrorResponse body) {
