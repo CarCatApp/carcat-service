@@ -861,7 +861,9 @@ public class CarServiceImpl implements CarService {
         Map<Long, ServiceEntity> servicesById = serviceEntityRepository.findAllById(serviceIds).stream()
                 .collect(Collectors.toMap(ServiceEntity::getId, s -> s));
 
-        for (Percentage percentage : percentages) {
+        for (Percentage loaded : percentages) {
+            Percentage percentage = percentageRepository.findById(loaded.getId()).orElse(loaded);
+
             ServiceEntity service = percentage.getServiceId() != null
                     ? servicesById.get(percentage.getServiceId())
                     : null;
@@ -873,13 +875,34 @@ public class CarServiceImpl implements CarService {
                 percentage.setServiceNameRu(service.getNameRu());
             }
 
-            //  Customer/partner tarafindan set edilibse, birbasa db deki degerleri ver, yeniden hesablama
             PercentageStatus execStatus = PercentageStatus.fromStored(percentage.getStatus());
             if (execStatus.isManuallySet()) {
                 log.info("[pct-status-debug] execute SKIP recompute (manual status preserved) | carId={}, percentageId={}, serviceName={}, status={}, thread={}",
                         car.getCarId(), percentage.getId(), percentage.getServiceName(), execStatus.name(),
                         Thread.currentThread().getName());
                 manualPreservedCount++;
+
+                LocalDate lastServiceDate = percentage.getLastServiceDate();
+                Integer lastServiceKm = percentage.getLastServiceKm();
+                Integer nextServiceKm = percentage.getNextServiceKm();
+                LocalDate nextServiceDate = percentage.getNextServiceDate();
+
+                Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer monthPercentage = computeMonthPercentage(lastServiceDate, nextServiceDate);
+                Integer remainingKm = null;
+                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
+                    remainingKm = (int) Math.max(nextServiceKm - car.getMileage(), 0);
+                }
+
+                if (kmPercentage != null) {
+                    percentage.setKmPercentage(kmPercentage);
+                }
+                if (monthPercentage != null) {
+                    percentage.setMonthPercentage(monthPercentage);
+                }
+                if (remainingKm != null) {
+                    percentage.setRemainingKm(remainingKm);
+                }
 
                 responseList.add(
                         CarServicePercentageResponse.builder()
@@ -892,24 +915,27 @@ public class CarServiceImpl implements CarService {
                                 .actionType(percentage.getActionType())
                                 .intervalKm(percentage.getIntervalKm())
                                 .intervalMonth(percentage.getIntervalMonth())
-                                .kmPercentage(percentage.getKmPercentage())
-                                .monthPercentage(percentage.getMonthPercentage())
-                                .remainingKm(percentage.getRemainingKm())
+                                .kmPercentage(kmPercentage)
+                                .monthPercentage(monthPercentage)
+                                .monthPercentageDigit(monthPercentage)
+                                .remainingKm(remainingKm)
                                 .remainingMonths(
-                                        percentage.getRemainingMonths() != null
+                                        nextServiceDate != null
+                                                ? nextServiceDate.format(formatter)
+                                                : (percentage.getRemainingMonths() != null
                                                 ? percentage.getRemainingMonths().format(formatter)
-                                                : null
+                                                : null)
                                 )
-                                .lastServiceKm(percentage.getLastServiceKm())
+                                .lastServiceKm(lastServiceKm)
                                 .lastServiceDate(
-                                        percentage.getLastServiceDate() != null
-                                                ? percentage.getLastServiceDate().format(formatter)
+                                        lastServiceDate != null
+                                                ? lastServiceDate.format(formatter)
                                                 : null
                                 )
-                                .nextServiceKm(percentage.getNextServiceKm())
+                                .nextServiceKm(nextServiceKm)
                                 .nextServiceDate(
-                                        percentage.getNextServiceDate() != null
-                                                ? percentage.getNextServiceDate().format(formatter)
+                                        nextServiceDate != null
+                                                ? nextServiceDate.format(formatter)
                                                 : null
                                 )
                                 .status(execStatus.name())
@@ -918,10 +944,7 @@ public class CarServiceImpl implements CarService {
                                 .build()
                 );
 
-                if (service != null) {
-                    percentageRepository.save(percentage);
-                }
-
+                percentageRepository.save(percentage);
                 continue;
             }
 
@@ -929,6 +952,77 @@ public class CarServiceImpl implements CarService {
             log.info("[pct-status-debug] execute RECOMPUTE branch | carId={}, percentageId={}, serviceName={}, statusAtSnapshot={}, thread={}",
                     car.getCarId(), percentage.getId(), percentage.getServiceName(), statusAtSnapshot,
                     Thread.currentThread().getName());
+
+            String serviceNameEn = service != null ? service.getNameEn() : percentage.getServiceNameEn();
+            Optional<HyperPercentageSyncService.PartnerLineSnapshot> partnerLine =
+                    hyperPercentageSyncService.findBestPartnerLineForService(
+                            car,
+                            serviceNameEn,
+                            percentage.getIntervalKm(),
+                            percentage.getIntervalMonth()
+                    );
+
+            if (partnerLine.isPresent()) {
+                HyperPercentageSyncService.PartnerLineSnapshot snap = partnerLine.get();
+                LocalDate lastServiceDate = snap.lastServiceDate() != null
+                        ? snap.lastServiceDate()
+                        : (car.getCreatedAt() != null ? car.getCreatedAt().toLocalDate() : today);
+                Integer lastServiceKm = snap.lastServiceKm() != null ? snap.lastServiceKm() : 0;
+                Integer nextServiceKm = snap.nextServiceKm();
+                LocalDate nextServiceDate = snap.nextServiceDate();
+
+                Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer monthPercentage = computeMonthPercentage(lastServiceDate, nextServiceDate);
+                Integer remainingKm = null;
+                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
+                    remainingKm = (int) Math.max(nextServiceKm - car.getMileage(), 0);
+                }
+
+                responseList.add(
+                        CarServicePercentageResponse.builder()
+                                .percentageId(percentage.getId())
+                                .serviceId(percentage.getServiceId())
+                                .serviceName(percentage.getServiceName())
+                                .serviceNameAz(percentage.getServiceNameAz())
+                                .serviceNameEn(percentage.getServiceNameEn())
+                                .serviceNameRu(percentage.getServiceNameRu())
+                                .actionType(percentage.getActionType())
+                                .intervalKm(percentage.getIntervalKm())
+                                .intervalMonth(percentage.getIntervalMonth())
+                                .kmPercentage(kmPercentage)
+                                .monthPercentage(monthPercentage)
+                                .monthPercentageDigit(monthPercentage)
+                                .remainingKm(remainingKm)
+                                .remainingMonths(nextServiceDate != null ? nextServiceDate.format(formatter) : null)
+                                .lastServiceKm(lastServiceKm)
+                                .lastServiceDate(lastServiceDate.format(formatter))
+                                .nextServiceKm(nextServiceKm)
+                                .nextServiceDate(nextServiceDate != null ? nextServiceDate.format(formatter) : null)
+                                .status(PercentageStatus.EDITED_BY_PARTNER.name())
+                                .editable(PercentageStatus.EDITED_BY_PARTNER.isEditable())
+                                .important(percentage.isImportant())
+                                .build()
+                );
+
+                percentage.setLastServiceDate(lastServiceDate);
+                percentage.setLastServiceKm(lastServiceKm);
+                percentage.setNextServiceDate(nextServiceDate);
+                percentage.setNextServiceKm(nextServiceKm);
+                percentage.setRemainingKm(remainingKm);
+                if (nextServiceDate != null) {
+                    percentage.setRemainingMonths(nextServiceDate);
+                }
+                percentage.setKmPercentage(kmPercentage);
+                percentage.setMonthPercentage(monthPercentage);
+                percentage.setStatus(PercentageStatus.EDITED_BY_PARTNER.name());
+                percentage.setLastPartnerSyncAt(LocalDateTime.now());
+
+                percentageRepository.save(percentage);
+                recomputeSavedCount++;
+                log.info("[pct-status-debug] execute SAVED from partner visit line | carId={}, percentageId={}, serviceName={}, thread={}",
+                        car.getCarId(), percentage.getId(), percentage.getServiceName(), Thread.currentThread().getName());
+                continue;
+            }
 
             CustomerServiceRecord customerRecord =
                     customerServiceRecordRepository
@@ -1007,6 +1101,7 @@ public class CarServiceImpl implements CarService {
                             .intervalMonth(intervalMonth)
                             .kmPercentage(remainingKmPercentage)
                             .monthPercentage(remainingMonthPercentage)
+                            .monthPercentageDigit(remainingMonthPercentage)
                             .remainingKm(remainingKm)
                             .remainingMonths(nextServiceDate.format(formatter))
                             .lastServiceKm(lastServiceKm)
@@ -1020,6 +1115,15 @@ public class CarServiceImpl implements CarService {
             );
 
             /* ===== SAVE BACK TO PERCENTAGE ===== */
+            Optional<Percentage> freshBeforeSave = percentageRepository.findById(percentage.getId());
+            if (freshBeforeSave.isPresent()
+                    && PercentageStatus.fromStored(freshBeforeSave.get().getStatus()).isManuallySet()) {
+                log.warn("[pct-status-debug] execute SKIP template save — DB now has manual status | carId={}, percentageId={}, serviceName={}, dbStatus={}, statusAtSnapshot={}, thread={}",
+                        car.getCarId(), percentage.getId(), percentage.getServiceName(),
+                        freshBeforeSave.get().getStatus(), statusAtSnapshot, Thread.currentThread().getName());
+                continue;
+            }
+
             percentage.setLastServiceDate(lastServiceDate);
             percentage.setLastServiceKm(lastServiceKm);
             percentage.setNextServiceDate(nextServiceDate);
@@ -1029,16 +1133,6 @@ public class CarServiceImpl implements CarService {
             percentage.setKmPercentage(remainingKmPercentage);
             percentage.setMonthPercentage(remainingMonthPercentage);
             percentage.setStatus(PercentageStatus.CREATED.name());
-
-            // Diagnostic only: detect stale snapshot overwriting a customer/partner edit (Variant A race).
-            percentageRepository.findById(percentage.getId()).ifPresent(fresh -> {
-                PercentageStatus dbStatus = PercentageStatus.fromStored(fresh.getStatus());
-                if (dbStatus.isManuallySet()) {
-                    log.warn("[pct-status-debug] RACE_OR_STALE_SNAPSHOT | execute will write CREATED but DB already has {} | carId={}, percentageId={}, serviceName={}, statusAtSnapshot={}, thread={}",
-                            dbStatus.name(), car.getCarId(), percentage.getId(), percentage.getServiceName(),
-                            statusAtSnapshot, Thread.currentThread().getName());
-                }
-            });
 
             percentageRepository.save(percentage);
             recomputeSavedCount++;
@@ -1651,6 +1745,35 @@ public class CarServiceImpl implements CarService {
      * Lower score = less remaining service life (km or time) = sort higher on the list.
      * Uses the minimum of km and month remaining percentages when both are present.
      */
+    private Integer computeKmPercentage(Integer lastServiceKm, Integer nextServiceKm, Long carMileage) {
+        if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
+            return null;
+        }
+        long totalKm = nextServiceKm - lastServiceKm;
+        long remainingKmRaw = nextServiceKm - carMileage;
+        if (totalKm > 0) {
+            int kmPct = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
+            return Math.max(0, Math.min(100, kmPct));
+        }
+        return 0;
+    }
+
+    private Integer computeMonthPercentage(LocalDate lastServiceDate, LocalDate nextServiceDate) {
+        if (lastServiceDate == null || nextServiceDate == null) {
+            return null;
+        }
+        long lastDay = lastServiceDate.toEpochDay();
+        long nextDay = nextServiceDate.toEpochDay();
+        long nowDay = LocalDate.now().toEpochDay();
+        long totalDays = nextDay - lastDay;
+        long remainingDays = Math.max(nextDay - nowDay, 0);
+        if (totalDays > 0) {
+            int monthPct = (int) Math.round((remainingDays * 100.0) / totalDays);
+            return Math.max(0, Math.min(100, monthPct));
+        }
+        return 0;
+    }
+
     private int remainingServiceScore(CarServicePercentageResponse item) {
         Integer kmRemaining = item.getKmPercentage();
         Integer monthRemaining = item.getMonthPercentageDigit() != null

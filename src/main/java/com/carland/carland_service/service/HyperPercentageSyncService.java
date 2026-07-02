@@ -151,10 +151,7 @@ public class HyperPercentageSyncService {
         LocalDate lastServiceDate = visit.getLastServiceDate();
         Integer lastServiceKm = visit.getLastServiceMileage();
 
-        Integer nextServiceKm = line.getNextServiceMileage();
-        if (nextServiceKm == null && lastServiceKm != null && intervalKm != null && intervalKm > 0) {
-            nextServiceKm = Math.toIntExact(lastServiceKm + intervalKm);
-        }
+        Integer nextServiceKm = resolveNextServiceKm(line.getNextServiceMileage(), lastServiceKm, intervalKm);
 
         LocalDate nextServiceDate = line.getNextServiceDate();
         if (nextServiceDate == null && lastServiceDate != null && intervalMonth != null && intervalMonth > 0) {
@@ -272,10 +269,7 @@ public class HyperPercentageSyncService {
         Long intervalKm = percentage.getIntervalKm();
         Integer intervalMonth = percentage.getIntervalMonth();
 
-        Integer nextServiceKm = line.getNextServiceMileage();
-        if (nextServiceKm == null && lastServiceKm != null && intervalKm != null && intervalKm > 0) {
-            nextServiceKm = Math.toIntExact(lastServiceKm + intervalKm);
-        }
+        Integer nextServiceKm = resolveNextServiceKm(line.getNextServiceMileage(), lastServiceKm, intervalKm);
         if (nextServiceKm != null) {
             percentage.setNextServiceKm(nextServiceKm);
         }
@@ -325,6 +319,17 @@ public class HyperPercentageSyncService {
                 nextServiceKm, line.getNextServiceMileage() != null,
                 nextServiceDate, line.getNextServiceDate() != null,
                 intervalKm, intervalMonth);
+    }
+
+    /** Line-level next km from Hyper can be invalid; fall back to template interval when needed. */
+    private Integer resolveNextServiceKm(Integer lineNext, Integer lastServiceKm, Long intervalKm) {
+        if (lineNext != null && lastServiceKm != null && lineNext > lastServiceKm) {
+            return lineNext;
+        }
+        if (lastServiceKm != null && intervalKm != null && intervalKm > 0) {
+            return Math.toIntExact(lastServiceKm + intervalKm);
+        }
+        return lineNext;
     }
 
     private String recordIdOf(Visit visit) {
