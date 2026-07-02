@@ -10,7 +10,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.IOException;
 
@@ -49,20 +51,35 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
         }
 
         CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(request);
-        byte[] body = wrapped.getCachedBody();
+        byte[] body = resolveBodyBytes(request, wrapped);
 
         WebhookAuthValidationResult partnerResult = partnerWebhookSignatureService.validate(wrapped, body);
         if (!partnerResult.isValid()) {
             log.warn(
-                    "Webhook partner auth failed: path={}, partnerId={}, reason={}",
+                    "Webhook partner auth failed: path={}, partnerId={}, reason={}, bodyBytes={}",
                     path,
                     partnerResult.getPartnerId(),
-                    partnerResult.getFailure().getError()
+                    partnerResult.getFailure().getError(),
+                    body.length
             );
             webhookAuthResponseWriter.writeUnauthorized(response, partnerResult);
             return;
         }
 
         filterChain.doFilter(wrapped, response);
+    }
+
+    private byte[] resolveBodyBytes(HttpServletRequest request, CachedBodyHttpServletRequest wrapped) throws IOException {
+        byte[] body = wrapped.getCachedBody();
+        if (body.length > 0) {
+            return body;
+        }
+        if (request instanceof ContentCachingRequestWrapper caching) {
+            byte[] cached = caching.getContentAsByteArray();
+            if (cached.length > 0) {
+                return cached;
+            }
+        }
+        return StreamUtils.copyToByteArray(request.getInputStream());
     }
 }

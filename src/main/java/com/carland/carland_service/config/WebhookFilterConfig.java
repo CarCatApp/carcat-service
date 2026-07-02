@@ -28,7 +28,7 @@ public class WebhookFilterConfig {
     @Bean
     FilterRegistrationBean<WebhookSignatureFilter> webhookSignatureFilterRegistration(WebhookSignatureFilter filter) {
         FilterRegistrationBean<WebhookSignatureFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setOrder(Ordered.LOWEST_PRECEDENCE - 10);
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 5);
         registration.addUrlPatterns("/webhook/partner/*");
         return registration;
     }
