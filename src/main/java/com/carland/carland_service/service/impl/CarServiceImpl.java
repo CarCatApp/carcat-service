@@ -13,6 +13,7 @@ import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.AfterAddCarSyncService;
+import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.interfaces.CarService;
 import com.carland.carland_service.service.interfaces.PushNotificationService;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,7 @@ public class CarServiceImpl implements CarService {
     private final LogRepository logRepository;
     private final EngineTypeRepository engineTypeRepository;
     private final AfterAddCarSyncService afterAddCarSyncService;
+    private final HyperPercentageSyncService hyperPercentageSyncService;
 //    private static final List<String> simulatedVins = List.of(
 //            "JTJGB7CX2R4121777",
 //            "LFMAAA0C6S0640604",
@@ -513,6 +515,84 @@ public class CarServiceImpl implements CarService {
 
 
 // ================= CREATED / DEFAULT FLOW =================
+
+            Optional<HyperPercentageSyncService.PartnerLineSnapshot> partnerLine =
+                    hyperPercentageSyncService.findBestPartnerLineForService(
+                            car,
+                            serviceEntity.getNameEn(),
+                            serviceEntity.getIntervalKm(),
+                            serviceEntity.getIntervalMonth()
+                    );
+
+            if (partnerLine.isPresent()) {
+                HyperPercentageSyncService.PartnerLineSnapshot snap = partnerLine.get();
+                LocalDate lastServiceDate = snap.lastServiceDate() != null
+                        ? snap.lastServiceDate()
+                        : car.getCreatedAt().toLocalDate();
+                Integer lastServiceKm = snap.lastServiceKm() != null ? snap.lastServiceKm() : 0;
+                Integer nextServiceKm = snap.nextServiceKm();
+                LocalDate nextServiceDate = snap.nextServiceDate();
+
+                Integer kmPercentage = null;
+                Integer remainingKm = null;
+                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
+                    long totalKm = nextServiceKm - lastServiceKm;
+                    long remainingKmRaw = nextServiceKm - car.getMileage();
+                    remainingKm = (int) Math.max(remainingKmRaw, 0);
+                    if (totalKm > 0) {
+                        kmPercentage = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
+                        kmPercentage = Math.max(0, Math.min(100, kmPercentage));
+                    } else {
+                        kmPercentage = 0;
+                    }
+                }
+
+                Integer monthPercentageDigit = null;
+                String remainingDaysValue = null;
+                if (lastServiceDate != null && nextServiceDate != null) {
+                    long lastDay = lastServiceDate.toEpochDay();
+                    long nextDay = nextServiceDate.toEpochDay();
+                    long nowDay = LocalDate.now().toEpochDay();
+                    long totalDays = nextDay - lastDay;
+                    long remainingDays = Math.max(nextDay - nowDay, 0);
+                    if (totalDays > 0) {
+                        monthPercentageDigit = (int) Math.round((remainingDays * 100.0) / totalDays);
+                        monthPercentageDigit = Math.max(0, Math.min(100, monthPercentageDigit));
+                    } else {
+                        monthPercentageDigit = 0;
+                    }
+                    remainingDaysValue = String.valueOf(remainingDays);
+                }
+
+                responseList.add(
+                        CarServicePercentageResponse.builder()
+                                .percentageId(percentage != null ? percentage.getId() : null)
+                                .serviceId(serviceEntity.getId())
+                                .serviceName(serviceEntity.getServiceName())
+                                .serviceNameAz(serviceEntity.getNameAz())
+                                .serviceNameEn(serviceEntity.getNameEn())
+                                .serviceNameRu(serviceEntity.getNameRu())
+                                .actionType(serviceEntity.getActionType())
+                                .intervalKm(serviceEntity.getIntervalKm())
+                                .intervalMonth(serviceEntity.getIntervalMonth())
+                                .kmPercentage(kmPercentage)
+                                .monthPercentageDigit(monthPercentageDigit)
+                                .remainingKm(remainingKm)
+                                .remainingMonths(remainingDaysValue)
+                                .lastServiceKm(lastServiceKm)
+                                .lastServiceDate(capitalizeMonth(lastServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)))
+                                .nextServiceKm(nextServiceKm)
+                                .nextServiceDate(nextServiceDate != null
+                                        ? capitalizeMonth(nextServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage))
+                                        : null)
+                                .status(listStatus.name())
+                                .editable(listStatus.isEditable())
+                                .servicedStatus(record != null ? record.getServicedStatus() : null)
+                                .important(percentage != null ? percentage.isImportant() : serviceEntity.isImportant())
+                                .build()
+                );
+                continue;
+            }
 
             List<CustomerServiceRecord> csrList = customerServiceRecordList.stream()
                     .filter(r -> serviceEntity.getId().equals(r.getServiceId()))

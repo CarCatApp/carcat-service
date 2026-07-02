@@ -24,6 +24,7 @@ import com.carland.carland_service.service.PartnerServiceVisitIngestService;
 import com.carland.carland_service.service.mapper.HyperWebhookIngestMapper;
 import com.carland.carland_service.service.validation.HyperServiceVisitValidator;
 import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
+import com.carland.carland_service.service.webhook.PartnerVisitIngestGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,9 +34,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +47,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private final PartnerLookupService partnerLookupService;
     private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
     private final HyperPercentageSyncService hyperPercentageSyncService;
+    private final PartnerVisitIngestGuard partnerVisitIngestGuard;
 
     @Override
     @Transactional
@@ -78,18 +77,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         List<Visit> touchedVisits = new ArrayList<>();
 
         for (ServiceHistoryVisitV2Response item : request.getItems()) {
-            Optional<Visit> existing = visitRepository.findWithDetailsByCarIdAndHyperRecordId(
-                    car.getCarId(), item.getPartnerRecordId());
-            if (existing.isPresent()) {
-                Visit visit = existing.get();
-                assertVisitBelongsToPartner(visit, partnerId, item.getPartnerRecordId(), vin);
-                visit.getParts().size();
-                VisitIngestDetail detail = appendMissingLinesAndParts(visit, item, result);
-                touchedVisits.add(visit);
-                result.getVisits().add(detail);
-                result.setVisitsSkipped(result.getVisitsSkipped() + 1);
-                continue;
-            }
+            partnerVisitIngestGuard.assertNewVisit(car.getCarId(), item);
 
             Visit created = mapItemToVisit(car, item);
             visitRepository.saveAndFlush(created);
@@ -100,21 +88,12 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
             result.setPartsCreated(result.getPartsCreated() + sizeOf(item.getParts()));
         }
 
-        if (result.getVisitsCreated() > 0 || result.getLinesCreated() > 0 || result.getPartsCreated() > 0) {
-            recalculateAllTimeCost(car);
-            refreshServicedPartnerIds(car);
-            refreshPercentagesFromTouchedVisits(car, touchedVisits);
-        }
+        recalculateAllTimeCost(car);
+        refreshServicedPartnerIds(car);
+        refreshPercentagesFromTouchedVisits(car, touchedVisits);
 
-        result.setMessage(resolveMessage(result));
+        result.setMessage("Visit and service lines created");
         return result;
-    }
-
-    private void assertVisitBelongsToPartner(Visit visit, Long partnerId, Long recordId, String vin) {
-        if (visit.getServiceCenterId() != null && !Objects.equals(visit.getServiceCenterId(), partnerId)) {
-            throw new ResourceNotFoundException(
-                    "Visit not found for recordId=" + recordId + " and vin=" + vin);
-        }
     }
 
     private void refreshPercentagesFromTouchedVisits(Car car, List<Visit> touchedVisits) {
@@ -144,75 +123,6 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
                 .visitCreated(true)
                 .lines(lines)
                 .build();
-    }
-
-    private VisitIngestDetail appendMissingLinesAndParts(Visit visit, ServiceHistoryVisitV2Response item, PartnerNewServiceVisitResult result) {
-        Set<String> existingLineKeys = new LinkedHashSet<>();
-        for (ServiceHistoryV2 line : visit.getServices()) {
-            existingLineKeys.add(lineKey(line));
-        }
-
-        if (item.getServices() != null) {
-            for (ServiceHistoryLineV2Response line : item.getServices()) {
-                if (findMatchingLine(visit, line) != null) {
-                    result.setLinesSkipped(result.getLinesSkipped() + 1);
-                    continue;
-                }
-                visit.addService(mapLineToEntity(line));
-                result.setLinesCreated(result.getLinesCreated() + 1);
-            }
-        }
-        if (item.getParts() != null) {
-            for (ServiceHistoryPartV2Response part : item.getParts()) {
-                if (partExists(visit, part)) {
-                    result.setPartsSkipped(result.getPartsSkipped() + 1);
-                    continue;
-                }
-                visit.addPart(mapPartToEntity(part));
-                result.setPartsCreated(result.getPartsCreated() + 1);
-            }
-        }
-        visitRepository.saveAndFlush(visit);
-
-        List<LineIngestDetail> lineDetails = new ArrayList<>();
-        if (item.getServices() != null) {
-            for (ServiceHistoryLineV2Response line : item.getServices()) {
-                ServiceHistoryV2 matched = findMatchingLine(visit, line);
-                if (matched == null) {
-                    continue;
-                }
-                lineDetails.add(LineIngestDetail.builder()
-                        .serviceCode(matched.getServiceCode())
-                        .lineId(matched.getId())
-                        .created(!existingLineKeys.contains(lineKey(line)))
-                        .build());
-            }
-        }
-
-        return VisitIngestDetail.builder()
-                .partnerRecordId(item.getPartnerRecordId())
-                .visitId(visit.getId())
-                .visitCreated(false)
-                .lines(lineDetails)
-                .build();
-    }
-
-    private ServiceHistoryV2 findMatchingLine(Visit visit, ServiceHistoryLineV2Response line) {
-        String key = lineKey(line);
-        return visit.getServices().stream()
-                .filter(existing -> lineKey(existing).equals(key))
-                .findFirst()
-                .orElse(null);
-    }
-
-    private String resolveMessage(PartnerNewServiceVisitResult result) {
-        if (result.getVisitsCreated() > 0 || result.getLinesCreated() > 0 || result.getPartsCreated() > 0) {
-            if (result.getVisitsSkipped() > 0 || result.getLinesSkipped() > 0 || result.getPartsSkipped() > 0) {
-                return "Visit updated with new service lines or parts";
-            }
-            return "Visit and service lines created";
-        }
-        return "Visit and service lines already exist";
     }
 
     private Visit mapItemToVisit(Car car, ServiceHistoryVisitV2Response item) {
@@ -271,42 +181,6 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
                 .qty(part.getQty())
                 .unit(part.getUnit())
                 .build();
-    }
-
-    private boolean partExists(Visit visit, ServiceHistoryPartV2Response part) {
-        String key = partKey(part);
-        return visit.getParts().stream().anyMatch(existing -> partKey(existing).equals(key));
-    }
-
-    private String lineKey(ServiceHistoryLineV2Response line) {
-        return Objects.toString(line.getServiceCode(), "")
-                + "|" + normalizeUniversalServiceId(line.getUniversalServiceId())
-                + "|" + Objects.toString(line.getServiceName(), "");
-    }
-
-    private String lineKey(ServiceHistoryV2 line) {
-        return Objects.toString(line.getServiceCode(), "")
-                + "|" + normalizeUniversalServiceId(line.getUniversalServiceId())
-                + "|" + Objects.toString(line.getServiceName(), "");
-    }
-
-    private String partKey(ServiceHistoryPartV2Response part) {
-        return Objects.toString(part.getName(), "")
-                + "|" + normalizeQty(part.getQty())
-                + "|" + Objects.toString(part.getUnit(), "");
-    }
-
-    private String partKey(ServiceHistoryPartV2 part) {
-        return Objects.toString(part.getName(), "")
-                + "|" + normalizeQty(part.getQty())
-                + "|" + Objects.toString(part.getUnit(), "");
-    }
-
-    private String normalizeQty(BigDecimal qty) {
-        if (qty == null) {
-            return "";
-        }
-        return qty.stripTrailingZeros().toPlainString();
     }
 
     private String resolvePartnerName(ServiceHistoryVisitV2Response item, Long partnerId) {

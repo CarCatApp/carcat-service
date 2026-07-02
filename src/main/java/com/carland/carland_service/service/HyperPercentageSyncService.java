@@ -4,13 +4,16 @@ import com.carland.carland_service.dto.response.v2.ServiceHistoryV2;
 import com.carland.carland_service.dto.response.v2.Visit;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Percentage;
+import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.enums.HyperServiceMapping;
 import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.repository.PercentageRepository;
+import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -20,23 +23,6 @@ import java.util.Optional;
 
 /**
  * Applies Hyper (partner) service history onto a car's percentages.
- *
- * <p>Rules:</p>
- * <ul>
- *   <li>Match: Hyper {@code universalServiceId} (String) is translated to our {@code name_en}
- *       via {@link HyperServiceMapping}; the percentage is found by {@code serviceNameEn}.</li>
- *   <li>Precedence: partner data is authoritative. CREATED and EDITED_BY_CUSTOMER are
- *       overwritten and become {@link PercentageStatus#EDITED_BY_PARTNER} (locked).
- *       An already partner-locked row is only updated by a strictly newer Hyper record.</li>
- *   <li>Idempotent: re-applying the same Hyper record is a no-op.</li>
- *   <li>Next service: when Hyper sends {@code nextServiceDate} / {@code nextServiceMileage} on the
- *       matched line, those values are applied as-is. Otherwise {@code lastService + intervalKm/intervalMonth}
- *       from the percentage template is used.</li>
- *   <li>Webhook ingest/update: each matched service line updates its percentage only when that line is
- *       the latest Hyper record for the same {@code universalServiceId} across all visits (a newer visit
- *       for another service does not block sync).</li>
- *   <li>Unmatched / never-serviced records are skipped silently (no error).</li>
- * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -45,20 +31,43 @@ public class HyperPercentageSyncService {
 
     private final PercentageRepository percentageRepository;
     private final VisitRepository visitRepository;
+    private final ServiceEntityRepository serviceEntityRepository;
+
+    public record PartnerLineSnapshot(
+            LocalDate lastServiceDate,
+            Integer lastServiceKm,
+            LocalDate nextServiceDate,
+            Integer nextServiceKm
+    ) {
+    }
 
     public void syncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, false);
     }
 
-    /**
-     * Re-applies partner visit data onto matching percentages after a successful webhook create/update.
-     * Unlike {@link #syncFromVisits}, re-syncs even when the same partner record was applied before.
-     */
     public void syncFromVisit(Car car, Visit visit) {
         if (visit == null) {
             return;
         }
         syncInternal(car, List.of(visit), true);
+    }
+
+    /**
+     * Read-only: best matching partner visit line for list display (CREATED percentages).
+     */
+    public Optional<PartnerLineSnapshot> findBestPartnerLineForService(
+            Car car,
+            String serviceNameEn,
+            Long intervalKm,
+            Integer intervalMonth
+    ) {
+        if (!StringUtils.hasText(serviceNameEn)) {
+            return Optional.empty();
+        }
+        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        return findLatestMatch(serviceNameEn.trim(), visits)
+                .filter(this::hasUsableData)
+                .map(match -> toSnapshot(match, intervalKm, intervalMonth));
     }
 
     private void syncInternal(Car car, List<Visit> visits, boolean forceReapply) {
@@ -72,23 +81,27 @@ public class HyperPercentageSyncService {
 
         List<Percentage> percentages = percentageRepository.findAllByCarId(car.getCarId());
         for (Percentage percentage : percentages) {
-            if (percentage.getServiceNameEn() == null || percentage.getServiceNameEn().isBlank()) {
+            String nameEn = resolveServiceNameEn(percentage);
+            if (!StringUtils.hasText(nameEn)) {
                 continue;
             }
+            if (!StringUtils.hasText(percentage.getServiceNameEn())) {
+                percentage.setServiceNameEn(nameEn);
+            }
 
-            Optional<HyperServiceMatch> matchOpt = findLatestMatch(percentage.getServiceNameEn(), visits);
+            Optional<HyperServiceMatch> matchOpt = findLatestMatch(nameEn, visits);
             if (matchOpt.isEmpty()) {
                 continue;
             }
             HyperServiceMatch match = matchOpt.get();
 
             if (forceReapply) {
-                Optional<HyperServiceMatch> globalBest = findLatestMatch(percentage.getServiceNameEn(), allVisits);
+                Optional<HyperServiceMatch> globalBest = findLatestMatch(nameEn, allVisits);
                 if (globalBest.isEmpty() || !isSameServiceLine(globalBest.get(), match)) {
                     log.info(
                             "Skipping percentage sync — a newer line exists for this service | carId={}, nameEn={}, recordId={}",
                             car.getCarId(),
-                            percentage.getServiceNameEn(),
+                            nameEn,
                             recordIdOf(match.visit())
                     );
                     continue;
@@ -113,8 +126,42 @@ public class HyperPercentageSyncService {
             applyPartnerData(car, percentage, match, matchedRecordId);
             percentageRepository.save(percentage);
             log.info("Synced percentage from Hyper | carId={}, nameEn={}, percentageId={}, recordId={}, forced={}",
-                    car.getCarId(), percentage.getServiceNameEn(), percentage.getId(), matchedRecordId, forceReapply);
+                    car.getCarId(), nameEn, percentage.getId(), matchedRecordId, forceReapply);
         }
+    }
+
+    private String resolveServiceNameEn(Percentage percentage) {
+        if (StringUtils.hasText(percentage.getServiceNameEn())) {
+            return percentage.getServiceNameEn().trim();
+        }
+        if (percentage.getServiceId() == null) {
+            return null;
+        }
+        return serviceEntityRepository.findById(percentage.getServiceId())
+                .map(ServiceEntity::getNameEn)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .orElse(null);
+    }
+
+    private PartnerLineSnapshot toSnapshot(HyperServiceMatch match, Long intervalKm, Integer intervalMonth) {
+        Visit visit = match.visit();
+        ServiceHistoryV2 line = match.line();
+
+        LocalDate lastServiceDate = visit.getLastServiceDate();
+        Integer lastServiceKm = visit.getLastServiceMileage();
+
+        Integer nextServiceKm = line.getNextServiceMileage();
+        if (nextServiceKm == null && lastServiceKm != null && intervalKm != null && intervalKm > 0) {
+            nextServiceKm = Math.toIntExact(lastServiceKm + intervalKm);
+        }
+
+        LocalDate nextServiceDate = line.getNextServiceDate();
+        if (nextServiceDate == null && lastServiceDate != null && intervalMonth != null && intervalMonth > 0) {
+            nextServiceDate = lastServiceDate.plusMonths(intervalMonth);
+        }
+
+        return new PartnerLineSnapshot(lastServiceDate, lastServiceKm, nextServiceDate, nextServiceKm);
     }
 
     private boolean isSameServiceLine(HyperServiceMatch a, HyperServiceMatch b) {
@@ -186,7 +233,6 @@ public class HyperPercentageSyncService {
         return Long.compare(a.getId(), b.getId());
     }
 
-    /** True when the matched visit is strictly newer than what is currently stored on the percentage. */
     private boolean isNewerThanApplied(Visit visit, Percentage percentage) {
         LocalDate visitDate = visit.getLastServiceDate();
         LocalDate appliedDate = percentage.getLastServiceDate();
