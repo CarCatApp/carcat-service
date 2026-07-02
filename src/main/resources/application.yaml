@@ -49,8 +49,6 @@ super:
 
 hyper:
   auth:
-    client-id: ${HYPER_CLIENT_ID}
-    client-secret: ${HYPER_CLIENT_SECRET}
     base-url: https://api.hyper.az
     token-url: /partner/v1/oauth/token
 

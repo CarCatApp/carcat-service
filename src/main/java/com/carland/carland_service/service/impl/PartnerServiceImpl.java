@@ -48,6 +48,8 @@ public class PartnerServiceImpl implements PartnerService {
                 .active(request.getActive() != null ? request.getActive() : true)
                 .source(source)
                 .webhookSecret(request.getWebhookSecret())
+                .apiClientId(trimToNull(request.getApiClientId()))
+                .apiClientSecret(trimToNull(request.getApiClientSecret()))
                 .build();
 
         Partner saved = partnerRepository.save(partner);
@@ -97,6 +99,12 @@ public class PartnerServiceImpl implements PartnerService {
                     ? request.getWebhookSecret().trim()
                     : null);
         }
+        if (request.getApiClientId() != null) {
+            partner.setApiClientId(trimToNull(request.getApiClientId()));
+        }
+        if (request.getApiClientSecret() != null) {
+            partner.setApiClientSecret(trimToNull(request.getApiClientSecret()));
+        }
 
         Partner saved = partnerRepository.save(partner);
         return toResponse(saved, EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage));
@@ -120,5 +128,12 @@ public class PartnerServiceImpl implements PartnerService {
                         .source(partner.getSource())
                         .build())
                 .build();
+    }
+
+    private static String trimToNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 }

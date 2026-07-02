@@ -16,4 +16,6 @@ public class PartnerRequest {
     Boolean active;
     String source;
     String webhookSecret;
+    String apiClientId;
+    String apiClientSecret;
 }

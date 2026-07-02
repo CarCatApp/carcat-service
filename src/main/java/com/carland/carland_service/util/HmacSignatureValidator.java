@@ -36,11 +36,22 @@ public class HmacSignatureValidator {
         byte[] expected = computeMac(secret, payload);
         byte[] provided;
         try {
-            provided = HexFormat.of().parseHex(providedSignature);
+            provided = HexFormat.of().parseHex(providedSignature.trim());
         } catch (IllegalArgumentException e) {
             return false;
         }
         return MessageDigest.isEqual(expected, provided);
+    }
+
+    /** First 16 hex chars of SHA-256(payload) — for signature debugging in logs only. */
+    public String sha256Prefix(byte[] payload) {
+        byte[] data = payload != null ? payload : new byte[0];
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
+            return HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            return "unavailable";
+        }
     }
 
     private byte[] computeMac(String secret, byte[] payload) {

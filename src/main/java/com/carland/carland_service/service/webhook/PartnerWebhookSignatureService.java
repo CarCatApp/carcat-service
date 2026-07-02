@@ -42,6 +42,7 @@ public class PartnerWebhookSignatureService {
         if (!StringUtils.hasText(secret)) {
             return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_WEBHOOK_SECRET_NOT_CONFIGURED, partnerId);
         }
+        secret = secret.trim();
 
         String provided = request.getHeader(HmacSignatureValidator.HEADER_NAME);
         if (!StringUtils.hasText(provided)) {
@@ -51,10 +52,12 @@ public class PartnerWebhookSignatureService {
         byte[] payload = hmacSignatureValidator.resolvePayload(request, body);
         if (!hmacSignatureValidator.isValid(secret, payload, provided.trim())) {
             log.warn(
-                    "Partner webhook signature mismatch: partnerId={}, path={}, payloadBytes={}",
+                    "Partner webhook signature mismatch: partnerId={}, secretSource=db, secretLength={}, path={}, payloadBytes={}, payloadSha256Prefix={}",
                     partnerId,
+                    secret.length(),
                     request.getRequestURI(),
-                    payload.length
+                    payload.length,
+                    hmacSignatureValidator.sha256Prefix(payload)
             );
             return WebhookAuthValidationResult.failure(WebhookAuthFailure.INVALID_SIGNATURE, partnerId);
         }

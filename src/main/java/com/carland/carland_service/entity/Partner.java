@@ -40,4 +40,12 @@ public class Partner {
     /** HMAC secret for partner webhook requests (X-Signature). */
     @Column(name = "webhook_secret")
     String webhookSecret;
+
+    /** OAuth client id for outbound API calls to this partner (e.g. Hyper). */
+    @Column(name = "api_client_id")
+    String apiClientId;
+
+    /** OAuth client secret for outbound API calls to this partner. */
+    @Column(name = "api_client_secret")
+    String apiClientSecret;
 }
