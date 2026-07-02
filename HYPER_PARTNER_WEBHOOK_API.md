@@ -28,13 +28,19 @@ Every request under `/webhook/partner/*` must include:
 | `X-Signature` | HMAC-SHA256 hex digest (lowercase, no prefix) |
 | `Content-Type` | `application/json` (POST and PUT only) |
 
-**Shared secret:** Provided separately by Carland (out-of-band).
+**Shared secret:** Per-partner HMAC secret stored in Carland (`partners.webhook_secret`). Set via admin API or SQL when onboarding a partner.
+
+**Validation (carland-service, two layers):**
+1. **Service trust** — `X-Internal-Token` (webhook-service → carland only; Hyper never sends this).
+2. **Partner trust** — `X-Signature` verified with that partner's `webhook_secret` from DB, using `partnerId` from the request.
+
+The webhook gateway forwards the partner's raw body/query and original `X-Signature` unchanged; it does not validate or re-sign.
 
 ### What gets signed
 
 | Request type | Bytes signed |
 |--------------|--------------|
-| `GET` (query only) | Raw UTF-8 query string **exactly as sent**, e.g. `vin=HHGHHHJHGHHHHHGGG` |
+| `GET` (query only) | Raw UTF-8 query string **exactly as sent**, e.g. `partnerId=1&vin=HHGHHHJHGHHHHHGGG` |
 | `POST` / `PUT` | Raw HTTP body bytes **exactly as sent** |
 
 Algorithm:
@@ -48,7 +54,7 @@ signature = HMAC-SHA256(secret, payload).hex()
 1. Sign the **exact bytes** on the wire — not a re-serialized JSON object.
 2. Pretty-print vs minified JSON produces **different signatures**.
 3. For GET, URL-encode the VIN if it contains special characters; sign the encoded query string.
-4. Missing or invalid signature → **401** (webhook gateway, no forward to Carland).
+4. Missing or invalid signature → **401** from carland-service (`{"error":"Invalid or missing signature"}`).
 
 **401 example:**
 
@@ -168,8 +174,9 @@ Root object:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `partnerId` | long | **Yes** | Carland partner id (must exist and be active in `partners` table; Hyper = `1`) |
 | `vin` | string | **Yes** | Vehicle VIN (must exist in Carland) |
-| `plate` | string | No | License plate; updates car if sent |
+| `plate` | string | **Yes** | License plate; updates car |
 | `brand` | string | No | Car brand |
 | `model` | string | No | Car model |
 | `year` | integer | No | Model year |
@@ -178,7 +185,7 @@ Root object:
 | `bodyType` | string | No | Body type |
 | `trim` | string | No | Trim level |
 | `currentMileage` | integer | No | Current odometer; updates car if sent |
-| `serviceHistory` | array | **Yes** | One or more visit records |
+| `serviceHistory` | array | **Yes** | **Exactly one** visit record (real-time webhook; not bulk history) |
 
 Each element in `serviceHistory[]`:
 
@@ -187,25 +194,25 @@ Each element in `serviceHistory[]`:
 | `recordId` | long | **Yes** | Hyper's unique visit ID (idempotency key) |
 | `serviceType` | string | No | e.g. `"Mühərrik xidməti"` |
 | `serviceGroups` | string[] | No | Visit-level service groups |
-| `lastServiceDate` | string (date) | No | `YYYY-MM-DD` |
-| `lastServiceMileage` | integer | No | Odometer at service |
+| `lastServiceDate` | string (date) | **Yes** | `YYYY-MM-DD` |
+| `lastServiceMileage` | integer | **Yes** | Odometer at service |
 | `dealer` | string | No | Dealer name |
 | `invoiceNumber` | string | No | Invoice reference |
 | `cost` | money | No | Pre-discount visit cost |
 | `finalCost` | money | No | Final visit cost (falls back to `cost` if omitted) |
 | `nextServiceDate` | string (date) | No | Visit-level next due date (informational) |
 | `nextServiceMileage` | integer | No | Visit-level next due mileage (informational) |
-| `services` | array | No | Service lines |
+| `services` | array | **Yes** | At least one service line |
 | `parts` | array | No | Parts used |
 
 `services[]` line:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `serviceCode` | integer | No | Hyper line identifier |
+| `serviceCode` | integer | **Yes** | Hyper line identifier (stored as partner line key) |
 | `serviceName` | string | No | Line description |
 | `serviceGroups` | string[] | No | Line-level service groups |
-| `universalServiceId` | string | No | Universal service catalog ID (`"other"` → stored as empty) |
+| `universalServiceId` | string | **Yes** | Universal service catalog ID (`"other"` → stored as empty) |
 | `cost` | money | No | Line cost |
 | `nextServiceDate` | string (date) | No | Next due date (used for percentage sync) |
 | `nextServiceMileage` | integer | No | Next due mileage (used for percentage sync) |
@@ -232,12 +239,14 @@ Each element in `serviceHistory[]`:
 | Visit exists; new lines/parts added | **200** | `linesCreated > 0` or `partsCreated > 0` |
 | Visit + all lines/parts already exist | **409** | No new data |
 | VIN not in Carland | **404** | |
-| Missing `vin` or `serviceHistory` | **400** | |
+| Missing required field (`partnerId`, `vin`, `plate`, `serviceHistory`, `recordId`, `lastServiceDate`, `lastServiceMileage`, `services`, `serviceCode`, `universalServiceId`) | **400** | Message: `{fieldName} is required` |
+| Unknown or inactive `partnerId` | **404** | `Partner not found for partnerId: ...` |
+| `serviceHistory` length ≠ 1 | **400** | `serviceHistory must contain exactly one visit` |
 | Invalid JSON | **400** | |
 | Invalid signature | **401** | |
 | Carland down | **202 Accepted** | Queued for retry (see §8) |
 
-Items **without** `recordId` are skipped silently (not an error).
+Items **without** `recordId` are rejected with **400** (`recordId is required`).
 
 Duplicate line match key: `serviceCode + universalServiceId + serviceName`.  
 Duplicate part match key: `name + qty + unit`.
@@ -389,26 +398,26 @@ X-Signature: <hmac of raw body bytes>
 
 ### Body schema
 
+**Same JSON shape as POST** (§6). Hyper sends the corrected full visit snapshot.
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `vin` | string | **Yes** | Vehicle VIN |
-| `partnerRecordId` | long | **Yes** | Hyper visit ID (must exist for this VIN) |
-| `type` | string | No | Update visit type |
-| `date` | string (date) | No | Update service date |
-| `mileage` | integer | No | Update mileage |
-| `serviceCenterId` | long | No | Update service center |
-| `serviceCenterName` | string | No | Update center name |
-| `dealer` | string | No | Update dealer |
-| `amount` | money | No | Update total cost |
-| `serviceGroups` | string[] | No | Replace service groups |
-| `services` | array | No | Update existing lines (matched by `serviceCode`) |
-| `parts` | array | No | Update existing parts |
+| `plate` | string | **Yes** | License plate |
+| `serviceHistory` | array | **Yes** | **Exactly one** visit — the visit being corrected |
+| _(vehicle fields)_ | | No | Same as POST (`brand`, `model`, `currentMileage`, …) |
+| _(visit fields)_ | | | Same as POST (`recordId`, `lastServiceDate`, `lastServiceMileage`, `services`, …) |
 
-At least one updatable field (visit, line, or part) is required.
+`recordId` must already exist for this VIN (created via POST). Otherwise **404**.
 
-**Line update** (`services[]`): `serviceCode` is **required** per line; other fields are optional and only applied when sent.
+### Update semantics
 
-**Part update** (`parts[]`): identify by `id` (Carland DB id), or by `name` + `qty` + `unit`.
+- Visit-level fields from the payload **overwrite** the stored visit.
+- Service lines matched by `serviceCode`: updated if present, **added** if new.
+- Parts matched by `name + qty + unit`: updated if present, **added** if new.
+- Lines/parts not included in the payload are **left unchanged** (not deleted).
+- Car metadata (`plate`, `brand`, `currentMileage`, …) updated like POST.
+- Percentages refreshed only when this visit is at least as recent as all other visits on the car.
 
 ### Responses
 
@@ -416,30 +425,54 @@ At least one updatable field (visit, line, or part) is required.
 |--------|---------|
 | **200 OK** | At least one field/line/part changed |
 | **409 Conflict** | Visit found but payload matches current data (no changes) |
-| **404 Not Found** | VIN, visit, line, or part not found |
-| **400 Bad Request** | Validation error (missing required fields) |
+| **404 Not Found** | VIN or `recordId` not found |
+| **400 Bad Request** | Validation error (same rules as POST) |
 | **401 Unauthorized** | Invalid signature |
 | **202 Accepted** | Carland down; request queued (§8) |
 
-### Example request body (single line)
+### Example request body
 
 ```json
-{"vin":"HHGHHHJHGHHHHHGGG","partnerRecordId":33333,"mileage":53000,"services":[{"serviceCode":55555,"serviceName":"Engine oil & filter changed","cost":{"amount":95.00,"currency":"AZN"},"nextServiceMileage":75000}]}
+{
+    "plate": "99-FH-032",
+    "vin": "3FA6P0HDXKR168752",
+    "currentMileage": 121000,
+    "serviceHistory": [
+        {
+            "recordId": 19387,
+            "serviceType": "Mühərrik xidməti",
+            "lastServiceDate": "2026-05-25",
+            "lastServiceMileage": 121000,
+            "services": [
+                {
+                    "serviceCode": 7,
+                    "serviceName": "EXTRA Mühərrik yağının dəyişdirilməsi",
+                    "universalServiceId": "Engine oil & filter",
+                    "cost": {"amount": 50.0, "currency": "AZN"},
+                    "nextServiceDate": "2027-05-25",
+                    "nextServiceMileage": 141000
+                }
+            ],
+            "finalCost": {"amount": 50.0, "currency": "AZN"},
+            "dealer": "Babək Ekspress"
+        }
+    ]
+}
 ```
 
 ### Example — 200 Updated
 
 ```json
 {
-  "vin": "HHGHHHJHGHHHHHGGG",
+  "vin": "3FA6P0HDXKR168752",
   "message": "Visit and service lines updated",
-  "partnerRecordId": 33333,
+  "partnerRecordId": 19387,
   "visitId": 9876,
   "visitFieldsUpdated": 1,
   "linesUpdated": 1,
   "partsUpdated": 0,
   "lines": [
-    {"serviceCode": 55555, "lineId": 4412, "updated": true}
+    {"serviceCode": 7, "lineId": 4412, "updated": true}
   ],
   "parts": []
 }
@@ -449,15 +482,15 @@ At least one updatable field (visit, line, or part) is required.
 
 ```json
 {
-  "vin": "HHGHHHJHGHHHHHGGG",
+  "vin": "3FA6P0HDXKR168752",
   "message": "Visit and service lines already up to date",
-  "partnerRecordId": 33333,
+  "partnerRecordId": 19387,
   "visitId": 9876,
   "visitFieldsUpdated": 0,
   "linesUpdated": 0,
   "partsUpdated": 0,
   "lines": [
-    {"serviceCode": 55555, "lineId": 4412, "updated": false}
+    {"serviceCode": 7, "lineId": 4412, "updated": false}
   ],
   "parts": []
 }
@@ -468,18 +501,7 @@ At least one updatable field (visit, line, or part) is required.
 ```json
 {
   "error": "Resource not found error",
-  "message": "Visit not found for partnerRecordId=99999 and vin=HHGHHHJHGHHHHHGGG",
-  "timeStamp": "2026-06-30T14:22:10.123",
-  "status": 404
-}
-```
-
-### Example — 404 Service line not found
-
-```json
-{
-  "error": "Resource not found error",
-  "message": "Service line not found for serviceCode=88888 in visit partnerRecordId=33333",
+  "message": "Visit not found for recordId=99999 and vin=3FA6P0HDXKR168752",
   "timeStamp": "2026-06-30T14:22:10.123",
   "status": 404
 }
@@ -490,7 +512,7 @@ At least one updatable field (visit, line, or part) is required.
 ```json
 {
   "error": "Missed required fields",
-  "message": "At least one visit, service line or part field must be provided for update",
+  "message": "serviceHistory must contain exactly one visit",
   "timeStamp": "2026-06-30T14:22:10.123",
   "status": 400
 }
@@ -529,7 +551,7 @@ When Carland is temporarily unreachable, POST and PUT are **accepted and queued*
 
 ## 10. Integration checklist for Hyper
 
-- [ ] Store shared `WEBHOOK_SECRET` securely
+- [ ] Store partner webhook secret securely (Carland `partners.webhook_secret`; share out-of-band with partner only)
 - [ ] Always serialize JSON to **single compact line** before signing
 - [ ] Sign **raw body bytes** for POST/PUT; sign **query string** for GET
 - [ ] Use stable `partnerRecordId` per visit for idempotency
@@ -547,7 +569,7 @@ When Carland is temporarily unreachable, POST and PUT are **accepted and queued*
 ```bash
 VIN="HHGHHHJHGHHHHHGGG"
 QUERY="vin=${VIN}"
-SIG=$(printf '%s' "$QUERY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')
+SIG=$(printf '%s' "$QUERY" | openssl dgst -sha256 -hmac "$HYPER_WEBHOOK_SECRET" | awk '{print $2}')
 
 curl -s -o /dev/null -w "%{http_code}" \
   "https://digital-innovation.agency/webhook/partner/car/find?${QUERY}" \
@@ -558,7 +580,7 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 ```bash
 BODY='{"vin":"3FA6P0HDXKR168752","currentMileage":121000,"serviceHistory":[{"recordId":19387,"serviceType":"Mühərrik xidməti","lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"Engine oil change","universalServiceId":"Engine oil & filter","cost":{"amount":47.4,"currency":"AZN"}}],"finalCost":{"amount":47.4,"currency":"AZN"},"dealer":"Babək Ekspress"}]}'
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$HYPER_WEBHOOK_SECRET" | awk '{print $2}')
 
 curl -X POST "https://digital-innovation.agency/webhook/partner/new-service-visit" \
   -H "Content-Type: application/json" \
@@ -569,8 +591,8 @@ curl -X POST "https://digital-innovation.agency/webhook/partner/new-service-visi
 ### PUT — update visit
 
 ```bash
-BODY='{"vin":"HHGHHHJHGHHHHHGGG","partnerRecordId":33333,"mileage":53000,"services":[{"serviceCode":55555,"nextServiceMileage":75000}]}'
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')
+BODY='{"plate":"99-FH-032","vin":"3FA6P0HDXKR168752","currentMileage":121000,"serviceHistory":[{"recordId":19387,"lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"Engine oil change","universalServiceId":"Engine oil & filter","cost":{"amount":50.0,"currency":"AZN"},"nextServiceMileage":141000}],"finalCost":{"amount":50.0,"currency":"AZN"},"dealer":"Babək Ekspress"}]}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$HYPER_WEBHOOK_SECRET" | awk '{print $2}')
 
 curl -X PUT "https://digital-innovation.agency/webhook/partner/edit/service-visit" \
   -H "Content-Type: application/json" \

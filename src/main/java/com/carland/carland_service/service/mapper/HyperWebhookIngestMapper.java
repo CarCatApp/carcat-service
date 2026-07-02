@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.response.hyper.HyperServiceHistoryItemRes
 import com.carland.carland_service.dto.response.hyper.HyperServiceLineResponse;
 import com.carland.carland_service.dto.response.hyper.HyperServicePartResponse;
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.dto.response.v2.CarVinServiceHistoryV2Response;
 import com.carland.carland_service.dto.response.v2.MoneyResponse;
 import com.carland.carland_service.dto.response.v2.ServiceHistoryLineV2Response;
@@ -19,19 +20,24 @@ public final class HyperWebhookIngestMapper {
     private HyperWebhookIngestMapper() {
     }
 
-    public static CarVinServiceHistoryV2Response toIngestRequest(HyperVehicleByVinResponse hyper) {
+    public static ServiceHistoryVisitV2Response toSingleVisitItem(HyperVehicleByVinResponse hyper, Partner partner) {
+        List<HyperServiceHistoryItemResponse> history = hyper.getServiceHistory();
+        return toVisitItem(history.get(0), partner);
+    }
+
+    public static CarVinServiceHistoryV2Response toIngestRequest(HyperVehicleByVinResponse hyper, Partner partner) {
         List<HyperServiceHistoryItemResponse> history = hyper.getServiceHistory() == null
                 ? Collections.emptyList()
                 : hyper.getServiceHistory();
 
         return CarVinServiceHistoryV2Response.builder()
                 .vin(hyper.getVin())
-                .source("hyper")
-                .items(history.stream().map(HyperWebhookIngestMapper::toVisitItem).toList())
+                .source(partner.getSource() != null ? partner.getSource() : "hyper")
+                .items(history.stream().map(item -> toVisitItem(item, partner)).toList())
                 .build();
     }
 
-    private static ServiceHistoryVisitV2Response toVisitItem(HyperServiceHistoryItemResponse item) {
+    private static ServiceHistoryVisitV2Response toVisitItem(HyperServiceHistoryItemResponse item, Partner partner) {
         HyperCostResponse finalCost = item.getFinalCost() != null ? item.getFinalCost() : item.getCost();
 
         return ServiceHistoryVisitV2Response.builder()
@@ -42,6 +48,8 @@ public final class HyperWebhookIngestMapper {
                 .dealer(item.getDealer())
                 .serviceGroups(item.getServiceGroups())
                 .invoiceNumber(item.getInvoiceNumber())
+                .serviceCenterId(partner.getId())
+                .serviceCenterName(partner.getName())
                 .cost(toMoney(item.getCost()))
                 .amount(toMoney(finalCost))
                 .services(mapLines(item.getServices()))

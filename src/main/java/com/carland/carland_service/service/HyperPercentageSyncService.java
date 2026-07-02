@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.Percentage;
 import com.carland.carland_service.enums.HyperServiceMapping;
 import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.repository.PercentageRepository;
+import com.carland.carland_service.repository.VisitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -30,6 +32,8 @@ import java.util.Optional;
  *   <li>Next service: when Hyper sends {@code nextServiceDate} / {@code nextServiceMileage} on the
  *       matched line, those values are applied as-is. Otherwise {@code lastService + intervalKm/intervalMonth}
  *       from the percentage template is used.</li>
+ *   <li>Webhook ingest/update: percentages are refreshed only when the visit is at least as recent as
+ *       all other visits on the car (date &gt;= max existing date and mileage &gt;= max existing mileage).</li>
  *   <li>Unmatched / never-serviced records are skipped silently (no error).</li>
  * </ul>
  */
@@ -39,6 +43,7 @@ import java.util.Optional;
 public class HyperPercentageSyncService {
 
     private final PercentageRepository percentageRepository;
+    private final VisitRepository visitRepository;
 
     public void syncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, false);
@@ -52,7 +57,53 @@ public class HyperPercentageSyncService {
         if (visit == null) {
             return;
         }
+        if (!isEligibleForPercentageSync(car, visit)) {
+            log.info("Skipping percentage sync — visit is older than existing visits | carId={}, recordId={}, date={}, mileage={}",
+                    car.getCarId(), visit.getHyperRecordId(), visit.getLastServiceDate(), visit.getLastServiceMileage());
+            return;
+        }
         syncInternal(car, List.of(visit), true);
+    }
+
+    /**
+     * Returns {@code true} when the visit is recent enough to refresh percentages.
+     * Skips when another visit has a newer date or higher mileage (backfilled historical visits).
+     */
+    boolean isEligibleForPercentageSync(Car car, Visit candidate) {
+        LocalDate maxOtherDate = null;
+        Integer maxOtherMileage = null;
+
+        for (Visit other : visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)) {
+            if (isSameVisit(other, candidate)) {
+                continue;
+            }
+            LocalDate otherDate = other.getLastServiceDate();
+            if (otherDate != null && (maxOtherDate == null || otherDate.isAfter(maxOtherDate))) {
+                maxOtherDate = otherDate;
+            }
+            Integer otherMileage = other.getLastServiceMileage();
+            if (otherMileage != null && (maxOtherMileage == null || otherMileage > maxOtherMileage)) {
+                maxOtherMileage = otherMileage;
+            }
+        }
+
+        LocalDate candidateDate = candidate.getLastServiceDate();
+        Integer candidateMileage = candidate.getLastServiceMileage();
+
+        if (maxOtherDate != null && candidateDate != null && candidateDate.isBefore(maxOtherDate)) {
+            return false;
+        }
+        if (maxOtherMileage != null && candidateMileage != null && candidateMileage < maxOtherMileage) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isSameVisit(Visit a, Visit b) {
+        if (a.getId() != null && Objects.equals(a.getId(), b.getId())) {
+            return true;
+        }
+        return a.getHyperRecordId() != null && Objects.equals(a.getHyperRecordId(), b.getHyperRecordId());
     }
 
     private void syncInternal(Car car, List<Visit> visits, boolean forceReapply) {

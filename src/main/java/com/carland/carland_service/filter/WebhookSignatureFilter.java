@@ -1,6 +1,6 @@
 package com.carland.carland_service.filter;
 
-import com.carland.carland_service.util.HmacSignatureValidator;
+import com.carland.carland_service.service.webhook.PartnerWebhookSignatureService;
 import com.carland.carland_service.util.InternalTokenValidator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,8 +21,8 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
     private static final String PARTNER_PREFIX = "/webhook/partner/";
     private static final String TEST_PATH = "/webhook/partner/test";
 
-    private final HmacSignatureValidator hmacSignatureValidator;
     private final InternalTokenValidator internalTokenValidator;
+    private final PartnerWebhookSignatureService partnerWebhookSignatureService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -30,21 +30,27 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        if (!path.startsWith(PARTNER_PREFIX) || TEST_PATH.equals(path)) {
+        if (!path.startsWith(PARTNER_PREFIX)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (!internalTokenValidator.isValid(request)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Invalid or missing internal token\"}");
+            return;
+        }
+
+        if (TEST_PATH.equals(path)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(request);
-
-        if (internalTokenValidator.isValid(request)) {
-            filterChain.doFilter(wrapped, response);
-            return;
-        }
-
         byte[] body = wrapped.getCachedBody();
 
-        if (!hmacSignatureValidator.isValid(wrapped, body)) {
+        if (!partnerWebhookSignatureService.isValid(wrapped, body)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Invalid or missing signature\"}");

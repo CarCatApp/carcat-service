@@ -15,7 +15,6 @@ import com.carland.carland_service.dto.response.v2.VisitIngestDetail;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.EnumPartnerId;
-import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
@@ -23,6 +22,8 @@ import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitIngestService;
 import com.carland.carland_service.service.mapper.HyperWebhookIngestMapper;
+import com.carland.carland_service.service.validation.HyperServiceVisitValidator;
+import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -46,17 +47,15 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private final CarRepository carRepository;
     private final VisitRepository visitRepository;
     private final PartnerLookupService partnerLookupService;
+    private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
     private final HyperPercentageSyncService hyperPercentageSyncService;
 
     @Override
     @Transactional
     public PartnerNewServiceVisitResult ingest(HyperVehicleByVinResponse request) {
-        if (request == null || request.getVin() == null || request.getVin().isBlank()) {
-            throw new MissingFieldException("vin is required");
-        }
-        if (request.getServiceHistory() == null || request.getServiceHistory().isEmpty()) {
-            throw new MissingFieldException("serviceHistory is required");
-        }
+        HyperServiceVisitValidator.validateSingleVisit(request);
+
+        Partner partner = partnerLookupService.requireActivePartner(request.getPartnerId());
 
         String vin = request.getVin().trim();
         Car car = carRepository.findByVin(vin);
@@ -64,11 +63,11 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
             throw new ResourceNotFoundException("Car not found for vin: " + vin);
         }
 
-        applyCarMetadata(car, request);
-        return ingestVisits(car, HyperWebhookIngestMapper.toIngestRequest(request));
+        hyperWebhookCarMetadataApplier.apply(car, request);
+        return ingestVisits(car, HyperWebhookIngestMapper.toIngestRequest(request, partner), partner.getId());
     }
 
-    private PartnerNewServiceVisitResult ingestVisits(Car car, CarVinServiceHistoryV2Response request) {
+    private PartnerNewServiceVisitResult ingestVisits(Car car, CarVinServiceHistoryV2Response request, Long partnerId) {
         String vin = request.getVin().trim();
 
         PartnerNewServiceVisitResult result = PartnerNewServiceVisitResult.builder()
@@ -79,15 +78,11 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         List<Visit> touchedVisits = new ArrayList<>();
 
         for (ServiceHistoryVisitV2Response item : request.getItems()) {
-            if (item.getPartnerRecordId() == null) {
-                log.warn("Skipping visit without partnerRecordId for vin={}", vin);
-                continue;
-            }
-
             Optional<Visit> existing = visitRepository.findWithDetailsByCarIdAndHyperRecordId(
                     car.getCarId(), item.getPartnerRecordId());
             if (existing.isPresent()) {
                 Visit visit = existing.get();
+                assertVisitBelongsToPartner(visit, partnerId, item.getPartnerRecordId(), vin);
                 visit.getParts().size();
                 VisitIngestDetail detail = appendMissingLinesAndParts(visit, item, result);
                 touchedVisits.add(visit);
@@ -115,44 +110,10 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         return result;
     }
 
-    private void applyCarMetadata(Car car, HyperVehicleByVinResponse hyper) {
-        boolean changed = false;
-
-        if (hyper.getPlate() != null && !hyper.getPlate().isBlank()) {
-            car.setPlateNumber(hyper.getPlate().trim());
-            changed = true;
-        }
-        if (hyper.getCurrentMileage() != null) {
-            car.setMileage(hyper.getCurrentMileage().longValue());
-            changed = true;
-        }
-        if (hyper.getBrand() != null && !hyper.getBrand().isBlank()) {
-            car.setBrand(hyper.getBrand());
-            changed = true;
-        }
-        if (hyper.getModel() != null && !hyper.getModel().isBlank()) {
-            car.setModel(hyper.getModel());
-            changed = true;
-        }
-        if (hyper.getYear() != null) {
-            car.setModelYear(hyper.getYear());
-            changed = true;
-        }
-        if (hyper.getBodyType() != null && !hyper.getBodyType().isBlank()) {
-            car.setBodyType(hyper.getBodyType());
-            changed = true;
-        }
-        if (hyper.getEngineType() != null && !hyper.getEngineType().isBlank()) {
-            car.setEngineType(hyper.getEngineType());
-            changed = true;
-        }
-        if (hyper.getEngineVolume() != null) {
-            car.setEngineVolume((int) (hyper.getEngineVolume() * 1000));
-            changed = true;
-        }
-
-        if (changed) {
-            carRepository.save(car);
+    private void assertVisitBelongsToPartner(Visit visit, Long partnerId, Long recordId, String vin) {
+        if (visit.getServiceCenterId() != null && !Objects.equals(visit.getServiceCenterId(), partnerId)) {
+            throw new ResourceNotFoundException(
+                    "Visit not found for recordId=" + recordId + " and vin=" + vin);
         }
     }
 

@@ -1,7 +1,7 @@
 $bodyPath = Join-Path $env:TEMP "webhook-put-body.json"
 $secret = "Y2FybGFuZC1zZWNyZXQta2V5LXNoYXJlZC13aXRoLWh5cGVy"
 
-$body = '{"vin":"HHGHHHJHGHHHHHGGG","partnerRecordId":33333,"mileage":53000,"services":[{"serviceCode":55555,"serviceName":"Engine oil & filter changed","cost":{"amount":95.00,"currency":"AZN"},"nextServiceMileage":75000}]}'
+$body = '{"partnerId":1,"plate":"55-BB-666","vin":"HHGHHHJHGHHHHHGGG","currentMileage":121000,"serviceHistory":[{"recordId":19387,"serviceType":"Mühərrik xidməti","lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"EXTRA Mühərrik yağının dəyişdirilməsi","universalServiceId":"Engine oil & filter","cost":{"amount":50.0,"currency":"AZN"},"nextServiceDate":"2027-05-25","nextServiceMileage":141000}],"finalCost":{"amount":50.0,"currency":"AZN"},"dealer":"Babək Ekspress"}]}'
 
 [System.IO.File]::WriteAllText($bodyPath, $body, [System.Text.UTF8Encoding]::new($false))
 

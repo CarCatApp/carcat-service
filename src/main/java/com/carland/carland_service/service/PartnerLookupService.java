@@ -3,6 +3,8 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.response.PartnerDataResponse;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.EnumPartnerId;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.PartnerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,25 @@ import java.util.stream.Collectors;
 public class PartnerLookupService {
 
     private final PartnerRepository partnerRepository;
+
+    public Optional<Partner> findById(Long partnerId) {
+        if (partnerId == null) {
+            return Optional.empty();
+        }
+        return partnerRepository.findById(partnerId);
+    }
+
+    public Partner requireActivePartner(Long partnerId) {
+        if (partnerId == null) {
+            throw new MissingFieldException("partnerId is required");
+        }
+        Partner partner = partnerRepository.findById(partnerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partner not found for partnerId: " + partnerId));
+        if (!Boolean.TRUE.equals(partner.getActive())) {
+            throw new ResourceNotFoundException("Partner is not active for partnerId: " + partnerId);
+        }
+        return partner;
+    }
 
     public Optional<Partner> find(EnumPartnerId partnerId) {
         return partnerRepository.findById(partnerId.getId());

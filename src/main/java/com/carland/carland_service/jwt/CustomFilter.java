@@ -4,10 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import com.carland.carland_service.util.InternalTokenValidator;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,27 +17,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CustomFilter extends OncePerRequestFilter {
 
-    private final InternalTokenValidator internalTokenValidator;
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
 
+        if (path.startsWith("/webhook/partner/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (path.startsWith("/webhook/")) {
-            if ("/webhook/partner/test".equals(path)) {
-                filterChain.doFilter(request, response);
-                return;
-            }
-            if (!internalTokenValidator.isValid(request)) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Invalid or missing internal token\"}");
-                return;
-            }
-            SecurityContextHolder.getContext().setAuthentication(
-                    new UsernamePasswordAuthenticationToken("internal-webhook", null, List.of())
-            );
             filterChain.doFilter(request, response);
             return;
         }
@@ -54,7 +43,6 @@ public class CustomFilter extends OncePerRequestFilter {
             return;
         }
 
-// JWT check sadece private endpointlerde
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -64,8 +52,6 @@ public class CustomFilter extends OncePerRequestFilter {
             return;
         }
 
-
-
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken("user", null, List.of());
 
@@ -74,6 +60,3 @@ public class CustomFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-
-
-

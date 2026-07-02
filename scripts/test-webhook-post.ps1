@@ -1,7 +1,7 @@
 $bodyPath = Join-Path $env:TEMP "webhook-body.json"
 $secret = "Y2FybGFuZC1zZWNyZXQta2V5LXNoYXJlZC13aXRoLWh5cGVy"
 
-$body = '{"plate":"99-FH-032","vin":"3FA6P0HDXKR168752","brand":"Ford","model":"Fusion","year":2019,"engineVolume":1.5,"engineType":null,"bodyType":null,"trim":null,"currentMileage":121000,"serviceHistory":[{"recordId":19387,"serviceType":"Mühərrik xidməti","serviceGroups":["Mühərrik xidməti","Salon xidməti"],"lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"EXTRA Mühərrik yağının dəyişdirilməsi","serviceGroups":["Mühərrik xidməti"],"universalServiceId":"Engine oil & filter","cost":{"amount":0,"currency":"AZN"},"nextServiceDate":null,"nextServiceMileage":null}],"parts":[{"name":"5W-20","qty":0.8,"unit":null}],"cost":{"amount":47.4,"currency":"AZN"},"finalCost":{"amount":47.4,"currency":"AZN"},"nextServiceDate":null,"nextServiceMileage":null,"invoiceNumber":null,"dealer":"Babək Ekspress"}]}'
+$body = '{"partnerId":1,"plate":"55-BB-666","vin":"HHGHHHJHGHHHHHGGG","currentMileage":121000,"serviceHistory":[{"recordId":19387,"serviceType":"Mühərrik xidməti","lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"EXTRA Mühərrik yağının dəyişdirilməsi","universalServiceId":"Engine oil & filter","cost":{"amount":35.0,"currency":"AZN"},"nextServiceDate":"2027-05-25","nextServiceMileage":141000}],"finalCost":{"amount":47.4,"currency":"AZN"},"dealer":"Babək Ekspress"}]}'
 
 [System.IO.File]::WriteAllText($bodyPath, $body, [System.Text.UTF8Encoding]::new($false))
 
