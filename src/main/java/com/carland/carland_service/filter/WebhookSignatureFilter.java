@@ -1,12 +1,15 @@
 package com.carland.carland_service.filter;
 
 import com.carland.carland_service.service.webhook.PartnerWebhookSignatureService;
+import com.carland.carland_service.service.webhook.WebhookAuthResponseWriter;
+import com.carland.carland_service.service.webhook.WebhookAuthValidationResult;
 import com.carland.carland_service.util.InternalTokenValidator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -16,6 +19,7 @@ import java.io.IOException;
 @Component
 @Order(1)
 @RequiredArgsConstructor
+@Slf4j
 public class WebhookSignatureFilter extends OncePerRequestFilter {
 
     private static final String PARTNER_PREFIX = "/webhook/partner/";
@@ -23,6 +27,7 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
 
     private final InternalTokenValidator internalTokenValidator;
     private final PartnerWebhookSignatureService partnerWebhookSignatureService;
+    private final WebhookAuthResponseWriter webhookAuthResponseWriter;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -35,10 +40,10 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!internalTokenValidator.isValid(request)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid or missing internal token\"}");
+        WebhookAuthValidationResult internalResult = internalTokenValidator.validate(request);
+        if (!internalResult.isValid()) {
+            log.warn("Webhook internal auth failed: path={}, reason={}", path, internalResult.getFailure().getError());
+            webhookAuthResponseWriter.writeUnauthorized(response, internalResult.getFailure());
             return;
         }
 
@@ -50,10 +55,15 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
         CachedBodyHttpServletRequest wrapped = new CachedBodyHttpServletRequest(request);
         byte[] body = wrapped.getCachedBody();
 
-        if (!partnerWebhookSignatureService.isValid(wrapped, body)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid or missing signature\"}");
+        WebhookAuthValidationResult partnerResult = partnerWebhookSignatureService.validate(wrapped, body);
+        if (!partnerResult.isValid()) {
+            log.warn(
+                    "Webhook partner auth failed: path={}, partnerId={}, reason={}",
+                    path,
+                    partnerResult.getPartnerId(),
+                    partnerResult.getFailure().getError()
+            );
+            webhookAuthResponseWriter.writeUnauthorized(response, partnerResult.getFailure());
             return;
         }
 

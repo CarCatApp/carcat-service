@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -14,6 +15,7 @@ import java.io.IOException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PartnerWebhookSignatureService {
 
     private static final String PARTNER_ID_PARAM = "partnerId";
@@ -22,29 +24,42 @@ public class PartnerWebhookSignatureService {
     private final HmacSignatureValidator hmacSignatureValidator;
     private final ObjectMapper objectMapper;
 
-    public boolean isValid(HttpServletRequest request, byte[] body) {
+    public WebhookAuthValidationResult validate(HttpServletRequest request, byte[] body) {
         Long partnerId = resolvePartnerId(request, body);
         if (partnerId == null) {
-            return false;
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.MISSING_PARTNER_ID);
         }
 
         Partner partner = partnerRepository.findById(partnerId).orElse(null);
-        if (partner == null || !Boolean.TRUE.equals(partner.getActive())) {
-            return false;
+        if (partner == null) {
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_NOT_FOUND, partnerId);
+        }
+        if (!Boolean.TRUE.equals(partner.getActive())) {
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_INACTIVE, partnerId);
         }
 
         String secret = partner.getWebhookSecret();
         if (!StringUtils.hasText(secret)) {
-            return false;
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_WEBHOOK_SECRET_NOT_CONFIGURED, partnerId);
         }
 
         String provided = request.getHeader(HmacSignatureValidator.HEADER_NAME);
         if (!StringUtils.hasText(provided)) {
-            return false;
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.MISSING_SIGNATURE_HEADER, partnerId);
         }
 
         byte[] payload = hmacSignatureValidator.resolvePayload(request, body);
-        return hmacSignatureValidator.isValid(secret, payload, provided.trim());
+        if (!hmacSignatureValidator.isValid(secret, payload, provided.trim())) {
+            log.warn(
+                    "Partner webhook signature mismatch: partnerId={}, path={}, payloadBytes={}",
+                    partnerId,
+                    request.getRequestURI(),
+                    payload.length
+            );
+            return WebhookAuthValidationResult.failure(WebhookAuthFailure.INVALID_SIGNATURE, partnerId);
+        }
+
+        return WebhookAuthValidationResult.success(partnerId);
     }
 
     private Long resolvePartnerId(HttpServletRequest request, byte[] body) {
@@ -74,6 +89,7 @@ public class PartnerWebhookSignatureService {
             }
             return partnerIdNode.asLong();
         } catch (IOException e) {
+            log.warn("Failed to parse partnerId from webhook body: {}", e.getMessage());
             return null;
         }
     }
