@@ -10,14 +10,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Component
-@Order(1)
 @RequiredArgsConstructor
 @Slf4j
 public class WebhookSignatureFilter extends OncePerRequestFilter {
@@ -43,7 +39,7 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
         WebhookAuthValidationResult internalResult = internalTokenValidator.validate(request);
         if (!internalResult.isValid()) {
             log.warn("Webhook internal auth failed: path={}, reason={}", path, internalResult.getFailure().getError());
-            webhookAuthResponseWriter.writeUnauthorized(response, internalResult.getFailure());
+            webhookAuthResponseWriter.writeUnauthorized(response, internalResult);
             return;
         }
 
@@ -63,7 +59,7 @@ public class WebhookSignatureFilter extends OncePerRequestFilter {
                     partnerResult.getPartnerId(),
                     partnerResult.getFailure().getError()
             );
-            webhookAuthResponseWriter.writeUnauthorized(response, partnerResult.getFailure());
+            webhookAuthResponseWriter.writeUnauthorized(response, partnerResult);
             return;
         }
 
