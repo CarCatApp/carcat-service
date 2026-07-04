@@ -19,16 +19,41 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GroupByServiceImpl implements GroupByService {
 
+    private static final String NEW_SET_MARKER = ".";
+
     private final BrandRepository brandRepository;
     private final ModelRepository modelRepository;
     private final BodyTypeRepository bodyTypeRepository;
     private final TransmissionTypeRepository transmissionTypeRepository;
     private final EngineTypeRepository engineTypeRepository;
 private final ModelYearRepository modelYearRepository;
+
+    private boolean isNewBrandModelSetActive() {
+        return brandRepository.existsByIsnew(NEW_SET_MARKER);
+    }
+
+    private List<Brand> loadActiveBrands() {
+        return isNewBrandModelSetActive()
+                ? brandRepository.findAllByIsnew(NEW_SET_MARKER)
+                : brandRepository.findAll();
+    }
+
+    private List<Model> loadModelsForBrand(Long brandId) {
+        return isNewBrandModelSetActive()
+                ? modelRepository.findAllByBrandIdAndIsnew(brandId, NEW_SET_MARKER)
+                : modelRepository.findAllByBrandId(brandId);
+    }
+
+    private List<Model> loadAllActiveModels() {
+        return isNewBrandModelSetActive()
+                ? modelRepository.findAllByIsnew(NEW_SET_MARKER)
+                : modelRepository.findAll();
+    }
+
     @Override
     public List<Model> getModelsByBrand(Long brandId, String timezone, String acceptLanguage) {
 
-        List<Model> modelList = modelRepository.findAllByBrandId(brandId);
+        List<Model> modelList = loadModelsForBrand(brandId);
 
         if (modelList.isEmpty()) {
             throw new ResourceNotFoundException(EnumMessagesLangValues.MODEL_NOT_FOUND.getMessageByLang(acceptLanguage));
@@ -39,7 +64,7 @@ private final ModelYearRepository modelYearRepository;
 
     @Override
     public List<Brand> getAllBrands(String timezone, String acceptLanguage) {
-        List<Brand> brandList = brandRepository.findAll();
+        List<Brand> brandList = loadActiveBrands();
         if (brandList.isEmpty()) {
             throw new ResourceNotFoundException(EnumMessagesLangValues.BRAND_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
@@ -112,8 +137,8 @@ private final ModelYearRepository modelYearRepository;
 
     @Override
     public List<Brand> getAllBrandsWithModels() {
-        List<Brand> brands = brandRepository.findAll();
-        Map<Long, List<Model>> modelsByBrandId = modelRepository.findAll().stream()
+        List<Brand> brands = loadActiveBrands();
+        Map<Long, List<Model>> modelsByBrandId = loadAllActiveModels().stream()
                 .collect(Collectors.groupingBy(Model::getBrandId));
 
         brands.forEach(brand ->

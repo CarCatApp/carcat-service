@@ -18,5 +18,6 @@ public class Model {
     String modelName;
     Long brandId;
     String status;
+    String isnew;
 
 }

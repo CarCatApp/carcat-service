@@ -10,4 +10,9 @@ import java.util.List;
 public interface ModelRepository extends JpaRepository<Model, Long> {
 
     List<Model> findAllByBrandId(Long brandId);
+
+    List<Model> findAllByIsnew(String isnew);
+
+    List<Model> findAllByBrandIdAndIsnew(Long brandId, String isnew);
+
 }

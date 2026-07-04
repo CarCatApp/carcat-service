@@ -19,6 +19,7 @@ public class Brand {
     Long brandId;
     String brandName;
     String status;
+    String isnew;
 
     @Transient
     List<Model> models;
