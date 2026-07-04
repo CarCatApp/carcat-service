@@ -31,7 +31,7 @@ public class Car {
     @ToString.Exclude
     Customer customer;
 
-    @Column(nullable = false, unique = true, length = 17)
+    @Column(nullable = false, unique = true)
     private String vin;
     private String plateNumber;
     private String brand;
