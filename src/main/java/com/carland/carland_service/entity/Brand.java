@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Entity
 @Data
 @Builder
@@ -18,4 +20,6 @@ public class Brand {
     String brandName;
     String status;
 
+    @Transient
+    List<Model> models;
 }

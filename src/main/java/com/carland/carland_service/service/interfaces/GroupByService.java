@@ -21,7 +21,6 @@ public interface GroupByService {
 
     List<ModelYear> getYearList(String timezone, String acceptLanguage);
 
-
-
+    List<Brand> getAllBrandsWithModels();
 
 }

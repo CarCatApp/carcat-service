@@ -23,6 +23,11 @@ public class GroupByController {
         return groupByService.getAllBrands(timezone, acceptLanguage);
     }
 
+    @GetMapping("/get/brand/list/with/models")
+    public List<Brand> getAllBrandsWithModels() {
+        return groupByService.getAllBrandsWithModels();
+    }
+
     @GetMapping("/get/model/list/by/brand")
     public List<Model> getModelsByBrand(@RequestParam Long brandId,
                                         @RequestHeader("Authorization") String token,

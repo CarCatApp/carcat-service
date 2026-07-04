@@ -28,6 +28,7 @@ public class JWTConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/legal/**").permitAll()
                         .requestMatchers("/api/v1/user/customer-cars").permitAll()
+                        .requestMatchers("/api/v1/group/by/get/brand/list/with/models").permitAll()
                         .requestMatchers("/webhook/**").permitAll()
                         .anyRequest().authenticated())
 

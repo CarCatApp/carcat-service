@@ -10,7 +10,10 @@ import com.carland.carland_service.service.interfaces.GroupByService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -105,6 +108,19 @@ private final ModelYearRepository modelYearRepository;
             throw new ResourceNotFoundException(EnumMessagesLangValues.MODEL_YEAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         return modelYears;
+    }
+
+    @Override
+    public List<Brand> getAllBrandsWithModels() {
+        List<Brand> brands = brandRepository.findAll();
+        Map<Long, List<Model>> modelsByBrandId = modelRepository.findAll().stream()
+                .collect(Collectors.groupingBy(Model::getBrandId));
+
+        brands.forEach(brand ->
+                brand.setModels(modelsByBrandId.getOrDefault(brand.getBrandId(), Collections.emptyList()))
+        );
+
+        return brands;
     }
 
 }
