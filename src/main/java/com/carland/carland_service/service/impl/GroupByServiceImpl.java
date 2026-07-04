@@ -57,15 +57,11 @@ private final ModelYearRepository modelYearRepository;
             );
         }
 
-        if ("az".equalsIgnoreCase(acceptLanguage)) {
-            bodyTypes.forEach(bodyType ->
-                    bodyType.setBodyType(
-                            BodyTypeTranslation.translate(
-                                    bodyType.getBodyType(), "az"
-                            )
-                    )
-            );
-        }
+        bodyTypes.forEach(bodyType ->
+                bodyType.setBodyType(
+                        BodyTypeTranslation.translate(bodyType.getBodyType(), acceptLanguage)
+                )
+        );
 
         return bodyTypes;
     }
@@ -90,15 +86,11 @@ private final ModelYearRepository modelYearRepository;
             throw new ResourceNotFoundException(EnumMessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        if ("az".equalsIgnoreCase(acceptLanguage)) {
-            engineTypes.forEach(engineType ->
-                    engineType.setEngineType(
-                            EngineTypeTranslation.translate(
-                                    engineType.getEngineType(), "az"
-                            )
-                    )
-            );
-        }
+        engineTypes.forEach(engineType ->
+                engineType.setEngineType(
+                        EngineTypeTranslation.translate(engineType.getEngineType(), acceptLanguage)
+                )
+        );
 
         return engineTypes;
     }

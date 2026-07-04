@@ -9,16 +9,24 @@ package com.carland.carland_service.enums;
  */
 public enum PercentageStatus {
 
-    /** Backend created / calculated the value, nobody overrode it. */
+    /**
+     * Backend created / calculated the value, nobody overrode it.
+     */
     CREATED,
 
-    /** Customer overrode the value via editPercentage. */
+    /**
+     * Customer overrode the value via editPercentage.
+     */
     EDITED_BY_CUSTOMER,
 
-    /** HyperService (partner) data overrode the value. Locked for customer edits. */
+    /**
+     * HyperService (partner) data overrode the value. Locked for customer edits.
+     */
     EDITED_BY_PARTNER;
 
-    /** Legacy stored value, kept for backward compatibility with old rows. */
+    /**
+     * Legacy stored value, kept for backward compatibility with old rows.
+     */
     private static final String LEGACY_EDITED = "EDITED";
 
     /**
@@ -41,12 +49,16 @@ public enum PercentageStatus {
         }
     }
 
-    /** Only partner-locked rows are non-editable. */
+    /**
+     * Only partner-locked rows are non-editable.
+     */
     public boolean isEditable() {
         return this != EDITED_BY_PARTNER;
     }
 
-    /** True when the value was set explicitly (customer or partner) rather than auto-calculated. */
+    /**
+     * True when the value was set explicitly (customer or partner) rather than auto-calculated.
+     */
     public boolean isManuallySet() {
         return this == EDITED_BY_CUSTOMER || this == EDITED_BY_PARTNER;
     }

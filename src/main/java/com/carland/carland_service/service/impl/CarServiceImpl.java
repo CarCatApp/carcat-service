@@ -7,6 +7,7 @@ import com.carland.carland_service.dto.response.*;
 import com.carland.carland_service.entity.*;
 import com.carland.carland_service.enums.ColorTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
+import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.EnumMessagesLangValues;
 import com.carland.carland_service.enums.EnumUserStatus;
 import com.carland.carland_service.enums.PercentageStatus;
@@ -80,7 +81,10 @@ public class CarServiceImpl implements CarService {
                     .brand(carFromDb != null ? carFromDb.getBrand() : null)
                     .model(carFromDb != null ? carFromDb.getModel() : null)
                     .modelYear(carFromDb != null ? carFromDb.getModelYear() : null)
-                    .bodyType(carFromDb != null ? carFromDb.getBodyType() : null)
+                    .bodyType(BodyTypeTranslation.translate(
+                            carFromDb != null ? carFromDb.getBodyType() : null,
+                            acceptLanguage
+                    ))
                     .transmissionType(carFromDb != null ? carFromDb.getTransmissionType() : null)
                     .engineVolume(carFromDb != null ? carFromDb.getEngineVolume() : null)
                     .engineType(
@@ -143,10 +147,10 @@ public class CarServiceImpl implements CarService {
                     .brand(brand)
                     .model(model)
                     .modelYear(modelYear)
-                    .bodyType(bodyType)
+                    .bodyType(BodyTypeTranslation.translate(bodyType, acceptLanguage))
                     .transmissionType(transmissionType)
                     .engineVolume(engineVolume)
-                    .engineType(engineType)
+                    .engineType(EngineTypeTranslation.translate(engineType, acceptLanguage))
                     .vinProvidedFields(vinProvidedFields)
                     .resource("fromDecoderTool")
                     .build();
@@ -1686,7 +1690,7 @@ public class CarServiceImpl implements CarService {
                 .transmissionType(car.getTransmissionType())
                 .mileage(car.getMileage())
                 .updatedAt(car.getUpdatedAt())
-                .bodyType(car.getBodyType())
+                .bodyType(BodyTypeTranslation.translate(car.getBodyType(), acceptLanguage))
                 .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .vinProvidedFields(car.getVinProvidedFields())
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
@@ -1711,16 +1715,7 @@ public class CarServiceImpl implements CarService {
     }
 
     private Integer convertEngineVolume(String value) {
-        if (value == null) return null;
-
-        value = value.trim();
-
-        if (value.contains(".")) {
-            double liters = Double.parseDouble(value);
-            return (int) (liters * 1000); // 1.5 → 1500
-        }
-
-        return Integer.parseInt(value);
+        return VinService.parseEngineVolumeCc(value);
     }
 
     private String capitalizeMonth(String date, Locale locale) {

@@ -20,8 +20,11 @@ public enum EngineTypeTranslation {
     private final String ru;
 
     public static String translate(String enValue, String acceptLanguage) {
+        if (enValue == null || enValue.isBlank()) {
+            return enValue;
+        }
         for (EngineTypeTranslation type : values()) {
-            if (type.en.equalsIgnoreCase(enValue)) {
+            if (type.en.equalsIgnoreCase(enValue.trim())) {
 
                 if ("az".equalsIgnoreCase(acceptLanguage)) {
                     return type.az;
