@@ -67,6 +67,7 @@ public class CarController {
 
         return CarResponse.builder()
                 .engineTypeId(null)
+                .vin(vin)
                 .bodyType(null)
                 .mileage(null)
                 .plateNumber(null)
