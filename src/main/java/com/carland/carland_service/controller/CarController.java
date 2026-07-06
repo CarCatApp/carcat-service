@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -62,7 +63,21 @@ public class CarController {
     @GetMapping("/check/vin")
     public CarResponse checkVin(@RequestParam String vin,
                                 @RequestHeader("Accept-Language") String acceptLanguage) {
-        return carService.checkVin(vin, acceptLanguage);
+
+
+        return CarResponse.builder()
+                .engineTypeId(null)
+                .bodyType(null)
+                .mileage(null)
+                .plateNumber(null)
+                .model(null)
+                .engineType(null)
+                .color(null)
+                .modelYear(null)
+                .vinProvidedFields(Collections.emptyList())
+                .message("vin min yoxdu :)")
+                .build();
+//        return carService.checkVin(vin, acceptLanguage);
     }
 
     @PutMapping("/remove")
