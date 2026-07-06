@@ -19,6 +19,7 @@ import com.carland.carland_service.service.interfaces.CarService;
 import com.carland.carland_service.service.interfaces.PushNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -1160,6 +1161,8 @@ public class CarServiceImpl implements CarService {
     public CarResponse addCar(CarRequest carRequest, String phoneNumber, String userIdHeader,
                               String timezone, String acceptLanguage) {
 
+        String logUserId = userIdHeader != null ? userIdHeader : "unknown";
+
         log.info("[addCar] START | phoneNumber={}, userIdHeader={}, timezone={}, acceptLanguage={}",
                 phoneNumber, userIdHeader, timezone, acceptLanguage);
         log.info("[addCar] CarRequest | vin={}, plateNumber={}, brand={}, model={}, modelYear={}, colorId={}, " +
@@ -1180,167 +1183,294 @@ public class CarServiceImpl implements CarService {
                 carRequest != null ? carRequest.getCarId() : null,
                 carRequest != null ? carRequest.getVinProvidedFields() : null);
 
-        log.info("[addCar] CHECK required fields | carRequest={}, phoneNumber={}, userIdHeader={}, engineTypeId={}",
-                carRequest != null, phoneNumber != null, userIdHeader != null,
-                carRequest != null ? carRequest.getEngineTypeId() : null);
-        if (carRequest == null || phoneNumber == null || userIdHeader == null || carRequest.getEngineTypeId() == null) {
-            log.warn("[addCar] FAIL MissingFieldException | reason=carRequest/phoneNumber/userIdHeader/engineTypeId null");
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
-        }
-        log.info("[addCar] PASS required fields check");
+        try {
+            if (carRequest == null) {
+                throwAddCarFailure(logUserId,
+                        "carRequest is null",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            if (phoneNumber == null || phoneNumber.isBlank()) {
+                throwAddCarFailure(logUserId,
+                        "phoneNumber is null or blank",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            if (userIdHeader == null || userIdHeader.isBlank()) {
+                throwAddCarFailure(logUserId,
+                        "userIdHeader is null or blank",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            if (carRequest.getEngineTypeId() == null) {
+                throwAddCarFailure(logUserId,
+                        "engineTypeId is null",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
 
-        log.info("[addCar] CHECK vin/plateNumber/mileage | vin={}, plateNumber={}, mileage={}",
-                carRequest.getVin(), carRequest.getPlateNumber(), carRequest.getMileage());
-        if (carRequest.getVin() == null || carRequest.getPlateNumber() == null || carRequest.getMileage() == null) {
-            log.warn("[addCar] FAIL MissingFieldException | reason=vin/plateNumber/mileage null");
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
-        }
-        log.info("[addCar] PASS vin/plateNumber/mileage check");
+            if (carRequest.getVin() == null) {
+                throwAddCarFailure(logUserId,
+                        "vin is null",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            String vin = carRequest.getVin().trim();
+            if (vin.isBlank()) {
+                throwAddCarFailure(logUserId,
+                        "vin is blank after trim",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
 
-        log.info("[addCar] customerRepository.findByUserIdAndPhoneNumberAndStatus | userId={}, phoneNumber={}, status={}",
-                userIdHeader, phoneNumber, EnumUserStatus.ACTIVE.name());
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
-                Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
-        log.info("[addCar] customer lookup result | customerUserId={}", customer != null ? customer.getUserId() : null);
-        if (customer == null) {
-            log.warn("[addCar] FAIL UserNotFoundException | userIdHeader={}, phoneNumber={}", userIdHeader, phoneNumber);
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-        log.info("[addCar] PASS customer found | customerUserId={}", customer.getUserId());
+            if (carRequest.getPlateNumber() == null) {
+                throwAddCarFailure(logUserId,
+                        "plateNumber is null",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            String plateNumber = carRequest.getPlateNumber().trim();
+            if (plateNumber.isBlank()) {
+                throwAddCarFailure(logUserId,
+                        "plateNumber is blank after trim",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
 
-        log.info("[addCar] carRepository.findByVin | vin={}", carRequest.getVin());
-        Car existingCar = carRepository.findByVin(carRequest.getVin());
-        log.info("[addCar] existing car lookup result | carId={}, hasCustomer={}, customerUserId={}",
-                existingCar != null ? existingCar.getCarId() : null,
-                existingCar != null && existingCar.getCustomer() != null,
-                existingCar != null && existingCar.getCustomer() != null ? existingCar.getCustomer().getUserId() : null);
+            if (carRequest.getMileage() == null) {
+                throwAddCarFailure(logUserId,
+                        "mileage is null",
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
+            if (carRequest.getMileage() < 0) {
+                throwAddCarFailure(logUserId,
+                        "mileage is negative | mileage=" + carRequest.getMileage(),
+                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            }
 
-        if (existingCar != null && existingCar.getCustomer() != null) {
-            log.warn("[addCar] FAIL AlreadyExistsException | carId={}, ownerUserId={}, requestUserId={}",
-                    existingCar.getCarId(), existingCar.getCustomer().getUserId(), customer.getUserId());
-            throw new AlreadyExistsException("avtomobil basqasina mexsusdur");
-        }
+            Long userId = parseAddCarUserId(userIdHeader, logUserId, acceptLanguage);
+            logUserId = userId.toString();
 
-        if (existingCar != null) {
-            log.info("[addCar] BRANCH existing car without customer | linking carId={} to customerUserId={}",
-                    existingCar.getCarId(), customer.getUserId());
-            existingCar.setCustomer(customer);
-            customer.getCars().add(existingCar);
-            log.info("[addCar] calling convertCarEntityToResponse | carId={}, resource=fromDb", existingCar.getCarId());
-            CarResponse response = convertCarEntityToResponse(existingCar, acceptLanguage, "fromDb");
-            log.info("[addCar] END success (existing car linked) | carId={}, vin={}", response.getCarId(), response.getVin());
+            log.info("[addCar] customerRepository.findByUserIdAndPhoneNumberAndStatus | userId={}, phoneNumber={}, status={}",
+                    userId, phoneNumber, EnumUserStatus.ACTIVE.name());
+            Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
+                    userId, phoneNumber.trim(), EnumUserStatus.ACTIVE.name());
+            if (customer == null) {
+                throwAddCarFailure(logUserId,
+                        "customer not found | userId=" + userId + ", phoneNumber=" + phoneNumber,
+                        new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage)));
+            }
+            log.info("[addCar] PASS customer found | customerUserId={}", customer.getUserId());
+
+            if (carRequest.getColorId() != null) {
+                Color color = colorRepository.findByColorId(carRequest.getColorId());
+                if (color == null) {
+                    throwAddCarFailure(logUserId,
+                            "colorId not found | colorId=" + carRequest.getColorId(),
+                            new ResourceNotFoundException(EnumMessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                }
+            }
+
+            log.info("[addCar] carRepository.findByVin | vin={}", vin);
+            Car existingCar = carRepository.findByVin(vin);
+            log.info("[addCar] existing car lookup result | carId={}, hasCustomer={}, customerUserId={}",
+                    existingCar != null ? existingCar.getCarId() : null,
+                    existingCar != null && existingCar.getCustomer() != null,
+                    existingCar != null && existingCar.getCustomer() != null ? existingCar.getCustomer().getUserId() : null);
+
+            if (existingCar != null && existingCar.getCustomer() != null) {
+                throwAddCarFailure(logUserId,
+                        "car already linked to another customer | carId=" + existingCar.getCarId()
+                                + ", ownerUserId=" + existingCar.getCustomer().getUserId()
+                                + ", requestUserId=" + customer.getUserId()
+                                + ", vin=" + vin,
+                        new AlreadyExistsException(EnumMessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+            }
+
+            if (existingCar != null) {
+                log.info("[addCar] BRANCH existing car without customer | linking carId={} to customerUserId={}",
+                        existingCar.getCarId(), customer.getUserId());
+                existingCar.setCustomer(customer);
+                if (customer.getCars() == null) {
+                    customer.setCars(new ArrayList<>());
+                }
+                if (!customer.getCars().contains(existingCar)) {
+                    customer.getCars().add(existingCar);
+                }
+                carRepository.save(existingCar);
+                customerRepository.save(customer);
+                CarResponse response = convertCarEntityToResponse(existingCar, acceptLanguage, "fromDb");
+                log.info("[addCar] END success (existing car linked) | carId={}, vin={}", response.getCarId(), response.getVin());
+                return response;
+            }
+
+            Optional<Car> plateOwner = carRepository.findByPlateNumberIgnoreCase(plateNumber);
+            if (plateOwner.isPresent()) {
+                Car conflictingCar = plateOwner.get();
+                throwAddCarFailure(logUserId,
+                        "plateNumber already exists | plateNumber=" + plateNumber
+                                + ", existingCarId=" + conflictingCar.getCarId()
+                                + ", existingVin=" + conflictingCar.getVin()
+                                + ", requestVin=" + vin,
+                        new AlreadyExistsException(
+                                EnumMessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+            }
+            log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
+
+            log.info("[addCar] BRANCH new car flow | engineTypeId={}", carRequest.getEngineTypeId());
+            EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
+            if (engineType == null) {
+                throwAddCarFailure(logUserId,
+                        "engineType not found | engineTypeId=" + carRequest.getEngineTypeId(),
+                        new ResourceNotFoundException(EnumMessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+            }
+            log.info("[addCar] engine type lookup result | engineTypeId={}, engineType={}",
+                    engineType.getEngineTypeId(), engineType.getEngineType());
+
+            MaintenanceTemplate maintenanceTemplate = maintenanceTemplateRepository.findByEngineType(engineType)
+                    .orElse(null);
+            if (maintenanceTemplate == null) {
+                throwAddCarFailure(logUserId,
+                        "maintenance template not found | engineTypeId=" + engineType.getEngineTypeId()
+                                + ", engineType=" + engineType.getEngineType(),
+                        new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+            }
+            List<ServiceEntity> templateServices = maintenanceTemplate.getServices();
+            if (templateServices == null || templateServices.isEmpty()) {
+                throwAddCarFailure(logUserId,
+                        "maintenance template has no services | templateId=" + maintenanceTemplate.getId()
+                                + ", engineType=" + engineType.getEngineType(),
+                        new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+            }
+            log.info("[addCar] PASS maintenance template found | templateId={}, templateName={}, serviceCount={}",
+                    maintenanceTemplate.getId(), maintenanceTemplate.getName(), templateServices.size());
+
+            Car newCar = Car.builder()
+                    .vin(vin)
+                    .plateNumber(plateNumber)
+                    .brand(carRequest.getBrand())
+                    .model(carRequest.getModel())
+                    .modelYear(carRequest.getModelYear())
+                    .engineType(engineType.getEngineType())
+                    .engineTypeId(engineType.getEngineTypeId())
+                    .engineVolume(carRequest.getEngineVolume())
+                    .transmissionType(carRequest.getTransmissionType())
+                    .bodyType(carRequest.getBodyType())
+                    .mileage(carRequest.getMileage())
+                    .colorId(carRequest.getColorId())
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .customer(customer)
+                    .maintenanceTemplate(maintenanceTemplate)
+                    .vinProvidedFields(carRequest.getVinProvidedFields())
+                    .build();
+
+            try {
+                carRepository.save(newCar);
+            } catch (DataIntegrityViolationException e) {
+                throwAddCarFailure(logUserId,
+                        "DB constraint violation on car save | vin=" + vin
+                                + ", plateNumber=" + plateNumber
+                                + ", cause=" + e.getMostSpecificCause().getMessage(),
+                        new AlreadyExistsException(EnumMessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+            }
+            log.info("[addCar] car saved | carId={}, vin={}", newCar.getCarId(), newCar.getVin());
+
+            for (ServiceEntity serviceEntity : templateServices) {
+                if (serviceEntity == null) {
+                    throwAddCarFailure(logUserId,
+                            "null service entity in maintenance template | templateId=" + maintenanceTemplate.getId(),
+                            new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                }
+                if (serviceEntity.getServiceName() == null || serviceEntity.getServiceName().isBlank()) {
+                    throwAddCarFailure(logUserId,
+                            "service entity has blank serviceName | templateId=" + maintenanceTemplate.getId()
+                                    + ", serviceId=" + serviceEntity.getId(),
+                            new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                }
+
+                Percentage percentage = Percentage.builder()
+                        .intervalKm(serviceEntity.getIntervalKm())
+                        .intervalMonth(serviceEntity.getIntervalMonth())
+                        .serviceName(serviceEntity.getServiceName())
+                        .serviceNameAz(serviceEntity.getNameAz())
+                        .serviceNameEn(serviceEntity.getNameEn())
+                        .serviceNameRu(serviceEntity.getNameRu())
+                        .actionType(serviceEntity.getActionType())
+                        .serviceId(serviceEntity.getId())
+                        .important(serviceEntity.isImportant())
+                        .status(PercentageStatus.CREATED.name())
+                        .carId(newCar.getCarId())
+                        .build();
+                percentageRepository.save(percentage);
+
+                CustomerServiceRecord customerServiceRecord = CustomerServiceRecord.builder()
+                        .serviceName(serviceEntity.getServiceName())
+                        .serviceNameAz(serviceEntity.getNameAz())
+                        .serviceNameEn(serviceEntity.getNameEn())
+                        .serviceNameRu(serviceEntity.getNameRu())
+                        .actionType(serviceEntity.getActionType())
+                        .serviceId(serviceEntity.getId())
+                        .car(newCar)
+                        .build();
+                customerServiceRecordRepository.save(customerServiceRecord);
+            }
+            log.info("[addCar] PASS all service records created | count={}", templateServices.size());
+
+            if (customer.getCars() == null) {
+                customer.setCars(new ArrayList<>());
+            }
+            customer.getCars().add(newCar);
+            customerRepository.save(customer);
+
+            CarResponse response = convertCarEntityToResponse(newCar, acceptLanguage, "fromDecoderTool");
+            triggerAfterAddCarSync(newCar.getCarId(), newCar.getVin(), phoneNumber, userIdHeader, timezone, acceptLanguage);
+
+            log.info("[addCar] END success (new car) | carId={}, vin={}, plateNumber={}",
+                    response.getCarId(), response.getVin(), response.getPlateNumber());
             return response;
+        } catch (RuntimeException ex) {
+            if (!isKnownAddCarException(ex)) {
+                logAddCarFailure(logUserId,
+                        "unexpected runtime error | type=" + ex.getClass().getSimpleName()
+                                + ", message=" + ex.getMessage()
+                                + ", vin=" + (carRequest != null ? carRequest.getVin() : null));
+            }
+            throw ex;
+        } catch (Exception ex) {
+            logAddCarFailure(logUserId,
+                    "unexpected error | type=" + ex.getClass().getSimpleName()
+                            + ", message=" + ex.getMessage()
+                            + ", vin=" + (carRequest != null ? carRequest.getVin() : null));
+            throw ex;
         }
+    }
 
-        String plateNumber = carRequest.getPlateNumber().trim();
-        if (carRepository.findByPlateNumberIgnoreCase(plateNumber).isPresent()) {
-            log.warn("[addCar] FAIL AlreadyExistsException | reason=plateNumber already exists | plateNumber={}",
-                    plateNumber);
-            throw new AlreadyExistsException(
-                    EnumMessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+    private Long parseAddCarUserId(String userIdHeader, String logUserId, String acceptLanguage) {
+        try {
+            return Long.valueOf(userIdHeader.trim());
+        } catch (NumberFormatException e) {
+            throwAddCarFailure(logUserId,
+                    "userIdHeader is not a valid number | userIdHeader=" + userIdHeader,
+                    new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+            throw new IllegalStateException("unreachable");
         }
-        log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
+    }
 
-        log.info("[addCar] BRANCH new car flow | engineTypeId={}", carRequest.getEngineTypeId());
-        log.info("[addCar] engineTypeRepository.findByEngineTypeId | engineTypeId={}", carRequest.getEngineTypeId());
-        EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
-        log.info("[addCar] engine type lookup result | engineTypeId={}, engineType={}",
-                engineType != null ? engineType.getEngineTypeId() : null,
-                engineType != null ? engineType.getEngineType() : null);
+    private boolean isKnownAddCarException(RuntimeException ex) {
+        return ex instanceof MissingFieldException
+                || ex instanceof UserNotFoundException
+                || ex instanceof AlreadyExistsException
+                || ex instanceof ResourceNotFoundException;
+    }
 
-        log.info("[addCar] maintenanceTemplateRepository.findByEngineType | engineType={}", engineType.getEngineType());
-        MaintenanceTemplate maintenanceTemplate = maintenanceTemplateRepository.findByEngineType(engineType)
-                .orElseThrow(() -> {
-                    log.warn("[addCar] FAIL ResourceNotFoundException | reason=maintenance template not found for engineType={}",
-                            engineType.getEngineType());
-                    return new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage));
-                });
-        log.info("[addCar] PASS maintenance template found | templateId={}, templateName={}",
-                maintenanceTemplate.getId(), maintenanceTemplate.getName());
+    private void throwAddCarFailure(String userId, String detail, RuntimeException exception) {
+        log.warn("[addCar] FAIL | userId={}, detail={}", userId, detail);
+        logAddCarFailure(userId, detail);
+        throw exception;
+    }
 
-        log.info("[addCar] building new Car entity | vin={}, plateNumber={}, brand={}, model={}",
-                carRequest.getVin(), carRequest.getPlateNumber(), carRequest.getBrand(), carRequest.getModel());
-        Car newCar = Car.builder()
-                .vin(carRequest.getVin())
-                .plateNumber(plateNumber)
-                .brand(carRequest.getBrand())
-                .model(carRequest.getModel())
-                .modelYear(carRequest.getModelYear())
-                .engineType(engineType.getEngineType())
-                .engineTypeId(engineType.getEngineTypeId())
-                .engineVolume(carRequest.getEngineVolume())
-                .transmissionType(carRequest.getTransmissionType())
-                .bodyType(carRequest.getBodyType())
-                .mileage(carRequest.getMileage())
-                .colorId(carRequest.getColorId())
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .customer(customer)
-                .maintenanceTemplate(maintenanceTemplate)
-                .vinProvidedFields(carRequest.getVinProvidedFields())
-                .build();
-
-        log.info("[addCar] carRepository.save | vin={}", newCar.getVin());
-        carRepository.save(newCar);
-        log.info("[addCar] car saved | carId={}, vin={}", newCar.getCarId(), newCar.getVin());
-
-        log.info("[addCar] creating Percentage + CustomerServiceRecord | serviceCount={}",
-                maintenanceTemplate.getServices() != null ? maintenanceTemplate.getServices().size() : 0);
-        for (ServiceEntity serviceEntity : maintenanceTemplate.getServices()) {
-            log.info("[addCar] processing ServiceEntity | serviceName={}, actionType={}, intervalKm={}, intervalMonth={}",
-                    serviceEntity.getServiceName(), serviceEntity.getActionType(),
-                    serviceEntity.getIntervalKm(), serviceEntity.getIntervalMonth());
-
-            Percentage percentage = Percentage.builder()
-                    .intervalKm(serviceEntity.getIntervalKm())
-                    .intervalMonth(serviceEntity.getIntervalMonth())
-                    .serviceName(serviceEntity.getServiceName())
-                    .serviceNameAz(serviceEntity.getNameAz())
-                    .serviceNameEn(serviceEntity.getNameEn())
-                    .serviceNameRu(serviceEntity.getNameRu())
-                    .actionType(serviceEntity.getActionType())
-                    .serviceId(serviceEntity.getId())
-                    .important(serviceEntity.isImportant())
-                    .status(PercentageStatus.CREATED.name())
-                    .carId(newCar.getCarId())
-                    .build();
-
-            log.info("[addCar] percentageRepository.save | carId={}, serviceName={}", newCar.getCarId(), percentage.getServiceName());
-            percentageRepository.save(percentage);
-
-            CustomerServiceRecord customerServiceRecord = CustomerServiceRecord.builder()
-                    .serviceName(serviceEntity.getServiceName())
-                    .serviceNameAz(serviceEntity.getNameAz())
-                    .serviceNameEn(serviceEntity.getNameEn())
-                    .serviceNameRu(serviceEntity.getNameRu())
-                    .actionType(serviceEntity.getActionType())
-                    .serviceId(serviceEntity.getId())
-                    .car(newCar)
-                    .build();
-            log.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
-            log.info("[addCar] customerServiceRecordRepository.save  serviceName={}", customerServiceRecord.getServiceName());
-            log.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
-
-            customerServiceRecordRepository.save(customerServiceRecord);
+    private void logAddCarFailure(String userId, String detail) {
+        try {
+            logRepository.save(Log.builder()
+                    .userId(userId != null ? userId : "unknown")
+                    .log(LocalDateTime.now() + " | addCar | " + detail)
+                    .build());
+        } catch (Exception logEx) {
+            log.error("[addCar] failed to persist failure log | userId={}, detail={}", userId, detail, logEx);
         }
-        log.info("[addCar] PASS all service records created");
-
-        log.info("[addCar] linking car to customer | customerUserId={}, carId={}", customer.getUserId(), newCar.getCarId());
-        customer.getCars().add(newCar);
-        log.info("[addCar] customerRepository.save | customerUserId={}", customer.getUserId());
-        customerRepository.save(customer);
-        log.info("[addCar] PASS customer updated");
-
-        log.info("[addCar] calling convertCarEntityToResponse | carId={}, resource=fromDecoderTool", newCar.getCarId());
-        CarResponse response = convertCarEntityToResponse(newCar, acceptLanguage, "fromDecoderTool");
-
-        // Fire percentage calculation + Hyper partner sync only AFTER the car is committed,
-        // and only asynchronously: addCar must never depend on Hyper availability.
-        triggerAfterAddCarSync(newCar.getCarId(), newCar.getVin(), phoneNumber, userIdHeader, timezone, acceptLanguage);
-
-        log.info("[addCar] END success (new car) | carId={}, vin={}, plateNumber={}",
-                response.getCarId(), response.getVin(), response.getPlateNumber());
-        return response;
     }
 
     /**
