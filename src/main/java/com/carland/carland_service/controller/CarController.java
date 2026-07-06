@@ -65,20 +65,20 @@ public class CarController {
                                 @RequestHeader("Accept-Language") String acceptLanguage) {
 
 
-        return CarResponse.builder()
-                .engineTypeId(null)
-                .vin(vin)
-                .bodyType(null)
-                .mileage(null)
-                .plateNumber(null)
-                .model(null)
-                .engineType(null)
-                .color(null)
-                .modelYear(null)
-                .vinProvidedFields(Collections.emptyList())
-                .message("vin min yoxdu :)")
-                .build();
-//        return carService.checkVin(vin, acceptLanguage);
+//        return CarResponse.builder()
+//                .engineTypeId(null)
+//                .vin(vin)
+//                .bodyType(null)
+//                .mileage(null)
+//                .plateNumber(null)
+//                .model(null)
+//                .engineType(null)
+//                .color(null)
+//                .modelYear(null)
+//                .vinProvidedFields(Collections.emptyList())
+//                .message("vin min yoxdu :)")
+//                .build();
+        return carService.checkVin(vin, acceptLanguage);
     }
 
     @PutMapping("/remove")
