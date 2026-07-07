@@ -103,73 +103,73 @@ public class CarServiceImpl implements CarService {
         } else {
 
             // 3️⃣ NHTSA decode flow
-//            Map<String, String> decodeVin = vinService.extractFieldsFromVin(vin);
-//
-//            List<String> vinProvidedFields = new ArrayList<>();
-//
-//            String brand = decodeVin.get("brand");
-//            if (hasValue(brand)) vinProvidedFields.add("brand");
-//
-//            String model = decodeVin.get("model");
-//            if (hasValue(model)) vinProvidedFields.add("model");
-//
-//            String modelYearStr = decodeVin.get("modelYear");
-//            Integer modelYear = null;
-//            if (hasValue(modelYearStr)) {
-//                try {
-//                    modelYear = Integer.valueOf(modelYearStr);
-//                    vinProvidedFields.add("modelYear");
-//                } catch (NumberFormatException e) {
-//                    log.warn("Model year parse edilmedi: {}", modelYearStr);
-//                }
-//            }
-//
-//            String bodyType = decodeVin.get("bodyType");
-//            if (hasValue(bodyType)) vinProvidedFields.add("bodyType");
-//
-//            String transmissionType = decodeVin.get("transmissionType");
-//            if (hasValue(transmissionType)) vinProvidedFields.add("transmissionType");
-//
-//            String engineVolumeStr = decodeVin.get("engineVolume");
-//            Integer engineVolume = null;
-//            if (hasValue(engineVolumeStr)) {
-//                engineVolume = convertEngineVolumeSafe(engineVolumeStr);
-//                if (engineVolume != null) {
-//                    vinProvidedFields.add("engineVolume");
-//                }
-//            }
-//
-//            String engineType = decodeVin.get("engineType");
-//            if (hasValue(engineType)) vinProvidedFields.add("engineType");
+            Map<String, String> decodeVin = vinService.extractFieldsFromVin(vin);
 
+            List<String> vinProvidedFields = new ArrayList<>();
 
-//            return CarResponse.builder()
-//                    .vin(vin)
-//                    .brand(brand)
-//                    .model(model)
-//                    .modelYear(modelYear)
-//                    .bodyType(BodyTypeTranslation.translate(bodyType, acceptLanguage))
-//                    .transmissionType(transmissionType)
-//                    .engineVolume(engineVolume)
-//                    .engineType(EngineTypeTranslation.translate(engineType, acceptLanguage))
-//                    .vinProvidedFields(vinProvidedFields)
-//                    .resource("fromDecoderTool")
-//                    .build();
+            String brand = decodeVin.get("brand");
+            if (hasValue(brand)) vinProvidedFields.add("brand");
+
+            String model = decodeVin.get("model");
+            if (hasValue(model)) vinProvidedFields.add("model");
+
+            String modelYearStr = decodeVin.get("modelYear");
+            Integer modelYear = null;
+            if (hasValue(modelYearStr)) {
+                try {
+                    modelYear = Integer.valueOf(modelYearStr);
+                    vinProvidedFields.add("modelYear");
+                } catch (NumberFormatException e) {
+                    log.warn("Model year parse edilmedi: {}", modelYearStr);
+                }
+            }
+
+            String bodyType = decodeVin.get("bodyType");
+            if (hasValue(bodyType)) vinProvidedFields.add("bodyType");
+
+            String transmissionType = decodeVin.get("transmissionType");
+            if (hasValue(transmissionType)) vinProvidedFields.add("transmissionType");
+
+            String engineVolumeStr = decodeVin.get("engineVolume");
+            Integer engineVolume = null;
+            if (hasValue(engineVolumeStr)) {
+                engineVolume = convertEngineVolumeSafe(engineVolumeStr);
+                if (engineVolume != null) {
+                    vinProvidedFields.add("engineVolume");
+                }
+            }
+
+            String engineType = decodeVin.get("engineType");
+            if (hasValue(engineType)) vinProvidedFields.add("engineType");
+
 
             return CarResponse.builder()
-                    .engineTypeId(null)
                     .vin(vin)
-                    .bodyType(null)
-                    .mileage(null)
-                    .plateNumber(null)
-                    .model(null)
-                    .engineType(null)
-                    .color(null)
-                    .modelYear(null)
-                    .vinProvidedFields(Collections.emptyList())
-                    .resource("unknown")
-                    .message("vin min yoxdu :)")
+                    .brand(brand)
+                    .model(model)
+                    .modelYear(modelYear)
+                    .bodyType(BodyTypeTranslation.translate(bodyType, acceptLanguage))
+                    .transmissionType(transmissionType)
+                    .engineVolume(engineVolume)
+                    .engineType(EngineTypeTranslation.translate(engineType, acceptLanguage))
+                    .vinProvidedFields(vinProvidedFields)
+                    .resource("fromDecoderTool")
                     .build();
+
+//            return CarResponse.builder()
+//                    .engineTypeId(null)
+//                    .vin(vin)
+//                    .bodyType(null)
+//                    .mileage(null)
+//                    .plateNumber(null)
+//                    .model(null)
+//                    .engineType(null)
+//                    .color(null)
+//                    .modelYear(null)
+//                    .vinProvidedFields(Collections.emptyList())
+//                    .resource("unknown")
+//                    .message("vin min yoxdu :)")
+//                    .build();
         }
     }
 
