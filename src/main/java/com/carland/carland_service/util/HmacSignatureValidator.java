@@ -28,24 +28,45 @@ public class HmacSignatureValidator {
 //        }
 //        return new byte[0];
 //    }
-public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
-    if (body != null && body.length > 0) {
-        return body;
-    }
+//public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
+//    if (body != null && body.length > 0) {
+//        return body;
+//    }
+//
+//    if ("GET".equalsIgnoreCase(request.getMethod())) {
+//        StringBuilder payload = new StringBuilder(request.getRequestURL());
+//
+//        String queryString = request.getQueryString();
+//        if (StringUtils.hasText(queryString)) {
+//            payload.append('?').append(queryString);
+//        }
+//
+//        return payload.toString().getBytes(StandardCharsets.UTF_8);
+//    }
+//
+//    return new byte[0];
+//}
 
-    if ("GET".equalsIgnoreCase(request.getMethod())) {
-        StringBuilder payload = new StringBuilder(request.getRequestURL());
-
-        String queryString = request.getQueryString();
-        if (StringUtils.hasText(queryString)) {
-            payload.append('?').append(queryString);
+    public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
+        if (body != null && body.length > 0) {
+            return body;
         }
 
-        return payload.toString().getBytes(StandardCharsets.UTF_8);
+        if (!request.getParameterMap().isEmpty()) {
+            String payload = request.getParameterMap().entrySet().stream()
+                    .sorted(java.util.Map.Entry.comparingByKey())
+                    .flatMap(entry -> java.util.Arrays.stream(entry.getValue())
+                            .map(value -> entry.getKey() + "=" +
+                                    java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)))
+                    .collect(java.util.stream.Collectors.joining("&"));
+
+            return payload.getBytes(StandardCharsets.UTF_8);
+        }
+
+        return new byte[0];
     }
 
-    return new byte[0];
-}
+
     public boolean isValid(String secret, byte[] payload, String providedSignature) {
         if (!StringUtils.hasText(secret) || !StringUtils.hasText(providedSignature)) {
             return false;
