@@ -27,6 +27,10 @@ public class VinService {
 
         Map<String, String> output = new HashMap<>();
 
+        String electrificationLevel = null;
+        String primaryFuel = null;
+        String secondaryFuel = null;
+
         for (Map<String, Object> item : results) {
             String variable = (String) item.get("Variable");
             String value = item.get("Value") != null
@@ -49,64 +53,92 @@ public class VinService {
                     output.put("engineVolume", cc != null ? String.valueOf(cc) : value);
                 }
 
-                case "Fuel Type - Primary" -> {
-                    String engineType = mapEngineType(value);
-                    if (engineType != null) {
-                        output.put("engineType", engineType);
-                    }
-                }
+                case "Fuel Type - Primary" -> primaryFuel = value;
+
+                case "Fuel Type - Secondary" -> secondaryFuel = value;
+
+                case "Electrification Level" -> electrificationLevel = value;
             }
+        }
+
+        String engineType = mapEngineType(
+                electrificationLevel,
+                primaryFuel,
+                secondaryFuel
+        );
+
+        if (engineType != null) {
+            output.put("engineType", engineType);
         }
 
         return output;
     }
 
-    private String mapEngineType(String value) {
+    private String mapEngineType(String electrificationLevel,
+                                 String primaryFuel,
+                                 String secondaryFuel) {
 
-        if (value == null || value.isBlank()) {
-            return null;
+        String electrification = electrificationLevel == null
+                ? ""
+                : electrificationLevel.toLowerCase().trim();
+
+        String primary = primaryFuel == null
+                ? ""
+                : primaryFuel.toLowerCase().trim();
+
+        String secondary = secondaryFuel == null
+                ? ""
+                : secondaryFuel.toLowerCase().trim();
+
+        // Plug-in Hybrid
+        if (electrification.contains("plug-in")
+                || electrification.contains("plug in")
+                || electrification.contains("phev")) {
+            return "Plug-in Hybrid";
         }
 
-        String normalized = value.toLowerCase().trim();
-
-        if (normalized.contains("diesel hybrid")) {
+        // Diesel Hybrid
+        if (electrification.contains("diesel hybrid")
+                || (primary.contains("diesel") && secondary.contains("electric"))) {
             return "Diesel Hybrid";
+        }
 
-        } else if (normalized.contains("plug-in hybrid")
-                || normalized.contains("plug in hybrid")
-                || normalized.contains("phev")) {
-
-            return "Plug-in Hybrid";
-
-        } else if (normalized.contains("hybrid")) {
-
+        // Hybrid (HEV)
+        if (electrification.contains("hybrid")
+                || (primary.contains("gasoline") && secondary.contains("electric"))) {
             return "Hybrid";
+        }
 
-        } else if (normalized.contains("electric")
-                || normalized.contains("battery electric")
-                || normalized.contains("bev")) {
-
+        // Electric (BEV)
+        if (electrification.contains("battery electric")
+                || electrification.contains("bev")
+                || (electrification.contains("electric") && !electrification.contains("hybrid"))
+                || primary.equals("electric")
+                || primary.contains("battery electric")
+                || (primary.isBlank() && secondary.equals("electric"))) {
             return "Electric";
+        }
 
-        } else if (normalized.contains("lpg")
-                || normalized.contains("cng")
-                || normalized.contains("natural gas")) {
-
+        // LPG / CNG
+        if (primary.contains("lpg")
+                || primary.contains("cng")
+                || primary.contains("natural gas")) {
             return "Gas (LPG / CNG)";
+        }
 
-        } else if (normalized.contains("diesel")) {
-
+        // Diesel
+        if (primary.contains("diesel")) {
             return "Diesel";
+        }
 
-        } else if (normalized.contains("gasoline")
-                || normalized.contains("petrol")) {
-
+        // Petrol
+        if (primary.contains("gasoline")
+                || primary.contains("petrol")) {
             return "Petrol (Gasoline)";
         }
 
         return null;
     }
-
     /**
      * NHTSA "Displacement (L)" is usually liters (1.5, 2.0).
      * Sometimes whole liters without decimals (5 → 5L).

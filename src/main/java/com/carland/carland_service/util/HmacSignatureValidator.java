@@ -18,17 +18,34 @@ public class HmacSignatureValidator {
     public static final String HEADER_NAME = "X-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
-    public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
-        if (body != null && body.length > 0) {
-            return body;
-        }
-        String queryString = request.getQueryString();
-        if (StringUtils.hasText(queryString)) {
-            return queryString.getBytes(StandardCharsets.UTF_8);
-        }
-        return new byte[0];
+//    public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
+//        if (body != null && body.length > 0) {
+//            return body;
+//        }
+//        String queryString = request.getQueryString();
+//        if (StringUtils.hasText(queryString)) {
+//            return queryString.getBytes(StandardCharsets.UTF_8);
+//        }
+//        return new byte[0];
+//    }
+public byte[] resolvePayload(HttpServletRequest request, byte[] body) {
+    if (body != null && body.length > 0) {
+        return body;
     }
 
+    if ("GET".equalsIgnoreCase(request.getMethod())) {
+        StringBuilder payload = new StringBuilder(request.getRequestURL());
+
+        String queryString = request.getQueryString();
+        if (StringUtils.hasText(queryString)) {
+            payload.append('?').append(queryString);
+        }
+
+        return payload.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    return new byte[0];
+}
     public boolean isValid(String secret, byte[] payload, String providedSignature) {
         if (!StringUtils.hasText(secret) || !StringUtils.hasText(providedSignature)) {
             return false;
