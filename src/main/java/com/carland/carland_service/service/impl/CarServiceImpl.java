@@ -1835,6 +1835,7 @@ public class CarServiceImpl implements CarService {
                 .transmissionType(car.getTransmissionType())
                 .mileage(car.getMileage())
                 .updatedAt(car.getUpdatedAt())
+                .createdAt(car.getCreatedAt())  // added getCreatedAt into  response json from entity
                 .bodyType(BodyTypeTranslation.translate(car.getBodyType(), acceptLanguage))
                 .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .vinProvidedFields(car.getVinProvidedFields())

@@ -28,6 +28,7 @@ public class CarResponse {
     private String transmissionType;
     private Long mileage;
     private LocalDateTime updatedAt;
+    private LocalDateTime createdAt;
     private String bodyType;
     private String message;
     private List<String> vinProvidedFields;
