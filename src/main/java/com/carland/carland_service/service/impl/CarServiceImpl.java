@@ -1582,7 +1582,7 @@ public class CarServiceImpl implements CarService {
             throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        List<Car> carList = carRepository.findAllByCustomer(customer);
+        List<Car> carList = carRepository.findAllByCustomerOrderByCreatedAtDesc(customer);
 
         if (carList == null || carList.isEmpty()) {
             throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));

@@ -34,7 +34,7 @@ public class WebhookController {
 
     @GetMapping("/test")
     public String test() {
-        return "test basarili oldu";
+        return "test uğurlu oldu";
     }
 
     @GetMapping("/car/find")

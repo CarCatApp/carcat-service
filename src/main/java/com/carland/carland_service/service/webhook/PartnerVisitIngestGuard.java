@@ -2,10 +2,13 @@ package com.carland.carland_service.service.webhook;
 
 import com.carland.carland_service.dto.response.v2.ServiceHistoryLineV2Response;
 import com.carland.carland_service.dto.response.v2.ServiceHistoryVisitV2Response;
+import com.carland.carland_service.entity.Log;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
+import com.carland.carland_service.repository.LogRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.repository.VisitServiceLineRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -14,10 +17,12 @@ import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class PartnerVisitIngestGuard {
 
     private final VisitRepository visitRepository;
     private final VisitServiceLineRepository visitServiceLineRepository;
+    private final LogRepository logRepository;
 
     public void assertNewVisit(Long carId, ServiceHistoryVisitV2Response item) {
         Long recordId = item.getPartnerRecordId();
@@ -43,9 +48,12 @@ public class PartnerVisitIngestGuard {
                 throw new AlreadyExistsException("Duplicate serviceCode in request: " + line.getServiceCode());
             }
             if (visitServiceLineRepository.existsByVisit_Car_CarIdAndServiceCode(carId, line.getServiceCode())) {
-                throw new AlreadyExistsException(
-                        "serviceCode " + line.getServiceCode() + " already exists in service history for this vehicle"
-                );
+                log.info("dublicate service code");
+                Log log = Log.builder()
+                        .userId("webhook post")
+                        .log("dublicate service code " + recordId)
+                        .build();
+                logRepository.save(log);
             }
         }
     }

@@ -22,7 +22,7 @@ public interface CarRepository extends JpaRepository<Car, Long> {
 
     @Query("SELECT c FROM Car c JOIN FETCH c.customer")
     List<Car> findAllWithCustomer();
-
+    List<Car> findAllByCustomerOrderByCreatedAtDesc(Customer customer);
     Car findByVinAndCustomer(String vin, Customer customer);
 
 
