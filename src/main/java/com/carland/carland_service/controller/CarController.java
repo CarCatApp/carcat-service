@@ -16,6 +16,7 @@ import com.carland.carland_service.service.interfaces.CarService;
 import com.carland.carland_service.dto.response.v2.CarVinServiceHistoryV2Response;
 import com.carland.carland_service.service.interfaces.CarVinHistoryService;
 import com.carland.carland_service.dto.response.v2.CarVinHistoryServiceV2;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +40,7 @@ public class CarController {
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
     @GetMapping("/test/hyper")
-    public String testHyperApi() {
+    public String testHyperApi(HttpServletRequest requestk) {
 
         try {
             String token = hyperTokenService.getToken();
@@ -59,7 +60,7 @@ public class CarController {
                     String.class
             );
 
-            return "TESTTT     EHEHEHEHEHEHEHEHEHEHHEEHEEHHEHEHEHHEHAHAHAHAAHAHAHHAHAHAHAHAHAHAHAHHAHAHA"+response.getBody();
+            return "TESTTT     EHEHEHEHEHEHEHEHEHEHHEEHEEHHEHEHEHHEHAHAHAHAAHAHAHHAHAHAHAHAHAHAHAHHAHAHA"+response.getBody()+requestk.getRequestURI();
 
         } catch (Exception e) {
             return "ERROR: " + e.getMessage();
