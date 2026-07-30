@@ -4,9 +4,9 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.repository.CarRepository;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -72,8 +72,8 @@ public class AdminController {
         Page<Car> carPage = carRepository.findAll(pageable);
 
 
-        model.addAttribute("cars", carPage.getContent());
-        model.addAttribute("page", carPage);
+        // Thymeleaf tarafında ${cars.content} kullanabilmek için Page gönderiyoruz
+        model.addAttribute("cars", carPage);
 
 
         return "cars";

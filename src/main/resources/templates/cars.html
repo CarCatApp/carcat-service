@@ -5,9 +5,7 @@
   <title>Cars</title>
 </head>
 
-
 <body>
-
 
 <h1>Car List Panel</h1>
 
@@ -15,32 +13,56 @@
   Logout
 </a>
 
+<br><br>
 
 <table border="1">
 
   <tr>
-    <th>ID</th>
-    <th>Plate</th>
     <th>VIN</th>
+    <th>Plate Number</th>
     <th>Brand</th>
     <th>Model</th>
+    <th>Model Year</th>
+    <th>Engine Type</th>
+    <th>Engine Type ID</th>
+    <th>Engine Volume</th>
+    <th>Transmission Type</th>
+    <th>Body Type</th>
+    <th>Mileage</th>
+    <th>Created At</th>
+    <th>Updated At</th>
   </tr>
 
 
   <tr th:each="car : ${cars.content}">
 
-    <td th:text="${car.id}"></td>
-
-    <td th:text="${car.plate}"></td>
-
     <td th:text="${car.vin}"></td>
+
+    <td th:text="${car.plateNumber}"></td>
 
     <td th:text="${car.brand}"></td>
 
     <td th:text="${car.model}"></td>
 
-  </tr>
+    <td th:text="${car.modelYear}"></td>
 
+    <td th:text="${car.engineType}"></td>
+
+    <td th:text="${car.engineTypeId}"></td>
+
+    <td th:text="${car.engineVolume}"></td>
+
+    <td th:text="${car.transmissionType}"></td>
+
+    <td th:text="${car.bodyType}"></td>
+
+    <td th:text="${car.mileage}"></td>
+
+    <td th:text="${car.createdAt}"></td>
+
+    <td th:text="${car.updatedAt}"></td>
+
+  </tr>
 
 </table>
 
@@ -57,18 +79,17 @@
 
 
   <span>
-Page:
-<span th:text="${cars.number+1}"></span>
-/
-<span th:text="${cars.totalPages}"></span>
-</span>
+        Page:
+        <span th:text="${cars.number + 1}"></span>
+        /
+        <span th:text="${cars.totalPages}"></span>
+    </span>
 
 
   <a th:if="${cars.hasNext()}"
      th:href="@{/admin/cars(page=${cars.number+1})}">
     Next
   </a>
-
 
 </div>
 

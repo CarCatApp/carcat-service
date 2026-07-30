@@ -2,9 +2,11 @@ package com.carland.carland_service.repository;
 
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
+import com.google.api.gax.paging.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.awt.print.Pageable;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,7 +16,7 @@ public interface CarRepository extends JpaRepository<Car, Long> {
     Optional<Car> findByPlateNumberIgnoreCase(String plateNumber);
 
     List<Car> findAllByCustomer(Customer customer);
-
+    Page<Car> findAll(Pageable pageable);
     Car findByCarId(Long carId);
 
     Car findByCarIdAndCustomer(Long carId, Customer customer);
