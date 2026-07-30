@@ -30,6 +30,7 @@ public class JWTConfiguration {
                         .requestMatchers("/api/v1/user/customer-cars").permitAll()
                         .requestMatchers("/api/v1/group/by/get/brand/list/with/models").permitAll()
                         .requestMatchers("/webhook/**").permitAll()
+                        .requestMatchers("/api/v1/car/test/**").permitAll()
                         .anyRequest().authenticated())
 
                 .addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
