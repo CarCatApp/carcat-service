@@ -38,7 +38,33 @@ public class CarController {
     private final CustomerRepository customerRepository;
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
+    @GetMapping("/test/hyper")
+    public String testHyperApi() {
 
+        try {
+            String token = hyperTokenService.getToken();
+
+            String url = "https://api.hyper.az/partner/v1/vehicles/by-vin/3FA6P0HDXKR168752";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    request,
+                    String.class
+            );
+
+            return "TESTTT     EHEHEHEHEHEHEHEHEHEHHEEHEEHHEHEHEHHEHAHAHAHAAHAHAHHAHAHAHAHAHAHAHAHHAHAHA"+response.getBody();
+
+        } catch (Exception e) {
+            return "ERROR: " + e.getMessage();
+        }
+    }
     @PostMapping("/add")
     public CarResponse addCar(@RequestBody CarRequest carRequest,
                               @RequestHeader("Authorization") String token,
@@ -256,33 +282,7 @@ public class CarController {
     }
 
 
-    @GetMapping("/test/hyper")
-    public String testHyperApi() {
 
-        try {
-            String token = hyperTokenService.getToken();
-
-            String url = "https://api.hyper.az/partner/v1/vehicles/by-vin/3FA6P0HDXKR168752";
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(token);
-            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    request,
-                    String.class
-            );
-
-            return "TESTTT     EHEHEHEHEHEHEHEHEHEHHEEHEEHHEHEHEHHEHAHAHAHAAHAHAHHAHAHAHAHAHAHAHAHHAHAHA"+response.getBody();
-
-        } catch (Exception e) {
-            return "ERROR: " + e.getMessage();
-        }
-    }
 }
 
 

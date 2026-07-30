@@ -35,7 +35,7 @@ public class CustomFilter extends OncePerRequestFilter {
         boolean isPublic =
                 path.startsWith("/legal/")
                         || path.startsWith("/auth/")
-                        || path.startsWith("/test/get")
+                        || path.contains("/test/get")
                         || path.startsWith("/api/v1/user/customer-cars")
                         || path.equals("/api/v1/group/by/get/brand/list/with/models");
 
