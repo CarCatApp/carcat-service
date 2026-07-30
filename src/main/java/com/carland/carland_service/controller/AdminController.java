@@ -17,6 +17,8 @@ public class AdminController {
 
     private final CarRepository carRepository;
 
+    private static final String ADMIN_URL = "https://digital-innovation.agency";
+
 
     @GetMapping({"/admin", "/admin/"})
     public String loginPage(
@@ -43,10 +45,10 @@ public class AdminController {
 
             session.setAttribute("ADMIN_LOGIN", true);
 
-            return "redirect:/admin/cars";
+            return "redirect:" + ADMIN_URL + "/admin/cars";
         }
 
-        return "redirect:/admin?error=true";
+        return "redirect:" + ADMIN_URL + "/admin/?error=true";
     }
 
 
@@ -60,7 +62,8 @@ public class AdminController {
         Boolean loggedIn = (Boolean) session.getAttribute("ADMIN_LOGIN");
 
         if (!Boolean.TRUE.equals(loggedIn)) {
-            return "redirect:/admin";
+
+            return "redirect:" + ADMIN_URL + "/admin/";
         }
 
 
@@ -82,6 +85,6 @@ public class AdminController {
 
         session.invalidate();
 
-        return "redirect:/admin";
+        return "redirect:" + ADMIN_URL + "/admin/";
     }
 }
