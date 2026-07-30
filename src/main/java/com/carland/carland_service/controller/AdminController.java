@@ -1,6 +1,5 @@
 package com.carland.carland_service.controller;
 
-
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.repository.CarRepository;
 import jakarta.servlet.http.HttpSession;
@@ -20,7 +19,15 @@ public class AdminController {
 
 
     @GetMapping({"/admin", "/admin/"})
-    public String loginPage() {
+    public String loginPage(
+            @RequestParam(required = false) String error,
+            Model model
+    ) {
+
+        if (error != null) {
+            model.addAttribute("error", true);
+        }
+
         return "login";
     }
 
@@ -50,26 +57,28 @@ public class AdminController {
             Model model
     ) {
 
-        Boolean login = (Boolean) session.getAttribute("ADMIN_LOGIN");
+        Boolean loggedIn = (Boolean) session.getAttribute("ADMIN_LOGIN");
 
-        if (login == null || !login) {
+        if (!Boolean.TRUE.equals(loggedIn)) {
             return "redirect:/admin";
         }
 
 
         Pageable pageable = PageRequest.of(page, 10);
 
-        Page<Car> cars = carRepository.findAll(pageable);
+        Page<Car> carPage = carRepository.findAll(pageable);
 
 
-        model.addAttribute("cars", cars);
+        model.addAttribute("cars", carPage.getContent());
+        model.addAttribute("page", carPage);
+
 
         return "cars";
     }
 
 
     @GetMapping("/admin/logout")
-    public String logout(HttpSession session){
+    public String logout(HttpSession session) {
 
         session.invalidate();
 
