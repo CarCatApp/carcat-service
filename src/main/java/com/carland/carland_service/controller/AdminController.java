@@ -19,7 +19,7 @@ public class AdminController {
     private final CarRepository carRepository;
 
 
-    @GetMapping("/admin")
+    @GetMapping({"/admin", "/admin/"})
     public String loginPage() {
         return "login";
     }
