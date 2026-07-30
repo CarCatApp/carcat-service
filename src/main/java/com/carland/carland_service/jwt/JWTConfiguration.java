@@ -30,7 +30,7 @@ public class JWTConfiguration {
                         .requestMatchers("/api/v1/user/customer-cars").permitAll()
                         .requestMatchers("/api/v1/group/by/get/brand/list/with/models").permitAll()
                         .requestMatchers("/webhook/**").permitAll()
-                        .requestMatchers("/admin/**").permitAll()
+                        .requestMatchers("/admin", "/admin/**").permitAll()
                         .requestMatchers("/api/v1/car/test/**").permitAll()
                         .anyRequest().authenticated())
 

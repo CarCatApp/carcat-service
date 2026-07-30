@@ -22,6 +22,10 @@ public class CustomFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
+        System.out.println("========== REQUEST ==========");
+        System.out.println("URI: " + path);
+        System.out.println("Context: " + request.getContextPath());
+        System.out.println("Servlet: " + request.getServletPath());
         if (path.startsWith("/webhook/partner/")) {
             filterChain.doFilter(request, response);
             return;
