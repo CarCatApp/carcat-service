@@ -39,6 +39,7 @@ spring:
 
 server:
   port: 9091
+  forward-headers-strategy: framework
 
 carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
