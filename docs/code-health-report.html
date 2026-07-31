@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Carland Service — Code Health &amp; Architecture Audit</title>
+<style>
+  @page {
+    size: A4;
+    margin: 17mm 15mm 18mm 15mm;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Segoe UI", -apple-system, Arial, sans-serif;
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: #1a2333;
+    margin: 0;
+  }
+
+  /* ---------- Cover ---------- */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 240mm;
+    padding: 0 8mm;
+  }
+
+  .cover .badge {
+    display: inline-block;
+    width: fit-content;
+    background: #1e40af;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 4px;
+    margin-bottom: 22px;
+  }
+
+  .cover h1 {
+    font-size: 34px;
+    line-height: 1.2;
+    margin: 0 0 10px;
+    color: #0f172a;
+  }
+
+  .cover .subtitle {
+    font-size: 16px;
+    color: #475569;
+    margin-bottom: 34px;
+  }
+
+  .cover .meta {
+    border-top: 2px solid #e2e8f0;
+    padding-top: 18px;
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .cover .meta div { margin-bottom: 5px; }
+  .cover .meta strong { color: #0f172a; display: inline-block; width: 130px; }
+
+  /* ---------- Headings ---------- */
+  h2 {
+    font-size: 17px;
+    color: #0f172a;
+    border-bottom: 2.5px solid #1e40af;
+    padding-bottom: 5px;
+    margin: 26px 0 12px;
+    page-break-after: avoid;
+  }
+
+  h2 .secno { color: #1e40af; margin-right: 8px; }
+
+  h3 {
+    font-size: 13px;
+    color: #1e3a8a;
+    margin: 18px 0 7px;
+    page-break-after: avoid;
+  }
+
+  h4 {
+    font-size: 11px;
+    color: #334155;
+    margin: 12px 0 5px;
+    page-break-after: avoid;
+  }
+
+  p { margin: 0 0 8px; }
+
+  ul, ol { margin: 4px 0 10px; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9.5px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    padding: 0.5px 4px;
+    color: #0f172a;
+    word-break: break-all;
+  }
+
+  pre {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #1e40af;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9px;
+    line-height: 1.5;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-break: break-all;
+    page-break-inside: avoid;
+  }
+
+  pre code { background: none; border: none; padding: 0; }
+
+  /* ---------- Tables ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 14px;
+    font-size: 9.5px;
+    page-break-inside: auto;
+  }
+
+  th {
+    background: #1e3a8a;
+    color: #fff;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 5px 8px;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr { page-break-inside: avoid; }
+
+  /* ---------- Severity badges ---------- */
+  .sev {
+    display: inline-block;
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .sev-critical { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+  .sev-high     { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }
+  .sev-medium   { background: #fef9c3; color: #a16207; border: 1px solid #fde047; }
+  .sev-low      { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+  .sev-good     { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+
+  /* ---------- Callout boxes ---------- */
+  .callout {
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 10px 0 14px;
+    page-break-inside: avoid;
+  }
+
+  .callout .title { font-weight: 700; margin-bottom: 4px; }
+
+  .callout-red    { background: #fef2f2; border: 1px solid #fecaca; }
+  .callout-red .title { color: #b91c1c; }
+
+  .callout-amber  { background: #fffbeb; border: 1px solid #fde68a; }
+  .callout-amber .title { color: #b45309; }
+
+  .callout-blue   { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .callout-blue .title { color: #1d4ed8; }
+
+  .callout-green  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .callout-green .title { color: #15803d; }
+
+  /* ---------- Metric cards ---------- */
+  .metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 14px;
+  }
+
+  .metric {
+    flex: 1 1 120px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    page-break-inside: avoid;
+  }
+
+  .metric .value { font-size: 19px; font-weight: 800; color: #1e40af; }
+  .metric .label { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+
+  .pagebreak { page-break-before: always; }
+  .avoid-break { page-break-inside: avoid; }
+
+  .small { font-size: 9px; color: #64748b; }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER ==================== -->
+<div class="cover">
+  <span class="badge">Confidential — Internal Engineering Report</span>
+  <h1>Carland Service<br>Code Health &amp; Architecture Audit</h1>
+  <div class="subtitle">Full-codebase review: structure, duplication, dead code, security posture and maintainability</div>
+  <div class="meta">
+    <div><strong>Project</strong> carland_service (Spring Boot 3.4.3, Java 21)</div>
+    <div><strong>Repository</strong> github.com/azizJava91/carcat-service</div>
+    <div><strong>Audit date</strong> July 31, 2026</div>
+    <div><strong>Method</strong> Static review of every package, class and method in <code>src/main/java</code>, resources and build/deploy configuration. No code was modified.</div>
+    <div><strong>Audience</strong> Engineering management</div>
+  </div>
+</div>
+
+<!-- ==================== 1. EXECUTIVE SUMMARY ==================== -->
+<h2><span class="secno">1</span>Executive Summary</h2>
+
+<p>
+carland_service is the core backend of the Carland/CarCat product: it manages cars, customers, maintenance
+templates, service-life percentages, partner service visits (Hyper integration), photos, notifications and an
+admin panel. The service is <strong>functional and actively deployed</strong>, and several recent additions
+(webhook HMAC security, the V2 visit model) show good engineering instincts. However, the codebase carries
+significant accumulated debt that now slows every change and creates real production risk.
+</p>
+
+<div class="metrics">
+  <div class="metric"><div class="value">~230</div><div class="label">Java files (main app)</div></div>
+  <div class="metric"><div class="value">~77</div><div class="label">Active API endpoints</div></div>
+  <div class="metric"><div class="value">2,038</div><div class="label">Lines in largest class</div></div>
+  <div class="metric"><div class="value">42%</div><div class="label">Of repo is a stale copy</div></div>
+  <div class="metric"><div class="value">1</div><div class="label">Test (empty, skipped in CI)</div></div>
+  <div class="metric"><div class="value">0</div><div class="label">Bean-validation checks</div></div>
+</div>
+
+<h3>Top 5 risks (ranked)</h3>
+<table>
+  <tr><th style="width:60px">Severity</th><th style="width:230px">Finding</th><th>Why it matters</th></tr>
+  <tr>
+    <td><span class="sev sev-critical">Critical</span></td>
+    <td>API authentication does not verify tokens — any string starting with <code>Bearer&nbsp;</code> is accepted</td>
+    <td>Every "protected" endpoint (cars, records, photos, personal data) is effectively open to anyone who sends a fake header. Identity is taken from client-supplied headers.</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-critical">Critical</span></td>
+    <td>Admin panel guarded only by hardcoded credentials (<code>nemet</code>/<code>nemet</code>) committed to source</td>
+    <td>Anyone with repo access or who guesses the credentials gets the full customer/car database and Excel exports. <code>/admin/**</code> is also excluded from Spring Security entirely.</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-critical">Critical</span></td>
+    <td>A full stale copy of the repository (<code>carcat-service/</code>, 205 tracked files) is committed inside the repository</td>
+    <td>42% of tracked files are dead weight. It corrupts code search, invites edits to the wrong file, and doubles confusion for every new developer.</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-high">High</span></td>
+    <td><code>CarServiceImpl</code> is a 2,038-line god class; its two percentage methods alone are ~660 lines</td>
+    <td>The core business calculation (service-life percentages) is implemented twice with different formulas, so results can disagree depending on which endpoint is called.</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-high">High</span></td>
+    <td>No safety net: 1 empty test, CI builds with <code>-x test</code>, schema managed by <code>ddl-auto: update</code></td>
+    <td>Every deploy is unverified; the database schema mutates automatically in production with no migration history or rollback path.</td>
+  </tr>
+</table>
+
+<h3>Overall assessment</h3>
+<p>
+The product logic is real and valuable, but the codebase is in a state where <strong>correctness depends on
+individual memory rather than structure</strong>: business rules are duplicated in 2–3 places, security is
+inconsistent per endpoint, roughly 10% of classes are dead or stubbed, and there is no automated verification.
+None of this requires a rewrite — the recommended path (Section&nbsp;10) is a focused 4-phase cleanup that can be
+executed incrementally alongside feature work.
+</p>
+
+<!-- ==================== 2. SCOPE ==================== -->
+<h2><span class="secno">2</span>Scope &amp; Method</h2>
+<ul>
+  <li><strong>Reviewed:</strong> all packages under <code>src/main/java/com/carland/carland_service</code>
+      (controller, service, entity, repository, dto, enums, exceptions, filter, config, jwt, util, feign),
+      <code>src/main/resources</code>, <code>build.gradle</code>, Dockerfile and the GitHub Actions pipeline.</li>
+  <li><strong>Excluded from deep review:</strong> the nested <code>carcat-service/</code> folder (confirmed to be a stale
+      duplicate — reported as a finding, not analyzed line-by-line) and the separate <code>carland_auth</code> project
+      (referenced only where the two services interact).</li>
+  <li><strong>Method:</strong> full manual read of the largest classes, systematic usage searches for every exception,
+      repository method and DTO, cross-file duplication comparison, and configuration/security review.
+      <strong>No code was changed.</strong></li>
+</ul>
+
+<!-- ==================== 3. ARCHITECTURE OVERVIEW ==================== -->
+<h2><span class="secno">3</span>Architecture Overview</h2>
+
+<p>The service follows a conventional Spring Boot layering on paper — controller → service interface → service
+implementation → repository → entity — with four outbound integrations and one inbound webhook channel:</p>
+
+<pre>
+Mobile / Partner clients
+        │
+        ▼
+ ┌─ Controllers (17 classes, ~77 endpoints) ──────────────────────────────┐
+ │  /api/v1/*  (cars, users, photos, templates, ranges, calendar, ...)    │
+ │  /webhook/partner/*  (Hyper service-visit ingest/update)               │
+ │  /admin/*  (session-based Thymeleaf panel)      /legal/*               │
+ └──────────────────────────────────────────────────────────────────────┬─┘
+        │ services (~30 impls; CarServiceImpl = 2,038 lines)             │
+        ▼                                                                ▼
+ PostgreSQL (33 JPA entities, ddl-auto: update)              Outbound: Hyper API (OAuth),
+ V1 history: service_histories   V2: visits/lines/parts      NHTSA VIN decode, carland_auth
+                                                             (Feign), Brevo mail, Firebase push
+</pre>
+
+<p>Security is split into three inconsistent regimes:</p>
+<table>
+  <tr><th>Surface</th><th>Protection</th><th>Assessment</th></tr>
+  <tr><td><code>/api/v1/**</code></td><td>Custom filter checks only that an <code>Authorization: Bearer …</code> header <em>exists</em>; the JWT is never parsed or verified</td><td><span class="sev sev-critical">Critical</span></td></tr>
+  <tr><td><code>/admin/**</code></td><td>Excluded from Spring Security; HTTP-session flag set after comparing to hardcoded credentials</td><td><span class="sev sev-critical">Critical</span></td></tr>
+  <tr><td><code>/webhook/partner/*</code></td><td>Two-layer: shared <code>X-Internal-Token</code> + per-partner HMAC-SHA256 signature (constant-time compares, secrets in DB/env)</td><td><span class="sev sev-good">Good</span></td></tr>
+</table>
+
+<p class="small">The webhook security stack (internal token + HMAC, fail-closed validation, structured 401 responses)
+is the best-engineered part of the codebase and should be the model for the rest.</p>
+
+<!-- ==================== 4. CRITICAL FINDINGS ==================== -->
+<h2 class="pagebreak"><span class="secno">4</span>Critical Findings (act immediately)</h2>
+
+<h3>4.1 Token "validation" that validates nothing</h3>
+<div class="callout callout-red">
+  <div class="title">jwt/CustomFilter.java — any Bearer string authenticates</div>
+  The filter checks <code>authHeader.startsWith("Bearer ")</code> and then unconditionally creates an authenticated
+  principal named <code>"user"</code>. The three <code>jjwt</code> libraries declared in <code>build.gradle</code> are never used.
+  Real user identity (user id, phone, role) is taken from <em>client-supplied request headers</em>
+  (<code>X-User-Id</code>, <code>phoneNumber</code>, <code>role</code>), which any caller can forge. In practice, all
+  "authenticated" endpoints are open, and any user can act as any other user by changing a header.
+</div>
+
+<h3>4.2 Admin panel: hardcoded credentials + security bypass</h3>
+<div class="callout callout-red">
+  <div class="title">AdminController.java line 67 + JWTConfiguration permitAll</div>
+  <code>if ("nemet".equals(username) &amp;&amp; "nemet".equals(password))</code> is the entire admin login.
+  The credentials are committed to a repository whose history is shared; there is no hashing, rate-limiting or audit
+  trail. <code>/admin/**</code> is additionally listed as <code>permitAll</code> in Spring Security and bypassed in the
+  JWT filter, so the panel's only protection is this string comparison. Behind it sit the full car and customer
+  databases plus one-click Excel exports.
+</div>
+
+<h3>4.3 Stale nested repository copy committed to git</h3>
+<div class="callout callout-red">
+  <div class="title">carcat-service/ — 205 tracked files, ~42% of the repository</div>
+  A complete, older fork of the project (including its own <code>.github/workflows</code>, Dockerfile and full source
+  tree) lives inside the repository and is fully tracked by git. File contents have diverged from the live tree
+  (verified by hash comparison). Consequences observed during this audit: code searches return double results,
+  and it is easy to open and edit the dead copy by mistake. It should be deleted and git-ignored.
+</div>
+
+<h3>4.4 Sensitive data written to logs</h3>
+<table>
+  <tr><th>Location</th><th>What leaks</th></tr>
+  <tr><td><code>UserController</code> (~L103–111)</td><td>Logs the <strong>full Authorization token</strong> and all request headers</td></tr>
+  <tr><td><code>util/MailTrapConfig</code></td><td>Prints the <strong>mail API token</strong> to <code>System.err</code> at startup</td></tr>
+  <tr><td><code>jwt/CustomFilter</code></td><td>Prints every request URI via <code>System.out.println</code> (noise, and URIs can contain identifiers)</td></tr>
+  <tr><td><code>application.yaml</code></td><td><code>show_sql: true</code> dumps all SQL (with data patterns) to production logs</td></tr>
+</table>
+
+<h3>4.5 Unprotected bulk data exports</h3>
+<ul>
+  <li><code>GET /api/v1/user/customer-cars</code> — generates an Excel file of <strong>all customers and their cars</strong>
+      and is on the filter's <em>public</em> path list (no authentication at all).</li>
+  <li><code>GET /api/v1/user/get/all/with/cars</code> — full customer+car dump behind the non-validating Bearer check only.</li>
+  <li>Admin Excel exports (<code>/admin/cars/export</code>, <code>/admin/users/export</code>) sit behind the hardcoded password only.</li>
+</ul>
+
+<!-- ==================== 5. GOD CLASSES / SPAGHETTI ==================== -->
+<h2 class="pagebreak"><span class="secno">5</span>Structural Debt: God Classes &amp; Spaghetti Logic</h2>
+
+<h3>5.1 CarServiceImpl — 2,038 lines</h3>
+<p>The single most expensive maintenance point in the system. It owns 17 public operations plus helpers, mixing
+authentication, validation, business math, persistence, response mapping and even push-notification copywriting.</p>
+
+<table>
+  <tr><th>Method</th><th style="width:80px">Approx. size</th><th>Mixed responsibilities</th></tr>
+  <tr><td><code>executeServicePercentages</code> (L827–1171)</td><td>~345 lines</td><td>Auth, status branching, partner sync, record/history merging, percentage math, persistence, response building, a manual re-read to dodge a race condition</td></tr>
+  <tr><td><code>getServicePercentageList</code> (L413–730)</td><td>~318 lines</td><td>Re-implements the same km/month math <em>inline</em> instead of reusing the existing helper methods</td></tr>
+  <tr><td><code>addCar</code> (L1176–1454)</td><td>~279 lines</td><td>Validation, customer/color/plate/VIN checks, template bootstrap, percentage + record creation, DB audit logging, async post-commit sync</td></tr>
+  <tr><td><code>checkVin</code> (L66–174)</td><td>~109 lines</td><td>DB check + NHTSA decode + field extraction + response assembly</td></tr>
+</table>
+
+<div class="callout callout-amber">
+  <div class="title">Business-correctness risk, not just style</div>
+  The percentage formula exists in <strong>three places</strong>: inline in <code>getServicePercentageList</code>,
+  in the <code>computeKmPercentage</code>/<code>computeMonthPercentage</code> helpers used by
+  <code>executeServicePercentages</code>, and again in <code>HyperPercentageSyncService.applyPartnerData</code>.
+  The list and execute paths already use <em>different month formulas</em> in their default branches, so the value a
+  user sees in the list can differ from the value stored after execution.
+</div>
+
+<h3>5.2 Other oversized / tangled classes</h3>
+<table>
+  <tr><th>Class</th><th style="width:60px">Lines</th><th>Problem</th></tr>
+  <tr><td><code>controller/Legal.java</code></td><td>558</td><td>~475 lines of terms &amp; privacy-policy text embedded as Java text blocks; legal edits require recompile + redeploy; also contains a debug endpoint returning <code>"AAHAHHAHAHA…"</code></td></tr>
+  <tr><td><code>PhotoServiceImpl</code></td><td>459</td><td>Four near-identical upload/get/delete pipelines (car / user / partner / badge-logo); media-type normalization copy-pasted 4×; returns <code>ResponseEntity</code> from the service layer</td></tr>
+  <tr><td><code>dto/response/v2/CarVinHistoryServiceV2Impl</code></td><td>414</td><td>A full <code>@Service</code> living inside a DTO package (see 5.3)</td></tr>
+  <tr><td><code>PartnerServiceVisitUpdateServiceImpl</code></td><td>369</td><td>~55-line procedural entry method; ~55 lines of repetitive field-diff blocks; ownership failure disguised as 404</td></tr>
+  <tr><td><code>AdminController</code></td><td>353</td><td>MVC controller doing repository pagination, in-memory paging of Feign results and full Apache POI Excel generation inline</td></tr>
+  <tr><td><code>HyperPercentageSyncService</code></td><td>341</td><td>Sync + matching + a third copy of the percentage math</td></tr>
+</table>
+
+<h3>5.3 Misplaced classes (package hygiene)</h3>
+<table>
+  <tr><th>Class</th><th>Actual kind</th><th>Lives in</th><th>Belongs in</th></tr>
+  <tr><td><code>Visit</code>, <code>ServiceHistoryV2</code>, <code>ServiceHistoryPartV2</code></td><td>JPA entities (<code>visits</code>, <code>visit_service_lines</code>, <code>visit_parts</code>)</td><td><code>dto.response.v2</code></td><td><code>entity</code></td></tr>
+  <tr><td><code>CarVinHistoryServiceV2</code> / <code>…V2Impl</code></td><td>Service interface + implementation</td><td><code>dto.response.v2</code></td><td><code>service</code> / <code>service.impl</code></td></tr>
+  <tr><td><code>MailTrapConfig</code></td><td><code>@Configuration</code> (also defines the app's only <code>RestTemplate</code> bean)</td><td><code>util</code></td><td><code>config</code></td></tr>
+  <tr><td><code>PushCron</code></td><td>Scheduled job (fully commented out)</td><td><code>util</code></td><td><code>job</code> / delete</td></tr>
+  <tr><td><code>Helper</code></td><td><code>@Service</code> doing user provisioning by role + date formatting</td><td><code>util</code></td><td>split into proper services</td></tr>
+  <tr><td><code>FirebaseTokenService</code></td><td><code>@Configuration</code> named like a service</td><td><code>service.impl</code></td><td><code>config</code></td></tr>
+</table>
+
+<!-- ==================== 6. DUPLICATION ==================== -->
+<h2 class="pagebreak"><span class="secno">6</span>Duplicated Logic Inventory</h2>
+
+<table>
+  <tr><th>Duplication</th><th style="width:90px">Copies</th><th>Evidence / impact</th></tr>
+  <tr>
+    <td>Service-life percentage math (km + month formulas)</td><td>3</td>
+    <td>Inline in <code>getServicePercentageList</code>; helpers in <code>CarServiceImpl</code> L1889–1916; again in <code>HyperPercentageSyncService</code> L286–311. Formulas already diverge.</td>
+  </tr>
+  <tr>
+    <td>Hyper VIN-history flow (fetch, lock, persist, map)</td><td>2</td>
+    <td><code>CarVinHistoryServiceImpl</code> (276 lines, V1) vs <code>CarVinHistoryServiceV2Impl</code> (414 lines, V2): identical <code>fetchHyperHistory</code> HTTP method byte-for-byte, parallel persist/map pipelines. Hyper→DTO mapping additionally exists a third time in <code>HyperWebhookIngestMapper</code>.</td>
+  </tr>
+  <tr>
+    <td>Customer authentication boilerplate (<code>findByUserIdAndPhoneNumberAndStatus</code> + null check)</td><td>~14</td>
+    <td>Repeated at the top of nearly every <code>CarServiceImpl</code> method instead of one guard/helper.</td>
+  </tr>
+  <tr>
+    <td>Webhook ingest vs update services</td><td>2</td>
+    <td>~25 lines of byte-identical mapper helpers (<code>mapLineToEntity</code>, <code>mapPartToEntity</code>, <code>normalizeUniversalServiceId</code>, cost recalculation) plus a ~15-line identical entry pipeline across 604 combined lines.</td>
+  </tr>
+  <tr>
+    <td>Response-builder blocks</td><td>6+ / 4</td>
+    <td><code>CarServicePercentageResponse.builder()…</code> appears ≥6 times; <code>RecordResponse.builder()…</code> 4 times — one mapper each would do.</td>
+  </tr>
+  <tr>
+    <td>Photo upload/get pipeline &amp; media-type normalization</td><td>4</td>
+    <td>Copy-pasted per photo kind in <code>PhotoServiceImpl</code>.</td>
+  </tr>
+  <tr>
+    <td>Body-buffering filters</td><td>2</td>
+    <td><code>ContentCachingFilter</code> wraps <em>every</em> request (incl. 50&nbsp;MB multipart) at highest precedence; <code>WebhookSignatureFilter</code> then buffers the same body again via <code>CachedBodyHttpServletRequest</code> — double memory per webhook.</td>
+  </tr>
+  <tr>
+    <td>Person-shaped DTOs</td><td>3</td>
+    <td><code>NameSurname</code>, <code>AuthUser</code>, <code>CustomerResponse</code> model the same person with overlapping fields.</td>
+  </tr>
+  <tr>
+    <td>V1 vs V2 history response DTOs</td><td>2 sets</td>
+    <td><code>CarVinServiceHistoryResponse</code>/<code>ServiceHistoryItemResponse</code>/<code>…PartResponse</code> vs their V2 twins — both API versions live under <code>/api/v1</code>.</td>
+  </tr>
+</table>
+
+<!-- ==================== 7. DEAD CODE ==================== -->
+<h2><span class="secno">7</span>Dead, Stubbed &amp; Unused Code</h2>
+
+<h3>7.1 Endpoints that return null or nonsense</h3>
+<table>
+  <tr><th>Surface</th><th>State</th></tr>
+  <tr><td><code>SuperAdminController</code> + service + 2 DTOs</td><td>Controller has <strong>zero endpoints</strong>; service returns <code>null</code>; both DTOs have <strong>zero fields</strong> — an entire dead vertical slice</td></tr>
+  <tr><td><code>AppointmentServiceImpl</code> (both methods), <code>AutoServiceServiceImpl.getService</code>/<code>addServiceAmount</code>, <code>RangeServiceImpl.decideOnBooking</code>, <code>MaintenanceTemplateServiceImpl.createMaintenanceTemplate</code></td><td>All <code>return null;</code> — live endpoints backed by stubs (real bodies sit in comments)</td></tr>
+  <tr><td><code>GET /legal/get</code>, <code>GET /webhook/partner/test</code>, <code>GET /api/v1/car/test/hyper</code></td><td>Debug/test endpoints in production route table; <code>/test/hyper</code> calls the real Hyper API with a hardcoded VIN and is on the public path list</td></tr>
+</table>
+
+<h3>7.2 Unused classes and members (usage-verified)</h3>
+<ul>
+  <li><strong>9 exception classes never thrown anywhere</strong> — <code>ExpiredOtpException</code>, <code>InvalidOtpCodeException</code>,
+      <code>RefreshTokenNotSetException</code>, <code>UsernameAlreadyExistException</code>, <code>MsmTransactionException</code>,
+      <code>InviteException</code>, <code>WrongPasswordException</code>, <code>UnderageException</code>, <code>NotificationException</code>.
+      All are OTP/invite/auth concerns evidently copied from carland_auth; each still has a handler registered in the
+      256-line <code>CustomExceptionHandler</code>. <code>UICustomExceptionHandler</code> renders a template
+      (<code>invite-error</code>) that does not exist.</li>
+  <li><strong>Unused repository methods:</strong> <code>BrandRepository.findAllByBrandName</code>/<code>existsByBrandName</code>,
+      <code>PartnerRepository.findBySourceIgnoreCaseAndActiveTrue</code>, <code>ColorRepository.findAllByOrderByColorIdAsc</code>,
+      <code>VisitRepository.findWithDetailsByCarAndHyperRecordId</code>, <code>ModelYearRepository.findAllByStatus</code>.</li>
+  <li><strong>Dead config/util:</strong> <code>RestTemplateConfig</code> (an empty class — no annotation, no beans),
+      <code>CustomImageCrop</code> (only call sites are commented), <code>PushCron</code> (all schedules commented),
+      the Mailtrap client bean (never injected), <code>ServiceNameAz</code> enum (entire body commented out).</li>
+  <li><strong>Dead notification pipeline:</strong> <code>CarServiceImpl.canSendNotification</code> and
+      <code>buildMessage</code> (~85 lines) are referenced only from commented code, while the <em>live</em>
+      <code>calculateAndPushNotification</code> sends a hardcoded fake message ("oil change — 230 km left") to
+      every car with a device token. Only the fact that its cron trigger is also commented out prevents mass
+      fake pushes.</li>
+  <li><strong>Unused DTOs:</strong> <code>PrivacyPolicyResponse</code>, <code>TermsConditionsResponse</code> (imported but never used),
+      SuperAdmin request/response.</li>
+  <li><strong>Unused controller members:</strong> <code>CarController</code> injects <code>customerRepository</code> and
+      <code>maintenanceTemplateRepository</code> that are never read; ~30 <code>@RequestHeader("Authorization")</code>
+      parameters across 7 controllers are accepted and then ignored.</li>
+  <li><strong>Unused build dependencies:</strong> <code>jjwt-api/impl/jackson</code> (no JWT parsing exists),
+      <code>spring-boot-starter-webflux</code> (no WebClient/Mono/Flux usage), <code>mailtrap-java</code> and
+      <code>spring-boot-starter-mail</code> (active mail path is Brevo via RestTemplate), Lombok declared twice.</li>
+</ul>
+
+<h3>7.3 Commented-out code volume</h3>
+<p>12 blocks longer than 3 lines, the largest being ~80 and ~68 lines of legacy doctor/appointment logic in
+<code>RangeServiceImpl</code>, ~44 lines in <code>CarServiceImpl</code>, ~35 in <code>MaintenanceTemplateServiceImpl</code>,
+plus fully commented files (<code>ServiceNameAz</code>, <code>PushCron</code> schedules, alternate HMAC strategies).
+Commented code is where the real business rules currently hide — e.g. template-creation auth checks are commented
+out, meaning <strong>role verification for maintenance-template management is disabled in production</strong>.</p>
+
+<!-- ==================== 8. DATA & API LAYER ==================== -->
+<h2 class="pagebreak"><span class="secno">8</span>Data Layer &amp; API Design</h2>
+
+<h3>8.1 Persistence findings</h3>
+<table>
+  <tr><th>Finding</th><th>Detail</th><th style="width:70px">Severity</th></tr>
+  <tr><td>No migration tool</td><td>Liquibase is commented out in <code>build.gradle</code>; production schema evolves via <code>ddl-auto: update</code> — no history, no rollback, silent drift</td><td><span class="sev sev-high">High</span></td></tr>
+  <tr><td>Lombok <code>@Data</code> on all 30 entities</td><td>Generated equals/hashCode/toString over JPA associations risk LazyInitialization errors, recursion and broken collection semantics; only sporadic <code>@ToString.Exclude</code> mitigations</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td>Raw <code>Long</code> foreign keys</td><td><code>Car.colorId</code>/<code>engineTypeId</code>, <code>Percentage.carId</code>/<code>serviceId</code>, <code>Notification.customerId</code>, photo tables etc. bypass JPA relations while proper <code>@ManyToOne</code> is used elsewhere — two inconsistent styles</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td>Denormalized car attributes</td><td><code>Car.brand/model/engineType/bodyType/transmissionType</code> stored as free strings although lookup tables exist for each</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td>Zero declared indexes</td><td>No <code>@Index</code> anywhere; frequent lookups (percentages by car, notifications by customer) rely on defaults</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td><code>Optional</code> inconsistency</td><td><code>CarRepository</code> mixes <code>Optional&lt;Car&gt; findByPlateNumberIgnoreCase</code> with null-returning <code>findByVin</code>; callers null-check inconsistently</td><td><span class="sev sev-low">Low</span></td></tr>
+  <tr><td>Transactions</td><td>Only <code>addCar</code> is <code>@Transactional</code> in <code>CarServiceImpl</code>; multi-write loops (<code>executeServicePercentages</code>) can partially commit. Conversely, VIN-history and feedback services hold DB transactions <em>across external HTTP calls</em>. One service uses <code>jakarta.transaction.Transactional</code> instead of Spring's</td><td><span class="sev sev-high">High</span></td></tr>
+  <tr><td>N+1 query patterns</td><td>Per-item queries in percentage list/execute, per-row part loading in V1 history mapping, per-car color lookup in car-list conversion, per-car device-token lookup in the notification loop</td><td><span class="sev sev-medium">Medium</span></td></tr>
+</table>
+
+<h3>8.2 API design findings</h3>
+<ul>
+  <li><strong>RPC-style verb URLs</strong> throughout: <code>/get/brand/list</code>, <code>/for/car/upload</code>, <code>/insert/service/history</code>, <code>/edit/byId</code> — no resource-oriented convention.</li>
+  <li><strong>Wrong HTTP methods:</strong> reads via <code>PUT</code> (<code>PUT /api/v1/car/get/record</code>), deletes via <code>PUT</code> (<code>/car/remove</code>, <code>/range/delete</code>), updates via <code>POST</code>, and <code>GET</code> endpoints that require request bodies (often stripped by proxies).</li>
+  <li><strong>Zero bean validation:</strong> not a single <code>@Valid</code>/<code>jakarta.validation</code> annotation in the controller or DTO trees; all validation is manual and inconsistent.</li>
+  <li><strong>Entities leaked as API responses:</strong> <code>GroupByController</code>, <code>NotificationController</code> and <code>getColors</code> return JPA entities directly, coupling the public contract to the DB schema.</li>
+  <li><strong>Version confusion:</strong> V2 history exposed as a path suffix under V1 (<code>/api/v1/car/{vin}/service-history/v2</code>); <code>/webhook</code>, <code>/admin</code>, <code>/legal</code> unversioned.</li>
+  <li><strong>Three different error envelopes</strong> face integrators: webhook auth errors, global <code>ResponseException</code> payloads and success-shaped bodies returned with 409 (which is also used for benign no-op updates).</li>
+</ul>
+
+<h3>8.3 Hardcoded business data in enums</h3>
+<p><code>EnumMessagesLangValues</code> holds 90 message constants in three languages — including leftover
+<em>hospital/doctor-domain</em> messages (<code>HOSPITAL_NOT_FOUND</code>, <code>ONLY_DOCTOR_ALLOWED</code>…) from a previous
+product. Five more enums hardcode translations and partner data (<code>ServiceTypeTranslation</code> 37 entries,
+<code>ColorTranslation</code> 19, <code>HyperServiceMapping</code> 23 alias mappings — one of which is ambiguous and
+silently returns empty on collision, <code>EnumPartnerId</code> duplicating the <code>partners</code> DB table).
+Adding a partner or fixing a translation currently requires a code deploy.</p>
+
+<!-- ==================== 9. QUALITY PRACTICES ==================== -->
+<h2><span class="secno">9</span>Engineering Practices</h2>
+
+<table>
+  <tr><th>Practice</th><th>Current state</th><th style="width:70px">Rating</th></tr>
+  <tr><td>Automated tests</td><td>One file with an empty <code>contextLoads()</code>; CI pipeline builds with <code>-x test</code>, so even that never runs</td><td><span class="sev sev-critical">Critical</span></td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions → Docker Hub → SSH docker-compose deploy on every push to <code>main</code>: solid automation, but no quality gate of any kind before production</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td>Logging</td><td>Mix of SLF4J, 5× <code>System.out.println</code>, 15× <code>System.err.println</code>; debug banners (<code>"OOOOOO…"</code>, <code>"WWWWW…"</code>); log messages in three languages incl. informal strings ("yuxudan oyandim rabbit istek gonderdi")</td><td><span class="sev sev-medium">Medium</span></td></tr>
+  <tr><td>Error handling</td><td>Generic <code>RuntimeException</code> in mail/push services; <code>HyperTokenService</code> swallows failures and returns <code>null</code> tokens; duplicate webhook <code>serviceCode</code>s are logged and ingested anyway</td><td><span class="sev sev-high">High</span></td></tr>
+  <tr><td>Naming &amp; language</td><td>Identifiers in English but user-facing strings, log lines and even exception messages mix Azerbaijani, Turkish and English; typos (<code>FeedBackResponse</code>); class named <code>Legal</code> instead of <code>LegalController</code>; misleading names (<code>getCalendarByDoctorId</code> serving auto-services)</td><td><span class="sev sev-low">Low</span></td></tr>
+  <tr><td>Caching / scale readiness</td><td>Hyper OAuth token cached in a local in-memory map — with Hyper's 20 req/hour limit, running a second instance would cause token thrash</td><td><span class="sev sev-medium">Medium</span></td></tr>
+</table>
+
+<!-- ==================== 10. RECOMMENDATIONS ==================== -->
+<h2 class="pagebreak"><span class="secno">10</span>Recommended Remediation Plan</h2>
+
+<p>The plan is ordered so that each phase is independently shippable and reduces risk before convenience.
+Estimates assume one experienced developer familiar with the codebase.</p>
+
+<h3>Phase 1 — Security &amp; hygiene (≈ 1 week)</h3>
+<ol>
+  <li>Implement real JWT validation in <code>CustomFilter</code> (the jjwt dependencies are already on the classpath), or validate against carland_auth; stop trusting client-supplied identity headers.</li>
+  <li>Move admin credentials to environment variables with a hashed password; add rate limiting; remove <code>/admin/**</code> from the public path lists.</li>
+  <li>Remove the token/header logging in <code>UserController</code>, the mail-token print in <code>MailTrapConfig</code>, and the per-request <code>System.out</code> in the filter.</li>
+  <li>Lock down or delete the public bulk exports (<code>/customer-cars</code>) and the test/debug endpoints (<code>/test/hyper</code>, <code>/legal/get</code>).</li>
+  <li>Delete <code>carcat-service/</code> from the repository and add it to <code>.gitignore</code>.</li>
+</ol>
+
+<h3>Phase 2 — Safety net (≈ 1–2 weeks)</h3>
+<ol>
+  <li>Re-enable tests in CI (drop <code>-x test</code>); add characterization tests around the percentage math and webhook ingest/update before touching them.</li>
+  <li>Introduce Liquibase (already half-planned — the dependency is commented out); snapshot the current schema as the baseline; switch <code>ddl-auto</code> to <code>validate</code>.</li>
+  <li>Turn off <code>show_sql</code>; standardize on SLF4J.</li>
+</ol>
+
+<h3>Phase 3 — Dead-code purge (≈ 3–4 days, low risk)</h3>
+<ol>
+  <li>Delete: 9 unused exceptions + their handlers, unused repository methods, empty <code>RestTemplateConfig</code>, <code>PushCron</code>, <code>CustomImageCrop</code>, <code>ServiceNameAz</code>, the SuperAdmin slice, unused DTOs, unused controller fields and ~30 ignored Authorization parameters.</li>
+  <li>Remove unused dependencies (<code>webflux</code>, <code>jjwt</code> if unused after Phase 1, <code>mailtrap</code>, <code>spring-mail</code>, duplicate Lombok line).</li>
+  <li>Delete or implement the <code>return null</code> stub endpoints; either restore or remove the commented notification pipeline and the commented template-auth checks (decide, don't defer).</li>
+</ol>
+
+<h3>Phase 4 — Structural refactoring (incremental, ≈ 3–4 weeks spread out)</h3>
+<ol>
+  <li>Extract from <code>CarServiceImpl</code>: a <code>CustomerAccessGuard</code> (kills ~14 duplications), a single <code>PercentageCalculator</code> (kills the triple formula), and response mappers.</li>
+  <li>Move the V2 entities and service out of <code>dto.response.v2</code> into <code>entity</code>/<code>service</code>; decide the V1-history sunset plan and collapse the duplicated Hyper fetch/map code into one client + one mapper.</li>
+  <li>Extract shared webhook persistence support from the ingest/update twins; move Excel generation out of <code>AdminController</code> into an export service.</li>
+  <li>Externalize legal texts (static resources or DB), translations and partner/service mappings out of Java enums.</li>
+  <li>Adopt <code>@Valid</code> bean validation on request DTOs; stop returning JPA entities from controllers.</li>
+</ol>
+
+<div class="callout callout-blue">
+  <div class="title">What NOT to do</div>
+  A big-bang rewrite is not justified. The domain logic works and is encoded in this code (including in its
+  commented-out corners). The debt is concentrated: two security fixes, one folder deletion, one god class and
+  one duplicated integration account for most of the risk. Fix those and the codebase becomes ordinary.
+</div>
+
+<!-- ==================== 11. APPENDIX ==================== -->
+<h2><span class="secno">11</span>Appendix — Key Metrics</h2>
+
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Java files in live source tree (<code>src/main/java</code>)</td><td>~230</td></tr>
+  <tr><td>Git-tracked files in stale <code>carcat-service/</code> copy</td><td>205 (≈ 42% of all tracked files)</td></tr>
+  <tr><td>Controllers / active endpoints</td><td>17 / ~77 (Car 19, Photo 11, Admin 7, GroupBy 7, Webhook 4, others smaller; SuperAdmin 0)</td></tr>
+  <tr><td>Largest classes</td><td><code>CarServiceImpl</code> 2,038 · <code>Legal</code> 558 · <code>PhotoServiceImpl</code> 459 · <code>CarVinHistoryServiceV2Impl</code> 414 · <code>PartnerServiceVisitUpdateServiceImpl</code> 369 · <code>AdminController</code> 353</td></tr>
+  <tr><td>Methods over 100 lines in <code>CarServiceImpl</code></td><td>5 (two exceed 300 lines; ~32% of the class is two methods)</td></tr>
+  <tr><td>JPA entities / repositories</td><td>33 (3 misplaced in DTO package) / 32 (all referenced; 6 unused query methods)</td></tr>
+  <tr><td>Exception classes / never thrown</td><td>23 / 9</td></tr>
+  <tr><td>Message/translation constants hardcoded in enums</td><td>90 messages × 3 languages + 5 translation/mapping enums (incl. leftover hospital-domain entries)</td></tr>
+  <tr><td><code>System.out</code> / <code>System.err</code> / <code>printStackTrace</code></td><td>5 / 15 / 0</td></tr>
+  <tr><td>Commented-out blocks &gt; 3 lines</td><td>12 (largest ≈ 80 lines)</td></tr>
+  <tr><td>Bean-validation (<code>@Valid</code>) usages</td><td>0</td></tr>
+  <tr><td>Test files / tests executed in CI</td><td>1 (empty) / 0 (CI uses <code>-x test</code>)</td></tr>
+  <tr><td>Unused build dependencies</td><td>4 (webflux, jjwt×3 counted as one, mailtrap, spring-mail) + duplicate Lombok declaration</td></tr>
+</table>
+
+<p class="small" style="margin-top:18px">
+Prepared by the engineering team's automated audit tooling with full manual verification of all cited locations.
+All file paths and line numbers refer to the repository state on July 31, 2026. No source files were modified
+during this audit.
+</p>
+
+</body>
+</html>

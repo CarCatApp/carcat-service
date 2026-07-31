@@ -26,6 +26,12 @@ public class JWTConfiguration {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/swagger-resources/**",
+                                "/webjars/**").permitAll()
                         .requestMatchers("/legal/**").permitAll()
                         .requestMatchers("/api/v1/user/customer-cars").permitAll()
                         .requestMatchers("/api/v1/group/by/get/brand/list/with/models").permitAll()
