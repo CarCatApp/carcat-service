@@ -37,10 +37,10 @@ public class CustomFilter extends OncePerRequestFilter {
         }
 
         boolean isPublic =
-                path.startsWith("/swagger-ui")
-                        || path.startsWith("/v3/api-docs")
-                        || path.startsWith("/swagger-resources")
-                        || path.startsWith("/webjars/")
+                path.contains("/swagger-ui")
+                        || path.contains("/v3/api-docs")
+                        || path.contains("/swagger-resources")
+                        || path.contains("/webjars/")
                         || path.startsWith("/legal/")
                         ||        path.equals("/admin")
                         || path.startsWith("/admin/")
