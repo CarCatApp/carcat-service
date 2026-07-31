@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cars — Carland Admin</title>
+  <title>Users — Carland Admin</title>
   <style>
     * {
       margin: 0;
@@ -124,6 +124,16 @@
       background: var(--green-dark);
     }
 
+    .btn-excel-outline {
+      background: transparent;
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    .btn-excel-outline:hover {
+      background: #f0fdf4;
+    }
+
     .btn-logout {
       background: transparent;
       color: var(--text-muted);
@@ -136,7 +146,7 @@
     }
 
     .container {
-      max-width: 1500px;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 24px 28px 40px;
     }
@@ -160,28 +170,85 @@
       color: var(--text-muted);
     }
 
-    .filter-banner {
+    /* ---------- Filter bar ---------- */
+    .filter-bar {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       gap: 12px;
       flex-wrap: wrap;
-      font-size: 14px;
-      color: var(--primary-dark);
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 10px;
-      padding: 10px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
       margin-bottom: 16px;
     }
 
-    .filter-banner a {
-      color: var(--primary);
-      font-weight: 700;
-      text-decoration: none;
+    .filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
     }
 
-    .filter-banner a:hover {
-      text-decoration: underline;
+    .filter-field label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .filter-field input[type="date"] {
+      padding: 8px 12px;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--text);
+      outline: none;
+    }
+
+    .filter-field input[type="date"]:focus {
+      border-color: var(--primary);
+      background: #fff;
+    }
+
+    .btn-filter {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-filter:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-clear {
+      background: transparent;
+      color: var(--text-muted);
+      border-color: var(--border);
+    }
+
+    .btn-clear:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    .filter-info {
+      font-size: 13px;
+      color: var(--primary-dark);
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .error-box {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      font-size: 14px;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
     }
 
     .card {
@@ -200,25 +267,19 @@
 
     table {
       width: 100%;
-      min-width: 1350px;
+      min-width: 900px;
       border-collapse: collapse;
-      table-layout: fixed; /* kolon genişlikleri her sayfada aynı kalır */
+      table-layout: fixed;
       font-size: 13.5px;
     }
 
-    col.c-vin           { width: 165px; }
-    col.c-plate         { width: 105px; }
-    col.c-brand         { width: 110px; }
-    col.c-model         { width: 120px; }
-    col.c-year          { width: 70px; }
-    col.c-engine        { width: 105px; }
-    col.c-engine-id     { width: 80px; }
-    col.c-volume        { width: 85px; }
-    col.c-transmission  { width: 115px; }
-    col.c-body          { width: 100px; }
-    col.c-mileage       { width: 90px; }
-    col.c-created       { width: 130px; }
-    col.c-updated       { width: 130px; }
+    col.c-id      { width: 70px; }
+    col.c-name    { width: 150px; }
+    col.c-surname { width: 170px; }
+    col.c-phone   { width: 150px; }
+    col.c-status  { width: 120px; }
+    col.c-created { width: 150px; }
+    col.c-cars    { width: 100px; }
 
     thead th {
       background: #f8fafc;
@@ -254,15 +315,47 @@
       background: #f8fafc;
     }
 
-    .vin {
-      font-family: "SF Mono", Consolas, "Courier New", monospace;
-      font-size: 12.5px;
-      color: var(--primary-dark);
-    }
-
     .muted {
       color: var(--text-muted);
       font-size: 12.5px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge-active {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .badge-other {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+
+    .btn-cars {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-cars:hover {
+      border-color: var(--primary);
+      background: #eff6ff;
     }
 
     .empty-row td {
@@ -354,18 +447,30 @@
     <span class="logo">&#128663;</span>
     <span>Carland Admin</span>
     <nav class="nav-links">
-      <a class="nav-link active" href="/admin/cars">Cars</a>
-      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link active" href="/admin/users">Users</a>
     </nav>
   </div>
 
   <div class="topbar-actions">
-    <a class="btn btn-excel" href="/admin/cars/export">
-      &#11015; Excel indir
+
+    <!-- Filtre aktifken: seçili aralığın Excel'i -->
+    <a class="btn btn-excel" th:if="${from != null || to != null}"
+       th:href="@{/admin/users/export(from=${from}, to=${to})}">
+      &#11015; Excel indir (filtreli)
     </a>
+
+    <!-- Her zaman: tam listenin Excel'i -->
+    <a class="btn"
+       th:classappend="${from != null || to != null} ? 'btn-excel-outline' : 'btn-excel'"
+       href="/admin/users/export">
+      &#11015; Excel indir (tam liste)
+    </a>
+
     <a class="btn btn-logout" href="/admin/logout">
       Logout
     </a>
+
   </div>
 
 </header>
@@ -374,19 +479,43 @@
 <main class="container">
 
   <div class="page-head">
-    <h1>Car List Panel</h1>
+    <h1>User List Panel</h1>
     <span class="total">
-      Toplam <strong th:text="${cars.totalElements}">0</strong> araç
+      Toplam <strong th:text="${totalUsers}">0</strong> kullanıcı
     </span>
   </div>
 
-  <div class="filter-banner" th:if="${filterUserId != null}">
-    <span>
-      Sadece <strong th:text="'User #' + ${filterUserId}"></strong> kullanıcısının araçları gösteriliyor
-    </span>
-    <a href="/admin/cars">Tüm araçları göster &#215;</a>
-    <a href="/admin/users">&#8592; Users listesine dön</a>
+
+  <div class="error-box" th:if="${loadError}">
+    Kullanıcı listesi carland_auth servisinden alınamadı. Servisin çalıştığını kontrol edip sayfayı yenileyin.
   </div>
+
+
+  <form class="filter-bar" method="get" action="/admin/users">
+
+    <div class="filter-field">
+      <label for="from">Başlangıç tarihi</label>
+      <input type="date" id="from" name="from" th:value="${from}">
+    </div>
+
+    <div class="filter-field">
+      <label for="to">Bitiş tarihi</label>
+      <input type="date" id="to" name="to" th:value="${to}">
+    </div>
+
+    <button class="btn btn-filter" type="submit">Filtrele</button>
+
+    <a class="btn btn-clear" th:if="${from != null || to != null}" href="/admin/users">Temizle</a>
+
+    <span class="filter-info" th:if="${from != null || to != null}">
+      <span th:text="${from != null ? #temporals.format(from, 'dd.MM.yyyy') : '...'}"></span>
+      &#8211;
+      <span th:text="${to != null ? #temporals.format(to, 'dd.MM.yyyy') : '...'}"></span>
+      aralığı gösteriliyor
+    </span>
+
+  </form>
+
 
   <div class="card">
 
@@ -394,61 +523,50 @@
       <table>
 
         <colgroup>
-          <col class="c-vin">
-          <col class="c-plate">
-          <col class="c-brand">
-          <col class="c-model">
-          <col class="c-year">
-          <col class="c-engine">
-          <col class="c-engine-id">
-          <col class="c-volume">
-          <col class="c-transmission">
-          <col class="c-body">
-          <col class="c-mileage">
+          <col class="c-id">
+          <col class="c-name">
+          <col class="c-surname">
+          <col class="c-phone">
+          <col class="c-status">
           <col class="c-created">
-          <col class="c-updated">
+          <col class="c-cars">
         </colgroup>
 
         <thead>
         <tr>
-          <th>VIN</th>
-          <th>Plate Number</th>
-          <th>Brand</th>
-          <th>Model</th>
-          <th>Year</th>
-          <th>Engine Type</th>
-          <th>Engine ID</th>
-          <th>Volume</th>
-          <th>Transmission</th>
-          <th>Body</th>
-          <th>Mileage</th>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Surname</th>
+          <th>Phone Number</th>
+          <th>Status</th>
           <th>Created At</th>
-          <th>Updated At</th>
+          <th>Cars</th>
         </tr>
         </thead>
 
         <tbody>
 
-        <tr th:each="car : ${cars.content}">
-          <td class="vin" th:text="${car.vin}" th:title="${car.vin}"></td>
-          <td th:text="${car.plateNumber}"></td>
-          <td th:text="${car.brand}"></td>
-          <td th:text="${car.model}"></td>
-          <td th:text="${car.modelYear}"></td>
-          <td th:text="${car.engineType}"></td>
-          <td th:text="${car.engineTypeId}"></td>
-          <td th:text="${car.engineVolume}"></td>
-          <td th:text="${car.transmissionType}"></td>
-          <td th:text="${car.bodyType}"></td>
-          <td th:text="${car.mileage}"></td>
+        <tr th:each="u : ${users}">
+          <td th:text="${u.id}"></td>
+          <td th:text="${u.name}"></td>
+          <td th:text="${u.surname}"></td>
+          <td th:text="${u.phoneNumber}"></td>
+          <td>
+            <span class="badge"
+                  th:classappend="${u.status == 'ACTIVE'} ? 'badge-active' : 'badge-other'"
+                  th:text="${u.status}"></span>
+          </td>
           <td class="muted"
-              th:text="${car.createdAt != null ? #temporals.format(car.createdAt, 'yyyy-MM-dd HH:mm') : ''}"></td>
-          <td class="muted"
-              th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt, 'yyyy-MM-dd HH:mm') : ''}"></td>
+              th:text="${u.createdAt != null ? #temporals.format(u.createdAt, 'yyyy-MM-dd HH:mm') : ''}"></td>
+          <td>
+            <a class="btn-cars" th:href="@{/admin/cars(userId=${u.id})}">
+              &#128663; Cars
+            </a>
+          </td>
         </tr>
 
-        <tr class="empty-row" th:if="${cars.content.isEmpty()}">
-          <td colspan="13">Kayıt bulunamadı</td>
+        <tr class="empty-row" th:if="${users.isEmpty()}">
+          <td colspan="7">Kayıt bulunamadı</td>
         </tr>
 
         </tbody>
@@ -467,31 +585,31 @@
 
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage - 1}, userId=${filterUserId})}">
+           th:href="@{/admin/users(page=${currentPage - 1}, from=${from}, to=${to})}">
           &#8592; Previous
         </a>
 
         <!-- İlk sayfa + üç nokta -->
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/cars(page=1, userId=${filterUserId})}">1</a>
+           th:href="@{/admin/users(page=1, from=${from}, to=${to})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
 
         <!-- Aktif sayfa etrafındaki numaralar -->
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/cars(page=${p}, userId=${filterUserId})}"
+           th:href="@{/admin/users(page=${p}, from=${from}, to=${to})}"
            th:text="${p}">1</a>
 
         <!-- Üç nokta + son sayfa -->
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/cars(page=${totalPages}, userId=${filterUserId})}"
+           th:href="@{/admin/users(page=${totalPages}, from=${from}, to=${to})}"
            th:text="${totalPages}"></a>
 
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage + 1}, userId=${filterUserId})}">
+           th:href="@{/admin/users(page=${currentPage + 1}, from=${from}, to=${to})}">
           Next &#8594;
         </a>
 

@@ -2,6 +2,8 @@ package com.carland.carland_service.dto.response;
 
 import lombok.*;
 
+import java.time.LocalDate;
+
 
 @Data
 @NoArgsConstructor
@@ -13,5 +15,6 @@ public class CustomerResponse {
     String name;
     String surname;
     String status;
+    LocalDate createdAt;
 
 }

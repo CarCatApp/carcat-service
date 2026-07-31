@@ -1,30 +1,39 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class AdminController {
 
     private final CarRepository carRepository;
+
+    private final AuthUsersFeign authUsersFeign;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -66,9 +75,12 @@ public class AdminController {
     }
 
 
+    // ==================== CARS ====================
+
     @GetMapping("/admin/cars")
     public String cars(
             @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) Long userId,
             HttpSession session,
             Model model
     ) {
@@ -82,26 +94,14 @@ public class AdminController {
 
         Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE);
 
-        Page<Car> carPage = carRepository.findAll(pageable);
+        Page<Car> carPage = (userId != null)
+                ? carRepository.findByCustomer_UserId(userId, pageable)
+                : carRepository.findAll(pageable);
 
-        int totalPages = Math.max(carPage.getTotalPages(), 1);
-        int currentPage = pageIndex + 1;
-
-        // Numaralı sayfalama penceresi: aktif sayfanın ±2 komşusu
-        int windowStart = Math.max(1, currentPage - 2);
-        int windowEnd = Math.min(totalPages, currentPage + 2);
-
-        // page > totalPages girilirse pencere ters dönmesin
-        if (windowStart > windowEnd) {
-            windowStart = windowEnd;
-        }
+        addPaginationAttributes(model, carPage.getTotalPages(), pageIndex);
 
         model.addAttribute("cars", carPage);
-        model.addAttribute("currentPage", currentPage);
-        model.addAttribute("totalPages", totalPages);
-        model.addAttribute("windowStart", windowStart);
-        model.addAttribute("windowEnd", windowEnd);
-        model.addAttribute("pageSize", PAGE_SIZE);
+        model.addAttribute("filterUserId", userId);
 
         return "cars";
     }
@@ -131,20 +131,7 @@ public class AdminController {
                     "Created At", "Updated At"
             };
 
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerFont.setColor(IndexedColors.WHITE.getIndex());
-            headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-
-            Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(headerStyle);
-            }
+            createHeaderRow(workbook, sheet, headers);
 
             int rowIndex = 1;
             for (Car car : cars) {
@@ -166,17 +153,103 @@ public class AdminController {
                 setCell(row, 12, formatDate(car.getUpdatedAt()));
             }
 
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
+            writeWorkbook(workbook, sheet, headers.length, "cars", response);
+        }
+    }
+
+
+    // ==================== USERS (carland_auth) ====================
+
+    @GetMapping("/admin/users")
+    public String users(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            HttpSession session,
+            Model model
+    ) {
+
+        if (!isLoggedIn(session)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+
+        List<AuthUser> allUsers;
+        boolean loadError = false;
+
+        try {
+            allUsers = fetchUsers(from, to);
+        } catch (Exception e) {
+            log.error("carland_auth user listesi alınamadı", e);
+            allUsers = Collections.emptyList();
+            loadError = true;
+        }
+
+        // Liste uzak servisten geldiği için sayfalama burada, bellek üzerinde yapılır
+        int pageIndex = Math.max(page, 1) - 1;
+        int totalPages = Math.max((int) Math.ceil((double) allUsers.size() / PAGE_SIZE), 1);
+
+        if (pageIndex >= totalPages) {
+            pageIndex = totalPages - 1;
+        }
+
+        int fromIndex = pageIndex * PAGE_SIZE;
+        int toIndex = Math.min(fromIndex + PAGE_SIZE, allUsers.size());
+
+        List<AuthUser> pageContent = fromIndex < allUsers.size()
+                ? allUsers.subList(fromIndex, toIndex)
+                : Collections.emptyList();
+
+        addPaginationAttributes(model, totalPages, pageIndex);
+
+        model.addAttribute("users", pageContent);
+        model.addAttribute("totalUsers", allUsers.size());
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        model.addAttribute("loadError", loadError);
+
+        return "users";
+    }
+
+
+    @GetMapping("/admin/users/export")
+    public void exportUsers(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            HttpSession session,
+            HttpServletResponse response
+    ) throws IOException {
+
+        if (!isLoggedIn(session)) {
+            response.sendRedirect(ADMIN_URL + "/admin/");
+            return;
+        }
+
+        List<AuthUser> users = fetchUsers(from, to);
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+
+            Sheet sheet = workbook.createSheet("Users");
+
+            String[] headers = {"ID", "Name", "Surname", "Phone Number", "Status", "Created At"};
+
+            createHeaderRow(workbook, sheet, headers);
+
+            int rowIndex = 1;
+            for (AuthUser user : users) {
+
+                Row row = sheet.createRow(rowIndex++);
+
+                setNumericCell(row, 0, user.getId());
+                setCell(row, 1, user.getName());
+                setCell(row, 2, user.getSurname());
+                setCell(row, 3, user.getPhoneNumber());
+                setCell(row, 4, user.getStatus());
+                setCell(row, 5, formatDate(user.getCreatedAt()));
             }
 
-            String fileName = "cars-" + LocalDateTime.now()
-                    .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".xlsx";
+            String baseName = (from != null || to != null) ? "users-filtered" : "users";
 
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
-
-            workbook.write(response.getOutputStream());
+            writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
     }
 
@@ -190,8 +263,77 @@ public class AdminController {
     }
 
 
+    // ==================== helpers ====================
+
     private boolean isLoggedIn(HttpSession session) {
         return Boolean.TRUE.equals(session.getAttribute("ADMIN_LOGIN"));
+    }
+
+    private List<AuthUser> fetchUsers(LocalDate from, LocalDate to) {
+        return authUsersFeign.getUserList(
+                from != null ? from.toString() : null,
+                to != null ? to.toString() : null
+        );
+    }
+
+    /** currentPage / totalPages / windowStart / windowEnd model attribute'larını doldurur (1 tabanlı). */
+    private void addPaginationAttributes(Model model, int rawTotalPages, int pageIndex) {
+
+        int totalPages = Math.max(rawTotalPages, 1);
+        int currentPage = pageIndex + 1;
+
+        // Numaralı sayfalama penceresi: aktif sayfanın ±2 komşusu
+        int windowStart = Math.max(1, currentPage - 2);
+        int windowEnd = Math.min(totalPages, currentPage + 2);
+
+        // page > totalPages girilirse pencere ters dönmesin
+        if (windowStart > windowEnd) {
+            windowStart = windowEnd;
+        }
+
+        model.addAttribute("currentPage", currentPage);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("windowStart", windowStart);
+        model.addAttribute("windowEnd", windowEnd);
+    }
+
+    private void createHeaderRow(Workbook workbook, Sheet sheet, String[] headers) {
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerFont.setColor(IndexedColors.WHITE.getIndex());
+        headerStyle.setFont(headerFont);
+        headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+    }
+
+    private void writeWorkbook(
+            Workbook workbook,
+            Sheet sheet,
+            int columnCount,
+            String baseName,
+            HttpServletResponse response
+    ) throws IOException {
+
+        for (int i = 0; i < columnCount; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        String fileName = baseName + "-" + LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".xlsx";
+
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
+
+        workbook.write(response.getOutputStream());
     }
 
     private void setCell(Row row, int column, String value) {

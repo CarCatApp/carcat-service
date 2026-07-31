@@ -33,4 +33,6 @@ public interface CarRepository extends JpaRepository<Car, Long> {
 
     List<Car> findByCustomer_UserId(Long userId);
 
+    Page<Car> findByCustomer_UserId(Long userId, Pageable pageable);
+
 }

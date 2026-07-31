@@ -119,6 +119,7 @@ public class Helper {
                         .phoneNumber(phoneNumber)
                         .name(name)
                         .surname(surname)
+                        .createdAt(LocalDate.now())
                         .status(EnumUserStatus.ACTIVE.name())
                         .notificationLanguage(acceptLanguage)
                         .build();

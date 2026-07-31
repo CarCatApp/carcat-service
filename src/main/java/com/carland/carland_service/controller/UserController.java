@@ -53,7 +53,7 @@ public class UserController {
             customerResponse.setSurname(customer.getSurname());
             customerResponse.setPhoneNumber(customer.getPhoneNumber());
             customerResponse.setStatus(customer.getStatus());
-
+            customerResponse.setCreatedAt(customer.getCreatedAt());
             // CAR MAP
             List<CarResponseForLink> carResponses =
                     customer.getCars() != null

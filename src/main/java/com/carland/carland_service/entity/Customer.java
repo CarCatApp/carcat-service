@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -21,6 +22,7 @@ public class Customer {
     String surname;
     String notificationLanguage;
     String status;
+    LocalDate createdAt;
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL)
     @ToString.Exclude
     List<Car> cars;
