@@ -58,7 +58,6 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.contains("/webjars/")
                         || path.equals("/swagger-custom.js")
                         || path.equals("/swagger-auth-config")
-                        || path.equals("/swagger-definitions-config")
                         || path.startsWith("/legal/")
                         ||        path.equals("/admin")
                         || path.startsWith("/admin/")

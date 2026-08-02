@@ -59,9 +59,17 @@ springdoc:
     persist-authorization: true
     try-it-out-enabled: true
     custom-js: /swagger-custom.js
-    # Locked list of 4 definitions (no GroupedOpenApi duplicates) — see SwaggerDefinitionsConfigController
-    config-url: /swagger-definitions-config
+    # Final list is locked to these 4 by SwaggerUiDefinitionCustomizer (drops GroupedOpenApi duplicates)
     urls-primary-name: "1. Auth — Login / Register / Tokens"
+    urls:
+      - name: "1. Auth — Login / Register / Tokens"
+        url: /v3/api-docs/external/carland-auth
+      - name: "2. Carland — Mobile API"
+        url: /v3/api-docs/mobile-api
+      - name: "3. Carland — Partner Webhook Receiver"
+        url: /v3/api-docs/partner-webhooks
+      - name: "4. Webhook Gateway — Partner Edge Adapter"
+        url: /v3/api-docs/external/webhook
   show-actuator: false
 
 super:
