@@ -37,38 +37,48 @@ public class OpenApiConfig {
     );
 
     private static final Map<String, String> KONG_HEADER_BASE_DESC = Map.of(
-            "X-User-Id", "User id from JWT claims.",
-            "phoneNumber", "Phone number from JWT claims.",
-            "role", "Role from JWT claims (USER / ADMIN / SUPER_ADMIN / BOSS).",
-            "inviterId", "Inviter id from JWT claims (invite flows)."
+            "X-User-Id",
+            "Extracted from the access JWT by Kong Lua on the server and injected into the request header automatically. Do not set manually.",
+            "phoneNumber",
+            "Extracted from the access JWT by Kong Lua on the server and injected into the request header automatically. Do not set manually.",
+            "role",
+            "Extracted from the access JWT by Kong Lua on the server and injected into the request header automatically. Do not set manually.",
+            "inviterId",
+            "Extracted from the access JWT by Kong Lua on the server and injected into the request header automatically (invite flows). Do not set manually."
     );
 
-    /**
-     * tr: Ana OpenAPI tanımını üretir.
-     * en: Produces the main OpenAPI definition.
-     */
     @Bean
     public OpenAPI carlandServiceOpenAPI() {
         String description = """
-                Internal API documentation for **carland_service**.
+                Internal API documentation for **carland-service** (core domain microservice).
 
-                ### Login in Swagger
-                Use the black **Carland Login** bar (phone + password). It calls **carland_auth** `/login`,
-                stores `accessToken` + `refreshToken`, and auto-fills **Authorize → bearerAuth**.
-                When the access token expires (or a Try-it-out call returns 401), the page renews it via `/refresh`.
+                ### How to use this Swagger UI
+                1. Open **1. Auth — Login / Register / Tokens** (top-right dropdown) — **login or register first**.
+                2. Use the black **Carland Login** bar (phone + password). It stores `accessToken` + `refreshToken`
+                   and auto-fills **Authorize → bearerAuth** for all JWT-protected Try-it-out calls.
+                3. Access JWT TTL ≈ **15 minutes**. On **401** (or near expiry) the UI renews via `/refresh`.
+                4. Switch definitions as needed — the Bearer token stays in the browser session.
+
+                ### Select a definition (catalogue)
+                | Definition | Microservice | Role |
+                |---|---|---|
+                | **1. Auth — Login / Register / Tokens** | **auth-service** | Identity: login, register, OTP, refresh |
+                | **2. Carland — Mobile API** | **carland-service** | Mobile / app APIs (`/api/v1/**`) |
+                | **3. Carland — Partner Webhook Receiver** | **carland-service** | Internal **receiver** for partner visit ingest/update (`/webhook/**`) |
+                | **4. Webhook Gateway — Partner Edge Adapter** | **webhook-service** | Public **edge adapter**: partners call here; forwards to carland; queues in RabbitMQ if carland is down |
+
+                ### Partner webhook vs gateway (do not confuse)
+                - **Definition 4 (Webhook Gateway)** = adapter facing partner body shops / service centers.
+                - **Definition 3 (Carland Receiver)** = same domain operations accepted **inside** carland after the gateway forwards them.
+                - They look similar on purpose: gateway adapts & relays; carland persists & applies business rules.
 
                 ### Kong identity headers
-                `X-User-Id`, `phoneNumber`, `role`, `inviterId` are injected by Kong Lua after JWT validation.
-                In Swagger they stay **required** for documentation fidelity but are **read only** and labelled
-                **oto ekleme kong function** — do not type them manually in production.
+                `X-User-Id`, `phoneNumber`, `role`, `inviterId` are **read-only** in Swagger. In production Kong Lua
+                extracts them from the access JWT and injects them — do not type them manually.
 
                 ### Defaults
-                - `Accept-Language` = `az`
-                - `X-Client-Timezone` = `Asia/Baku`
-
-                ### Unified catalogue
-                This Swagger UI also lists **Carland Auth** and **Webhook Gateway** (dropdown top-right).
-                Their OpenAPI specs are aggregated by this service; Try it out uses the public gateway URLs.
+                - `Accept-Language` = `az` (read-only in Swagger)
+                - `X-Client-Timezone` = `Asia/Baku` (read-only in Swagger)
                 """;
 
         return new OpenAPI()
@@ -92,15 +102,24 @@ public class OpenApiConfig {
                         new Tag().name("user-controller").description("User details and notifications"),
                         new Tag().name("photo-controller").description("Photos for cars, users, partners"),
                         new Tag().name("group-by-controller").description("Reference lookups"),
-                        new Tag().name("webhook-controller").description("Partner Hyper webhook ingest/update")));
+                        new Tag().name("webhook-controller").description(
+                                "Partner visit ingest/update **receiver** (called by webhook-service, not by partners directly)")));
     }
 
     @Bean
     public GroupedOpenApi mobileApiGroup() {
         return GroupedOpenApi.builder()
                 .group("mobile-api")
-                .displayName("Mobile API (/api/v1)")
+                .displayName("2. Carland — Mobile API")
                 .pathsToMatch("/api/v1/**")
+                .addOpenApiCustomizer(openApi -> openApi.getInfo()
+                        .title("Carland — Mobile API")
+                        .description("""
+                                **carland-service** mobile / app APIs (`/api/v1/**`).
+
+                                Requires access JWT from **1. Auth**. Use the **Carland Login** bar first.
+                                Kong injects `X-User-Id` / `phoneNumber` from the JWT (read-only fields in Swagger).
+                                """))
                 .build();
     }
 
@@ -108,8 +127,20 @@ public class OpenApiConfig {
     public GroupedOpenApi partnerWebhookGroup() {
         return GroupedOpenApi.builder()
                 .group("partner-webhooks")
-                .displayName("Partner Webhooks (/webhook)")
+                .displayName("3. Carland — Partner Webhook Receiver")
                 .pathsToMatch("/webhook/**")
+                .addOpenApiCustomizer(openApi -> openApi.getInfo()
+                        .title("Carland — Partner Webhook Receiver")
+                        .description("""
+                                **carland-service** internal **receiver** for partner service-visit events (`/webhook/**`).
+
+                                ### Relationship to Webhook Gateway
+                                Partners should call **4. Webhook Gateway — Partner Edge Adapter**, not these endpoints
+                                directly in production. The gateway validates/forwards (and can queue via RabbitMQ when
+                                carland is down). These controllers are the **accepting** side inside carland.
+
+                                Auth here is service-to-service (`X-Internal-Token` + partner `X-Signature`), not end-user JWT.
+                                """))
                 .build();
     }
 
@@ -131,22 +162,31 @@ public class OpenApiConfig {
                 String name = param.getName();
 
                 if (KONG_INJECTED_HEADERS.contains(name)) {
-                    String base = KONG_HEADER_BASE_DESC.getOrDefault(name, name);
-                    param.setDescription(base + " — oto ekleme kong function");
+                    param.setDescription(KONG_HEADER_BASE_DESC.getOrDefault(name, name));
                     param.setRequired(true);
-                    param.setSchema(new StringSchema().readOnly(true));
+                    param.setSchema(new StringSchema()
+                            .readOnly(true)
+                            .example("injected-by-kong-from-jwt"));
                     continue;
                 }
 
                 if ("Accept-Language".equalsIgnoreCase(name)) {
-                    param.setDescription("Client locale for localized messages.");
-                    param.setSchema(new StringSchema()._default("az").example("az"));
+                    param.setDescription("Client locale. Fixed to `az` in Swagger UI (read-only).");
+                    param.setRequired(true);
+                    param.setSchema(new StringSchema()
+                            ._default("az")
+                            .example("az")
+                            .readOnly(true));
                     continue;
                 }
 
                 if ("X-Client-Timezone".equalsIgnoreCase(name)) {
-                    param.setDescription("Client device timezone.");
-                    param.setSchema(new StringSchema()._default("Asia/Baku").example("Asia/Baku"));
+                    param.setDescription("Client timezone. Fixed to `Asia/Baku` in Swagger UI (read-only).");
+                    param.setRequired(true);
+                    param.setSchema(new StringSchema()
+                            ._default("Asia/Baku")
+                            .example("Asia/Baku")
+                            .readOnly(true));
                 }
             }
             return operation;

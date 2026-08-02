@@ -62,6 +62,7 @@ public class OpenApiAggregationController {
             server.put("url", serverUrl);
             server.put("description", serverDescription);
             doc.put("servers", List.of(server));
+            // Keep upstream info.title/description from auth / webhook OpenAPI configs.
             return doc;
         } catch (Exception ex) {
             log.error("Failed to aggregate OpenAPI from {}", docsUrl, ex);

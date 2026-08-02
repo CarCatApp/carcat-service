@@ -51,24 +51,17 @@ carland:
     auth-server-url: ${SWAGGER_AUTH_SERVER_URL:https://digital-innovation.agency/auth/server}
     webhook-server-url: ${SWAGGER_WEBHOOK_SERVER_URL:https://digital-innovation.agency}
     # Where this service fetches OpenAPI JSON (Docker internal preferred)
-    auth-docs-url: ${SWAGGER_AUTH_DOCS_URL:http://carland-auth:9090/v3/api-docs}
-    webhook-docs-url: ${SWAGGER_WEBHOOK_DOCS_URL:http://webhook:8080/v3/api-docs}
+    auth-docs-url: ${SWAGGER_AUTH_DOCS_URL:http://auth-service:9090/v3/api-docs}
+    webhook-docs-url: ${SWAGGER_WEBHOOK_DOCS_URL:http://webhook-service:8080/v3/api-docs}
 
 springdoc:
   swagger-ui:
     persist-authorization: true
     try-it-out-enabled: true
     custom-js: /swagger-custom.js
-    urls-primary-name: 1. Carland Service — Mobile API
-    urls:
-      - name: 1. Carland Service — Mobile API
-        url: /v3/api-docs/mobile-api
-      - name: 2. Carland Service — Partner Webhooks
-        url: /v3/api-docs/partner-webhooks
-      - name: 3. Carland Auth
-        url: /v3/api-docs/external/carland-auth
-      - name: 4. Webhook Gateway
-        url: /v3/api-docs/external/webhook
+    # Locked list of 4 definitions (no GroupedOpenApi duplicates) — see SwaggerDefinitionsConfigController
+    config-url: /swagger-definitions-config
+    urls-primary-name: "1. Auth — Login / Register / Tokens"
   show-actuator: false
 
 super:
