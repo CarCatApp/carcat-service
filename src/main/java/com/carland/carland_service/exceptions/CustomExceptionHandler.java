@@ -1,5 +1,6 @@
 package com.carland.carland_service.exceptions;
 
+import com.carland.carland_service.dto.response.ResponseException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
@@ -12,6 +13,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+/**
+ * tr: REST API genelinde fırlatılan exception'ları yakalayıp ResponseException gövdesiyle uygun HTTP durum koduna (400/401/404/409) çeviren global exception handler.
+ * en: Global exception handler that catches exceptions thrown across the REST API and maps them to the appropriate HTTP status (400/401/404/409) with a ResponseException body.
+ */
 @RestControllerAdvice
 public class CustomExceptionHandler {
 

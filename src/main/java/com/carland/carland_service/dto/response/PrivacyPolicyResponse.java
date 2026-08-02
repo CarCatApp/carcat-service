@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: LegalController gizlilik politikası endpoint'inde dönen, politika metni bölümlerini ve iletişim bilgilerini içeren yanıt DTO'su.
+ * en: Response DTO returned by the LegalController privacy policy endpoint, containing policy text sections and contact info.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

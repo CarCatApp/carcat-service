@@ -7,6 +7,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 
 import java.sql.Types;
 
+/**
+ * tr: "photos" tablosunu modelleyen entity; bir araca ait fotoğrafı ikili (binary) veri olarak saklar.
+ * en: Entity modeling the "photos" table; stores a car's photo as binary data.
+ */
 @Entity
 @Data
 @Builder

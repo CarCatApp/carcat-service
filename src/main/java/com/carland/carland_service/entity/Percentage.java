@@ -8,6 +8,10 @@ import org.hibernate.annotations.ColumnDefault;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * tr: "percentages" tablosunu modelleyen entity; bir aracın servis kalemi bazında bakım yüzdesi durumunu (son/sonraki servis, kalan km, yüzdeler) saklar.
+ * en: Entity modeling the "percentages" table; stores a car's per-service maintenance percentage state (last/next service, remaining km, percentages).
+ */
 @Entity
 @Data
 @NoArgsConstructor

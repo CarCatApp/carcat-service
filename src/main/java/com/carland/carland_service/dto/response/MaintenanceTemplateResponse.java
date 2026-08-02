@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: MaintenanceTemplateController sorgularında dönen, motor tipine bağlı bakım şablonunu ve servis listesini içeren yanıt DTO'su.
+ * en: Response DTO returned by MaintenanceTemplateController queries, containing the engine-type-based maintenance template and its service list.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

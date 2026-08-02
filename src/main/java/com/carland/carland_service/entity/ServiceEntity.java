@@ -6,6 +6,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.ColumnDefault;
 
+/**
+ * tr: "services" tablosunu modelleyen entity; bakım şablonuna bağlı servis tanımını (çok dilli ad, bakım aralığı km/ay) temsil eder.
+ * en: Entity modeling the "services" table; represents a service definition tied to a maintenance template (multilingual name, interval in km/months).
+ */
 @Entity
 @Data
 @NoArgsConstructor

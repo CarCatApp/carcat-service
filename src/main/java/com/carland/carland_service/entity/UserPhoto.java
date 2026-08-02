@@ -7,6 +7,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 
 import java.sql.Types;
 
+/**
+ * tr: "user_photos" tablosunu modelleyen entity; kullanıcının profil fotoğrafını ikili veri olarak saklar.
+ * en: Entity modeling the "user_photos" table; stores a user's profile photo as binary data.
+ */
 @Entity
 @Data
 @Builder

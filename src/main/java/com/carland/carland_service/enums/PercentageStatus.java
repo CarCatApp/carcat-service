@@ -1,6 +1,10 @@
 package com.carland.carland_service.enums;
 
 /**
+ * tr: Percentage kaydının yaşam döngüsü durumunu (oluşturuldu, müşteri düzenledi, partner düzenledi) tanımlayan enum.
+ * en: Enum defining the lifecycle state of a Percentage row (created, edited by customer, edited by partner).
+ */
+/**
  * Lifecycle state of a {@code Percentage} row.
  * Stored as a string in the {@code percentages.status} column.
  *

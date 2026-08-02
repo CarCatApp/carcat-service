@@ -1,8 +1,12 @@
 package com.carland.carland_service.exceptions;
 
-import com.carland.carland_service.service.webhook.WebhookAuthFailure;
+import com.carland.carland_service.security.WebhookAuthFailure;
 import lombok.Getter;
 
+/**
+ * tr: Partner webhook isteğinin kimlik doğrulaması (imza/partner kontrolü) başarısız olduğunda fırlatılan exception; WebhookAuthExceptionHandler tarafından HTTP 401 (Unauthorized) yanıtına çevrilir.
+ * en: Exception thrown when partner webhook request authentication (signature/partner check) fails; mapped to HTTP 401 (Unauthorized) by WebhookAuthExceptionHandler.
+ */
 @Getter
 public class WebhookAuthException extends RuntimeException {
 

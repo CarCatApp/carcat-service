@@ -10,6 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * tr: CarController araç sorgularında dönen yanıt DTO'su. Aracın kimlik, teknik özellik, kilometre ve toplam masraf bilgilerini içerir.
+ * en: Response DTO returned by CarController car queries. Contains the car's identity, technical specs, mileage and all-time cost info.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

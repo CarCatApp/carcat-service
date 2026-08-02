@@ -5,6 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * tr: Servis tanımını (çok dilli ad, bakım aralığı km/ay, önem durumu) döndüren yanıt DTO'su; bakım şablonu yanıtlarında kullanılır.
+ * en: Response DTO returning a service definition (multilingual name, maintenance interval in km/months, importance flag); used in maintenance template responses.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

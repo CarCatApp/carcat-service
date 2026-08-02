@@ -1,8 +1,8 @@
 package com.carland.carland_service.service.impl;
 
-import com.carland.carland_service.dto.response.HyperTokenResponse;
+import com.carland.carland_service.dto.response.hyper.HyperTokenResponse;
 import com.carland.carland_service.entity.Partner;
-import com.carland.carland_service.enums.EnumPartnerId;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.feign.HyperAuthClient;
 import com.carland.carland_service.repository.PartnerRepository;
@@ -20,6 +20,13 @@ import org.springframework.util.StringUtils;
 /**
  * Manages OAuth tokens for outbound partner API calls (currently Hyper).
  * Credentials are loaded from {@code partners.api_client_id} / {@code api_client_secret}.
+ *
+ * tr: Dışa giden partner API çağrıları (şu an Hyper) için OAuth token'larını yönetir: token'ı
+ *     client_credentials akışıyla alır, cache'te saklar ve zamanlanmış görevle periyodik yeniler.
+ *     Kimlik bilgileri partners tablosundaki api_client_id / api_client_secret alanlarından okunur.
+ * en: Manages OAuth tokens for outbound partner API calls (currently Hyper): obtains the token via
+ *     the client_credentials flow, stores it in a cache, and refreshes it periodically with a
+ *     scheduled task. Credentials are read from the partners table's api_client_id / api_client_secret.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,15 +39,30 @@ public class HyperTokenService {
     private final PartnerRepository partnerRepository;
     private final CacheManager cacheManager;
 
+    /**
+     * tr: Zamanlanmış görev (59 dakikada bir): Hyper partneri için token'ı yeniden alır ve cache'i günceller.
+     * en: Scheduled task (every 59 minutes): re-fetches the token for the Hyper partner and updates the cache.
+     */
     @Scheduled(fixedRate = 59 * 60 * 1000)
     public void refreshToken() {
-        fetchTokenAndCache(EnumPartnerId.HYPER.getId());
+        fetchTokenAndCache(PartnerId.HYPER.getId());
     }
 
+    /**
+     * tr: Varsayılan Hyper partneri için geçerli OAuth token'ını döner (cache'ten ya da yeni alarak).
+     * en: Returns the current OAuth token for the default Hyper partner (from cache or freshly fetched).
+     */
     public String getToken() {
-        return getToken(EnumPartnerId.HYPER.getId());
+        return getToken(PartnerId.HYPER.getId());
     }
 
+    /**
+     * tr: Verilen partner için token'ı önce cache'ten okur; yoksa OAuth ile alıp cache'ler ve döner.
+     *     Alma işlemi başarısız olursa (pasif partner, eksik kimlik bilgisi, ağ hatası) null döner.
+     * en: Reads the token for the given partner from the cache first; otherwise fetches it via OAuth,
+     *     caches it, and returns it. Returns null when the fetch fails (inactive partner, missing
+     *     credentials, network error).
+     */
     public String getToken(Long partnerId) {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         String cacheKey = cacheKey(partnerId);

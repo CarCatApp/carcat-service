@@ -5,6 +5,10 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
+/**
+ * tr: Hyper API servis geçmişi kaydındaki tek bir parçayı (ad, miktar, birim) eşleyen yanıt DTO'su.
+ * en: Response DTO mapping a single part within a Hyper API service history record (name, quantity, unit).
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HyperServicePartResponse {

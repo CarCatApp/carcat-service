@@ -8,16 +8,28 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * tr: NHTSA VIN çözümleme API'sini (Feign) kullanarak VIN'den araç bilgilerini çıkaran servis; marka, model, yıl, kasa tipi, şanzıman, motor hacmi ve motor/yakıt tipini haritalar.
+ * en: Service extracting vehicle information from a VIN using the NHTSA VIN decoding API (via Feign); maps brand, model, year, body type, transmission, engine volume, and engine/fuel type.
+ */
 @Service
 @RequiredArgsConstructor
 public class VinService {
 
     private final NhtsaFeign nhtsaFeign;
 
+    /**
+     * tr: Verilen VIN'i NHTSA API'sine gönderir ve ham JSON cevabını Map olarak döner.
+     * en: Sends the given VIN to the NHTSA API and returns the raw JSON response as a Map.
+     */
     public Map<String, Object> decodeVin(String vin) {
         return nhtsaFeign.decodeVin(vin, "json");
     }
 
+    /**
+     * tr: VIN'i çözüp NHTSA cevabından seçili alanları (brand, model, modelYear, bodyType, transmissionType, engineVolume cc cinsinden, engineType) String haritası olarak çıkarır; motor tipini elektriklenme seviyesi ve yakıt tiplerinden türetir.
+     * en: Decodes the VIN and extracts selected fields from the NHTSA response (brand, model, modelYear, bodyType, transmissionType, engineVolume in cc, engineType) as a String map; derives the engine type from the electrification level and fuel types.
+     */
     public Map<String, String> extractFieldsFromVin(String vin) {
         Map<String, Object> response = decodeVin(vin);
 
@@ -143,6 +155,9 @@ public class VinService {
      * NHTSA "Displacement (L)" is usually liters (1.5, 2.0).
      * Sometimes whole liters without decimals (5 → 5L).
      * Values already in cc/ml are typically 3–4 digits (890, 1200, 3500).
+     *
+     * tr: NHTSA'dan gelen motor hacmi değerini cc'ye çevirir: ondalıklı değerler litre kabul edilip 1000 ile çarpılır, 3 haneden kısa tam sayılar litre sayılır, diğerleri zaten cc kabul edilir. null/boş veya sayı olmayan girişte null döner.
+     * en: Converts the engine displacement value from NHTSA to cc: decimal values are treated as liters and multiplied by 1000, integers shorter than 3 digits are treated as liters, others are assumed to already be cc. Returns null for null/blank or non-numeric input.
      */
     public static Integer parseEngineVolumeCc(String raw) {
         if (raw == null || raw.isBlank()) {

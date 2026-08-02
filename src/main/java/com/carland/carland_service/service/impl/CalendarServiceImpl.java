@@ -12,8 +12,8 @@ import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.AdminRepository;
 import com.carland.carland_service.repository.AutoServiceRepository;
 import com.carland.carland_service.repository.CalendarRepository;
-import com.carland.carland_service.service.interfaces.CalendarService;
-import com.carland.carland_service.util.Helper;
+import com.carland.carland_service.service.CalendarService;
+import com.carland.carland_service.service.impl.Helper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -27,6 +27,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * tr: Takvim yönetiminin implementasyonudur: admin için gün/saat aralıklı takvim oluşturur
+ *     (saatleri UTC'ye çevirerek saklar) ve oto servise ait takvimi sorgular.
+ * en: Implementation of calendar management: creates a calendar with day/time ranges for an admin
+ *     (storing times converted to UTC) and queries the calendar of an auto service.
+ */
 @Service
 @RequiredArgsConstructor
 public class CalendarServiceImpl implements CalendarService {
@@ -35,6 +41,18 @@ public class CalendarServiceImpl implements CalendarService {
     private final Helper helper;
     private final AutoServiceRepository autoServiceRepository;
 
+    /**
+     * tr: Admin'in oto servisi için verilen gün/saat aralığında, rangeMinutes uzunluğunda dilimlerden
+     *     oluşan yeni bir takvim oluşturur ve aralık listesini döner. Eksik alan veya geçersiz süre için
+     *     MissingFieldException; admin bulunamazsa, geçmiş tarih/saat seçilirse InvalidStatusException;
+     *     oto servis yoksa ResourceNotFoundException; aynı gün+kategori için takvim zaten varsa
+     *     AlreadyExistsException fırlatır.
+     * en: Creates a new calendar for the admin's auto service on the given day/time window, sliced into
+     *     rangeMinutes-long ranges, and returns the range list. Throws MissingFieldException on missing
+     *     fields or invalid duration; InvalidStatusException when the admin is not found or a past
+     *     date/time is chosen; ResourceNotFoundException when the auto service is missing; and
+     *     AlreadyExistsException when a calendar already exists for the same day+category.
+     */
     @Override
     @Transactional
     public CalendarResponse createCalendar(CalendarRequest calendarRequest, String phoneNumber,
@@ -44,37 +62,37 @@ public class CalendarServiceImpl implements CalendarService {
                 calendarRequest.getStart() == null || calendarRequest.getEnd() == null ||
                 calendarRequest.getRangeMinutes() == null || calendarRequest.getServiceCategory() == null ||
                 calendarRequest.getWorkerCount() == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                EnumUserStatus.ACTIVE.name());
+                UserStatus.ACTIVE.name());
 
         if (admin == null) {
-            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
 
         if (calendarRequest.getRangeMinutes() <= 0) {
-            throw new MissingFieldException(EnumMessagesLangValues.INVALID_RANGE_MINUTES.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.INVALID_RANGE_MINUTES.getMessageByLang(acceptLanguage));
         }
 
         LocalDate todayLocal = LocalDate.now(ZoneId.of(timezone));
         LocalTime nowLocal = LocalTime.now(ZoneId.of(timezone));
 
         if (calendarRequest.getDay().isBefore(todayLocal)) {
-            throw new InvalidStatusException(EnumMessagesLangValues.PAST_DATE_NOT_ALLOWED.getMessageByLang(acceptLanguage));
+            throw new InvalidStatusException(MessagesLangValues.PAST_DATE_NOT_ALLOWED.getMessageByLang(acceptLanguage));
         }
         if (calendarRequest.getDay().isEqual(todayLocal) && calendarRequest.getStart().isBefore(nowLocal)) {
-            throw new InvalidStatusException(EnumMessagesLangValues.START_TIME_ALREADY_PASSED.getMessageByLang(acceptLanguage));
+            throw new InvalidStatusException(MessagesLangValues.START_TIME_ALREADY_PASSED.getMessageByLang(acceptLanguage));
         }
 
         if (!calendarRequest.getStart().isBefore(calendarRequest.getEnd())) {
-            throw new MissingFieldException(EnumMessagesLangValues.START_AFTER_END.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.START_AFTER_END.getMessageByLang(acceptLanguage));
         }
 
         AutoService autoService = admin.getAutoService();
         if (autoService == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         OffsetDateTime startUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(calendarRequest.getDay(),
@@ -87,7 +105,7 @@ public class CalendarServiceImpl implements CalendarService {
         Calendar existingCalendar = calendarRepository.findByDayAndServiceCategoryAndAutoService(utcDay,
                 calendarRequest.getServiceCategory(), autoService);
         if (existingCalendar != null) {
-            throw new AlreadyExistsException(EnumMessagesLangValues.CALENDAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+            throw new AlreadyExistsException(MessagesLangValues.CALENDAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
 
         List<Range> rangeList = createRangeList(
@@ -106,7 +124,7 @@ public class CalendarServiceImpl implements CalendarService {
                 .autoService(autoService)
                 .timeRanges(rangeList)
                 .rangeMinutes(calendarRequest.getRangeMinutes())
-                .status(EnumCalendarStatus.ACTIVE.name())
+                .status(CalendarStatus.ACTIVE.name())
                 .serviceCategory(calendarRequest.getServiceCategory())
                 .build();
 
@@ -118,43 +136,51 @@ public class CalendarServiceImpl implements CalendarService {
 
         return CalendarResponse.builder()
                 .timeRanges(rangeResponseList)
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
+    /**
+     * tr: Verilen oto servis id'si, gün ve servis kategorisine göre takvimi bulur ve zaman aralıklarını
+     *     kullanıcının saat dilimine çevirerek döner. Eksik alanlarda MissingFieldException; oto servis
+     *     veya takvim bulunamazsa ResourceNotFoundException fırlatır.
+     * en: Finds the calendar by the given auto service id, day, and service category, and returns its
+     *     time ranges converted to the caller's timezone. Throws MissingFieldException on missing fields
+     *     and ResourceNotFoundException when the auto service or calendar cannot be found.
+     */
     @Override
     public CalendarResponse getCalendarByAutoServiceId(CalendarRequest request, String role, String phoneNumber,
                                                        String userIdHeader, String timezone, String acceptLanguage) {
 
         if (request == null || request.getDay() == null || request.getServiceCategory() == null || role == null ||
                 phoneNumber == null || userIdHeader == null || request.getAutoServiceId() == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         AutoService autoService = autoServiceRepository.findById(request.getAutoServiceId()).orElseThrow(() -> new
-                ResourceNotFoundException(EnumMessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
 
 //        Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-//                EnumUserStatus.ACTIVE.name());
+//                UserStatus.ACTIVE.name());
 //
 //        if (admin == null) {
-//            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+//            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
 //        }
-//        if (role.equals(EnumUserRoles.ADMIN.name()) && !autoService.getAdmins().contains(admin)) {
-//            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+//        if (role.equals(UserRoles.ADMIN.name()) && !autoService.getAdmins().contains(admin)) {
+//            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
 //        }
 
         Calendar calendar = calendarRepository.findByDayAndServiceCategoryAndAutoService(request.getDay(),
                 request.getServiceCategory(), autoService);
 
         if (calendar == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CALENDAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CALENDAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         List<Range> ranges = calendar.getTimeRanges();
 
         return CalendarResponse.builder()
                 .timeRanges(mapToRangeResponseList(ranges, timezone, acceptLanguage))
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
@@ -172,7 +198,7 @@ public class CalendarServiceImpl implements CalendarService {
                         .start(helper.getLocalTimeFromUtcUseTZ(range.getStart(), timezone))
                         .end(helper.getLocalTimeFromUtcUseTZ(range.getEnd(), timezone))
                         .status(range.getStatus())
-                        .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                        .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                         .freeCount(range.getWorkerCount() - range.getAppointments().size())
                         .build())
                 .toList();
@@ -195,7 +221,7 @@ public class CalendarServiceImpl implements CalendarService {
                     .start(currentStartUtc)
                     .end(currentEndUtc)
                     .workerCount(workerCount)
-                    .status(EnumRangeStatus.AVAILABLE.name())
+                    .status(RangeStatus.AVAILABLE.name())
                     .build()
             );
 

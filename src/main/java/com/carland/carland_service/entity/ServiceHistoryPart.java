@@ -6,6 +6,10 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 
+/**
+ * tr: "service_history_parts" tablosunu modelleyen entity; bir servis geçmişi kaydında kullanılan parçayı (ad, miktar, maliyet, indirim) temsil eder.
+ * en: Entity modeling the "service_history_parts" table; represents a part used in a service history record (name, quantity, cost, discount).
+ */
 @Entity
 @Data
 @NoArgsConstructor

@@ -6,12 +6,20 @@ import com.carland.carland_service.repository.CarRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * tr: Hyper webhook payload'ındaki araç bilgilerini (plaka, kilometre, marka, model, yıl, kasa/motor tipi, motor hacmi) Car entity'sine uygulayan bileşen; yalnızca dolu gelen alanları günceller.
+ * en: Component applying vehicle metadata from the Hyper webhook payload (plate, mileage, brand, model, year, body/engine type, engine volume) to the Car entity; only non-empty fields are updated.
+ */
 @Component
 @RequiredArgsConstructor
 public class HyperWebhookCarMetadataApplier {
 
     private final CarRepository carRepository;
 
+    /**
+     * tr: Hyper cevabındaki dolu alanları araca kopyalar (motor hacmi litreden cc'ye çevrilir, plaka trim'lenir) ve en az bir alan değiştiyse aracı kaydeder. Exception fırlatmaz.
+     * en: Copies the non-empty fields from the Hyper response onto the car (engine volume converted from liters to cc, plate trimmed) and saves the car if at least one field changed. Does not throw.
+     */
     public void apply(Car car, HyperVehicleByVinResponse hyper) {
         boolean changed = false;
 

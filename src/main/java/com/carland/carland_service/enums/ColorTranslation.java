@@ -5,6 +5,10 @@ import lombok.Getter;
 import java.util.Arrays;
 
 
+/**
+ * tr: Araç renk adlarının İngilizce/Azerice çevirilerini tutan ve dile göre çeviri yapan enum.
+ * en: Enum holding English/Azerbaijani translations of car color names, translating based on language.
+ */
 @Getter
 public enum ColorTranslation {
 

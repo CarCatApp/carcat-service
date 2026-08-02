@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+/**
+ * tr: "transmission_types" tablosunu modelleyen entity; vites tipi sözlük kaydını (manuel, otomatik vb.) temsil eder.
+ * en: Entity modeling the "transmission_types" table; represents a transmission type lookup record (manual, automatic, etc.).
+ */
 @Entity
 @Data
 @Builder

@@ -6,6 +6,10 @@ import lombok.Getter;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * tr: Servis türü adlarının Azerice/İngilizce/Rusça çevirilerini tutan ve Accept-Language'a göre çeviri yapan enum.
+ * en: Enum holding Azerbaijani/English/Russian translations of service type names, translating based on Accept-Language.
+ */
 @Getter
 @AllArgsConstructor
 public enum ServiceTypeTranslation {

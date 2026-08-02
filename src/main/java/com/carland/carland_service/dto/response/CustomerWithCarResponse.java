@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: Bir müşteriyi araçlarıyla birlikte döndüren birleşik yanıt DTO'su (müşteri-araç link/listeleme akışı).
+ * en: Combined response DTO returning a customer together with their cars (customer-car link/listing flow).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -5,6 +5,10 @@ import lombok.experimental.FieldDefaults;
 
 import java.util.List;
 
+/**
+ * tr: CarController üzerinden araç ekleme ve güncelleme isteklerinde kullanılan DTO. VIN, plaka, marka/model ve teknik özellikleri taşır.
+ * en: DTO used in CarController requests for adding and updating a car. Carries VIN, plate number, brand/model and technical specs.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

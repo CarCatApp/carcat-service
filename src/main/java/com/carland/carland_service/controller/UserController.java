@@ -7,7 +7,7 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
-import com.carland.carland_service.service.interfaces.UserService;
+import com.carland.carland_service.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +23,10 @@ import java.util.Collections;
 import java.util.List;
 
 
+/**
+ * tr: Kullanıcı REST controller'ı; müşterileri araçlarıyla birlikte listeleme, kullanıcı detayı ekleme, bildirim listesi getirme ve müşteri-araç verisini Excel'e aktarma uçlarını sunar.
+ * en: REST controller for users; exposes endpoints to list customers with their cars, add user details, fetch the notification list, and export customer-car data to Excel.
+ */
 @RestController
 @RequestMapping("/api/v1/user")
 @RequiredArgsConstructor
@@ -35,6 +39,10 @@ public class UserController {
     private final CarRepository carRepository;
     private final ColorRepository colorRepository;
 
+    /**
+     * tr: Tüm müşterileri, her müşteriye bağlı araç bilgileriyle (renk çözümlenmiş halde) birlikte DTO listesi olarak döner.
+     * en: Returns all customers together with their cars (with color resolved) mapped into a DTO list.
+     */
     @GetMapping("/get/all/with/cars")
     public List<CustomerWithCarResponse> getCustomersWithCars() {
 
@@ -92,6 +100,10 @@ public class UserController {
         return responses;
     }
 
+    /**
+     * tr: Header'lardan gelen bilgilerle (X-User-Id, role, phoneNumber, inviterId vb.) kullanıcı detaylarını kaydeder ve kullanıcı bilgisini döner.
+     * en: Saves the user's details using the header values (X-User-Id, role, phoneNumber, inviterId etc.) and returns the user info.
+     */
     @PostMapping("/add-details")
     public UserResponse userAddDetails(@RequestHeader("Authorization") String token,
                                        @RequestHeader("role") String role,
@@ -112,6 +124,10 @@ public class UserController {
         return userService.userAddDetails(userId, role, phoneNumber, timezone, acceptLanguage, inviterId);
     }
 
+    /**
+     * tr: Çağıran kullanıcıya ait bildirim listesini döner.
+     * en: Returns the notification list for the calling user.
+     */
     @GetMapping("/notification/list")
     public List<NotificationResponse> getNotificationList(@RequestHeader("role") String role,
                                                           @RequestHeader("phoneNumber") String phoneNumber,
@@ -122,6 +138,10 @@ public class UserController {
     }
 
 
+    /**
+     * tr: Tüm müşterileri araçlarıyla birlikte (aracı olmayan müşteriler tek satır olarak) XLSX dosyasına yazar ve indirilebilir olarak döner.
+     * en: Writes all customers with their cars (customers without cars appear as a single row) into an XLSX file and returns it as a download.
+     */
     @GetMapping("/customer-cars")
     public void exportCustomerCars(HttpServletResponse response) throws IOException {
 

@@ -7,6 +7,10 @@ import lombok.experimental.FieldDefaults;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * tr: "auto_services" tablosunu modelleyen entity; bir servis merkezini (ad, adres, iletişim) ve ona bağlı admin/superadmin kullanıcılarını temsil eder.
+ * en: Entity modeling the "auto_services" table; represents an auto service center (name, address, contact) and its admin/superadmin users.
+ */
 @Entity
 @Data
 @Builder

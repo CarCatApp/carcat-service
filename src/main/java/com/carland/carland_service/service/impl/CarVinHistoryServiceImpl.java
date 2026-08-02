@@ -11,9 +11,9 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.ServiceHistory;
 import com.carland.carland_service.entity.ServiceHistoryPart;
-import com.carland.carland_service.enums.EnumMessagesLangValues;
-import com.carland.carland_service.enums.EnumPartnerId;
-import com.carland.carland_service.enums.EnumUserStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.PartnerId;
+import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.enums.ServiceTypeTranslation;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -23,7 +23,7 @@ import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.ServiceHistoryPartRepository;
 import com.carland.carland_service.repository.ServiceHistoryRepository;
 import com.carland.carland_service.service.PartnerLookupService;
-import com.carland.carland_service.service.interfaces.CarVinHistoryService;
+import com.carland.carland_service.service.CarVinHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +38,14 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * tr: VIN'e göre servis geçmişini getiren implementasyondur: önce lokal cache'e (service_history tablosu)
+ *     bakar, boşsa Hyper partner API'den geçmişi çekip parça detaylarıyla birlikte kaydeder. Araç bazlı
+ *     kilitleme ile eşzamanlı isteklerde çift kayıt oluşmasını engeller.
+ * en: Implementation that returns service history by VIN: reads the local cache (service_history table)
+ *     first, and when empty fetches the history from the Hyper partner API and persists it together with
+ *     part details. Uses per-car locking to prevent duplicate inserts under concurrent requests.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -45,7 +53,7 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
 
     private static final String HYPERSERVICE_SOURCE = "hyperservice";
     private static final String CACHE_SOURCE = "cache";
-    private static final EnumPartnerId HYPER_PARTNER = EnumPartnerId.HYPER;
+    private static final PartnerId HYPER_PARTNER = PartnerId.HYPER;
 
     private static final ConcurrentHashMap<Long, Object> CAR_PERSIST_LOCKS = new ConcurrentHashMap<>();
 
@@ -60,21 +68,30 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
     @Value("${hyper.auth.base-url}")
     private String hyperBaseUrl;
 
+    /**
+     * tr: VIN'e göre servis geçmişini döner. Önce cache'i kontrol eder; boşsa Hyper'dan çekip kaydeder
+     *     ve kaynak (cache/hyperservice) bilgisiyle döner. VIN/telefon/kullanıcı eksikse MissingFieldException,
+     *     müşteri bulunamazsa UserNotFoundException, araç müşteriye ait değilse ResourceNotFoundException fırlatır.
+     * en: Returns service history by VIN. Checks the cache first; when empty fetches from Hyper, persists
+     *     the rows, and returns them with the source flag (cache/hyperservice). Throws MissingFieldException
+     *     on missing VIN/phone/user, UserNotFoundException when the customer is not found, and
+     *     ResourceNotFoundException when the car does not belong to the customer.
+     */
     @Override
     @Transactional
     public CarVinServiceHistoryResponse getServiceHistoryByVin(String vin, String phoneNumber, String userIdHeader, String acceptLanguage) {
         if (vin == null || vin.isBlank() || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
         if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car car = carRepository.findByVinAndCustomer(vin, customer);
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         List<ServiceHistory> cachedRows = serviceHistoryRepository.findAllByCarOrderByDoneDateDescIdDesc(car);
@@ -253,7 +270,7 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
                 : ServiceTypeTranslation.translateList(history.getActionType(), acceptLanguage);
 
         Long partnerId = partnerLookupService.resolvePartnerId(history.getServiceCenterId(), HYPER_PARTNER);
-        EnumPartnerId enumPartner = EnumPartnerId.fromId(partnerId).orElse(HYPER_PARTNER);
+        PartnerId enumPartner = PartnerId.fromId(partnerId).orElse(HYPER_PARTNER);
         String partnerName = partnerLookupService.resolvePartnerName(
                 history.getServiceCenterId(), history.getServiceCenter(), partnerById, enumPartner);
 

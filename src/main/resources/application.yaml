@@ -43,6 +43,33 @@ server:
 
 carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
+  swagger:
+    auth-login-url: ${SWAGGER_AUTH_LOGIN_URL:https://digital-innovation.agency/auth/server/api/v1/users/login}
+    auth-refresh-url: ${SWAGGER_AUTH_REFRESH_URL:https://digital-innovation.agency/auth/server/api/v1/users/refresh}
+    # Public Try-it-out bases (browser → nginx/Kong)
+    service-server-url: ${SWAGGER_SERVICE_SERVER_URL:https://digital-innovation.agency/carland/server-carland}
+    auth-server-url: ${SWAGGER_AUTH_SERVER_URL:https://digital-innovation.agency/auth/server}
+    webhook-server-url: ${SWAGGER_WEBHOOK_SERVER_URL:https://digital-innovation.agency}
+    # Where this service fetches OpenAPI JSON (Docker internal preferred)
+    auth-docs-url: ${SWAGGER_AUTH_DOCS_URL:http://carland-auth:9090/v3/api-docs}
+    webhook-docs-url: ${SWAGGER_WEBHOOK_DOCS_URL:http://webhook:8080/v3/api-docs}
+
+springdoc:
+  swagger-ui:
+    persist-authorization: true
+    try-it-out-enabled: true
+    custom-js: /swagger-custom.js
+    urls-primary-name: 1. Carland Service — Mobile API
+    urls:
+      - name: 1. Carland Service — Mobile API
+        url: /v3/api-docs/mobile-api
+      - name: 2. Carland Service — Partner Webhooks
+        url: /v3/api-docs/partner-webhooks
+      - name: 3. Carland Auth
+        url: /v3/api-docs/external/carland-auth
+      - name: 4. Webhook Gateway
+        url: /v3/api-docs/external/webhook
+  show-actuator: false
 
 super:
   admin:

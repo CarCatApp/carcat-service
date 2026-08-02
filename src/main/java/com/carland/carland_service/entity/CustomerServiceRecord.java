@@ -6,6 +6,10 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
 
+/**
+ * tr: "customer_service_records" tablosunu modelleyen entity; müşterinin kendi girdiği araç servis kaydını (servis adı, tarih, km) temsil eder.
+ * en: Entity modeling the "customer_service_records" table; represents a car service record entered by the customer (service name, date, km).
+ */
 @Entity
 @Data
 @NoArgsConstructor

@@ -9,6 +9,10 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * tr: "calendars" tablosunu modelleyen entity; bir servis merkezinin günlük randevu takvimini ve zaman aralıklarını (Range) temsil eder.
+ * en: Entity modeling the "calendars" table; represents an auto service center's daily appointment calendar and its time ranges (Range).
+ */
 @Entity
 @Data
 @Builder

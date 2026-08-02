@@ -13,6 +13,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * tr: "cars" tablosunu modelleyen entity; müşteriye ait aracı (VIN, plaka, teknik özellikler, km) ve servis geçmişi ilişkilerini temsil eder.
+ * en: Entity modeling the "cars" table; represents a customer's car (VIN, plate, technical specs, mileage) and its service history relations.
+ */
 @Entity
 @Data
 @Builder

@@ -26,6 +26,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * tr: Admin panelinin MVC controller'ı; login/logout, araç ve kullanıcı listelerini sayfalayarak gösterir ve Excel (XLSX) export sağlar.
+ * en: MVC controller for the admin panel; handles login/logout, shows paginated car and user lists, and provides Excel (XLSX) exports.
+ */
 @Slf4j
 @Controller
 @RequiredArgsConstructor
@@ -43,6 +47,10 @@ public class AdminController {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
 
+    /**
+     * tr: Admin giriş sayfasını döner; "error" parametresi varsa modele hata bayrağı ekleyip login şablonunu render eder.
+     * en: Returns the admin login page; if the "error" query parameter is present, adds an error flag to the model and renders the login template.
+     */
     @GetMapping({"/admin", "/admin/"})
     public String loginPage(
             @RequestParam(required = false) String error,
@@ -57,6 +65,10 @@ public class AdminController {
     }
 
 
+    /**
+     * tr: Kullanıcı adı/şifreyi sabit değerlerle doğrular; başarılıysa session'a ADMIN_LOGIN yazıp araç listesine, değilse error=true ile login sayfasına yönlendirir.
+     * en: Validates the username/password against hardcoded values; on success stores ADMIN_LOGIN in the session and redirects to the car list, otherwise redirects back to the login page with error=true.
+     */
     @PostMapping("/admin/login")
     public String login(
             @RequestParam String username,
@@ -77,6 +89,10 @@ public class AdminController {
 
     // ==================== CARS ====================
 
+    /**
+     * tr: Araç listesini sayfa sayfa gösterir; opsiyonel userId filtresi uygular, login yoksa admin giriş sayfasına yönlendirir.
+     * en: Shows the car list page by page; applies an optional userId filter and redirects to the admin login page if the session is not authenticated.
+     */
     @GetMapping("/admin/cars")
     public String cars(
             @RequestParam(defaultValue = "1") int page,
@@ -107,6 +123,10 @@ public class AdminController {
     }
 
 
+    /**
+     * tr: Tüm araçları XLSX dosyası olarak indirir (VIN, plaka, marka, model, km vb. kolonlarla); login yoksa admin giriş sayfasına yönlendirir.
+     * en: Downloads all cars as an XLSX file (columns for VIN, plate, brand, model, mileage etc.); redirects to the admin login page if not authenticated.
+     */
     @GetMapping("/admin/cars/export")
     public void exportCars(
             HttpSession session,
@@ -160,6 +180,10 @@ public class AdminController {
 
     // ==================== USERS (carland_auth) ====================
 
+    /**
+     * tr: carland_auth servisinden kullanıcı listesini çekip (opsiyonel from/to tarih filtresiyle) bellekte sayfalayarak gösterir; uzak servis hatasında boş liste ve loadError bayrağı döner, login yoksa giriş sayfasına yönlendirir.
+     * en: Fetches the user list from the carland_auth service (with optional from/to date filters) and paginates it in memory; on remote-service failure shows an empty list with a loadError flag, and redirects to login if not authenticated.
+     */
     @GetMapping("/admin/users")
     public String users(
             @RequestParam(defaultValue = "1") int page,
@@ -211,6 +235,10 @@ public class AdminController {
     }
 
 
+    /**
+     * tr: carland_auth kullanıcılarını (opsiyonel from/to tarih filtresiyle) XLSX dosyası olarak indirir; login yoksa admin giriş sayfasına yönlendirir.
+     * en: Downloads carland_auth users as an XLSX file (with optional from/to date filters); redirects to the admin login page if not authenticated.
+     */
     @GetMapping("/admin/users/export")
     public void exportUsers(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -254,6 +282,10 @@ public class AdminController {
     }
 
 
+    /**
+     * tr: Admin oturumunu (session) sonlandırır ve giriş sayfasına yönlendirir.
+     * en: Invalidates the admin session and redirects to the login page.
+     */
     @GetMapping("/admin/logout")
     public String logout(HttpSession session) {
 
@@ -347,7 +379,11 @@ public class AdminController {
         }
     }
 
+    /**
+     * tr: DB Frankfurt (UTC) zamanını Azerbaycan (UTC+4) için +4 saat kaydırarak formatlar.
+     * en: Formats DB Frankfurt (UTC) time shifted +4 hours for Azerbaijan (UTC+4) display.
+     */
     private String formatDate(LocalDateTime dateTime) {
-        return dateTime != null ? EXCEL_DATE_FORMAT.format(dateTime) : "";
+        return dateTime != null ? EXCEL_DATE_FORMAT.format(dateTime.plusHours(4)) : "";
     }
 }

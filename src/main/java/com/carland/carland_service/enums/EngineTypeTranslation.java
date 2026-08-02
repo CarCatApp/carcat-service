@@ -3,6 +3,10 @@ package com.carland.carland_service.enums;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+/**
+ * tr: Motor tipi adlarının İngilizce/Azerice/Rusça çevirilerini tutan ve Accept-Language'a göre çeviri yapan enum.
+ * en: Enum holding English/Azerbaijani/Russian translations of engine type names, translating based on Accept-Language.
+ */
 @Getter
 @AllArgsConstructor
 public enum EngineTypeTranslation {

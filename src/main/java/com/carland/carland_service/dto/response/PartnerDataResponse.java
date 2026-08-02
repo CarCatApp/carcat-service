@@ -6,6 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * tr: İş ortağı (partner) temel bilgilerini (ad, bayi, logo, aktiflik) taşıyan yanıt DTO'su; PartnerResponse ve servis geçmişi yanıtlarında kullanılır.
+ * en: Response DTO carrying core partner info (name, dealer, logo, active flag); used in PartnerResponse and service history responses.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -8,6 +8,10 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * tr: "ranges" tablosunu modelleyen entity; takvim (Calendar) içindeki tek bir randevu zaman aralığını ve ona bağlı randevuları temsil eder.
+ * en: Entity modeling the "ranges" table; represents a single appointment time slot within a Calendar and its linked appointments.
+ */
 @Entity
 @Data
 @Builder

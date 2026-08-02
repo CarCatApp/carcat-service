@@ -442,9 +442,9 @@
           <td th:text="${car.bodyType}"></td>
           <td th:text="${car.mileage}"></td>
           <td class="muted"
-              th:text="${car.createdAt != null ? #temporals.format(car.createdAt, 'yyyy-MM-dd HH:mm') : ''}"></td>
+              th:text="${car.createdAt != null ? #temporals.format(car.createdAt.plusHours(4), 'yyyy-MM-dd HH:mm') : ''}"></td>
           <td class="muted"
-              th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt, 'yyyy-MM-dd HH:mm') : ''}"></td>
+              th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt.plusHours(4), 'yyyy-MM-dd HH:mm') : ''}"></td>
         </tr>
 
         <tr class="empty-row" th:if="${cars.content.isEmpty()}">

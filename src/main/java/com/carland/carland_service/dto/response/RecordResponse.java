@@ -8,6 +8,10 @@ import lombok.*;
 
 import java.time.LocalDate;
 
+/**
+ * tr: Müşterinin araç servis kaydı işlemlerinden dönen yanıt DTO'su (servis adı, tarih, km, durum).
+ * en: Response DTO returned by customer car service record operations (service name, date, km, status).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -8,15 +8,15 @@ import com.carland.carland_service.entity.*;
 import com.carland.carland_service.enums.ColorTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
 import com.carland.carland_service.enums.BodyTypeTranslation;
-import com.carland.carland_service.enums.EnumMessagesLangValues;
-import com.carland.carland_service.enums.EnumUserStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.HyperPercentageSyncService;
-import com.carland.carland_service.service.interfaces.CarService;
-import com.carland.carland_service.service.interfaces.PushNotificationService;
+import com.carland.carland_service.service.CarService;
+import com.carland.carland_service.service.PushNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,6 +34,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
+/**
+ * tr: Araç yönetiminin ana implementasyonudur: VIN kontrolü/decode (NHTSA), araç ekleme-silme-düzenleme,
+ *     kilometre güncelleme, müşteri servis kayıtları, bakım şablonuna ve Hyper partner verisine dayalı
+ *     servis yüzdesi hesaplama/listeleme/düzenleme ve servis hatırlatma push bildirimleri.
+ * en: Main implementation of car management: VIN check/decode (NHTSA), adding/removing/editing cars,
+ *     mileage updates, customer service records, service percentage calculation/listing/editing based on
+ *     the maintenance template and Hyper partner data, and service reminder push notifications.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -62,6 +70,16 @@ public class CarServiceImpl implements CarService {
 //            "5TDKBRCH8RS143667"
 //    );
 
+    /**
+     * tr: VIN'i kontrol eder: araç DB'de bir müşteriye bağlıysa AlreadyExistsException fırlatır;
+     *     müşterisiz kayıtlıysa DB'deki verilerle ("fromDb"), hiç yoksa NHTSA decoder sonucuyla
+     *     ("fromDecoderTool") doldurulmuş CarResponse döner. VIN'den elde edilen alanlar
+     *     vinProvidedFields listesinde işaretlenir.
+     * en: Checks the VIN: throws AlreadyExistsException when the car is already linked to a customer in
+     *     the DB; returns a CarResponse filled from the DB record ("fromDb") when it exists without a
+     *     customer, otherwise from the NHTSA decoder result ("fromDecoderTool"). Fields resolved from
+     *     the VIN are flagged in the vinProvidedFields list.
+     */
     @Override
     public CarResponse checkVin(String vin, String acceptLanguage) {
 
@@ -71,7 +89,7 @@ public class CarServiceImpl implements CarService {
 
         if (carFromDb != null && carFromDb.getCustomer() != null) {
             log.info("car ucun car !=null ve car.get customer != null controlu yandi");
-            throw new AlreadyExistsException(EnumMessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+            throw new AlreadyExistsException(MessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         } else if (carFromDb != null && carFromDb.getCustomer() == null) {
 
             List<String> vinProvidedFields = carFromDb != null ? carFromDb.getVinProvidedFields() : null;
@@ -173,6 +191,13 @@ public class CarServiceImpl implements CarService {
         }
     }
 
+    /**
+     * tr: Renk listesini dile göre çevirip dile özgü sıralamayla (az için sabit sıra, diğer dillerde
+     *     alfabetik ve "Other" en sonda) döner; liste boşsa ResourceNotFoundException fırlatır.
+     * en: Returns the color list translated per language with language-specific ordering (a fixed order
+     *     for az, alphabetical with "Other" last for other languages); throws ResourceNotFoundException
+     *     when the list is empty.
+     */
     @Override
     public List<Color> getColors(String acceptLanguage) {
 
@@ -180,7 +205,7 @@ public class CarServiceImpl implements CarService {
 
         if (colors.isEmpty()) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)
+                    MessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)
             );
         }
 
@@ -219,36 +244,33 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Araca ait müşteri servis kayıtlarını döner. Eksik parametrede MissingFieldException, müşteri
+     *     bulunamazsa UserNotFoundException, araç müşteriye ait değilse veya kayıt listesi boşsa
+     *     ResourceNotFoundException fırlatır.
+     * en: Returns the customer service records of the car. Throws MissingFieldException on missing
+     *     parameters, UserNotFoundException when the customer is not found, and ResourceNotFoundException
+     *     when the car does not belong to the customer or the record list is empty.
+     */
     @Override
     public List<RecordResponse> getServiceRecords(Long carId, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
 
         if (carId == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
             log.info("body de missing fieldler var");
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
-                phoneNumber, EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            log.info("customer tapilmadi");
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
         log.info("Customer adi:{}", customer.getName());
 
-        Car car = carRepository.findByCarIdAndCustomer(carId, customer);
-
-        if (car == null) {
-            log.info("car tapilmadi");
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Car car = requireCustomerCar(carId, customer, acceptLanguage);
         log.info("car id : {}", car.getCarId());
 
         List<CustomerServiceRecord> customerServiceRecordList = car.getServiceRecordList();
 
         if (customerServiceRecordList == null || customerServiceRecordList.isEmpty()) {
             log.info("customer service record list bosdur");
-            throw new ResourceNotFoundException(EnumMessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         log.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
@@ -274,24 +296,26 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Aracın gönderilen (null/boş olmayan) alanlarını günceller (marka, model, km, plaka, motor tipi,
+     *     motor hacmi, kasa tipi, model yılı) ve güncel aracı döner. Eksik zorunlu alanlarda
+     *     MissingFieldException; müşteri/araç doğrulamasında UserNotFoundException veya
+     *     ResourceNotFoundException fırlatır.
+     * en: Updates only the provided (non-null/non-blank) fields of the car (brand, model, mileage, plate,
+     *     engine type, engine volume, body type, model year) and returns the updated car. Throws
+     *     MissingFieldException on missing required fields, and UserNotFoundException or
+     *     ResourceNotFoundException from the customer/car ownership checks.
+     */
     @Override
     public CarResponse editCarDetails(CarRequest carRequest, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
 
         if (carRequest == null || phoneNumber == null || userIdHeader == null || carRequest.getCarId() == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
-                Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
-        if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-        Car car = carRepository.findByCarIdAndCustomer(carRequest.getCarId(), customer);
-
-        if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(carRequest.getCarId(), customer, acceptLanguage);
 
         if (carRequest.getBrand() == null) {
             log.info("null");
@@ -392,6 +416,14 @@ public class CarServiceImpl implements CarService {
 //        }
 //    }
 
+    /**
+     * tr: Tüm araçları müşterileriyle birlikte yükler ve cihaz token'ı olan her müşteriye sabit metinli
+     *     yağ değişimi hatırlatma push'u gönderir. (Yüzde bazlı dinamik bildirim mantığı üstteki yorum
+     *     satırlarındadır ve şu an devre dışıdır.)
+     * en: Loads all cars with their customers and sends a fixed-text oil change reminder push to every
+     *     customer that has a device token. (The percentage-based dynamic notification logic is in the
+     *     commented block above and is currently disabled.)
+     */
     @Override
     public void calculateAndPushNotification() {
         List<Car> cars = carRepository.findAllWithCustomer();
@@ -409,24 +441,26 @@ public class CarServiceImpl implements CarService {
         }
     }
 
+    /**
+     * tr: Aracın bakım şablonundaki her servis için yüzde satırı üretir ve kalan ömre göre sıralı liste döner.
+     *     Manuel düzenlenmiş (EDITED_BY_*) yüzdeler kayıtlı değerlerden, CREATED olanlar önce Hyper partner
+     *     satırından, o da yoksa müşteri kaydı/servis geçmişinden hesaplanır. Eksik parametrede
+     *     MissingFieldException; müşteri/araç doğrulamasında UserNotFoundException/ResourceNotFoundException fırlatır.
+     * en: Builds a percentage row for every service in the car's maintenance template and returns the list
+     *     sorted by remaining service life. Manually edited (EDITED_BY_*) percentages use the stored values;
+     *     CREATED ones are computed first from the Hyper partner line, otherwise from customer records/service
+     *     history. Throws MissingFieldException on missing parameters, and
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car ownership checks.
+     */
     @Override
-    public PercentageResponseMain getServicePercentageList(Long carId, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
+    public PercentageResponse getServicePercentageList(Long carId, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
 
         if (carId == null || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(carId, customer);
-
-        if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(carId, customer, acceptLanguage);
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM, yyyy", Locale.forLanguageTag(acceptLanguage));
 
@@ -456,52 +490,12 @@ public class CarServiceImpl implements CarService {
                 LocalDate lastServiceDate = percentage.getLastServiceDate();
                 Integer lastServiceKm = percentage.getLastServiceKm();
                 Integer nextServiceKm = percentage.getNextServiceKm();
-
-                Integer kmPercentage = null;
-                Integer remainingKm = null;
-
-                // ================= KM PERCENTAGE (EDITED LOGIC) =================
-                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
-
-                    long totalKm = nextServiceKm - lastServiceKm;
-                    long remainingKmRaw = nextServiceKm - car.getMileage();
-
-                    remainingKm = (int) Math.max(remainingKmRaw, 0);
-
-                    if (totalKm > 0) {
-                        kmPercentage = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
-                        kmPercentage = Math.max(0, Math.min(100, kmPercentage));
-                    } else {
-                        kmPercentage = 0;
-                    }
-                }
-
-                // ================= MONTH / DAY PERCENTAGE (DAY-BASED) =================
-                Integer monthPercentageDigit = null;
-                String remainingDaysValue = null;
                 LocalDate nextServiceDate = percentage.getNextServiceDate();
 
-                if (lastServiceDate != null && nextServiceDate != null) {
-
-                    long lastDay = lastServiceDate.toEpochDay();
-                    long nextDay = nextServiceDate.toEpochDay();
-                    long nowDay = LocalDate.now().toEpochDay();
-
-                    long totalDays = nextDay - lastDay;     // full period
-                    long remainingDays = nextDay - nowDay;  // remaining period
-
-                    remainingDays = Math.max(remainingDays, 0);
-
-                    if (totalDays > 0) {
-                        monthPercentageDigit = (int) Math.round((remainingDays * 100.0) / totalDays);
-                        monthPercentageDigit = Math.max(0, Math.min(100, monthPercentageDigit));
-                    } else {
-                        monthPercentageDigit = 0;
-                    }
-
-                    // sadece UI icin approximate ay (gun/30), yuzde icin KULLANILMIYOR
-                    remainingDaysValue = String.valueOf(remainingDays);
-                }
+                Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer remainingKm = computeRemainingKm(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer monthPercentageDigit = computeMonthPercentage(lastServiceDate, nextServiceDate);
+                String remainingDaysValue = computeRemainingDaysValue(lastServiceDate, nextServiceDate);
 
                 responseList.add(
 
@@ -520,9 +514,9 @@ public class CarServiceImpl implements CarService {
                                 .remainingKm(remainingKm)
                                 .remainingMonths(remainingDaysValue)
                                 .lastServiceKm(lastServiceKm)
-                                .lastServiceDate(lastServiceDate != null ? capitalizeMonth(lastServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)) : null)
+                                .lastServiceDate(formatWithCapitalizedMonth(lastServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                                 .nextServiceKm(nextServiceKm)
-                                .nextServiceDate(nextServiceDate != null ? capitalizeMonth(nextServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)) : null)
+                                .nextServiceDate(formatWithCapitalizedMonth(nextServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                                 .status(listStatus.name())
                                 .editable(listStatus.isEditable())
                                 .servicedStatus(record != null ? record.getServicedStatus() : null)
@@ -553,36 +547,10 @@ public class CarServiceImpl implements CarService {
                 Integer nextServiceKm = snap.nextServiceKm();
                 LocalDate nextServiceDate = snap.nextServiceDate();
 
-                Integer kmPercentage = null;
-                Integer remainingKm = null;
-                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
-                    long totalKm = nextServiceKm - lastServiceKm;
-                    long remainingKmRaw = nextServiceKm - car.getMileage();
-                    remainingKm = (int) Math.max(remainingKmRaw, 0);
-                    if (totalKm > 0) {
-                        kmPercentage = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
-                        kmPercentage = Math.max(0, Math.min(100, kmPercentage));
-                    } else {
-                        kmPercentage = 0;
-                    }
-                }
-
-                Integer monthPercentageDigit = null;
-                String remainingDaysValue = null;
-                if (lastServiceDate != null && nextServiceDate != null) {
-                    long lastDay = lastServiceDate.toEpochDay();
-                    long nextDay = nextServiceDate.toEpochDay();
-                    long nowDay = LocalDate.now().toEpochDay();
-                    long totalDays = nextDay - lastDay;
-                    long remainingDays = Math.max(nextDay - nowDay, 0);
-                    if (totalDays > 0) {
-                        monthPercentageDigit = (int) Math.round((remainingDays * 100.0) / totalDays);
-                        monthPercentageDigit = Math.max(0, Math.min(100, monthPercentageDigit));
-                    } else {
-                        monthPercentageDigit = 0;
-                    }
-                    remainingDaysValue = String.valueOf(remainingDays);
-                }
+                Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer remainingKm = computeRemainingKm(lastServiceKm, nextServiceKm, car.getMileage());
+                Integer monthPercentageDigit = computeMonthPercentage(lastServiceDate, nextServiceDate);
+                String remainingDaysValue = computeRemainingDaysValue(lastServiceDate, nextServiceDate);
 
                 responseList.add(
                         CarServicePercentageResponse.builder()
@@ -600,11 +568,9 @@ public class CarServiceImpl implements CarService {
                                 .remainingKm(remainingKm)
                                 .remainingMonths(remainingDaysValue)
                                 .lastServiceKm(lastServiceKm)
-                                .lastServiceDate(capitalizeMonth(lastServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)))
+                                .lastServiceDate(formatWithCapitalizedMonth(lastServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                                 .nextServiceKm(nextServiceKm)
-                                .nextServiceDate(nextServiceDate != null
-                                        ? capitalizeMonth(nextServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage))
-                                        : null)
+                                .nextServiceDate(formatWithCapitalizedMonth(nextServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                                 .status(listStatus.name())
                                 .editable(listStatus.isEditable())
                                 .servicedStatus(record != null ? record.getServicedStatus() : null)
@@ -666,28 +632,9 @@ public class CarServiceImpl implements CarService {
             LocalDate nextServiceDate = null;
 
             if (serviceEntity.getIntervalMonth() != null) {
-
-                int intervalMonth = serviceEntity.getIntervalMonth();
-
-                nextServiceDate = lastServiceDate.plusMonths(intervalMonth);
-
-                long lastDay = lastServiceDate.toEpochDay();
-                long nextDay = nextServiceDate.toEpochDay();
-                long nowDay = LocalDate.now().toEpochDay();
-
-                long totalDays = nextDay - lastDay;       // next - last
-                long remainingDays = nextDay - nowDay;    // next - current
-
-                remainingDays = Math.max(remainingDays, 0);
-
-                if (totalDays > 0) {
-                    monthPercentageDigit = (int) Math.round((remainingDays * 100.0) / totalDays);
-                    monthPercentageDigit = Math.max(0, Math.min(100, monthPercentageDigit));
-                } else {
-                    monthPercentageDigit = 0;
-                }
-
-                remainingDaysValue = String.valueOf(remainingDays);
+                nextServiceDate = lastServiceDate.plusMonths(serviceEntity.getIntervalMonth());
+                monthPercentageDigit = computeMonthPercentage(lastServiceDate, nextServiceDate);
+                remainingDaysValue = computeRemainingDaysValue(lastServiceDate, nextServiceDate);
             }
 
 // ================= RESPONSE =================
@@ -708,9 +655,9 @@ public class CarServiceImpl implements CarService {
                             .remainingKm(remainingKm)
                             .remainingMonths(remainingDaysValue)
                             .lastServiceKm(lastServiceKm)
-                            .lastServiceDate(capitalizeMonth(lastServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)))
+                            .lastServiceDate(formatWithCapitalizedMonth(lastServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                             .nextServiceKm(nextServiceKm)
-                            .nextServiceDate(nextServiceDate != null ? capitalizeMonth(nextServiceDate.format(formatter), Locale.forLanguageTag(acceptLanguage)) : null)
+                            .nextServiceDate(formatWithCapitalizedMonth(nextServiceDate, formatter, Locale.forLanguageTag(acceptLanguage)))
                             .status(listStatus.name())
                             .editable(listStatus.isEditable())
                             .servicedStatus(record != null ? record.getServicedStatus() : null)
@@ -722,35 +669,34 @@ public class CarServiceImpl implements CarService {
         responseList.sort(Comparator
                 .comparingInt(this::remainingServiceScore)
                 .thenComparing(CarServicePercentageResponse::getServiceName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
-        return PercentageResponseMain.builder()
+        return PercentageResponse.builder()
                 .carId(car.getCarId())
                 .vin(car.getVin())
                 .responseList(responseList)
                 .build();
     }
 
+    /**
+     * tr: Müşterinin bir yüzde kaydını (son/sonraki servis km ve tarihleri) düzenlemesini sağlar ve durumu
+     *     EDITED_BY_CUSTOMER yaparak günceller. Eksik alanlarda MissingFieldException; müşteri/araç
+     *     doğrulamasında UserNotFoundException/ResourceNotFoundException; yüzde bulunamaz veya araca ait
+     *     değilse ResourceNotFoundException; kayıt partner kilitliyse (EDITED_BY_PARTNER) ConflictException fırlatır.
+     * en: Lets the customer edit a percentage record (last/next service km and dates) and saves it with the
+     *     EDITED_BY_CUSTOMER status. Throws MissingFieldException on missing fields;
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car checks;
+     *     ResourceNotFoundException when the percentage is missing or belongs to another car; and
+     *     ConflictException when the record is partner-locked (EDITED_BY_PARTNER).
+     */
     @Override
     public CarServicePercentageResponse editPercentage(PercentageRequest request, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
 
         if (request == null || request.getCarId() == null || request.getPercentageId() == null || phoneNumber == null || userIdHeader == null) {
             log.error("missing body var");
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
-                phoneNumber, EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            log.error("customer null");
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(request.getCarId(), customer);
-
-        if (car == null) {
-            log.error("car null");
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(request.getCarId(), customer, acceptLanguage);
 
         Percentage percentage = percentageRepository.findById(request.getPercentageId())
                 .orElseThrow(() -> {
@@ -823,8 +769,21 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Aracın tüm yüzde kayıtlarını yeniden hesaplayıp kaydeder: manuel düzenlenmiş (EDITED_BY_*) olanların
+     *     durumu korunarak sadece türetilmiş alanları tazelenir; diğerleri önce Hyper partner satırından
+     *     (EDITED_BY_PARTNER), yoksa müşteri kaydı/servis geçmişinden (CREATED) hesaplanır. Eksik parametrede
+     *     MissingFieldException; müşteri/araç doğrulamasında UserNotFoundException/ResourceNotFoundException;
+     *     araçta hiç yüzde yoksa ResourceNotFoundException fırlatır.
+     * en: Recomputes and persists all percentage records of the car: manually edited (EDITED_BY_*) ones keep
+     *     their status and only get their derived fields refreshed; the rest are computed from the Hyper
+     *     partner line (EDITED_BY_PARTNER) when available, otherwise from customer records/service history
+     *     (CREATED). Throws MissingFieldException on missing parameters,
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car checks, and
+     *     ResourceNotFoundException when the car has no percentages at all.
+     */
     @Override
-    public PercentageResponseMain executeServicePercentages(
+    public PercentageResponse executeServicePercentages(
             Long carId,
             String phoneNumber,
             String userIdHeader,
@@ -833,31 +792,18 @@ public class CarServiceImpl implements CarService {
 
         if (carId == null || phoneNumber == null || userIdHeader == null) {
             throw new MissingFieldException(
-                    EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
-                Long.valueOf(userIdHeader),
-                phoneNumber,
-                EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            throw new UserNotFoundException(
-                    EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(carId, customer);
-        if (car == null) {
-            throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(carId, customer, acceptLanguage);
 
         List<Percentage> percentages =
                 percentageRepository.findAllByCarId(car.getCarId());
 
         if (percentages.isEmpty()) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         log.info("[pct-status-debug] executeServicePercentages START | carId={}, vin={}, count={}, thread={}",
@@ -909,10 +855,7 @@ public class CarServiceImpl implements CarService {
 
                 Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
                 Integer monthPercentage = computeMonthPercentage(lastServiceDate, nextServiceDate);
-                Integer remainingKm = null;
-                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
-                    remainingKm = (int) Math.max(nextServiceKm - car.getMileage(), 0);
-                }
+                Integer remainingKm = computeRemainingKm(lastServiceKm, nextServiceKm, car.getMileage());
 
                 if (kmPercentage != null) {
                     percentage.setKmPercentage(kmPercentage);
@@ -993,10 +936,7 @@ public class CarServiceImpl implements CarService {
 
                 Integer kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
                 Integer monthPercentage = computeMonthPercentage(lastServiceDate, nextServiceDate);
-                Integer remainingKm = null;
-                if (lastServiceKm != null && nextServiceKm != null && car.getMileage() != null) {
-                    remainingKm = (int) Math.max(nextServiceKm - car.getMileage(), 0);
-                }
+                Integer remainingKm = computeRemainingKm(lastServiceKm, nextServiceKm, car.getMileage());
 
                 responseList.add(
                         CarServicePercentageResponse.builder()
@@ -1163,7 +1103,7 @@ public class CarServiceImpl implements CarService {
         log.info("[pct-status-debug] executeServicePercentages END | carId={}, recomputeSaved={}, manualPreserved={}, thread={}",
                 car.getCarId(), recomputeSavedCount, manualPreservedCount, Thread.currentThread().getName());
 
-        return PercentageResponseMain.builder()
+        return PercentageResponse.builder()
                 .carId(car.getCarId())
                 .vin(car.getVin())
                 .responseList(responseList)
@@ -1171,6 +1111,23 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Müşteri adına araç ekler: zorunlu alanları (vin, plaka, km, engineTypeId) doğrular, VIN daha önce
+     *     müşterisiz kayıtlıysa aracı müşteriye bağlar, yoksa motor tipine uygun bakım şablonuyla yeni araç
+     *     oluşturup her şablon servisi için Percentage ve CustomerServiceRecord kayıtları açar; commit
+     *     sonrası asenkron yüzde+Hyper senkronizasyonunu tetikler. Eksik/geçersiz alanlarda
+     *     MissingFieldException; müşteri yoksa UserNotFoundException; VIN başka müşteriye bağlıysa, plaka
+     *     kullanımdaysa veya DB constraint ihlalinde AlreadyExistsException; renk/motor tipi/şablon
+     *     bulunamazsa ResourceNotFoundException fırlatır. Tüm hatalar log tablosuna da yazılır.
+     * en: Adds a car for the customer: validates required fields (vin, plate, mileage, engineTypeId), links
+     *     the car to the customer when the VIN already exists without an owner, otherwise creates a new car
+     *     with the maintenance template matching the engine type and creates Percentage and
+     *     CustomerServiceRecord rows for each template service; triggers the async percentage+Hyper sync
+     *     after commit. Throws MissingFieldException on missing/invalid fields; UserNotFoundException when
+     *     the customer is missing; AlreadyExistsException when the VIN belongs to another customer, the
+     *     plate is taken, or a DB constraint is violated; ResourceNotFoundException when the color, engine
+     *     type, or template cannot be found. All failures are also persisted to the log table.
+     */
     @Override
     @Transactional
     public CarResponse addCar(CarRequest carRequest, String phoneNumber, String userIdHeader,
@@ -1202,70 +1159,70 @@ public class CarServiceImpl implements CarService {
             if (carRequest == null) {
                 throwAddCarFailure(logUserId,
                         "carRequest is null",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             if (phoneNumber == null || phoneNumber.isBlank()) {
                 throwAddCarFailure(logUserId,
                         "phoneNumber is null or blank",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             if (userIdHeader == null || userIdHeader.isBlank()) {
                 throwAddCarFailure(logUserId,
                         "userIdHeader is null or blank",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             if (carRequest.getEngineTypeId() == null) {
                 throwAddCarFailure(logUserId,
                         "engineTypeId is null",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
 
             if (carRequest.getVin() == null) {
                 throwAddCarFailure(logUserId,
                         "vin is null",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             String vin = carRequest.getVin().trim();
             if (vin.isBlank()) {
                 throwAddCarFailure(logUserId,
                         "vin is blank after trim",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
 
             if (carRequest.getPlateNumber() == null) {
                 throwAddCarFailure(logUserId,
                         "plateNumber is null",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             String plateNumber = carRequest.getPlateNumber().trim();
             if (plateNumber.isBlank()) {
                 throwAddCarFailure(logUserId,
                         "plateNumber is blank after trim",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
 
             if (carRequest.getMileage() == null) {
                 throwAddCarFailure(logUserId,
                         "mileage is null",
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
             if (carRequest.getMileage() < 0) {
                 throwAddCarFailure(logUserId,
                         "mileage is negative | mileage=" + carRequest.getMileage(),
-                        new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                        new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
 
             Long userId = parseAddCarUserId(userIdHeader, logUserId, acceptLanguage);
             logUserId = userId.toString();
 
             log.info("[addCar] customerRepository.findByUserIdAndPhoneNumberAndStatus | userId={}, phoneNumber={}, status={}",
-                    userId, phoneNumber, EnumUserStatus.ACTIVE.name());
+                    userId, phoneNumber, UserStatus.ACTIVE.name());
             Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
-                    userId, phoneNumber.trim(), EnumUserStatus.ACTIVE.name());
+                    userId, phoneNumber.trim(), UserStatus.ACTIVE.name());
             if (customer == null) {
                 throwAddCarFailure(logUserId,
                         "customer not found | userId=" + userId + ", phoneNumber=" + phoneNumber,
-                        new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                        new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] PASS customer found | customerUserId={}", customer.getUserId());
 
@@ -1274,7 +1231,7 @@ public class CarServiceImpl implements CarService {
                 if (color == null) {
                     throwAddCarFailure(logUserId,
                             "colorId not found | colorId=" + carRequest.getColorId(),
-                            new ResourceNotFoundException(EnumMessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                            new ResourceNotFoundException(MessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)));
                 }
             }
 
@@ -1291,7 +1248,7 @@ public class CarServiceImpl implements CarService {
                                 + ", ownerUserId=" + existingCar.getCustomer().getUserId()
                                 + ", requestUserId=" + customer.getUserId()
                                 + ", vin=" + vin,
-                        new AlreadyExistsException(EnumMessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                        new AlreadyExistsException(MessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
             }
 
             if (existingCar != null) {
@@ -1320,7 +1277,7 @@ public class CarServiceImpl implements CarService {
                                 + ", existingVin=" + conflictingCar.getVin()
                                 + ", requestVin=" + vin,
                         new AlreadyExistsException(
-                                EnumMessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                                MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
 
@@ -1329,7 +1286,7 @@ public class CarServiceImpl implements CarService {
             if (engineType == null) {
                 throwAddCarFailure(logUserId,
                         "engineType not found | engineTypeId=" + carRequest.getEngineTypeId(),
-                        new ResourceNotFoundException(EnumMessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                        new ResourceNotFoundException(MessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] engine type lookup result | engineTypeId={}, engineType={}",
                     engineType.getEngineTypeId(), engineType.getEngineType());
@@ -1340,14 +1297,14 @@ public class CarServiceImpl implements CarService {
                 throwAddCarFailure(logUserId,
                         "maintenance template not found | engineTypeId=" + engineType.getEngineTypeId()
                                 + ", engineType=" + engineType.getEngineType(),
-                        new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                        new ResourceNotFoundException(MessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
             }
             List<ServiceEntity> templateServices = maintenanceTemplate.getServices();
             if (templateServices == null || templateServices.isEmpty()) {
                 throwAddCarFailure(logUserId,
                         "maintenance template has no services | templateId=" + maintenanceTemplate.getId()
                                 + ", engineType=" + engineType.getEngineType(),
-                        new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                        new ResourceNotFoundException(MessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] PASS maintenance template found | templateId={}, templateName={}, serviceCount={}",
                     maintenanceTemplate.getId(), maintenanceTemplate.getName(), templateServices.size());
@@ -1379,7 +1336,7 @@ public class CarServiceImpl implements CarService {
                         "DB constraint violation on car save | vin=" + vin
                                 + ", plateNumber=" + plateNumber
                                 + ", cause=" + e.getMostSpecificCause().getMessage(),
-                        new AlreadyExistsException(EnumMessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                        new AlreadyExistsException(MessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] car saved | carId={}, vin={}", newCar.getCarId(), newCar.getVin());
 
@@ -1387,13 +1344,13 @@ public class CarServiceImpl implements CarService {
                 if (serviceEntity == null) {
                     throwAddCarFailure(logUserId,
                             "null service entity in maintenance template | templateId=" + maintenanceTemplate.getId(),
-                            new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                            new ResourceNotFoundException(MessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
                 }
                 if (serviceEntity.getServiceName() == null || serviceEntity.getServiceName().isBlank()) {
                     throwAddCarFailure(logUserId,
                             "service entity has blank serviceName | templateId=" + maintenanceTemplate.getId()
                                     + ", serviceId=" + serviceEntity.getId(),
-                            new ResourceNotFoundException(EnumMessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+                            new ResourceNotFoundException(MessagesLangValues.TEMPLATE_NOT_FOUND.getMessageByLang(acceptLanguage)));
                 }
 
                 Percentage percentage = Percentage.builder()
@@ -1453,17 +1410,25 @@ public class CarServiceImpl implements CarService {
         }
     }
 
+    /**
+     * tr: userIdHeader'ı Long'a çevirir; sayı değilse hatayı loglayıp MissingFieldException fırlatır.
+     * en: Parses the userIdHeader into a Long; logs the failure and throws MissingFieldException when it is not numeric.
+     */
     private Long parseAddCarUserId(String userIdHeader, String logUserId, String acceptLanguage) {
         try {
             return Long.valueOf(userIdHeader.trim());
         } catch (NumberFormatException e) {
             throwAddCarFailure(logUserId,
                     "userIdHeader is not a valid number | userIdHeader=" + userIdHeader,
-                    new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
+                    new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             throw new IllegalStateException("unreachable");
         }
     }
 
+    /**
+     * tr: İstisnanın addCar akışında beklenen (bilinen) iş istisnalarından biri olup olmadığını döner.
+     * en: Returns whether the exception is one of the expected (known) business exceptions in the addCar flow.
+     */
     private boolean isKnownAddCarException(RuntimeException ex) {
         return ex instanceof MissingFieldException
                 || ex instanceof UserNotFoundException
@@ -1471,12 +1436,20 @@ public class CarServiceImpl implements CarService {
                 || ex instanceof ResourceNotFoundException;
     }
 
+    /**
+     * tr: addCar hatasını hem uygulama loguna hem log tablosuna yazar ve verilen istisnayı fırlatır.
+     * en: Writes the addCar failure to both the application log and the log table, then throws the given exception.
+     */
     private void throwAddCarFailure(String userId, String detail, RuntimeException exception) {
         log.warn("[addCar] FAIL | userId={}, detail={}", userId, detail);
         logAddCarFailure(userId, detail);
         throw exception;
     }
 
+    /**
+     * tr: addCar hata detayını log tablosuna kaydeder; kayıt başarısız olursa istisnayı yutup sadece loglar.
+     * en: Persists the addCar failure detail to the log table; swallows and only logs any persistence error.
+     */
     private void logAddCarFailure(String userId, String detail) {
         try {
             logRepository.save(Log.builder()
@@ -1490,6 +1463,11 @@ public class CarServiceImpl implements CarService {
 
     /**
      * Schedules the async percentage + Hyper sync to run after the addCar transaction commits.
+     *
+     * tr: Asenkron yüzde + Hyper senkronizasyonunu addCar transaction'ı commit olduktan sonra çalışacak
+     *     şekilde planlar; aktif transaction yoksa hemen başlatır.
+     * en: Schedules the async percentage + Hyper sync to run after the addCar transaction commits;
+     *     starts it immediately when no transaction synchronization is active.
      */
     private void triggerAfterAddCarSync(Long carId, String vin, String phoneNumber,
                                         String userIdHeader, String timezone, String acceptLanguage) {
@@ -1508,84 +1486,98 @@ public class CarServiceImpl implements CarService {
         }
     }
 
+    /**
+     * tr: Aracı müşteriden ayırır (kaydı silmez, customer bağını null yapar) ve başarı mesajı döner.
+     *     Eksik alanlarda MissingFieldException; müşteri/araç doğrulamasında
+     *     UserNotFoundException/ResourceNotFoundException fırlatır.
+     * en: Detaches the car from the customer (does not delete the record, just nulls the customer link)
+     *     and returns a success message. Throws MissingFieldException on missing fields, and
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car ownership checks.
+     */
     @Override
     public CarResponse removeCar(CarRequest carRequest, String phoneNumber, String userIdHeader, String timezone,
                                  String acceptLanguage) {
 
         if (carRequest == null || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
-                Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(carRequest.getCarId(), customer);
-
-        if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(carRequest.getCarId(), customer, acceptLanguage);
         customer.getCars().remove(car);
         car.setCustomer(null);
         carRepository.save(car);
         customerRepository.save(customer);
 
         return CarResponse.builder()
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
 
+    /**
+     * tr: VIN'e göre aracı bulur ve detaylarını döner. Eksik parametrede MissingFieldException, müşteri
+     *     bulunamazsa UserNotFoundException, araç yoksa ResourceNotFoundException, araç başka müşteriye
+     *     aitse NotMatchException fırlatır.
+     * en: Finds the car by VIN and returns its details. Throws MissingFieldException on missing parameters,
+     *     UserNotFoundException when the customer is not found, ResourceNotFoundException when the car does
+     *     not exist, and NotMatchException when the car belongs to a different customer.
+     */
     @Override
     public CarResponse getCarByVinCode(String vin, String phoneNumber, String userIdHeader,
                                        String timezone, String acceptLanguage) {
 
         if (vin == null || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
 
         if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car existingCar = carRepository.findByVin(vin);
 
         if (existingCar == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Customer carOwner = existingCar.getCustomer();
         if (carOwner != null && !carOwner.getUserId().equals(customer.getUserId())) {
-            throw new NotMatchException(EnumMessagesLangValues.CAR_NOT_MATCH_WITH_CUSTOMER.getMessageByLang(acceptLanguage));
+            throw new NotMatchException(MessagesLangValues.CAR_NOT_MATCH_WITH_CUSTOMER.getMessageByLang(acceptLanguage));
         }
 
         return convertCarEntityToResponse(existingCar, acceptLanguage, "null");
 
     }
 
+    /**
+     * tr: Müşterinin araçlarını eklenme tarihine göre azalan sırada döner ve isteği log tablosuna yazar.
+     *     Eksik parametrede MissingFieldException, müşteri bulunamazsa UserNotFoundException, araç listesi
+     *     boşsa ResourceNotFoundException fırlatır.
+     * en: Returns the customer's cars ordered by creation date descending and writes the request to the log
+     *     table. Throws MissingFieldException on missing parameters, UserNotFoundException when the customer
+     *     is not found, and ResourceNotFoundException when the car list is empty.
+     */
     @Override
     public List<CarResponse> getCarListByUserId(String phoneNumber, String userIdHeader,
                                                 String timezone, String acceptLanguage) {
         if (phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, EnumUserStatus.ACTIVE.name());
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
 
         if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         List<Car> carList = carRepository.findAllByCustomerOrderByCreatedAtDesc(customer);
 
         if (carList == null || carList.isEmpty()) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         List<CarResponse> responses = carList.stream().map(car -> convertCarEntityToResponse(car, acceptLanguage, "null")).collect(Collectors.toList());
@@ -1603,30 +1595,40 @@ public class CarServiceImpl implements CarService {
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
+    /**
+     * tr: Aracın kilometresini günceller: istek sahibi araç sahibi (customer) ise kendi aracında, admin ise
+     *     VIN ile herhangi bir araçta güncelleme yapabilir. Eksik alanlarda MissingFieldException; istek
+     *     sahibi ne müşteri ne admin ise InvalidStatusException; araç bulunamazsa
+     *     ResourceNotFoundException fırlatır.
+     * en: Updates the car's mileage: the caller may update their own car as the owner (customer), or any
+     *     car by VIN as an admin. Throws MissingFieldException on missing fields, InvalidStatusException
+     *     when the caller is neither a customer nor an admin, and ResourceNotFoundException when the car
+     *     cannot be found.
+     */
     @Override
     public CarResponse updateMileage(CarRequest carRequest, String phoneNumber, String userIdHeader, String timezone,
                                      String acceptLanguage) {
         if (carRequest == null || carRequest.getVin() == null || carRequest.getMileage() == null || phoneNumber == null
                 || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         Long userId = Long.valueOf(userIdHeader);
         Car car;
 
         Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(userId, phoneNumber,
-                EnumUserStatus.ACTIVE.name());
+                UserStatus.ACTIVE.name());
 
         if (customer != null) {
             log.info("Mileage update edən avtomobil sahibidir: {}", customer.getUserId());
             car = carRepository.findByVinAndCustomer(carRequest.getVin(), customer);
         } else {
             Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(userId, phoneNumber,
-                    EnumUserStatus.ACTIVE.name());
+                    UserStatus.ACTIVE.name());
 
             if (admin == null) {
                 log.warn("Mileage update eden ne avtomobil sahibi ne de admindir. Istek redd edilir.");
-                throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+                throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
             }
 
             log.info("Mileage update eden admindir : {}", admin.getUserId());
@@ -1634,7 +1636,7 @@ public class CarServiceImpl implements CarService {
         }
 
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         car.setMileage(carRequest.getMileage());
@@ -1645,24 +1647,29 @@ public class CarServiceImpl implements CarService {
         return convertCarEntityToResponse(car, acceptLanguage, "null");
     }
 
+    /**
+     * tr: Araca yeni müşteri servis kaydı ekler; servis, serviceId ile ya da isim+actionType ile bulunur.
+     *     Eksik alanlarda MissingFieldException; müşteri/araç doğrulamasında
+     *     UserNotFoundException/ResourceNotFoundException; servis tanımı bulunamazsa veya aynı servis için
+     *     kayıt zaten varsa ResourceNotFoundException fırlatır.
+     * en: Adds a new customer service record to the car; the service is resolved by serviceId or by
+     *     name+actionType. Throws MissingFieldException on missing fields;
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car checks; and
+     *     ResourceNotFoundException when the service definition is missing or a record for the same
+     *     service already exists.
+     */
     @Override
     public RecordResponse addRecord(RecordRequest request, String phoneNumber, String userIdHeader,
                                     String timezone, String acceptLanguage) {
 
         if (request == null || request.getCarId() == null || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                EnumUserStatus.ACTIVE.name());
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(request.getCarId(), customer, acceptLanguage);
 
-        if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(request.getCarId(), customer);
-
-        if (car == null || !customer.getCars().contains(car)) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+        if (!customer.getCars().contains(car)) {
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         ServiceEntity serviceEntity = request.getServiceId() != null
@@ -1670,11 +1677,11 @@ public class CarServiceImpl implements CarService {
                 : serviceEntityRepository.findByServiceNameAndActionType(request.getServiceName(), request.getActionType());
 
         if (serviceEntity == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         CustomerServiceRecord existingRecord = customerServiceRecordRepository.findByServiceIdAndCar(serviceEntity.getId(), car);
         if (existingRecord != null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.RECORD_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.RECORD_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
         CustomerServiceRecord record = CustomerServiceRecord.builder()
                 .serviceName(serviceEntity.getServiceName())
@@ -1698,10 +1705,19 @@ public class CarServiceImpl implements CarService {
                 .actionType(record.getActionType())
                 .doneDate(record.getDoneDate())
                 .doneKm(record.getDoneKm())
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
+    /**
+     * tr: Mevcut servis kaydının doneDate/doneKm alanlarını (gönderilmişse) ve servicedStatus'unu günceller
+     *     ve güncel kaydı döner. Eksik alanlarda MissingFieldException; müşteri/araç doğrulamasında
+     *     UserNotFoundException/ResourceNotFoundException; kayıt bulunamazsa ResourceNotFoundException fırlatır.
+     * en: Updates the doneDate/doneKm fields (when provided) and the servicedStatus of an existing service
+     *     record and returns the updated record. Throws MissingFieldException on missing fields;
+     *     UserNotFoundException/ResourceNotFoundException from the customer/car checks; and
+     *     ResourceNotFoundException when the record cannot be found.
+     */
     @Override
     public RecordResponse updateRecord(RecordRequest request, String phoneNumber, String userIdHeader,
                                        String timezone, String acceptLanguage) {
@@ -1711,28 +1727,16 @@ public class CarServiceImpl implements CarService {
                 || userIdHeader == null) {
             log.info("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");
             log.info("Request body xeta verdi");
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            log.info("Customer null oldu");
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(request.getCarId(), customer);
-
-        if (car == null) {
-            log.info("Car null oldu");
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(request.getCarId(), customer, acceptLanguage);
 
         CustomerServiceRecord record = customerServiceRecordRepository.findByIdAndCar(request.getRecordId(), car);
         log.info("Bazadan gelen record budur: {}", record);
         if (record == null) {
             log.info("Record null oldu");
-            throw new ResourceNotFoundException(EnumMessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         if (request.getDoneDate() != null) {
@@ -1762,37 +1766,35 @@ public class CarServiceImpl implements CarService {
                 .doneDate(record.getDoneDate())
                 .doneKm(record.getDoneKm())
                 .servicedStatus(record.getServicedStatus())
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
+    /**
+     * tr: Servis kaydını serviceId veya serviceName ile bulup döner. Eksik alanlarda MissingFieldException;
+     *     müşteri/araç doğrulamasında UserNotFoundException/ResourceNotFoundException; kayıt bulunamazsa
+     *     ResourceNotFoundException fırlatır.
+     * en: Finds and returns the service record by serviceId or serviceName. Throws MissingFieldException on
+     *     missing fields; UserNotFoundException/ResourceNotFoundException from the customer/car checks; and
+     *     ResourceNotFoundException when the record cannot be found.
+     */
     @Override
     public RecordResponse getRecord(RecordRequest request, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
         if (request == null || request.getCarId() == null
                 || (request.getServiceId() == null && request.getServiceName() == null)
                 || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                EnumUserStatus.ACTIVE.name());
-
-        if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        Car car = carRepository.findByCarIdAndCustomer(request.getCarId(), customer);
-
-        if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+        Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
+        Car car = requireCustomerCar(request.getCarId(), customer, acceptLanguage);
 
         CustomerServiceRecord record = request.getServiceId() != null
                 ? customerServiceRecordRepository.findByServiceIdAndCar(request.getServiceId(), car)
                 : customerServiceRecordRepository.findByServiceNameAndCar(request.getServiceName(), car);
 
         if (record == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
 
@@ -1806,11 +1808,73 @@ public class CarServiceImpl implements CarService {
                 .actionType(record.getActionType())
                 .doneDate(record.getDoneDate())
                 .doneKm(record.getDoneKm())
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
 
+    /**
+     * tr: userIdHeader + phoneNumber ile AKTİF customer'ı bulur; yoksa UserNotFoundException fırlatır.
+     *     (Eskiden her metodda tekrarlanan lookup bloğunun ortak hali.)
+     * en: Finds the ACTIVE customer by userIdHeader + phoneNumber; throws UserNotFoundException otherwise.
+     *     (Shared form of the lookup block previously repeated in every method.)
+     */
+    private Customer requireActiveCustomer(String userIdHeader, String phoneNumber, String acceptLanguage) {
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
+                Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
+        if (customer == null) {
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        return customer;
+    }
+
+    /**
+     * tr: carId'nin verilen customer'a ait olduğunu doğrulayıp aracı döner; değilse ResourceNotFoundException fırlatır.
+     * en: Verifies the carId belongs to the given customer and returns the car; throws ResourceNotFoundException otherwise.
+     */
+    private Car requireCustomerCar(Long carId, Customer customer, String acceptLanguage) {
+        Car car = carRepository.findByCarIdAndCustomer(carId, customer);
+        if (car == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        return car;
+    }
+
+    /**
+     * tr: Kalan km'yi hesaplar: max(nextServiceKm - araç km'si, 0); girdilerden biri null ise null döner.
+     * en: Computes remaining km: max(nextServiceKm - car mileage, 0); returns null when any input is null.
+     */
+    private Integer computeRemainingKm(Integer lastServiceKm, Integer nextServiceKm, Long carMileage) {
+        if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
+            return null;
+        }
+        return (int) Math.max(nextServiceKm - carMileage, 0);
+    }
+
+    /**
+     * tr: Sonraki servise kalan gün sayısını string olarak döner (negatifse 0); tarihlerden biri null ise null döner.
+     * en: Returns the remaining days to the next service as a string (clamped at 0); null when either date is null.
+     */
+    private String computeRemainingDaysValue(LocalDate lastServiceDate, LocalDate nextServiceDate) {
+        if (lastServiceDate == null || nextServiceDate == null) {
+            return null;
+        }
+        long remainingDays = Math.max(nextServiceDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
+        return String.valueOf(remainingDays);
+    }
+
+    /**
+     * tr: Tarihi formatlayıp az dili için ay adının baş harfini büyütür; tarih null ise null döner.
+     * en: Formats the date and capitalizes the month name for the az locale; returns null for a null date.
+     */
+    private String formatWithCapitalizedMonth(LocalDate date, DateTimeFormatter formatter, Locale locale) {
+        return date != null ? capitalizeMonth(date.format(formatter), locale) : null;
+    }
+
+    /**
+     * tr: Car entity'sini, renk/motor/kasa tipi çevirileriyle birlikte CarResponse DTO'suna dönüştürür.
+     * en: Converts a Car entity into a CarResponse DTO, including color/engine/body type translations.
+     */
     private CarResponse convertCarEntityToResponse(Car car, String acceptLanguage, String resource) {
         Color color = colorRepository.findByColorId(car.getColorId());
         String colorResponse = color != null ? ColorTranslation.translate(color.getColor(), acceptLanguage) : "unknown";
@@ -1837,7 +1901,7 @@ public class CarServiceImpl implements CarService {
                 .updatedAt(car.getUpdatedAt())
                 .createdAt(car.getCreatedAt())  // added getCreatedAt into  response json from entity
                 .bodyType(BodyTypeTranslation.translate(car.getBodyType(), acceptLanguage))
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .vinProvidedFields(car.getVinProvidedFields())
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
                         ? car.getServicedPartnerIds()
@@ -1847,6 +1911,10 @@ public class CarServiceImpl implements CarService {
                 .build();
     }
 
+    /**
+     * tr: Motor hacmi metnini güvenli şekilde cc değerine çevirir; boş veya parse edilemeyen değerde null döner.
+     * en: Safely converts an engine volume string to a cc value; returns null on blank or unparseable input.
+     */
     private Integer convertEngineVolumeSafe(String val) {
         if (val == null || val.isBlank()) {
             return null;
@@ -1864,6 +1932,10 @@ public class CarServiceImpl implements CarService {
         return VinService.parseEngineVolumeCc(value);
     }
 
+    /**
+     * tr: Sadece az dili için formatlanmış tarihteki ay adının baş harfini büyütür; diğer dillerde değiştirmez.
+     * en: Capitalizes the month name in a formatted date only for the az locale; leaves other languages unchanged.
+     */
     private String capitalizeMonth(String date, Locale locale) {
         if (!locale.getLanguage().equals("az")) {
             return date;
@@ -1885,6 +1957,11 @@ public class CarServiceImpl implements CarService {
     /**
      * Lower score = less remaining service life (km or time) = sort higher on the list.
      * Uses the minimum of km and month remaining percentages when both are present.
+     *
+     * tr: Kalan km yüzdesini hesaplar: (nextServiceKm - araç km'si) / (nextServiceKm - lastServiceKm) * 100,
+     *     0-100 aralığına sıkıştırılır; girdilerden biri null ise null döner.
+     * en: Computes the remaining km percentage: (nextServiceKm - car mileage) / (nextServiceKm - lastServiceKm) * 100,
+     *     clamped to 0-100; returns null when any input is null.
      */
     private Integer computeKmPercentage(Integer lastServiceKm, Integer nextServiceKm, Long carMileage) {
         if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
@@ -1899,6 +1976,12 @@ public class CarServiceImpl implements CarService {
         return 0;
     }
 
+    /**
+     * tr: Kalan süre yüzdesini gün bazında hesaplar (kalan gün / toplam gün * 100, 0-100 aralığında);
+     *     tarihlerden biri null ise null döner.
+     * en: Computes the remaining time percentage on a day basis (remaining days / total days * 100,
+     *     clamped to 0-100); returns null when either date is null.
+     */
     private Integer computeMonthPercentage(LocalDate lastServiceDate, LocalDate nextServiceDate) {
         if (lastServiceDate == null || nextServiceDate == null) {
             return null;
@@ -1915,6 +1998,12 @@ public class CarServiceImpl implements CarService {
         return 0;
     }
 
+    /**
+     * tr: Liste sıralaması için skor üretir: km ve süre yüzdelerinden küçük olanı döner (düşük skor = az
+     *     kalan ömür = listede üstte); ikisi de null ise Integer.MAX_VALUE döner.
+     * en: Produces the sorting score for the list: returns the smaller of the km and time percentages
+     *     (lower score = less remaining life = higher on the list); returns Integer.MAX_VALUE when both are null.
+     */
     private int remainingServiceScore(CarServicePercentageResponse item) {
         Integer kmRemaining = item.getKmPercentage();
         Integer monthRemaining = item.getMonthPercentageDigit() != null
@@ -1933,6 +2022,12 @@ public class CarServiceImpl implements CarService {
         return Math.min(kmRemaining, monthRemaining);
     }
 
+    /**
+     * tr: Bu yüzde için tekrar bildirim gönderilip gönderilemeyeceğini kontrol eder (şu an test için
+     *     5 dakikalık aralık; prod'da 7 gün olarak düşünülmüştür).
+     * en: Checks whether a new notification may be sent for this percentage (currently a 5-minute interval
+     *     for testing; intended to be 7 days in production).
+     */
     private boolean canSendNotification(Percentage percentage) {
 
         LocalDateTime lastSent = percentage.getLastNotificationSentAt();
@@ -1949,6 +2044,12 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Yüzde kaydına göre bildirim başlığı ve gövdesini üretir: km ve süre yüzdelerinden düşük olana göre
+     *     km ya da gün bazlı mesaj seçer; az ve en dillerini destekler. [başlık, gövde] dizisi döner.
+     * en: Builds the notification title and body for a percentage record: picks a km- or day-based message
+     *     depending on which of the km/time percentages is lower; supports az and en. Returns a [title, body] array.
+     */
     private String[] buildMessage(Percentage percentage, String lang) {
         // ---------------- Service Name ----------------
 //        String serviceNameTranslated = ServiceNameAz.translate(percentage.getServiceName(), lang);
@@ -2021,6 +2122,10 @@ public class CarServiceImpl implements CarService {
     }
 
 
+    /**
+     * tr: Cihaza servis hatırlatma push'u gönderir; başarıda true, hata durumunda (istisna yutulur, loglanır) false döner.
+     * en: Sends a service reminder push to the device; returns true on success, false on failure (the exception is swallowed and logged).
+     */
     private boolean sendServiceReminder(String deviceToken, String title, String body) {
         try {
             pushNotificationService.send(title, body, deviceToken);

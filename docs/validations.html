@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carland service — validations and checks</title>
+<style>
+  :root{
+    --blue:#2F6FBF; --purple:#6A5FCF; --green:#4E8A1F; --red:#C0392B; --amber:#B9770E;
+    --ink:#1F2937; --muted:#6B7280; --line:#E3E7EE; --bg:#F6F8FA;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:40px 20px 80px;background:var(--bg);color:var(--ink);
+       font:16px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1020px;margin:0 auto}
+  h1{font-size:28px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 26px;max-width:75ch}
+  code{font-family:Consolas,"Cascadia Mono",Menlo,monospace}
+  h2{color:var(--blue);font-size:21px;margin:44px 0 4px;font-family:Consolas,"Cascadia Mono",Menlo,monospace}
+  .nsdesc{color:var(--muted);margin:0 0 18px;font-size:15px}
+  h3{color:var(--purple);font-size:17.5px;margin:30px 0 2px;font-family:Consolas,"Cascadia Mono",Menlo,monospace}
+  .clsdesc{color:var(--muted);margin:0 0 12px;font-size:14.5px}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;margin:0 0 8px;padding:14px 18px;
+          background:#fff;border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--muted)}
+  /* function card */
+  .fn{background:#fff;border:1px solid var(--line);border-left:6px solid var(--green);
+      border-radius:12px;padding:16px 20px 12px;margin:0 0 14px;scroll-margin-top:20px}
+  .fh code{font-size:14.5px;color:#374151;word-break:break-word}
+  .fh .fd{display:block;color:var(--muted);font-size:14px;margin:2px 0 8px}
+  ol.ladder{list-style:none;counter-reset:step;margin:0;padding:0}
+  ol.ladder li{counter-increment:step;display:flex;align-items:baseline;gap:12px;
+               padding:7px 2px;border-top:1px dashed var(--line);flex-wrap:wrap}
+  ol.ladder li::before{content:counter(step);flex:0 0 22px;height:22px;text-align:center;line-height:22px;
+               align-self:center;font-size:12px;color:#fff;background:#9AA4B2;border-radius:50%}
+  .rid{font-family:Consolas,"Cascadia Mono",Menlo,monospace;font-size:12.5px;color:var(--muted);
+       background:#F2F4F7;border:1px solid var(--line);border-radius:6px;padding:1px 7px;flex:0 0 auto}
+  .q{flex:1 1 300px;min-width:240px}
+  .badge{flex:0 0 auto;font-size:12.5px;font-weight:600;color:#fff;border-radius:999px;padding:2px 11px;white-space:nowrap}
+  .badge-red,.b4{background:#C0392B}  /* 4xx client error */
+  .badge-amber,.b22{background:#B9770E} /* 422 unprocessable */
+  .b5{background:#4B5563}             /* 5xx server error */
+  .bn{background:#9AA4B2}             /* no HTTP error (redirect / handled internally) */
+  ol.ladder li.pass{color:var(--green);font-weight:600}
+  ol.ladder li.pass::before{content:"✓";background:var(--green)}
+  ol.ladder li.none{color:var(--muted);font-style:italic}
+  ol.ladder li.none::before{content:"–";background:#C6CDD6}
+  footer{color:var(--muted);font-size:13.5px;margin-top:36px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Carland service — validations and checks</h1>
+<p class="sub">Every validation, guard and precondition each function runs, in the order they execute (cheapest first: authentication → input shape → ownership → business rules → database checks). Each check has a stable rule ID and the HTTP status returned when it fails. Statuses come from the exception handlers: <code>MissingFieldException</code>, <code>InvalidStatusException</code>, <code>NotMatchException</code>, <code>FileStorageException</code> → 400; <code>UserNotFoundException</code>, <code>ResourceNotFoundException</code> → 404; <code>AlreadyExistsException</code>, <code>ConflictException</code> → 409; webhook auth failures → 401. Structure mirrors <a href="tree-map.html">tree-map.html</a> one to one.</p>
+
+<div class="legend">
+  <span><span class="badge b4">4xx</span> client error (red)</span>
+  <span><span class="badge b22">422</span> unprocessable (amber — none currently in this codebase)</span>
+  <span><span class="badge b5">5xx</span> server error</span>
+  <span><span class="badge bn">no error</span> redirect or handled internally</span>
+</div>
+
+<!-- ================= SECURITY ================= -->
+<h2>com.carland.carland_service.security</h2>
+<p class="nsdesc">These checks run before any controller code — they are the first rungs of every request's ladder.</p>
+
+<h3>ContentCachingFilter</h3>
+<p class="clsdesc">Wraps every request so its body can be read more than once.</p>
+<section class="fn" id="sec-contentcachingfilter-dofilterinternal">
+  <div class="fh"><code>doFilterInternal(request, response, filterChain)</code><span class="fd">Wraps the request in a re-readable body wrapper and continues the chain.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>CustomFilter</h3>
+<p class="clsdesc">Security filter on every request; webhook and public paths (Swagger, admin UI, legal pages, exports…) pass through freely.</p>
+<section class="fn" id="sec-customfilter-dofilterinternal">
+  <div class="fh"><code>doFilterInternal(request, response, filterChain)</code><span class="fd">Requires a Bearer token on protected paths; webhook and public paths are exempt.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SEC-001</span><span class="q">Does the request carry an "Authorization: Bearer …" header? (Skipped for webhook and public paths.)</span><span class="badge b4">401 unauthorized</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>WebhookSignatureFilter</h3>
+<p class="clsdesc">Authentication filter for /webhook/partner/* requests; both checks below delegate to the validators further down.</p>
+<section class="fn" id="sec-webhooksignaturefilter-dofilterinternal">
+  <div class="fh"><code>doFilterInternal(request, response, filterChain)</code><span class="fd">Runs internal-token then HMAC-signature validation; either failure ends the request with a 401 JSON body.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SEC-002</span><span class="q">Is the internal service token valid? (Details in InternalTokenValidator.validate.)</span><span class="badge b4">401 unauthorized</span></li>
+    <li><span class="rid">SEC-003</span><span class="q">Is the partner's HMAC signature valid? (Details in PartnerWebhookSignatureService.validate; skipped for the /test path.)</span><span class="badge b4">401 unauthorized</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>InternalTokenValidator</h3>
+<p class="clsdesc">Validates the X-Internal-Token header using a constant-time comparison.</p>
+<section class="fn" id="sec-internaltokenvalidator-validate">
+  <div class="fh"><code>validate(request)</code><span class="fd">Checks that the internal token is configured, present and matching.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SEC-004</span><span class="q">Is an internal token configured on the server at all?</span><span class="badge b4">401 internal_token_not_configured</span></li>
+    <li><span class="rid">SEC-005</span><span class="q">Did the request send the X-Internal-Token header?</span><span class="badge b4">401 missing_internal_token</span></li>
+    <li><span class="rid">SEC-006</span><span class="q">Does the provided token match the configured one (constant-time comparison)?</span><span class="badge b4">401 invalid_internal_token</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PartnerWebhookSignatureService</h3>
+<p class="clsdesc">HMAC signature validation of partner webhook requests.</p>
+<section class="fn" id="sec-partnerwebhooksignatureservice-validate">
+  <div class="fh"><code>validate(request, body)</code><span class="fd">Resolves the partner from the request and verifies the request signature.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SEC-007</span><span class="q">Can a partnerId be found in the query string or the request body?</span><span class="badge b4">401 missing_partner_id</span></li>
+    <li><span class="rid">SEC-008</span><span class="q">Does a partner with this id exist?</span><span class="badge b4">401 partner_not_found</span></li>
+    <li><span class="rid">SEC-009</span><span class="q">Is the partner active?</span><span class="badge b4">401 partner_inactive</span></li>
+    <li><span class="rid">SEC-010</span><span class="q">Does the partner have a webhook secret configured?</span><span class="badge b4">401 secret_not_configured</span></li>
+    <li><span class="rid">SEC-011</span><span class="q">Did the request send the X-Signature header?</span><span class="badge b4">401 missing_signature_header</span></li>
+    <li><span class="rid">SEC-012</span><span class="q">Does the HMAC-SHA256 signature of the payload match the header value?</span><span class="badge b4">401 invalid_signature</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>HmacSignatureValidator</h3>
+<p class="clsdesc">Computes and compares HMAC-SHA256 signatures in constant time.</p>
+<section class="fn" id="sec-hmacsignaturevalidator-resolvepayload">
+  <div class="fh"><code>resolvePayload(request, body)</code><span class="fd">Chooses what to sign: the body when present, otherwise the sorted query parameters.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="sec-hmacsignaturevalidator-isvalid">
+  <div class="fh"><code>isValid(secret, payload, providedSignature)</code><span class="fd">Computes the expected signature and compares it with the one the partner sent. A failed check makes the method return false, which the caller reports as 401 invalid_signature.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SEC-013</span><span class="q">Are both the secret and the provided signature non-blank?</span><span class="badge b4">401 invalid_signature (via caller)</span></li>
+    <li><span class="rid">SEC-014</span><span class="q">Is the provided signature valid hexadecimal?</span><span class="badge b4">401 invalid_signature (via caller)</span></li>
+    <li><span class="rid">SEC-015</span><span class="q">Does the computed HMAC equal the provided one (constant-time comparison)?</span><span class="badge b4">401 invalid_signature (via caller)</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="sec-hmacsignaturevalidator-sha256prefix">
+  <div class="fh"><code>sha256Prefix(payload)</code><span class="fd">Returns a short fingerprint of the payload for debug logging.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>WebhookAuthResponseWriter</h3>
+<p class="clsdesc">Writes the 401 JSON response when webhook authentication fails.</p>
+<section class="fn" id="sec-webhookauthresponsewriter-writeunauthorized-1">
+  <div class="fh"><code>writeUnauthorized(response, result)</code><span class="fd">Builds the error body from a validation result and writes it as a 401 response.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="sec-webhookauthresponsewriter-writeunauthorized-2">
+  <div class="fh"><code>writeUnauthorized(response, failure)</code><span class="fd">Writes a 401 response from failure info alone, without a partner id.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<!-- ================= CONTROLLER ================= -->
+<h2>com.carland.carland_service.controller</h2>
+<p class="nsdesc">Controllers mostly check that the required headers, parameters and body arrived (Spring returns 400 when they didn't) and then delegate — the business checks continue in service.impl.</p>
+
+<h3>AdminController</h3>
+<p class="clsdesc">MVC admin panel. Failing checks here redirect the browser instead of returning an error status.</p>
+<section class="fn" id="ctrl-admin-loginpage">
+  <div class="fh"><code>loginPage(error, model)</code><span class="fd">Returns the admin login page.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="ctrl-admin-login">
+  <div class="fh"><code>login(username, password, session)</code><span class="fd">Validates the credentials and opens an admin session.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-001</span><span class="q">Do the username and password match the configured admin credentials?</span><span class="badge bn">redirect to login?error</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-admin-cars">
+  <div class="fh"><code>cars(page, userId, session, model)</code><span class="fd">Shows the paginated car list.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-002</span><span class="q">Is there a logged-in admin session?</span><span class="badge bn">redirect to login</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-admin-exportcars">
+  <div class="fh"><code>exportCars(session, response)</code><span class="fd">Downloads all cars as an XLSX file.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-003</span><span class="q">Is there a logged-in admin session?</span><span class="badge bn">redirect to login</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-admin-users">
+  <div class="fh"><code>users(page, from, to, session, model)</code><span class="fd">Shows the paginated user list from the auth service.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-004</span><span class="q">Is there a logged-in admin session? (A failing auth-service call only shows a load error, it is not a check.)</span><span class="badge bn">redirect to login</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-admin-exportusers">
+  <div class="fh"><code>exportUsers(from, to, session, response)</code><span class="fd">Downloads the users as an XLSX file.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-005</span><span class="q">Is there a logged-in admin session?</span><span class="badge bn">redirect to login</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-admin-logout">
+  <div class="fh"><code>logout(session)</code><span class="fd">Ends the admin session.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>AppointmentController</h3>
+<p class="clsdesc">Appointment endpoints; business logic delegated to AppointmentServiceImpl (currently stubs).</p>
+<section class="fn" id="ctrl-appointment-getbookinglistbydate">
+  <div class="fh"><code>getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns bookings for a date; delegates to AppointmentServiceImpl.getBookingListByDate.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-006</span><span class="q">Are the required date parameter and role/phone/user-id/timezone headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-appointment-setappointmentfromreception">
+  <div class="fh"><code>setAppointmentFromReception(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates an appointment from reception; delegates to AppointmentServiceImpl.setAppointmentFromReception.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-007</span><span class="q">Are the required rangeId parameter and headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>AutoServiceController</h3>
+<p class="clsdesc">Auto service endpoints; business checks live in AutoServiceServiceImpl.</p>
+<section class="fn" id="ctrl-autoservice-createautoservice">
+  <div class="fh"><code>createAutoService(autoServiceRequest, token, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates an auto service; delegates to AutoServiceServiceImpl.createAutoService.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-008</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-autoservice-insertservicehistory">
+  <div class="fh"><code>insertServiceHistory(token, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Adds a service history record; delegates to AutoServiceServiceImpl.insertServiceHistory.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-009</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-autoservice-getservice">
+  <div class="fh"><code>getService(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Reads a service record; delegates to AutoServiceServiceImpl.getService.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-010</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-autoservice-addserviceamount">
+  <div class="fh"><code>addServiceAmount(token, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Adds a service amount; delegates to AutoServiceServiceImpl.addServiceAmount (stub).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-011</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>CalendarController</h3>
+<p class="clsdesc">Calendar endpoints; business checks live in CalendarServiceImpl.</p>
+<section class="fn" id="ctrl-calendar-createcalendar">
+  <div class="fh"><code>createCalendar(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates a day calendar; delegates to CalendarServiceImpl.createCalendar.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-012</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-calendar-getcalendarbydoctorid">
+  <div class="fh"><code>getCalendarByDoctorId(token, request, timezone, acceptLanguage, role, phoneNumber, userIdHeader)</code><span class="fd">Reads a calendar; delegates to CalendarServiceImpl.getCalendarByAutoServiceId.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-013</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>CarController</h3>
+<p class="clsdesc">Main car endpoints; the real ladders live in CarServiceImpl and the history services.</p>
+<section class="fn" id="ctrl-car-testhyperapi">
+  <div class="fh"><code>testHyperApi(requestk)</code><span class="fd">Test call to the Hyper API; every error is caught and returned as text.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="ctrl-car-addcar">
+  <div class="fh"><code>addCar(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Adds a car; delegates to CarServiceImpl.addCar (14 further checks there).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-014</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-editcardetails">
+  <div class="fh"><code>editCarDetails(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Edits car details; delegates to CarServiceImpl.editCarDetails.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-015</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-checkvin">
+  <div class="fh"><code>checkVin(vin, acceptLanguage)</code><span class="fd">Checks a VIN; delegates to CarServiceImpl.checkVin.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-016</span><span class="q">Are the vin parameter and the Accept-Language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-removecar">
+  <div class="fh"><code>removeCar(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Removes a car; delegates to CarServiceImpl.removeCar.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-017</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-updatemileage">
+  <div class="fh"><code>updateMileage(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Updates the mileage; delegates to CarServiceImpl.updateMileage.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-018</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getcarbyvincode">
+  <div class="fh"><code>getCarByVinCode(vin, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Finds a car by VIN; delegates to CarServiceImpl.getCarByVinCode.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-019</span><span class="q">Are the vin parameter and all required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getcarlistbyuserid">
+  <div class="fh"><code>getCarListByUserId(token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lists the caller's cars; delegates to CarServiceImpl.getCarListByUserId.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-020</span><span class="q">Are all required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-executeservicepercentages">
+  <div class="fh"><code>executeServicePercentages(token, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Recomputes percentages; delegates to CarServiceImpl.executeServicePercentages.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-021</span><span class="q">Are the carId parameter and all required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getservicepercentagelist">
+  <div class="fh"><code>getServicePercentageList(token, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lists percentages; delegates to CarServiceImpl.getServicePercentageList.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-022</span><span class="q">Are the carId parameter and all required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-editpercentage">
+  <div class="fh"><code>editPercentage(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Edits a percentage; delegates to CarServiceImpl.editPercentage.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-023</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-addrecord">
+  <div class="fh"><code>addRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Adds a service record; delegates to CarServiceImpl.addRecord.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-024</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-updaterecord">
+  <div class="fh"><code>updateRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Updates a service record; delegates to CarServiceImpl.updateRecord.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-025</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getrecord">
+  <div class="fh"><code>getRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Reads a service record; delegates to CarServiceImpl.getRecord.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-026</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getcolors">
+  <div class="fh"><code>getColors(acceptLanguage)</code><span class="fd">Lists colors; delegates to CarServiceImpl.getColors.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-027</span><span class="q">Is the Accept-Language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getservicerecords">
+  <div class="fh"><code>getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lists service records; delegates to CarServiceImpl.getServiceRecords.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-028</span><span class="q">Are the carId parameter and all required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getservicehistorybyvin">
+  <div class="fh"><code>getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Service history v1; delegates to CarVinHistoryServiceImpl.getServiceHistoryByVin.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-029</span><span class="q">Are the vin parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-getservicehistorybyvinv2">
+  <div class="fh"><code>getServiceHistoryByVinV2(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Service history v2; delegates to VisitHistoryServiceImpl.getServiceHistoryByVin.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-030</span><span class="q">Are the vin parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-car-removesimulatedcustomer">
+  <div class="fh"><code>removeSimulatedCustomer(vin)</code><span class="fd">Detaches a simulated customer from a car found by VIN (test utility).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-031</span><span class="q">Is the vin parameter present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">CTRL-032</span><span class="q">Does a car with this VIN exist?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>DeviceTokenController</h3>
+<p class="clsdesc">Device token endpoints; the content checks live in DeviceTokenServiceImpl.</p>
+<section class="fn" id="ctrl-devicetoken-saveorupdatetoken">
+  <div class="fh"><code>saveOrUpdateToken(request)</code><span class="fd">Saves or updates a device token; delegates to DeviceTokenServiceImpl.saveOrUpdateToken.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-033</span><span class="q">Is the request body present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-devicetoken-sendbulk">
+  <div class="fh"><code>sendBulk(bulkRequest, acceptLanguage)</code><span class="fd">Sends a bulk push; delegates to DeviceTokenServiceImpl.sendBulk.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-034</span><span class="q">Are the request body and the Accept-Language header present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>FeedbackController</h3>
+<p class="clsdesc">Feedback endpoints; the type check lives in FeedbackServiceImpl.</p>
+<section class="fn" id="ctrl-feedback-pushfeedback">
+  <div class="fh"><code>pushFeedback(file, feedbackRequest, rawBody, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Receives feedback with an optional file; delegates to FeedbackServiceImpl.pushFeedback.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-035</span><span class="q">Are the feedback data part and the required headers present (either the JSON part or the raw body form)?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-feedback-getfeedbacktypelist">
+  <div class="fh"><code>getFeedbackTypeList()</code><span class="fd">Returns the allowed feedback types.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>GroupByController</h3>
+<p class="clsdesc">Reference-data endpoints; the "does data exist" checks live in GroupByServiceImpl.</p>
+<section class="fn" id="ctrl-groupby-getallbrands">
+  <div class="fh"><code>getAllBrands(token, timezone, acceptLanguage)</code><span class="fd">Lists brands; delegates to GroupByServiceImpl.getAllBrands.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-036</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-groupby-getallbrandswithmodels">
+  <div class="fh"><code>getAllBrandsWithModels()</code><span class="fd">Lists brands with their models (public endpoint).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="ctrl-groupby-getmodelsbybrand">
+  <div class="fh"><code>getModelsByBrand(brandId, token, timezone, acceptLanguage)</code><span class="fd">Lists models of a brand; delegates to GroupByServiceImpl.getModelsByBrand.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-037</span><span class="q">Are the brandId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-groupby-getbodytypes">
+  <div class="fh"><code>getBodyTypes(token, timezone, acceptLanguage)</code><span class="fd">Lists body types; delegates to GroupByServiceImpl.getBodyTypes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-038</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-groupby-gettransmissiontypes">
+  <div class="fh"><code>getTransmissionTypes(token, timezone, acceptLanguage)</code><span class="fd">Lists transmission types; delegates to GroupByServiceImpl.getTransmissionTypes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-039</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-groupby-getenginetypes">
+  <div class="fh"><code>getEngineTypes(token, timezone, acceptLanguage)</code><span class="fd">Lists engine types; delegates to GroupByServiceImpl.getEngineTypes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-040</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-groupby-getyearlist">
+  <div class="fh"><code>getYearList(token, timezone, acceptLanguage)</code><span class="fd">Lists model years; delegates to GroupByServiceImpl.getYearList.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-041</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>LegalController</h3>
+<p class="clsdesc">Public legal-document endpoints.</p>
+<section class="fn" id="ctrl-legal-getterms">
+  <div class="fh"><code>getTerms(lang)</code><span class="fd">Returns the terms &amp; conditions JSON in the requested language.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-042</span><span class="q">Can the embedded terms document be read and parsed?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-legal-getpolicy">
+  <div class="fh"><code>getPolicy(lang)</code><span class="fd">Returns the privacy policy JSON in the requested language.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-043</span><span class="q">Can the embedded policy document be read and parsed?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-legal-get">
+  <div class="fh"><code>get()</code><span class="fd">Liveness test endpoint.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>MaintenanceTemplateController</h3>
+<p class="clsdesc">Maintenance template endpoints; content checks live in MaintenanceTemplateServiceImpl.</p>
+<section class="fn" id="ctrl-template-createmaintenancetemplate">
+  <div class="fh"><code>createMaintenanceTemplate(maintenanceTemplateRequest, token, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates a template; delegates to MaintenanceTemplateServiceImpl.createMaintenanceTemplate (disabled).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-044</span><span class="q">Are the request body and all required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-template-getmaintenancetemplatelist">
+  <div class="fh"><code>getMaintenanceTemplateList(token, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lists templates; delegates to MaintenanceTemplateServiceImpl.getMaintenanceTemplateList.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-045</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-template-addservicetotemplate">
+  <div class="fh"><code>addServiceToTemplate(token, templateId, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Adds a service to a template; delegates to MaintenanceTemplateServiceImpl.addServiceToTemplate.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-046</span><span class="q">Are the templateId parameter, request body and required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>NotificationController</h3>
+<p class="clsdesc">Notification endpoints; existence checks live in NotificationServiceImpl.</p>
+<section class="fn" id="ctrl-notification-editnotification">
+  <div class="fh"><code>editNotification(notificationId, setRead, acceptLanguage)</code><span class="fd">Marks a notification as read; delegates to NotificationServiceImpl.editNotification.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-047</span><span class="q">Are the notificationId, setRead parameters and Accept-Language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-notification-deletenotification">
+  <div class="fh"><code>deleteNotification(notificationId, acceptLanguage)</code><span class="fd">Soft-deletes a notification; delegates to NotificationServiceImpl.deleteNotification.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-048</span><span class="q">Are the notificationId parameter and Accept-Language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-notification-getnotificationlistbycustomerid">
+  <div class="fh"><code>getNotificationListByCustomerId(userIdHeader, acceptLanguage)</code><span class="fd">Lists the caller's notifications; delegates to NotificationServiceImpl.getNotificationListByCustomerId.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-049</span><span class="q">Are the user-id and Accept-Language headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PartnerController</h3>
+<p class="clsdesc">Partner CRUD endpoints; authorization and uniqueness checks live in PartnerServiceImpl.</p>
+<section class="fn" id="ctrl-partner-createpartner">
+  <div class="fh"><code>createPartner(request, token, phoneNumber, acceptLanguage)</code><span class="fd">Creates a partner; delegates to PartnerServiceImpl.createPartner.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-050</span><span class="q">Are the request body and required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-partner-updatepartner">
+  <div class="fh"><code>updatePartner(request, token, phoneNumber, acceptLanguage)</code><span class="fd">Updates a partner; delegates to PartnerServiceImpl.updatePartner.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-051</span><span class="q">Are the request body and required headers present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PhotoController</h3>
+<p class="clsdesc">Photo endpoints; file-safety and existence checks live in PhotoServiceImpl.</p>
+<section class="fn" id="ctrl-photo-uploadcarphoto">
+  <div class="fh"><code>uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Uploads a car photo; delegates to PhotoServiceImpl.uploadCarPhoto.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-052</span><span class="q">Are the file part, carId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-deletecarphoto">
+  <div class="fh"><code>deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Deletes a car photo; delegates to PhotoServiceImpl.deleteCarPhoto.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-053</span><span class="q">Are the carId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-deleteothercarphoto">
+  <div class="fh"><code>deleteOtherCarPhoto(carId, acceptLanguage)</code><span class="fd">Deletes a car photo without ownership checks; delegates to PhotoServiceImpl.deleteOtherCarPhoto.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-054</span><span class="q">Are the carId parameter and Accept-Language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-getcarphoto">
+  <div class="fh"><code>getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Fetches a car photo; delegates to PhotoServiceImpl.getCarPhoto.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-055</span><span class="q">Are the carId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-uploadpartnerphoto">
+  <div class="fh"><code>uploadPartnerPhoto(file, partnerId)</code><span class="fd">Uploads a partner logo; delegates to PhotoServiceImpl.uploadPartnerPhoto.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-056</span><span class="q">Are the file part and partnerId parameter present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-getpartnerphotobyid">
+  <div class="fh"><code>getPartnerPhotoById(partnerId)</code><span class="fd">Fetches a partner logo; delegates to PhotoServiceImpl.getPartnerPhotoById.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-057</span><span class="q">Is the partnerId path value a valid number?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-uploadpartnerbadgelogo">
+  <div class="fh"><code>uploadPartnerBadgeLogo(file, partnerId)</code><span class="fd">Uploads a partner badge logo; delegates to PhotoServiceImpl.uploadPartnerBadgeLogo.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-058</span><span class="q">Are the file part and partnerId parameter present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-getpartnerbadgelogobyid">
+  <div class="fh"><code>getPartnerBadgeLogoById(partnerId)</code><span class="fd">Fetches a partner badge logo; delegates to PhotoServiceImpl.getPartnerBadgeLogoById.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-059</span><span class="q">Is the partnerId path value a valid number?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-uploaduserpp">
+  <div class="fh"><code>uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Uploads a profile picture; delegates to PhotoServiceImpl.uploadUserPP.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-060</span><span class="q">Are the file part and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-deletepp">
+  <div class="fh"><code>deletePP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Deletes a profile picture; delegates to PhotoServiceImpl.deleteUserPP.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-061</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-photo-getprofilepicture">
+  <div class="fh"><code>getProfilePicture(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Fetches a profile picture; delegates to PhotoServiceImpl.getUserPP.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-062</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>RangeController</h3>
+<p class="clsdesc">Time-slot booking endpoints; the booking business rules live in RangeServiceImpl.</p>
+<section class="fn" id="ctrl-range-bookappointment">
+  <div class="fh"><code>bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Books a slot; delegates to RangeServiceImpl.bookAppointment (8 further checks there).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-063</span><span class="q">Are the rangeId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-range-decideonbooking">
+  <div class="fh"><code>decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Accepts or rejects a booking; delegates to RangeServiceImpl.decideOnBooking (stub).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-064</span><span class="q">Are the rangeId, accepted parameters and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-range-deletebookingbycustomer">
+  <div class="fh"><code>deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Cancels a booking; delegates to RangeServiceImpl.deleteBookingByCustomer (stub).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-065</span><span class="q">Are the rangeId parameter and required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>UserController</h3>
+<p class="clsdesc">User endpoints; role handling continues in UserServiceImpl and Helper.</p>
+<section class="fn" id="ctrl-user-getcustomerswithcars">
+  <div class="fh"><code>getCustomersWithCars()</code><span class="fd">Returns every customer with their cars (direct database read).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="ctrl-user-useradddetails">
+  <div class="fh"><code>userAddDetails(token, role, phoneNumber, userIdHeader, timezone, acceptLanguage, inviterId)</code><span class="fd">Registers user details after sign-up; delegates to UserServiceImpl.userAddDetails.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-066</span><span class="q">Are the required role/phone/user-id/timezone headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-user-getnotificationlist">
+  <div class="fh"><code>getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lists the caller's notifications; delegates to UserServiceImpl.getNotificationList.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-067</span><span class="q">Are the required headers present?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-user-exportcustomercars">
+  <div class="fh"><code>exportCustomerCars(response)</code><span class="fd">Exports customers and cars as XLSX (public endpoint).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>WebhookController</h3>
+<p class="clsdesc">Partner webhook endpoints. Remember: SEC-002…SEC-015 (internal token + HMAC signature) have already passed before these run.</p>
+<section class="fn" id="ctrl-webhook-test">
+  <div class="fh"><code>test()</code><span class="fd">Confirms the webhook channel works.</span></div>
+  <ol class="ladder"><li class="none">no checks (webhook auth already done by the filter)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="ctrl-webhook-findcarbyvin">
+  <div class="fh"><code>findCarByVin(vin, partnerId)</code><span class="fd">Tells the partner whether a car with the given VIN is registered.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-068</span><span class="q">Are both the vin and partnerId query parameters provided (vin not blank)?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">CTRL-069</span><span class="q">Is a car with this VIN registered in the system?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-webhook-newservicevisit">
+  <div class="fh"><code>newServiceVisit(httpRequest, request)</code><span class="fd">Receives a new service visit; delegates to PartnerServiceVisitIngestServiceImpl.ingest.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-070</span><span class="q">Is the JSON body present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">CTRL-071</span><span class="q">Did the ingest actually create at least one visit, service line or part?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="ctrl-webhook-updateservicevisit">
+  <div class="fh"><code>updateServiceVisit(httpRequest, request)</code><span class="fd">Receives an update to an existing visit; delegates to PartnerServiceVisitUpdateServiceImpl.update.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">CTRL-072</span><span class="q">Is the JSON body present and parseable?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">CTRL-073</span><span class="q">Did the update actually change, add or remove anything?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<!-- ================= SERVICE ================= -->
+<h2>com.carland.carland_service.service</h2>
+<p class="nsdesc">Interfaces declare the contracts and carry no runtime checks of their own — the ladders live in the implementations. The three concrete classes here are listed with their real checks.</p>
+
+<h3>AfterAddCarSyncService</h3>
+<p class="clsdesc">Asynchronous best-effort sync after a car is added.</p>
+<section class="fn" id="svc-afteraddcarsync-syncafteraddcar">
+  <div class="fh"><code>syncAfterAddCar(carId, vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Recalculates percentages and pulls partner history; every error is caught and logged so the user flow is never affected.</span></div>
+  <ol class="ladder"><li class="none">no checks (best effort — all errors swallowed)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>AppointmentService</h3>
+<p class="clsdesc">Contract only — see AppointmentServiceImpl.</p>
+<section class="fn" id="svc-appointmentservice-getbookinglistbydate">
+  <div class="fh"><code>getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns bookings for a date.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-appointmentservice-setappointmentfromreception">
+  <div class="fh"><code>setAppointmentFromReception(role, phoneNumber, rangeId, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — creates a reception appointment.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>AutoServiceService</h3>
+<p class="clsdesc">Contract only — see AutoServiceServiceImpl.</p>
+<section class="fn" id="svc-autoserviceservice-createautoservice">
+  <div class="fh"><code>createAutoService(autoServiceRequest, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — creates an auto service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-autoserviceservice-insertservicehistory">
+  <div class="fh"><code>insertServiceHistory(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Contract — inserts a service history record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-autoserviceservice-getservice">
+  <div class="fh"><code>getService(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns a service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-autoserviceservice-addserviceamount">
+  <div class="fh"><code>addServiceAmount(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Contract — adds an amount to a service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>CalendarService</h3>
+<p class="clsdesc">Contract only — see CalendarServiceImpl.</p>
+<section class="fn" id="svc-calendarservice-createcalendar">
+  <div class="fh"><code>createCalendar(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — creates a calendar.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-calendarservice-getcalendarbyautoserviceid">
+  <div class="fh"><code>getCalendarByAutoServiceId(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns a calendar.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>CarService</h3>
+<p class="clsdesc">Contract only — every ladder lives in CarServiceImpl.</p>
+<section class="fn" id="svc-carservice-addcar">
+  <div class="fh"><code>addCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — adds a car.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getcarbyvincode">
+  <div class="fh"><code>getCarByVinCode(vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — finds a car by VIN.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getcarlistbyuserid">
+  <div class="fh"><code>getCarListByUserId(phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — lists the customer's cars.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-executeservicepercentages">
+  <div class="fh"><code>executeServicePercentages(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — recomputes percentages.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-updatemileage">
+  <div class="fh"><code>updateMileage(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — updates the mileage.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-addrecord">
+  <div class="fh"><code>addRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — adds a service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-updaterecord">
+  <div class="fh"><code>updateRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — updates a service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getrecord">
+  <div class="fh"><code>getRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns a service record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-removecar">
+  <div class="fh"><code>removeCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — removes a car.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-checkvin">
+  <div class="fh"><code>checkVin(vin, acceptLanguage)</code><span class="fd">Contract — checks whether a VIN is registered.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getcolors">
+  <div class="fh"><code>getColors(acceptLanguage)</code><span class="fd">Contract — lists car colors.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getservicerecords">
+  <div class="fh"><code>getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — lists a car's service records.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-editcardetails">
+  <div class="fh"><code>editCarDetails(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — edits car details.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-getservicepercentagelist">
+  <div class="fh"><code>getServicePercentageList(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — lists percentages.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-editpercentage">
+  <div class="fh"><code>editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — edits a percentage record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-carservice-calculateandpushnotification">
+  <div class="fh"><code>calculateAndPushNotification()</code><span class="fd">Contract — scheduled reminder job.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>CarVinHistoryService</h3>
+<p class="clsdesc">Contract only — see CarVinHistoryServiceImpl.</p>
+<section class="fn" id="svc-carvinhistoryservice-getservicehistorybyvin">
+  <div class="fh"><code>getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Contract — returns service history by VIN (v1).</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>DeviceTokenService</h3>
+<p class="clsdesc">Contract only — see DeviceTokenServiceImpl.</p>
+<section class="fn" id="svc-devicetokenservice-saveorupdatetoken">
+  <div class="fh"><code>saveOrUpdateToken(request)</code><span class="fd">Contract — saves or updates a device token.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-devicetokenservice-sendbulk">
+  <div class="fh"><code>sendBulk(bulkRequest, acceptLanguage)</code><span class="fd">Contract — sends a bulk push notification.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>FeedbackService</h3>
+<p class="clsdesc">Contract only — see FeedbackServiceImpl.</p>
+<section class="fn" id="svc-feedbackservice-pushfeedback">
+  <div class="fh"><code>pushFeedback(file, feedbackRequest, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Contract — receives and forwards feedback.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>GroupByService</h3>
+<p class="clsdesc">Contract only — see GroupByServiceImpl.</p>
+<section class="fn" id="svc-groupbyservice-getmodelsbybrand">
+  <div class="fh"><code>getModelsByBrand(brandId, timezone, acceptLanguage)</code><span class="fd">Contract — lists models of a brand.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-getallbrands">
+  <div class="fh"><code>getAllBrands(timezone, acceptLanguage)</code><span class="fd">Contract — lists all brands.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-getbodytypes">
+  <div class="fh"><code>getBodyTypes(timezone, acceptLanguage)</code><span class="fd">Contract — lists body types.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-gettransmissiontypes">
+  <div class="fh"><code>getTransmissionTypes(timezone, acceptLanguage)</code><span class="fd">Contract — lists transmission types.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-getenginetypes">
+  <div class="fh"><code>getEngineTypes(timezone, acceptLanguage)</code><span class="fd">Contract — lists engine types.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-getyearlist">
+  <div class="fh"><code>getYearList(timezone, acceptLanguage)</code><span class="fd">Contract — lists model years.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-groupbyservice-getallbrandswithmodels">
+  <div class="fh"><code>getAllBrandsWithModels()</code><span class="fd">Contract — lists brands with their models.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>HyperPercentageSyncService</h3>
+<p class="clsdesc">Applies partner service history onto maintenance percentages — designed to skip silently rather than fail.</p>
+<section class="fn" id="svc-hyperpercentagesync-syncfromvisits">
+  <div class="fh"><code>syncFromVisits(car, visits)</code><span class="fd">Applies a list of partner visits onto the car's percentages.</span></div>
+  <ol class="ladder"><li class="none">no checks (skips silently when data is missing)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-hyperpercentagesync-syncfromvisit">
+  <div class="fh"><code>syncFromVisit(car, visit)</code><span class="fd">Applies a single partner visit onto the car's percentages.</span></div>
+  <ol class="ladder"><li class="none">no checks (skips silently when data is missing)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-hyperpercentagesync-findbestpartnerlineforservice">
+  <div class="fh"><code>findBestPartnerLineForService(car, serviceNameEn, intervalKm, intervalMonth)</code><span class="fd">Read-only lookup of the best matching partner visit line for one service.</span></div>
+  <ol class="ladder"><li class="none">no checks (returns empty when nothing matches)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>MailService</h3>
+<p class="clsdesc">Contract only — see BrevoMailServiceImpl.</p>
+<section class="fn" id="svc-mailservice-sendfeedbackmail">
+  <div class="fh"><code>sendFeedbackMail(feedbackRequest, file, ticketId, customerPhone)</code><span class="fd">Contract — sends the feedback e-mail.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>MaintenanceTemplateService</h3>
+<p class="clsdesc">Contract only — see MaintenanceTemplateServiceImpl.</p>
+<section class="fn" id="svc-maintenancetemplateservice-createmaintenancetemplate">
+  <div class="fh"><code>createMaintenanceTemplate(maintenanceTemplateRequest, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — creates a maintenance template.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-maintenancetemplateservice-getmaintenancetemplatelist">
+  <div class="fh"><code>getMaintenanceTemplateList(phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — lists maintenance templates.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-maintenancetemplateservice-addservicetotemplate">
+  <div class="fh"><code>addServiceToTemplate(templateId, request, phoneNumber, userIdHeader, roel, timezone, acceptLanguage)</code><span class="fd">Contract — adds a service item to a template.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>NotificationService</h3>
+<p class="clsdesc">Contract only — see NotificationServiceImpl.</p>
+<section class="fn" id="svc-notificationservice-editnotification">
+  <div class="fh"><code>editNotification(notificationId, setRead, acceptLanguage)</code><span class="fd">Contract — updates a notification's read state.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-notificationservice-deletenotification">
+  <div class="fh"><code>deleteNotification(notificationId, acceptLanguage)</code><span class="fd">Contract — deletes a notification.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-notificationservice-getnotificationlistbycustomerid">
+  <div class="fh"><code>getNotificationListByCustomerId(userIdHeader, acceptLanguage)</code><span class="fd">Contract — lists a customer's notifications.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PartnerLookupService</h3>
+<p class="clsdesc">Partner lookups and conversions; requireActivePartner is the enforcing entry used by webhook flows.</p>
+<section class="fn" id="svc-partnerlookup-findbyid">
+  <div class="fh"><code>findById(partnerId)</code><span class="fd">Finds a partner by id; empty when null or unknown.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-requireactivepartner">
+  <div class="fh"><code>requireActivePartner(partnerId)</code><span class="fd">Returns the partner only if it exists and is active.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">SVC-001</span><span class="q">Was a partnerId provided at all?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">SVC-002</span><span class="q">Does a partner with this id exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">SVC-003</span><span class="q">Is the partner active?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="svc-partnerlookup-find">
+  <div class="fh"><code>find(partnerId)</code><span class="fd">Finds a partner by its well-known enum id.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-loadbyids">
+  <div class="fh"><code>loadByIds(partnerIds)</code><span class="fd">Bulk-loads partners by id, logging any that are missing.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-todataresponse-1">
+  <div class="fh"><code>toDataResponse(partnerId, partnerById)</code><span class="fd">Builds a partner response for the given id.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-todataresponse-2">
+  <div class="fh"><code>toDataResponse(partner, enumPartner)</code><span class="fd">Builds a partner response from a record or its enum fallback.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-resolvepartnerid">
+  <div class="fh"><code>resolvePartnerId(storedPartnerId, fallback)</code><span class="fd">Returns the stored id or the fallback.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerlookup-resolvepartnername">
+  <div class="fh"><code>resolvePartnerName(storedPartnerId, storedName, partnerById, fallback)</code><span class="fd">Resolves the partner display name with fallbacks.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PartnerService</h3>
+<p class="clsdesc">Contract only — see PartnerServiceImpl.</p>
+<section class="fn" id="svc-partnerservice-createpartner">
+  <div class="fh"><code>createPartner(request, phoneNumber, acceptLanguage)</code><span class="fd">Contract — creates a partner record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-partnerservice-updatepartner">
+  <div class="fh"><code>updatePartner(request, phoneNumber, acceptLanguage)</code><span class="fd">Contract — updates a partner record.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PartnerServiceVisitIngestService</h3>
+<p class="clsdesc">Contract only — see PartnerServiceVisitIngestServiceImpl.</p>
+<section class="fn" id="svc-partnervisitingestservice-ingest">
+  <div class="fh"><code>ingest(request)</code><span class="fd">Contract — ingests a new service visit from a partner webhook.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PartnerServiceVisitUpdateService</h3>
+<p class="clsdesc">Contract only — see PartnerServiceVisitUpdateServiceImpl.</p>
+<section class="fn" id="svc-partnervisitupdateservice-update">
+  <div class="fh"><code>update(request)</code><span class="fd">Contract — applies a webhook update to an existing visit.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PhotoService</h3>
+<p class="clsdesc">Contract only — see PhotoServiceImpl.</p>
+<section class="fn" id="svc-photoservice-uploadcarphoto">
+  <div class="fh"><code>uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — uploads a car photo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-deletecarphoto">
+  <div class="fh"><code>deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — deletes a car photo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-uploaduserpp">
+  <div class="fh"><code>uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — uploads a profile picture.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-deleteuserpp">
+  <div class="fh"><code>deleteUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — deletes a profile picture.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-getcarphoto">
+  <div class="fh"><code>getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns a car photo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-getuserpp">
+  <div class="fh"><code>getUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — returns a profile picture.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-uploadpartnerphoto">
+  <div class="fh"><code>uploadPartnerPhoto(file, partnerId)</code><span class="fd">Contract — uploads a partner logo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-getpartnerphotobyid">
+  <div class="fh"><code>getPartnerPhotoById(partnerId)</code><span class="fd">Contract — returns a partner logo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-uploadpartnerbadgelogo">
+  <div class="fh"><code>uploadPartnerBadgeLogo(file, partnerId)</code><span class="fd">Contract — uploads a partner badge logo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-getpartnerbadgelogobyid">
+  <div class="fh"><code>getPartnerBadgeLogoById(partnerId)</code><span class="fd">Contract — returns a partner badge logo.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-photoservice-deleteothercarphoto">
+  <div class="fh"><code>deleteOtherCarPhoto(carId, acceptLanguage)</code><span class="fd">Contract — deletes a car photo without ownership checks.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PushNotificationService</h3>
+<p class="clsdesc">Contract only — see PushNotificationServiceImpl.</p>
+<section class="fn" id="svc-pushnotificationservice-send">
+  <div class="fh"><code>send(title, body, deviceToken)</code><span class="fd">Contract — sends one push notification.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>RangeService</h3>
+<p class="clsdesc">Contract only — see RangeServiceImpl.</p>
+<section class="fn" id="svc-rangeservice-bookappointment">
+  <div class="fh"><code>bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — books a time slot.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-rangeservice-decideonbooking">
+  <div class="fh"><code>decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — accepts or rejects a booking.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-rangeservice-deletebookingbycustomer">
+  <div class="fh"><code>deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — cancels a booking.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>UserService</h3>
+<p class="clsdesc">Contract only — see UserServiceImpl.</p>
+<section class="fn" id="svc-userservice-useradddetails">
+  <div class="fh"><code>userAddDetails(userId, role, phoneNumber, timezone, acceptLanguage, inviterId)</code><span class="fd">Contract — registers user details after sign-up.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="svc-userservice-getnotificationlist">
+  <div class="fh"><code>getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Contract — lists the caller's notifications.</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>VisitHistoryService</h3>
+<p class="clsdesc">Contract only — see VisitHistoryServiceImpl.</p>
+<section class="fn" id="svc-visithistoryservice-getservicehistorybyvin">
+  <div class="fh"><code>getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Contract — returns service history by VIN (v2).</span></div>
+  <ol class="ladder"><li class="none">no checks (interface — see implementation)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<!-- ================= SERVICE.IMPL ================= -->
+<h2>com.carland.carland_service.service.impl</h2>
+<p class="nsdesc">The implementations — this is where the guard clauses physically live, so this package carries most of the rules.</p>
+
+<h3>AppointmentServiceImpl</h3>
+<p class="clsdesc">Both methods are stubs that return null.</p>
+<section class="fn" id="impl-appointment-getbookinglistbydate">
+  <div class="fh"><code>getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Stub — not implemented yet.</span></div>
+  <ol class="ladder"><li class="none">no checks (stub)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-appointment-setappointmentfromreception">
+  <div class="fh"><code>setAppointmentFromReception(role, phoneNumber, rangeId, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Stub — not implemented yet.</span></div>
+  <ol class="ladder"><li class="none">no checks (stub)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>AutoServiceServiceImpl</h3>
+<p class="clsdesc">Creates auto service centers and records service history.</p>
+<section class="fn" id="impl-autoservice-createautoservice">
+  <div class="fh"><code>createAutoService(autoServiceRequest, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates a new auto service center owned by the calling super admin.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-001</span><span class="q">Is the caller's role SUPER_ADMIN?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-002</span><span class="q">Are the request body, phone number and user id all present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-003</span><span class="q">Does an active super admin exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-004</span><span class="q">Is this the super admin's first auto service (no existing one)?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-autoservice-insertservicehistory">
+  <div class="fh"><code>insertServiceHistory(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Adds a service history record for a car, entered by an admin.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-005</span><span class="q">Are the request body, VIN, phone, user id and role all present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-006</span><span class="q">Is the caller's role ADMIN?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-007</span><span class="q">Does an active admin exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-008</span><span class="q">Does this admin belong to an auto service?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-009</span><span class="q">Does a car with this VIN exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-010</span><span class="q">Does the referenced service (by name) exist?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-autoservice-getservice">
+  <div class="fh"><code>getService(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Reads a service record by name; the rest of the body is disabled and returns null.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-011</span><span class="q">Is the service name present in the request?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-autoservice-addserviceamount">
+  <div class="fh"><code>addServiceAmount(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Stub — not implemented yet.</span></div>
+  <ol class="ladder"><li class="none">no checks (stub)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>BrevoMailServiceImpl</h3>
+<p class="clsdesc">Sends the feedback e-mail through the Brevo API.</p>
+<section class="fn" id="impl-brevomail-sendfeedbackmail">
+  <div class="fh"><code>sendFeedbackMail(request, file, ticketId, customerPhone)</code><span class="fd">Builds the feedback e-mail and posts it to Brevo.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-012</span><span class="q">Did the Brevo API accept the e-mail?</span><span class="badge b5">500 internal_error</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>CalendarServiceImpl</h3>
+<p class="clsdesc">Creates and reads day calendars with time slots for auto services.</p>
+<section class="fn" id="impl-calendar-createcalendar">
+  <div class="fh"><code>createCalendar(calendarRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates a calendar for one day and slices it into bookable time slots.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-013</span><span class="q">Are all required fields present (phone, user id, day, start and end time, slot length, service category, worker count)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-014</span><span class="q">Does an active admin exist for this user id and phone?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-015</span><span class="q">Is the slot length greater than zero minutes?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-016</span><span class="q">Is the calendar day today or in the future (not a past day)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-017</span><span class="q">If the day is today, is the start time still ahead of now?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-018</span><span class="q">Is the start time before the end time?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-019</span><span class="q">Does the admin belong to an auto service?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-020</span><span class="q">Is there no calendar yet for this day, service category and auto service?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-calendar-getcalendarbyautoserviceid">
+  <div class="fh"><code>getCalendarByAutoServiceId(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns the calendar of an auto service for a given day and category.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-021</span><span class="q">Are the auto service id, day and service category present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-022</span><span class="q">Does the auto service exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-023</span><span class="q">Is there a calendar for this day and service category?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>CarServiceImpl</h3>
+<p class="clsdesc">The heart of the service — car CRUD, VIN checks, service records and the maintenance percentage engine.</p>
+<section class="fn" id="impl-car-checkvin">
+  <div class="fh"><code>checkVin(vin, acceptLanguage)</code><span class="fd">Checks whether a VIN exists; returns stored data or decodes the VIN via NHTSA.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-024</span><span class="q">Is the VIN free — not already registered to another customer?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-getcolors">
+  <div class="fh"><code>getColors(acceptLanguage)</code><span class="fd">Returns the color catalog for the requested language.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-025</span><span class="q">Are there any colors in the database?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-getservicerecords">
+  <div class="fh"><code>getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns all service records of one of the caller's cars.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-026</span><span class="q">Are the car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-027</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-028</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-029</span><span class="q">Does the car have any service records?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-editcardetails">
+  <div class="fh"><code>editCarDetails(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Edits car details field by field and saves the car.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-030</span><span class="q">Are the request body, car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-031</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-032</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-calculateandpushnotification">
+  <div class="fh"><code>calculateAndPushNotification()</code><span class="fd">Scheduled reminder job — sends a service reminder push to every customer with a device; customers without devices are skipped silently.</span></div>
+  <ol class="ladder"><li class="none">no checks (skips silently)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-car-getservicepercentagelist">
+  <div class="fh"><code>getServicePercentageList(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Builds the maintenance percentage list, merging template, records and partner data.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-033</span><span class="q">Are the car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-034</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-035</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-editpercentage">
+  <div class="fh"><code>editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lets the customer edit one percentage record unless a partner has locked it.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-036</span><span class="q">Are the car id, percentage id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-037</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-038</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-039</span><span class="q">Does the percentage record exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-040</span><span class="q">Does the percentage record belong to this car?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-041</span><span class="q">Is the record editable — not locked because a partner already recorded this service?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-executeservicepercentages">
+  <div class="fh"><code>executeServicePercentages(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Recomputes and saves every percentage of a car.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-042</span><span class="q">Are the car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-043</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-044</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-045</span><span class="q">Does the car have any percentage records to recompute?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-addcar">
+  <div class="fh"><code>addCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Adds a new car: validates the request, links or creates the car, seeds percentages and records, then schedules the async partner sync.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-046</span><span class="q">Is the request body present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-047</span><span class="q">Is the phone number header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-048</span><span class="q">Is the user id header present and a valid number?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-049</span><span class="q">Is the engine type id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-050</span><span class="q">Is the VIN present and not blank?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-051</span><span class="q">Is the plate number present and not blank?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-052</span><span class="q">Is the mileage present and not negative?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-053</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-054</span><span class="q">If a color id was sent, does that color exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-055</span><span class="q">Is the VIN free — not already linked to another customer?</span><span class="badge b4">409 conflict</span></li>
+    <li><span class="rid">IMPL-056</span><span class="q">Is the plate number unique — not used by another car?</span><span class="badge b4">409 conflict</span></li>
+    <li><span class="rid">IMPL-057</span><span class="q">Does the chosen engine type exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-058</span><span class="q">Is there a maintenance template with services for this engine type?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-059</span><span class="q">Did the database accept the save (no duplicate constraint violation)?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-removecar">
+  <div class="fh"><code>removeCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Detaches a car from the customer (the car record itself is kept).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-060</span><span class="q">Are the request body, car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-061</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-062</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-getcarbyvincode">
+  <div class="fh"><code>getCarByVinCode(vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Finds a car by VIN for the calling customer.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-063</span><span class="q">Are the VIN, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-064</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-065</span><span class="q">Does a car with this VIN exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-066</span><span class="q">Does the car belong to the calling customer (and not to someone else)?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-getcarlistbyuserid">
+  <div class="fh"><code>getCarListByUserId(phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns the caller's cars, newest first.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-067</span><span class="q">Are the phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-068</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-069</span><span class="q">Does the customer have at least one car?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-updatemileage">
+  <div class="fh"><code>updateMileage(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Updates a car's mileage; the owner or an active admin may do it.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-070</span><span class="q">Are the VIN, mileage, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-071</span><span class="q">Is the caller either the car's owner or an active admin?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-072</span><span class="q">Does a car with this VIN exist (for the owner or for the admin's update)?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-addrecord">
+  <div class="fh"><code>addRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Creates a service record for a car from a template service.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-073</span><span class="q">Are the request body, car id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-074</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-075</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-076</span><span class="q">Does the referenced template service exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-077</span><span class="q">Is there no record for this car and service yet? (Note: reported with status 404 in the current code.)</span><span class="badge b4">404 record_already_exists</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-updaterecord">
+  <div class="fh"><code>updateRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Updates the date, km and status of an existing service record.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-078</span><span class="q">Are the request body, car id, record id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-079</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-080</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-081</span><span class="q">Does the record exist for this car?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-car-getrecord">
+  <div class="fh"><code>getRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns one service record found by service id or service name.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-082</span><span class="q">Are the car id and either a service id or a service name present (plus phone and user id)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-083</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-084</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-085</span><span class="q">Does the requested record exist for this car?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>CarVinHistoryServiceImpl</h3>
+<p class="clsdesc">Service history v1 — cache-first with a live Hyper fetch fallback.</p>
+<section class="fn" id="impl-carvinhistory-getservicehistorybyvin">
+  <div class="fh"><code>getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Returns service history from cache, or live from Hyper under a per-car lock.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-086</span><span class="q">Are the VIN, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-087</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-088</span><span class="q">Does this car (by VIN) belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>DeviceTokenServiceImpl</h3>
+<p class="clsdesc">Reconciles device tokens and sends bulk push notifications.</p>
+<section class="fn" id="impl-devicetoken-saveorupdatetoken">
+  <div class="fh"><code>saveOrUpdateToken(requestToken)</code><span class="fd">Saves or updates the caller's device token, freeing it from other users first.</span></div>
+  <ol class="ladder"><li class="none">no checks (reconciles silently)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-devicetoken-sendbulk">
+  <div class="fh"><code>sendBulk(bulkRequest, acceptLanguage)</code><span class="fd">Sends a push notification to every listed customer with a device.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-089</span><span class="q">Are the customer list, title and body all present and non-empty?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-090</span><span class="q">Is the title at most 100 characters?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-091</span><span class="q">Is the body at most 300 characters?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>FeedbackServiceImpl</h3>
+<p class="clsdesc">Stores feedback, e-mails it and returns a ticket id.</p>
+<section class="fn" id="impl-feedback-pushfeedback">
+  <div class="fh"><code>pushFeedback(file, feedbackRequest, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Saves the feedback, e-mails it via Brevo and returns the ticket number.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-092</span><span class="q">Is the feedback type one of the allowed values (feedback, support, bug report)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-093</span><span class="q">Could the e-mail be dispatched through Brevo?</span><span class="badge b5">500 internal_error</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>GroupByServiceImpl</h3>
+<p class="clsdesc">Loads reference lists with translation and the "new data set" switch.</p>
+<section class="fn" id="impl-groupby-getmodelsbybrand">
+  <div class="fh"><code>getModelsByBrand(brandId, timezone, acceptLanguage)</code><span class="fd">Returns the models of a brand from the active data set.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-094</span><span class="q">Are there any models for this brand?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-getallbrands">
+  <div class="fh"><code>getAllBrands(timezone, acceptLanguage)</code><span class="fd">Returns all brands from the active data set.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-095</span><span class="q">Are there any brands in the database?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-getbodytypes">
+  <div class="fh"><code>getBodyTypes(timezone, acceptLanguage)</code><span class="fd">Returns the active body types, translated.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-096</span><span class="q">Are there any active body types?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-gettransmissiontypes">
+  <div class="fh"><code>getTransmissionTypes(timezone, acceptLanguage)</code><span class="fd">Returns the active transmission types.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-097</span><span class="q">Are there any active transmission types?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-getenginetypes">
+  <div class="fh"><code>getEngineTypes(timezone, acceptLanguage)</code><span class="fd">Returns the active engine types, translated.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-098</span><span class="q">Are there any active engine types?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-getyearlist">
+  <div class="fh"><code>getYearList(timezone, acceptLanguage)</code><span class="fd">Returns the active model years, newest first.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-099</span><span class="q">Are there any active model years?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-groupby-getallbrandswithmodels">
+  <div class="fh"><code>getAllBrandsWithModels()</code><span class="fd">Returns all brands with their models attached.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>Helper</h3>
+<p class="clsdesc">User creation by role and timezone/date utilities.</p>
+<section class="fn" id="impl-helper-checkorcreateuserbyrole">
+  <div class="fh"><code>checkOrCreateUserByRole(userId, role, phoneNumber, name, surname, acceptLanguage, inviterId)</code><span class="fd">Checks the user for the given role and creates the record when absent.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-100</span><span class="q">Is the role one of the recognized values (USER, ADMIN, SUPER_ADMIN)?</span><span class="badge b4">404 invalid_role</span></li>
+    <li><span class="rid">IMPL-101</span><span class="q">When creating an ADMIN: does the inviting super admin exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-102</span><span class="q">When creating an ADMIN: does the inviting super admin have an auto service?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-helper-getutctime">
+  <div class="fh"><code>getUtcTimeFromDayAndTimeAndTimeZone(date, time, timezone)</code><span class="fd">Converts a date, time and timezone into a UTC timestamp.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-helper-getutcday">
+  <div class="fh"><code>getUtcDayFromUtcTime(utcTime)</code><span class="fd">Returns the day part of a UTC timestamp.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-helper-getlocaltime">
+  <div class="fh"><code>getLocalTimeFromUtcUseTZ(utcDateTime, timezone)</code><span class="fd">Converts a UTC timestamp to local time in the given timezone.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-helper-formatappointmentdate-1">
+  <div class="fh"><code>formatAppointmentDate(dateTime, acceptLanguage)</code><span class="fd">Formats an appointment time in the requested language (time-only overload).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-helper-getlocaldatetime">
+  <div class="fh"><code>getLocalDateTimeFromUtcUseTZ(utcDateTime, timezone)</code><span class="fd">Converts a UTC timestamp to the given timezone (system default when null).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-helper-formatappointmentdate-2">
+  <div class="fh"><code>formatAppointmentDate(dateTime, acceptLanguage)</code><span class="fd">Formats an appointment date-time in the requested language (date-time overload).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>HyperTokenService</h3>
+<p class="clsdesc">Caches and refreshes OAuth tokens for outbound partner API calls. Failing checks here are logged and produce a null token instead of an HTTP error.</p>
+<section class="fn" id="impl-hypertoken-refreshtoken">
+  <div class="fh"><code>refreshToken()</code><span class="fd">Scheduled refresh of the Hyper token cache.</span></div>
+  <ol class="ladder"><li class="none">no checks (errors logged)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-hypertoken-gettoken-1">
+  <div class="fh"><code>getToken()</code><span class="fd">Returns the cached Hyper token, fetching a new one when the cache is empty.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-hypertoken-gettoken-2">
+  <div class="fh"><code>getToken(partnerId)</code><span class="fd">Returns the cached token for a partner, fetching when needed. Failures are caught: the method logs and returns null instead of raising an HTTP error.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-103</span><span class="q">Does the partner exist?</span><span class="badge bn">no error — logged, returns null</span></li>
+    <li><span class="rid">IMPL-104</span><span class="q">Is the partner active?</span><span class="badge bn">no error — logged, returns null</span></li>
+    <li><span class="rid">IMPL-105</span><span class="q">Are the partner's API credentials (base URL, key, secret) configured?</span><span class="badge bn">no error — logged, returns null</span></li>
+    <li><span class="rid">IMPL-106</span><span class="q">Did the partner's auth endpoint return a token?</span><span class="badge bn">no error — logged, returns null</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>MaintenanceTemplateServiceImpl</h3>
+<p class="clsdesc">Lists templates and adds services to a template; creation is disabled.</p>
+<section class="fn" id="impl-template-createmaintenancetemplate">
+  <div class="fh"><code>createMaintenanceTemplate(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Disabled — always returns null.</span></div>
+  <ol class="ladder"><li class="none">no checks (disabled)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-template-getmaintenancetemplatelist">
+  <div class="fh"><code>getMaintenanceTemplateList(phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Fetches all maintenance templates as language-aware responses.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-107</span><span class="q">Is at least one maintenance template defined?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-template-addservicetotemplate">
+  <div class="fh"><code>addServiceToTemplate(templateId, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</code><span class="fd">Adds a new service item to a template.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-108</span><span class="q">Are the template id, service name, action type and role all present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-109</span><span class="q">Is at least one interval given (km or months)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-110</span><span class="q">Does the template exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-111</span><span class="q">Is this exact service (name + intervals) not already in the template?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>NotificationServiceImpl</h3>
+<p class="clsdesc">Marks, deletes and lists notifications.</p>
+<section class="fn" id="impl-notification-editnotification">
+  <div class="fh"><code>editNotification(notificationId, setRead, acceptLanguage)</code><span class="fd">Marks the notification as read and saves it.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-112</span><span class="q">Does the notification exist?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-notification-deletenotification">
+  <div class="fh"><code>deleteNotification(notificationId, acceptLanguage)</code><span class="fd">Soft-deletes the notification.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-113</span><span class="q">Does the notification exist?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-notification-getnotificationlistbycustomerid">
+  <div class="fh"><code>getNotificationListByCustomerId(userIdHeader, acceptLanguage)</code><span class="fd">Lists the customer's active notifications.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-114</span><span class="q">Does the customer have any active notifications?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PartnerServiceImpl</h3>
+<p class="clsdesc">Creates and updates partner records with super-admin authorization.</p>
+<section class="fn" id="impl-partner-createpartner">
+  <div class="fh"><code>createPartner(request, phoneNumber, acceptLanguage)</code><span class="fd">Creates a new partner; active defaults to true.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-115</span><span class="q">Is the caller's phone number registered as a super admin?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-116</span><span class="q">Are the partner name and source present and not blank?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-117</span><span class="q">Is the name + source combination unique?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-partner-updatepartner">
+  <div class="fh"><code>updatePartner(request, phoneNumber, acceptLanguage)</code><span class="fd">Partially updates an existing partner — only sent fields change.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-118</span><span class="q">Is the caller's phone number registered as a super admin?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-119</span><span class="q">Is the partner id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-120</span><span class="q">Does the partner exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-121</span><span class="q">Would the new name + source combination not collide with another partner?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PartnerServiceVisitIngestServiceImpl</h3>
+<p class="clsdesc">Ingests NEW service visits from the partner webhook.</p>
+<section class="fn" id="impl-partnervisitingest-ingest">
+  <div class="fh"><code>ingest(request)</code><span class="fd">Validates and persists the new visit with its lines and parts, then re-syncs the car's totals and percentages.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-122</span><span class="q">Is the payload a complete single visit? (Delegates to HyperServiceVisitValidator.validateSingleVisit.)</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-123</span><span class="q">Does the partner exist and is it active? (Delegates to PartnerLookupService.requireActivePartner.)</span><span class="badge b4">400 / 404</span></li>
+    <li><span class="rid">IMPL-124</span><span class="q">Does a car with this VIN exist in the system?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-125</span><span class="q">Is the visit genuinely new — no duplicate record id or repeated service code? (Delegates to PartnerVisitIngestGuard.assertNewVisit.)</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PartnerServiceVisitUpdateServiceImpl</h3>
+<p class="clsdesc">Applies UPDATES to existing visits from the partner webhook.</p>
+<section class="fn" id="impl-partnervisitupdate-update">
+  <div class="fh"><code>update(request)</code><span class="fd">Finds the visit by record id, merges changed fields, lines and parts, and re-syncs totals when something changed.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-126</span><span class="q">Is the payload a complete single visit? (Delegates to HyperServiceVisitValidator.validateSingleVisit.)</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-127</span><span class="q">Does the partner exist and is it active? (Delegates to PartnerLookupService.requireActivePartner.)</span><span class="badge b4">400 / 404</span></li>
+    <li><span class="rid">IMPL-128</span><span class="q">Does a car with this VIN exist in the system?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-129</span><span class="q">Does a visit with this record id exist for this car?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-130</span><span class="q">Does the visit belong to the calling partner?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PhotoServiceImpl</h3>
+<p class="clsdesc">Photo storage with content-type verification (Tika) and path-traversal protection.</p>
+<section class="fn" id="impl-photo-getcarphoto">
+  <div class="fh"><code>getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns the car photo as image bytes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-131</span><span class="q">Are the required parameters present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-132</span><span class="q">Does the car have a photo?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-getuserpp">
+  <div class="fh"><code>getUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns the caller's profile picture as image bytes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-133</span><span class="q">Are the required parameters present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-134</span><span class="q">Does the user have a profile picture?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-uploadpartnerphoto">
+  <div class="fh"><code>uploadPartnerPhoto(file, partnerId)</code><span class="fd">Uploads the partner logo, replacing any existing one.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-135</span><span class="q">Are the file and partner id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-136</span><span class="q">Does the partner exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-137</span><span class="q">Is the file name free of ".." (no path-traversal attack)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-138</span><span class="q">Is the file content really an image (checked with Tika, not just the extension)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-139</span><span class="q">Could the file bytes be read?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-getpartnerphotobyid">
+  <div class="fh"><code>getPartnerPhotoById(partnerId)</code><span class="fd">Returns the partner logo as image bytes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-140</span><span class="q">Is the partner id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-141</span><span class="q">Does a logo exist for this partner?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-uploadpartnerbadgelogo">
+  <div class="fh"><code>uploadPartnerBadgeLogo(file, partnerId)</code><span class="fd">Uploads the partner badge logo, replacing any existing one.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-142</span><span class="q">Are the file and partner id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-143</span><span class="q">Does the partner exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-144</span><span class="q">Is the file name free of ".." (no path-traversal attack)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-145</span><span class="q">Is the file content really an image?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-146</span><span class="q">Could the file bytes be read?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-getpartnerbadgelogobyid">
+  <div class="fh"><code>getPartnerBadgeLogoById(partnerId)</code><span class="fd">Returns the partner badge logo as image bytes.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-147</span><span class="q">Is the partner id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-148</span><span class="q">Does a badge logo exist for this partner?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-deleteothercarphoto">
+  <div class="fh"><code>deleteOtherCarPhoto(carId, acceptLanguage)</code><span class="fd">Deletes a car photo without checking ownership (admin utility).</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-149</span><span class="q">Is the language header present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-150</span><span class="q">Does the car exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-151</span><span class="q">Does the car have a photo to delete?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-uploadcarphoto">
+  <div class="fh"><code>uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Uploads a photo for one of the caller's cars, replacing any existing photo.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-152</span><span class="q">Are the file, car id, role, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-153</span><span class="q">Is the caller's role USER?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-154</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-155</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-156</span><span class="q">Is the file name free of ".." (no path-traversal attack)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-157</span><span class="q">Is the file content really an image?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-158</span><span class="q">Could the file bytes be read?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-deletecarphoto">
+  <div class="fh"><code>deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Deletes the photo of one of the caller's cars.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-159</span><span class="q">Are the car id, role, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-160</span><span class="q">Is the caller's role USER?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-161</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-162</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-163</span><span class="q">Does the car have a photo to delete?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-uploaduserpp">
+  <div class="fh"><code>uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Uploads the caller's profile picture, replacing any existing one.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-164</span><span class="q">Are the file, role, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-165</span><span class="q">Is the file name free of ".." (no path-traversal attack)?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-166</span><span class="q">Is the file content really an image?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-167</span><span class="q">Could the file bytes be read?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-deleteuserpp">
+  <div class="fh"><code>deleteUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Deletes the caller's profile picture.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-168</span><span class="q">Are the role, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-169</span><span class="q">Does the user have a profile picture to delete?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-photo-checkattack">
+  <div class="fh"><code>checkAttack(file, acceptLanguage)</code><span class="fd">Rejects uploaded files whose name contains ".." — path-traversal protection used by all uploads.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-170</span><span class="q">Is the file name free of the ".." sequence?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>PushNotificationServiceImpl</h3>
+<p class="clsdesc">Sends a single push through Firebase Cloud Messaging.</p>
+<section class="fn" id="impl-pushnotification-send">
+  <div class="fh"><code>send(title, body, deviceToken)</code><span class="fd">Builds and sends one Firebase message to the device token.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-171</span><span class="q">Did Firebase accept and send the message?</span><span class="badge b5">500 internal_error</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>RangeServiceImpl</h3>
+<p class="clsdesc">Books time slots for customers with capacity, break-time and one-per-day rules.</p>
+<section class="fn" id="impl-range-bookappointment">
+  <div class="fh"><code>bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Books the slot for the customer and marks it full when capacity is reached.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-172</span><span class="q">Are the slot id, role, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-173</span><span class="q">Is the caller's role USER?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-174</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-175</span><span class="q">Does the time slot exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-176</span><span class="q">Is the slot still open — not pending or already full?</span><span class="badge b4">409 conflict</span></li>
+    <li><span class="rid">IMPL-177</span><span class="q">Is the slot not a break-time slot?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-178</span><span class="q">Does the auto service behind the slot exist?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-179</span><span class="q">Does the customer have no other booking for the same day and service category?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-range-decideonbooking">
+  <div class="fh"><code>decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Stub — the decision flow is disabled.</span></div>
+  <ol class="ladder"><li class="none">no checks (stub)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-range-deletebookingbycustomer">
+  <div class="fh"><code>deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Stub — customer cancellation is disabled.</span></div>
+  <ol class="ladder"><li class="none">no checks (stub)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-range-converttoresponse">
+  <div class="fh"><code>convertToResponse(appointment, timezone, acceptLanguage)</code><span class="fd">Converts an appointment entity into the response model with local times.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>UserServiceImpl</h3>
+<p class="clsdesc">Registers the user record by role and lists the user's notifications.</p>
+<section class="fn" id="impl-user-useradddetails">
+  <div class="fh"><code>userAddDetails(userId, role, phoneNumber, timezone, acceptLanguage, inviterId)</code><span class="fd">Fetches the user's name from the auth service and creates or verifies the role-specific record.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-180</span><span class="q">Are the user id, role, phone number and timezone present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-181</span><span class="q">Do the role-specific creation checks pass? (Delegates to Helper.checkOrCreateUserByRole.)</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+<section class="fn" id="impl-user-getnotificationlist">
+  <div class="fh"><code>getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Returns the caller's notifications as lightweight response objects.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-182</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-183</span><span class="q">Does the customer have any notifications?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>VinService</h3>
+<p class="clsdesc">Decodes VIN numbers through the public NHTSA API.</p>
+<section class="fn" id="impl-vin-decodevin">
+  <div class="fh"><code>decodeVin(vin)</code><span class="fd">Calls the NHTSA decoder and returns the raw result.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-vin-extractfieldsfromvin">
+  <div class="fh"><code>extractFieldsFromVin(vin)</code><span class="fd">Extracts brand, model, year, engine and body fields from the decoder answer.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="impl-vin-parseenginevolumecc">
+  <div class="fh"><code>parseEngineVolumeCc(raw)</code><span class="fd">Converts an engine displacement into cubic centimeters; returns null when unparseable.</span></div>
+  <ol class="ladder"><li class="none">no checks (returns null on bad input)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>VisitHistoryServiceImpl</h3>
+<p class="clsdesc">Service history v2 — visits table as cache, live Hyper fetch when empty, plus percentage sync.</p>
+<section class="fn" id="impl-visithistory-getservicehistorybyvin">
+  <div class="fh"><code>getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</code><span class="fd">Returns the visit-based history, from cache or live from Hyper, then syncs percentages.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">IMPL-184</span><span class="q">Are the VIN, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">IMPL-185</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
+    <li><span class="rid">IMPL-186</span><span class="q">Does this car (by VIN) belong to this customer?</span><span class="badge b4">404 not_found</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<!-- ================= SERVICE.WEBHOOK ================= -->
+<h2>com.carland.carland_service.service.webhook</h2>
+<p class="nsdesc">Support classes for the partner webhook flows — payload validation, duplicate guards and shared mapping helpers.</p>
+
+<h3>HyperServiceVisitValidator</h3>
+<p class="clsdesc">Field-by-field validation of the incoming webhook payload; every failure returns 400 (MissingFieldException).</p>
+<section class="fn" id="whk-validator-validatesinglevisit">
+  <div class="fh"><code>validateSingleVisit(request)</code><span class="fd">Validates the whole payload before any processing happens.</span></div>
+  <ol class="ladder">
+    <li><span class="rid">WHK-001</span><span class="q">Is the request body present at all?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-002</span><span class="q">Is the partnerId present?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-003</span><span class="q">Is the vin present and not blank?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-004</span><span class="q">Is the plate present and not blank?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-005</span><span class="q">Is the serviceHistory list present and non-empty?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-006</span><span class="q">Does the serviceHistory contain exactly one visit?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-007</span><span class="q">Does the visit have a recordId?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-008</span><span class="q">Does the visit have a lastServiceDate?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-009</span><span class="q">Does the visit have a lastServiceMileage?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-010</span><span class="q">Does the visit have at least one service line?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-011</span><span class="q">Does every service line have a serviceCode?</span><span class="badge b4">400 bad_request</span></li>
+    <li><span class="rid">WHK-012</span><span class="q">Does every service line have a universalServiceId?</span><span class="badge b4">400 bad_request</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>HyperWebhookCarMetadataApplier</h3>
+<p class="clsdesc">Copies non-empty car fields from the webhook onto the stored car.</p>
+<section class="fn" id="whk-metadataapplier-apply">
+  <div class="fh"><code>apply(car, hyper)</code><span class="fd">Applies the partner's car metadata onto the stored car record; saves only when something changed.</span></div>
+  <ol class="ladder"><li class="none">no checks (empty fields are simply skipped)</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>HyperWebhookIngestMapper</h3>
+<p class="clsdesc">Converts the raw webhook payload into the internal visit-history model.</p>
+<section class="fn" id="whk-ingestmapper-tosinglevisititem">
+  <div class="fh"><code>toSingleVisitItem(hyper, partner)</code><span class="fd">Maps the single visit in the payload to an internal visit item.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-ingestmapper-toingestrequest">
+  <div class="fh"><code>toIngestRequest(hyper, partner)</code><span class="fd">Maps the whole payload to the internal ingest request model.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<h3>PartnerVisitIngestGuard</h3>
+<p class="clsdesc">Stops duplicate webhook ingests.</p>
+<section class="fn" id="whk-guard-assertnewvisit">
+  <div class="fh"><code>assertNewVisit(carId, item)</code><span class="fd">Asserts the incoming visit is genuinely new for this car. (A service code that already exists in the database is only logged, not rejected.)</span></div>
+  <ol class="ladder">
+    <li><span class="rid">WHK-013</span><span class="q">Is there no existing visit with the same record id for this car?</span><span class="badge b4">409 conflict</span></li>
+    <li><span class="rid">WHK-014</span><span class="q">Is every service code unique within the payload itself?</span><span class="badge b4">409 conflict</span></li>
+    <li class="pass">all passed → proceeds</li>
+  </ol>
+</section>
+
+<h3>VisitWebhookSupport</h3>
+<p class="clsdesc">Shared mapping and cost-calculation helpers of the webhook services.</p>
+<section class="fn" id="whk-support-maplinetoentity">
+  <div class="fh"><code>mapLineToEntity(line)</code><span class="fd">Maps a webhook service line to its database entity.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-support-mapparttoentity">
+  <div class="fh"><code>mapPartToEntity(part)</code><span class="fd">Maps a webhook part to its database entity.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-support-normalizeuniversalserviceid">
+  <div class="fh"><code>normalizeUniversalServiceId(raw)</code><span class="fd">Normalizes the universal service id — blanks and "other" become an empty string.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-support-recalculatealltimecost">
+  <div class="fh"><code>recalculateAllTimeCost(car)</code><span class="fd">Recalculates and saves the car's all-time cost by summing all visits.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-support-resolvevisitfinalcost">
+  <div class="fh"><code>resolveVisitFinalCost(visit)</code><span class="fd">Resolves one visit's total (final cost first, then cost, else zero).</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+<section class="fn" id="whk-support-decimalequals">
+  <div class="fh"><code>decimalEquals(left, right)</code><span class="fd">Compares two decimal amounts ignoring scale; two nulls count as equal.</span></div>
+  <ol class="ladder"><li class="none">no checks</li><li class="pass">all passed → proceeds</li></ol>
+</section>
+
+<footer>Generated from <span class="code" style="font-family:Consolas,Menlo,monospace">src/main/java/com/carland/carland_service</span> — 5 packages, 72 classes, 254 functions. Companion file: <a href="tree-map.html">tree-map.html</a> (291 validation rules: SEC 15 · CTRL 73 · SVC 3 · IMPL 186 · WHK 14).</footer>
+</div>
+</body>
+</html>

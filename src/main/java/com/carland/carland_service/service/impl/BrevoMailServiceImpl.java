@@ -1,7 +1,7 @@
 package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.FeedbackRequest;
-import com.carland.carland_service.service.interfaces.MailService;
+import com.carland.carland_service.service.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -20,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * tr: MailService'in Brevo (eski adıyla Sendinblue) SMTP API üzerinden çalışan implementasyonudur;
+ *     geri bildirim maillerini HTML gövde ve opsiyonel Base64 ekiyle gönderir.
+ * en: Implementation of MailService backed by the Brevo (formerly Sendinblue) SMTP API;
+ *     sends feedback e-mails with an HTML body and an optional Base64-encoded attachment.
+ */
 @Service
 @RequiredArgsConstructor
 public class BrevoMailServiceImpl implements MailService {
@@ -31,6 +37,14 @@ public class BrevoMailServiceImpl implements MailService {
 
     private static final String BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
+    /**
+     * tr: Geri bildirim mailini Brevo API'ye POST ederek gönderir; dosya varsa Base64'e çevirip
+     *     ek olarak iliştirir. Brevo 4xx/5xx dönerse veya başka bir hata oluşursa açıklayıcı
+     *     mesajla RuntimeException fırlatır.
+     * en: Sends the feedback mail by POSTing to the Brevo API; when a file is provided it is
+     *     Base64-encoded and attached. Throws a RuntimeException with a descriptive message on
+     *     Brevo 4xx/5xx responses or any other failure.
+     */
     @Override
     public void sendFeedbackMail(FeedbackRequest request, MultipartFile file, String ticketId, String customerPhone) {
 

@@ -5,6 +5,10 @@
 //
 //import java.util.Arrays;
 //
+///**
+// * tr: Servis adlarını İngilizce'den Azerice'ye çevirmek için kullanılan (şu an tamamen yorum satırında) enum yardımcı sınıfı.
+// * en: Enum helper (currently fully commented out) used to translate service names from English into Azerbaijani.
+// */
 //@Getter
 //@AllArgsConstructor
 //public enum ServiceNameAz {

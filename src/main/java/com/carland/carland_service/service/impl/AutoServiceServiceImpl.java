@@ -7,17 +7,25 @@ import com.carland.carland_service.dto.response.AutoServiceResponse;
 import com.carland.carland_service.dto.response.ServiceHistoryResponse;
 import com.carland.carland_service.dto.response.ServiceResponse;
 import com.carland.carland_service.entity.*;
-import com.carland.carland_service.enums.EnumMessagesLangValues;
-import com.carland.carland_service.enums.EnumUserRoles;
-import com.carland.carland_service.enums.EnumUserStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.UserRoles;
+import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
-import com.carland.carland_service.service.interfaces.AutoServiceService;
+import com.carland.carland_service.service.AutoServiceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 
+/**
+ * tr: Oto servis yönetiminin implementasyonudur: SUPER_ADMIN için servis noktası oluşturma ve
+ *     ADMIN için araca servis geçmişi ekleme akışlarını içerir; getService ve addServiceAmount
+ *     henüz tamamlanmamıştır.
+ * en: Implementation of auto service management: creating a service point for SUPER_ADMIN and
+ *     inserting service history for a car as ADMIN; getService and addServiceAmount are not
+ *     completed yet.
+ */
 @Service
 @RequiredArgsConstructor
 public class AutoServiceServiceImpl implements AutoServiceService {
@@ -29,27 +37,36 @@ public class AutoServiceServiceImpl implements AutoServiceService {
     private final ServiceEntityRepository serviceEntityRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
 
+    /**
+     * tr: SUPER_ADMIN rolüyle yeni bir oto servis oluşturur ve süper admin'e bağlar. Rol SUPER_ADMIN
+     *     değilse InvalidStatusException, zorunlu alanlar eksikse MissingFieldException, süper admin
+     *     bulunamazsa UserNotFoundException, süper adminin zaten servisi varsa AlreadyExistsException fırlatır.
+     * en: Creates a new auto service under the SUPER_ADMIN role and links it to the super admin. Throws
+     *     InvalidStatusException when the role is not SUPER_ADMIN, MissingFieldException on missing required
+     *     fields, UserNotFoundException when the super admin is not found, and AlreadyExistsException when
+     *     the super admin already owns a service.
+     */
     @Override
     public AutoServiceResponse createAutoService(AutoServiceRequest autoServiceRequest, String phoneNumber, String role,
                                                  String userIdHeader, String timezone, String acceptLanguage) {
-        if (!role.equals(EnumUserRoles.SUPER_ADMIN.name())) {
-            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        if (!role.equals(UserRoles.SUPER_ADMIN.name())) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
         if (autoServiceRequest == null || phoneNumber == null || userIdHeader == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         SuperAdmin superAdmin = superAdminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
-                phoneNumber, EnumUserStatus.ACTIVE.name());
+                phoneNumber, UserStatus.ACTIVE.name());
 
         if (superAdmin == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         AutoService autoService = autoServiceRepository.findBySuperAdmin(superAdmin);
 
         if (autoService != null) {
-            throw new AlreadyExistsException(EnumMessagesLangValues.AUTO_SERVICE_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+            throw new AlreadyExistsException(MessagesLangValues.AUTO_SERVICE_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
 
         AutoService newAutoService = AutoService.builder()
@@ -65,45 +82,55 @@ public class AutoServiceServiceImpl implements AutoServiceService {
         superAdmin.setAutoService(newAutoService);
         superAdminRepository.save(superAdmin);
         return AutoServiceResponse.builder()
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
+    /**
+     * tr: ADMIN rolüyle, VIN'i verilen araca yeni bir servis geçmişi kaydı ekler ve kaydı döner.
+     *     Eksik alanlarda MissingFieldException, rol ADMIN değilse InvalidStatusException, admin
+     *     bulunamazsa UserNotFoundException; oto servis, araç veya servis tanımı bulunamazsa
+     *     ResourceNotFoundException fırlatır.
+     * en: Inserts a new service history record for the car with the given VIN under the ADMIN role and
+     *     returns it. Throws MissingFieldException on missing fields, InvalidStatusException when the role
+     *     is not ADMIN, UserNotFoundException when the admin is not found, and ResourceNotFoundException
+     *     when the auto service, car, or service definition cannot be found.
+     */
     @Override
     public ServiceHistoryResponse insertServiceHistory(ServiceHistoryRequest request, String phoneNumber,
                                                        String userIdHeader, String role, String timezone,
                                                        String acceptLanguage) {
 
         if (request == null || request.getVin() == null || phoneNumber == null || userIdHeader == null || role == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        if (!role.equals(EnumUserRoles.ADMIN.name())) {
-            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        if (!role.equals(UserRoles.ADMIN.name())) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
 
         Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                EnumUserStatus.ACTIVE.name());
+                UserStatus.ACTIVE.name());
 
         if (admin == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         AutoService autoService = admin.getAutoService();
 
         if (autoService == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car car = carRepository.findByVin(request.getVin());
 
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         ServiceEntity serviceEntity = serviceEntityRepository.findByServiceName(request.getServiceName());
         if (serviceEntity == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         ServiceHistory serviceHistory = ServiceHistory.builder()
@@ -130,17 +157,25 @@ public class AutoServiceServiceImpl implements AutoServiceService {
                 .build();
     }
 
+    /**
+     * tr: Henüz tamamlanmadı: servis adı yoksa MissingFieldException fırlatır, aksi halde null döner.
+     * en: Not completed yet: throws MissingFieldException when the service name is missing, otherwise returns null.
+     */
     @Override
     public ServiceResponse getService(ServiceRequest request, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
         if (request.getServiceName() == null ) {
-            throw new MissingFieldException(EnumMessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 //        AutoService autoService = autoServiceRepository.findById(request.getAutoServiceId()).orElseThrow(
-//                () -> new ResourceNotFoundException(EnumMessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+//                () -> new ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
 
         return null;
     }
 
+    /**
+     * tr: Henüz implemente edilmedi; her zaman null döner.
+     * en: Not implemented yet; always returns null.
+     */
     @Override
     public ServiceResponse addServiceAmount(ServiceRequest request, String phoneNumber, String userIdHeader, String role, String timezone, String acceptLanguage) {
         return null;

@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: VIN numarasına göre sorgulanan araç servis geçmişini (kaynak ve kalem listesi) döndüren yanıt DTO'su.
+ * en: Response DTO returning a car's service history looked up by VIN (source and list of items).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

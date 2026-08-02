@@ -5,6 +5,10 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
+/**
+ * tr: Kimlik doğrulama/login akışında dönen kullanıcı bilgilerini (id, telefon, durum, ad-soyad) taşıyan yanıt DTO'su.
+ * en: Response DTO carrying authenticated user info (id, phone, status, name-surname) returned in the auth/login flow.
+ */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

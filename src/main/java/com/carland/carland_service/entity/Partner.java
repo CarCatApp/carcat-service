@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+/**
+ * tr: "partners" tablosunu modelleyen entity; entegre iş ortağını (ad, bayi, kaynak) ve webhook/API kimlik bilgilerini temsil eder.
+ * en: Entity modeling the "partners" table; represents an integrated partner (name, dealer, source) and its webhook/API credentials.
+ */
 @Entity
 @Data
 @Builder

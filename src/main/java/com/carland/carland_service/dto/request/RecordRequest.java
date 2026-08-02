@@ -6,6 +6,10 @@ import lombok.experimental.FieldDefaults;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * tr: Müşterinin araç servis kaydını (yapılan servis, tarih, km) oluşturmak veya güncellemek için kullanılan istek DTO'su.
+ * en: Request DTO used to create or update a customer's car service record (performed service, date, km).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

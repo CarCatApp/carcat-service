@@ -9,6 +9,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalTime;
 import java.util.List;
 
+/**
+ * tr: Takvimdeki tek bir randevu zaman aralığını (başlangıç/bitiş, durum, boş kontenjan) döndüren yanıt DTO'su; CalendarResponse içinde kullanılır.
+ * en: Response DTO returning a single appointment time slot in the calendar (start/end, status, free count); used inside CalendarResponse.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -7,6 +7,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * tr: PartnerController işlemlerinden dönen yanıt DTO'su; işlem mesajı ve partner verisini (PartnerDataResponse) içerir.
+ * en: Response DTO returned by PartnerController operations; contains an operation message and the partner data (PartnerDataResponse).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

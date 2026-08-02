@@ -9,6 +9,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * tr: Servis geçmişindeki tek bir kaydı (servis adı, tarih, km, servis merkezi, parçalar, tutar) temsil eden yanıt DTO'su.
+ * en: Response DTO representing a single service history entry (service name, date, km, service center, parts, amount).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

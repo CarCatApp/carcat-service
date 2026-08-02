@@ -6,6 +6,10 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * tr: Hyper API'den gelen tek bir servis geçmişi kaydını (servis satırları, parçalar, maliyet, sonraki servis) eşleyen yanıt DTO'su.
+ * en: Response DTO mapping a single service history record from the Hyper API (service lines, parts, cost, next service).
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HyperServiceHistoryItemResponse {

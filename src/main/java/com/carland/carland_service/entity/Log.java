@@ -6,6 +6,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 
+/**
+ * tr: "logs" tablosunu modelleyen entity; kullanıcı bazlı uygulama log kayıtlarını saklar.
+ * en: Entity modeling the "logs" table; stores per-user application log entries.
+ */
 @Entity
 @Data
 @Builder

@@ -6,6 +6,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 
+/**
+ * tr: "colors" tablosunu modelleyen entity; araç rengi sözlük kaydını temsil eder.
+ * en: Entity modeling the "colors" table; represents a car color lookup record.
+ */
 @Entity
 @Data
 @Builder

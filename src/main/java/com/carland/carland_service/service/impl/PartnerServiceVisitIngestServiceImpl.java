@@ -1,46 +1,53 @@
 package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
-import com.carland.carland_service.dto.response.v2.CarVinServiceHistoryV2Response;
-import com.carland.carland_service.dto.response.v2.LineIngestDetail;
-import com.carland.carland_service.dto.response.v2.MoneyResponse;
-import com.carland.carland_service.dto.response.v2.PartnerNewServiceVisitResult;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryLineV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryPartV2;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryPartV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryVisitV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryV2;
-import com.carland.carland_service.dto.response.v2.Visit;
-import com.carland.carland_service.dto.response.v2.VisitIngestDetail;
+import com.carland.carland_service.dto.response.VisitHistoryResponse;
+import com.carland.carland_service.dto.webhook.LineIngestDetail;
+import com.carland.carland_service.dto.response.MoneyResponse;
+import com.carland.carland_service.dto.webhook.PartnerNewServiceVisitResult;
+import com.carland.carland_service.dto.response.VisitServiceLineResponse;
+import com.carland.carland_service.dto.response.VisitPartResponse;
+import com.carland.carland_service.dto.response.VisitHistoryItemResponse;
+import com.carland.carland_service.entity.VisitServiceLine;
+import com.carland.carland_service.entity.Visit;
+import com.carland.carland_service.dto.webhook.VisitIngestDetail;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Partner;
-import com.carland.carland_service.enums.EnumPartnerId;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitIngestService;
-import com.carland.carland_service.service.mapper.HyperWebhookIngestMapper;
-import com.carland.carland_service.service.validation.HyperServiceVisitValidator;
+import com.carland.carland_service.service.webhook.HyperWebhookIngestMapper;
+import com.carland.carland_service.service.webhook.HyperServiceVisitValidator;
 import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
 import com.carland.carland_service.service.webhook.PartnerVisitIngestGuard;
+import com.carland.carland_service.service.webhook.VisitWebhookSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+/**
+ * tr: Partner webhook'undan gelen YENİ servis ziyaretlerini işleyen servistir; payload'ı doğrular,
+ *     partner ve aracı bulur, ziyaretleri Visit entity'lerine çevirip kaydeder, aracın toplam maliyetini,
+ *     partner listesini ve yüzde (percentage) senkronunu günceller.
+ * en: Service handling NEW service visits arriving from the partner webhook; validates the payload,
+ *     resolves partner and car, maps visits to Visit entities and persists them, then refreshes the car's
+ *     total cost, partner list and percentage sync.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisitIngestService {
 
-    private static final EnumPartnerId DEFAULT_PARTNER = EnumPartnerId.HYPER;
+    private static final PartnerId DEFAULT_PARTNER = PartnerId.HYPER;
 
     private final CarRepository carRepository;
     private final VisitRepository visitRepository;
@@ -48,7 +55,16 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
     private final HyperPercentageSyncService hyperPercentageSyncService;
     private final PartnerVisitIngestGuard partnerVisitIngestGuard;
+    private final VisitWebhookSupport visitWebhookSupport;
 
+    /**
+     * tr: Webhook isteğini işler: payload'da tek ziyaret olmasını doğrular (validator exception fırlatır),
+     *     aktif partner'ı zorunlu kılar, VIN ile aracı bulur (yoksa ResourceNotFoundException),
+     *     araç metadata'sını günceller ve ziyaretleri kaydeder. Sonuçta oluşturulan kayıt sayıları döner.
+     * en: Processes the webhook request: validates single-visit payload (validator throws),
+     *     requires an active partner, finds the car by VIN (ResourceNotFoundException otherwise),
+     *     applies car metadata and persists the visits. Returns created record counts as the result.
+     */
     @Override
     @Transactional
     public PartnerNewServiceVisitResult ingest(HyperVehicleByVinResponse request) {
@@ -66,7 +82,14 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         return ingestVisits(car, HyperWebhookIngestMapper.toIngestRequest(request, partner), partner.getId());
     }
 
-    private PartnerNewServiceVisitResult ingestVisits(Car car, CarVinServiceHistoryV2Response request, Long partnerId) {
+    /**
+     * tr: Ziyaret listesini tek tek işler: her ziyaretin yeni olduğunu guard ile doğrular (mükerrer ise
+     *     exception), entity'ye çevirip kaydeder; sonra toplam maliyet, partner listesi ve percentage
+     *     senkronunu tetikler.
+     * en: Processes the visit list one by one: asserts each visit is new via the guard (throws on
+     *     duplicates), maps and persists them; then triggers total-cost, partner-list and percentage sync.
+     */
+    private PartnerNewServiceVisitResult ingestVisits(Car car, VisitHistoryResponse request, Long partnerId) {
         String vin = request.getVin().trim();
 
         PartnerNewServiceVisitResult result = PartnerNewServiceVisitResult.builder()
@@ -76,7 +99,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
 
         List<Visit> touchedVisits = new ArrayList<>();
 
-        for (ServiceHistoryVisitV2Response item : request.getItems()) {
+        for (VisitHistoryItemResponse item : request.getItems()) {
             partnerVisitIngestGuard.assertNewVisit(car.getCarId(), item);
 
             Visit created = mapItemToVisit(car, item);
@@ -88,7 +111,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
             result.setPartsCreated(result.getPartsCreated() + sizeOf(item.getParts()));
         }
 
-        recalculateAllTimeCost(car);
+        visitWebhookSupport.recalculateAllTimeCost(car);
         refreshServicedPartnerIds(car);
         refreshPercentagesFromTouchedVisits(car, touchedVisits);
 
@@ -96,6 +119,10 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         return result;
     }
 
+    /**
+     * tr: Yeni eklenen ziyaretleri DB'den detaylarıyla tekrar okuyup her biri için percentage senkronu çalıştırır.
+     * en: Re-reads the newly added visits with details from the DB and runs percentage sync for each.
+     */
     private void refreshPercentagesFromTouchedVisits(Car car, List<Visit> touchedVisits) {
         for (Visit visit : touchedVisits) {
             if (visit.getHyperRecordId() == null) {
@@ -106,10 +133,14 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         }
     }
 
+    /**
+     * tr: Kaydedilen ziyaret için webhook cevabında dönen detay nesnesini (ziyaret + satır id'leri) kurar.
+     * en: Builds the detail object (visit + line ids) returned in the webhook response for the saved visit.
+     */
     private VisitIngestDetail buildCreatedVisitDetail(Visit visit, Long partnerRecordId) {
         List<LineIngestDetail> lines = new ArrayList<>();
         if (visit.getServices() != null) {
-            for (ServiceHistoryV2 line : visit.getServices()) {
+            for (VisitServiceLine line : visit.getServices()) {
                 lines.add(LineIngestDetail.builder()
                         .serviceCode(line.getServiceCode())
                         .lineId(line.getId())
@@ -125,7 +156,13 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
                 .build();
     }
 
-    private Visit mapItemToVisit(Car car, ServiceHistoryVisitV2Response item) {
+    /**
+     * tr: Webhook ziyaret DTO'sunu satır ve parçalarıyla birlikte Visit entity'sine çevirir;
+     *     servis merkezi bilgisi yoksa varsayılan partner'ı (HYPER) kullanır.
+     * en: Maps the webhook visit DTO, including its lines and parts, to a Visit entity;
+     *     falls back to the default partner (HYPER) when service center info is missing.
+     */
+    private Visit mapItemToVisit(Car car, VisitHistoryItemResponse item) {
         Long partnerId = item.getServiceCenterId() != null ? item.getServiceCenterId() : DEFAULT_PARTNER.getId();
         String partnerName = resolvePartnerName(item, partnerId);
 
@@ -149,67 +186,37 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
                 .build();
 
         if (item.getServices() != null) {
-            for (ServiceHistoryLineV2Response line : item.getServices()) {
-                visit.addService(mapLineToEntity(line));
+            for (VisitServiceLineResponse line : item.getServices()) {
+                visit.addService(visitWebhookSupport.mapLineToEntity(line));
             }
         }
         if (item.getParts() != null) {
-            for (ServiceHistoryPartV2Response part : item.getParts()) {
-                visit.addPart(mapPartToEntity(part));
+            for (VisitPartResponse part : item.getParts()) {
+                visit.addPart(visitWebhookSupport.mapPartToEntity(part));
             }
         }
         return visit;
     }
 
-    private ServiceHistoryV2 mapLineToEntity(ServiceHistoryLineV2Response line) {
-        MoneyResponse cost = line.getCost();
-        return ServiceHistoryV2.builder()
-                .serviceCode(line.getServiceCode())
-                .serviceName(line.getServiceName())
-                .universalServiceId(normalizeUniversalServiceId(line.getUniversalServiceId()))
-                .serviceGroups(line.getServiceGroups() != null ? new ArrayList<>(line.getServiceGroups()) : new ArrayList<>())
-                .costAmount(cost != null ? cost.getAmount() : null)
-                .costCurrency(cost != null ? cost.getCurrency() : null)
-                .nextServiceDate(line.getNextServiceDate())
-                .nextServiceMileage(line.getNextServiceMileage())
-                .build();
-    }
-
-    private ServiceHistoryPartV2 mapPartToEntity(ServiceHistoryPartV2Response part) {
-        return ServiceHistoryPartV2.builder()
-                .name(part.getName())
-                .qty(part.getQty())
-                .unit(part.getUnit())
-                .build();
-    }
-
-    private String resolvePartnerName(ServiceHistoryVisitV2Response item, Long partnerId) {
+    /**
+     * tr: Servis merkezi adını belirler: DTO'da doluysa onu, yoksa partner kaydındaki adı,
+     *     o da yoksa varsayılan partner adını döner.
+     * en: Resolves the service center name: the DTO value when present, otherwise the partner record's
+     *     name, falling back to the default partner name.
+     */
+    private String resolvePartnerName(VisitHistoryItemResponse item, Long partnerId) {
         if (item.getServiceCenterName() != null && !item.getServiceCenterName().isBlank()) {
             return item.getServiceCenterName();
         }
-        return partnerLookupService.find(EnumPartnerId.fromId(partnerId).orElse(DEFAULT_PARTNER))
+        return partnerLookupService.find(PartnerId.fromId(partnerId).orElse(DEFAULT_PARTNER))
                 .map(Partner::getName)
                 .orElse(DEFAULT_PARTNER.getDefaultName());
     }
 
-    private void recalculateAllTimeCost(Car car) {
-        BigDecimal total = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
-                .map(this::resolveVisitFinalCost)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        car.setAllTimeCost(total);
-        carRepository.save(car);
-    }
-
-    private BigDecimal resolveVisitFinalCost(Visit visit) {
-        if (visit.getFinalCostAmount() != null) {
-            return visit.getFinalCostAmount();
-        }
-        if (visit.getCostAmount() != null) {
-            return visit.getCostAmount();
-        }
-        return BigDecimal.ZERO;
-    }
-
+    /**
+     * tr: Aracın servicedPartnerIds listesini tüm ziyaretlerden (en yeniden eskiye) yeniden kurar ve kaydeder.
+     * en: Rebuilds and persists the car's servicedPartnerIds list from all visits (newest to oldest).
+     */
     private void refreshServicedPartnerIds(Car car) {
         List<Visit> allVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
         LinkedHashSet<String> orderedPartnerIds = new LinkedHashSet<>();
@@ -222,13 +229,10 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         carRepository.save(car);
     }
 
-    private String normalizeUniversalServiceId(String raw) {
-        if (raw == null || raw.isBlank() || "other".equalsIgnoreCase(raw.trim())) {
-            return "";
-        }
-        return raw.trim();
-    }
-
+    /**
+     * tr: Liste null ise 0, değilse eleman sayısını döner.
+     * en: Returns 0 for a null list, the element count otherwise.
+     */
     private int sizeOf(List<?> items) {
         return items == null ? 0 : items.size();
     }

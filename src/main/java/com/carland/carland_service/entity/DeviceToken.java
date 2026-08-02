@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+/**
+ * tr: "device_tokens" tablosunu modelleyen entity; kullanıcının push bildirim cihaz token'ını ve platform bilgisini saklar.
+ * en: Entity modeling the "device_tokens" table; stores a user's push notification device token and platform info.
+ */
 @Entity
 @Table(name = "device_tokens")
 @Data

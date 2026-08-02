@@ -8,6 +8,10 @@ import lombok.experimental.FieldDefaults;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * tr: "maintenance_templates" tablosunu modelleyen entity; motor tipine bağlı bakım şablonunu ve içerdiği servis tanımlarını temsil eder.
+ * en: Entity modeling the "maintenance_templates" table; represents an engine-type-based maintenance template and the service definitions it contains.
+ */
 @Entity
 @Data
 @NoArgsConstructor

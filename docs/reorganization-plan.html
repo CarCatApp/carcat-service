@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Carland Service — Proje Düzenleme Planı</title>
+<style>
+    @page { size: A4; margin: 18mm 15mm; }
+    * { box-sizing: border-box; }
+    body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        color: #1f2937;
+        font-size: 11px;
+        line-height: 1.55;
+        margin: 0;
+        padding: 0 4px;
+    }
+    .cover {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+        color: #fff;
+        border-radius: 12px;
+        padding: 28px 32px;
+        margin-bottom: 24px;
+    }
+    .cover h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: .3px; }
+    .cover p { margin: 2px 0; color: #cbd5e1; font-size: 11.5px; }
+    .badge {
+        display: inline-block; background: #f59e0b; color: #111827;
+        font-weight: 600; border-radius: 20px; padding: 2px 12px;
+        font-size: 10px; margin-top: 10px;
+    }
+    h2 {
+        font-size: 16px; color: #1e3a8a; border-bottom: 2px solid #1e3a8a;
+        padding-bottom: 4px; margin: 26px 0 10px;
+    }
+    h3 { font-size: 13px; color: #0f172a; margin: 18px 0 6px; }
+    p { margin: 6px 0; }
+    table {
+        width: 100%; border-collapse: collapse; margin: 8px 0 14px;
+        font-size: 10px;
+    }
+    th {
+        background: #1e3a8a; color: #fff; text-align: left;
+        padding: 6px 8px; font-weight: 600;
+    }
+    td { border: 1px solid #d1d5db; padding: 5px 8px; vertical-align: top; }
+    tr:nth-child(even) td { background: #f3f6fb; }
+    code {
+        font-family: Consolas, "Courier New", monospace;
+        background: #eef2ff; color: #3730a3;
+        padding: 1px 4px; border-radius: 3px; font-size: 9.5px;
+    }
+    pre {
+        background: #0f172a; color: #e2e8f0; border-radius: 8px;
+        padding: 12px 14px; font-family: Consolas, monospace;
+        font-size: 9.5px; line-height: 1.5; overflow-x: hidden;
+        white-space: pre-wrap;
+    }
+    ul, ol { margin: 6px 0 10px; padding-left: 20px; }
+    li { margin: 3px 0; }
+    .note {
+        background: #fef3c7; border-left: 4px solid #f59e0b;
+        padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 10px 0;
+        font-size: 10.5px;
+    }
+    .ok    { color: #047857; font-weight: 600; }
+    .warn  { color: #b45309; font-weight: 600; }
+    .bad   { color: #b91c1c; font-weight: 600; }
+    .phase {
+        background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px;
+        padding: 10px 14px; margin: 8px 0;
+    }
+    .phase b { color: #065f46; }
+    .pagebreak { page-break-before: always; }
+    footer { margin-top: 24px; color: #6b7280; font-size: 9px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+    <h1>Carland Service — Proje Düzenleme Planı</h1>
+    <p>Paket yapısı, naming ve webhook tekrarları: tespit &amp; çözüm önerileri</p>
+    <p>Kapsam: <code style="background:rgba(255,255,255,.15);color:#fff">src/main/java/com/carland/carland_service</code> (~256 dosya)</p>
+    <p>Tarih: 1 Ağustos 2026</p>
+    <span class="badge">ANALİZ RAPORU — HENÜZ KOD DEĞİŞİKLİĞİ YAPILMADI</span>
+</div>
+
+<h2>Özet</h2>
+<p>Proje çalışır durumda; ancak <b>3 JPA entity ve ~414 satırlık bir service, DTO paketinin içinde yaşıyor</b>,
+webhook tarafında <b>aynı mapping/hesaplama kodu 3 ayrı yerde tekrar ediyor</b> ve paket yapısı 5–6 noktada tutarsız.
+Bu rapor, davranışı değiştirmeden yapılacak taşıma/yeniden adlandırma işlerini, webhook birleştirme fırsatlarını ve
+ölü kod adaylarını 3 fazlı bir plan halinde sunar.</p>
+
+<h2>A. En Kritik Yanlış Yerleşimler</h2>
+<p><code>dto/response/v2</code> paketi gerçekte DTO paketi değil; içinde entity'ler ve komple bir service katmanı var:</p>
+<table>
+    <tr><th>Sınıf</th><th>Gerçekte Ne</th><th>Olması Gereken Yer</th><th>Önerilen Yeni Ad</th></tr>
+    <tr><td><code>dto/response/v2/Visit</code></td><td>JPA <code>@Entity</code> (<code>visits</code> tablosu)</td><td><code>entity/</code></td><td><code>Visit</code> (aynı kalır)</td></tr>
+    <tr><td><code>dto/response/v2/ServiceHistoryV2</code></td><td>JPA <code>@Entity</code> (<code>visit_service_lines</code>)</td><td><code>entity/</code></td><td><code>VisitServiceLine</code></td></tr>
+    <tr><td><code>dto/response/v2/ServiceHistoryPartV2</code></td><td>JPA <code>@Entity</code> (<code>visit_parts</code>)</td><td><code>entity/</code></td><td><code>VisitPart</code></td></tr>
+    <tr><td><code>dto/response/v2/CarVinHistoryServiceV2</code></td><td>Service <b>interface</b></td><td><code>service/</code></td><td><code>VisitHistoryService</code></td></tr>
+    <tr><td><code>dto/response/v2/CarVinHistoryServiceV2Impl</code></td><td>~414 satırlık <code>@Service</code></td><td><code>service/impl/</code></td><td><code>VisitHistoryServiceImpl</code></td></tr>
+</table>
+<div class="note"><b>Güvenlik notu:</b> Taşıma risksizdir — tablo adları <code>@Table</code> ile sabitlendiği için sınıf adı/paket
+değişse de veritabanına dokunulmaz. Ayrıca <code>entity/v2/</code> diye <b>bomboş bir klasör</b> var; silinecek.</div>
+
+<h3>Diğer yanlış yerleşimler</h3>
+<table>
+    <tr><th>Sınıf</th><th>Sorun</th><th>Öneri</th></tr>
+    <tr><td><code>util/Helper</code></td><td>Repo'lara erişen gerçek bir <code>@Service</code></td><td><code>service/impl/UserProvisioningService</code></td></tr>
+    <tr><td><code>util/MailTrapConfig</code></td><td><code>@Configuration</code>; üstelik muhtemelen ölü (mail Brevo'dan gidiyor)</td><td><code>config/</code> veya sil</td></tr>
+    <tr><td><code>util/HmacSignatureValidator</code></td><td>Webhook güvenlik bileşeni</td><td><code>security/</code> (yeni paket)</td></tr>
+    <tr><td><code>util/InternalTokenValidator</code></td><td>Webhook güvenlik bileşeni</td><td><code>security/</code></td></tr>
+    <tr><td><code>util/PushCron</code></td><td>Tüm <code>@Scheduled</code> metodları yorumda, boş kabuk</td><td>Sil ya da <code>scheduler/</code></td></tr>
+    <tr><td><code>service/impl/FirebaseTokenService</code></td><td>Aslında <code>@Configuration</code></td><td><code>config/FirebaseConfig</code></td></tr>
+    <tr><td><code>exceptions/WebhookAuthErrorResponse</code>, <code>exceptions/ResponseException</code></td><td>Exception değil, error-body DTO'su</td><td><code>dto/response/</code> veya <code>exception/dto</code></td></tr>
+    <tr><td><code>dto/response/HyperTokenResponse</code></td><td>Hyper DTO'su ama kökte</td><td><code>dto/response/hyper/</code></td></tr>
+</table>
+
+<h2>B. Naming Düzeltmeleri</h2>
+<table>
+    <tr><th>Mevcut</th><th>Sorun</th><th>Öneri</th></tr>
+    <tr><td><code>...V2</code> ekli 17 sınıf</td><td>Versiyon eki anlam taşımıyor; <code>ServiceHistoryV2</code> adlı şey aslında "visit service line" entity'si</td><td>Bölüm A tablosu + response DTO'ları <code>VisitHistory...Response</code> kalıbına</td></tr>
+    <tr><td><code>controller/Legal</code></td><td>Controller ama suffix yok; 536 satır inline JSON string tutuyor</td><td><code>LegalController</code> (JSON'lar <code>resources/</code> altına — ayrı iş)</td></tr>
+    <tr><td><code>dto/response/FeedBackResponse</code></td><td>Büyük/küçük harf hatası (<code>FeedBack</code>)</td><td><code>FeedbackResponse</code></td></tr>
+    <tr><td><code>enums/</code> paketi</td><td>10 sınıf <code>EnumXxx</code> önekli, 6'sı düz adlı — karışık</td><td>Tek stil: önek kaldır (<code>EnumUserStatus</code> → <code>UserStatus</code> vb.)</td></tr>
+    <tr><td><code>BulkRequest / BulkResponse</code></td><td>Ne bulk'u olduğu belirsiz (push notification)</td><td><code>BulkPushRequest / BulkPushResponse</code></td></tr>
+    <tr><td><code>PercentageResponseMain</code></td><td>"Main" eki anlamsız</td><td><code>PercentageResponse</code></td></tr>
+    <tr><td><code>HyperVehicleByVinResponse</code></td><td>Adı Response ama webhook'ta <b>request body</b> olarak kullanılıyor</td><td>Nötr pakete: <code>dto/hyper/</code></td></tr>
+    <tr><td><code>jwt/</code> paketi</td><td>İçinde JWT'den çok Spring Security config + genel auth filter var</td><td><code>security/</code> altında birleştir</td></tr>
+    <tr><td><code>exceptions/</code></td><td>Standart dışı (tekil <code>exception</code> yaygın) — düşük öncelik</td><td>İsteğe bağlı</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+
+<h2>C. Webhook Tekrarları — Birleştirme Önerileri</h2>
+<ol>
+    <li><b>Ingest ↔ Update impl'leri:</b> <code>PartnerServiceVisitIngestServiceImpl</code> ile
+        <code>PartnerServiceVisitUpdateServiceImpl</code> içinde <code>mapLineToEntity</code>, <code>mapPartToEntity</code>,
+        <code>normalizeUniversalServiceId</code>, <code>recalculateAllTimeCost</code> metodları <b>birebir aynı</b>;
+        giriş bölümü (validate → partner bul → araç bul → metadata uygula) da aynı.
+        <br><span class="ok">Çözüm:</span> Ortak <code>VisitMapper</code> + <code>VisitCostCalculator</code>
+        (ya da tek <code>PartnerVisitSupport</code>) sınıfına çekilir.</li>
+    <li><b>Üç ayrı Hyper→entity mapping:</b> webhook ingest, <code>CarVinHistoryServiceV2Impl.mapHyperItemToVisit</code>
+        ve legacy <code>CarVinHistoryServiceImpl.persistHyperRows</code> aynı alanları üç farklı şekilde map'liyor.
+        <span class="bad">Davranış farkı da var:</span> <code>normalizeUniversalServiceId</code> webhook'ta boş string,
+        V2Impl'de <code>null</code> döndürüyor — sessiz tutarsızlık.
+        <br><span class="ok">Çözüm:</span> Tek mapper, tek davranış.</li>
+    <li><b><code>refreshServicedPartnerIds</code></b> hem ingest impl'de hem V2Impl'de kopya.
+        <br><span class="ok">Çözüm:</span> Ortak yere taşınır.</li>
+    <li><b><code>HyperCostResponse</code> ↔ <code>MoneyResponse</code></b> aynı kavram (amount + currency), iki ad.
+        <br><span class="ok">Çözüm:</span> Tek <code>Money</code> DTO.</li>
+    <li><b><code>LineIngestDetail</code> ↔ <code>LineUpdateDetail</code></b> sadece boolean alan adı farklı iki aynı sınıf.
+        <br><span class="ok">Çözüm:</span> Tek sınıf.</li>
+    <li><b>Partner "aktif mi" kontrolü 3 yerde:</b> signature service, lookup service, token service.
+        <br><span class="ok">Çözüm:</span> <code>PartnerLookupService.requireActivePartner</code>'a toplanır.</li>
+</ol>
+
+<h2>D. Ölü Kod Adayları <span style="font-size:11px;font-weight:400">(silme ayrıca onaya tabi)</span></h2>
+<table>
+    <tr><th>Aday</th><th>Gerekçe</th></tr>
+    <tr><td><code>config/RestTemplateConfig</code></td><td>Tamamen boş sınıf, <code>@Configuration</code> bile değil</td></tr>
+    <tr><td><code>util/MailTrapConfig</code>, <code>util/PushCron</code></td><td>Kullanılmıyor / içi yorumda</td></tr>
+    <tr><td><code>enums/ServiceNameAz</code></td><td>Dosyanın tamamı yorum satırı</td></tr>
+    <tr><td><code>enums/EnumInviteStatus</code>, <code>UICustomExceptionHandler</code>, <code>InviteException</code></td><td>Hiç referans yok / hiç fırlatılmıyor; OTP-password-underage gibi auth-servis artığı exception'lar da aynı durumda</td></tr>
+    <tr><td><code>SuperAdminController</code> + <code>SuperAdminServiceImpl</code> + <code>AppointmentServiceImpl</code></td><td>Endpoint'i yok / metodlar <code>null</code> dönen stub</td></tr>
+    <tr><td><code>WebhookAuthExceptionHandler</code></td><td>Filter 401'i kendisi yazdığı için hiç tetiklenmiyor</td></tr>
+    <tr><td><code>VisitRepository</code>'de 2 query, <code>PartnerLookupService.findById</code>, <code>PartnerNewServiceVisitResult.*Skipped</code> sayaçları</td><td>Hiç çağrılmıyor / hiç set edilmiyor</td></tr>
+    <tr><td>Repo kökündeki <code>carcat-service/</code> klasörü</td><td>Projenin 21.06.2026 tarihli bayat kopyası; yanlışlıkla commit'lenmiş (205 dosya)</td></tr>
+</table>
+
+<h2>E. Hedef Paket Yapısı</h2>
+<pre>com.carland.carland_service
+├── config/          ← OpenApi, Cache, WebhookFilter, Firebase (jwt/util'den toplananlar)
+├── security/        ← CustomFilter, JWTConfiguration, WebhookSignatureFilter,
+│                      Hmac/InternalToken validator, WebhookAuth* (jwt + filter + util birleşir)
+├── controller/
+├── dto/  request | response | hyper     ← v2 paketi kalkar
+├── entity/          ← Visit, VisitServiceLine, VisitPart buraya gelir
+├── enums/           ← Enum öneki kalkmış halde
+├── exception/       ← handler'lar ve error DTO'ları ayrışmış
+├── feign/
+├── repository/
+├── service/         ← interface'ler burada (interfaces/ ve root karışıklığı biter)
+│   ├── impl/
+│   └── webhook/     ← mapper/guard/validator + ortaklaştırılmış mapping
+└── scheduler/       ← (PushCron yaşayacaksa)</pre>
+
+<h2>Uygulama Planı — 3 Faz</h2>
+<div class="phase"><b>Faz 1 — Taşıma / Yeniden Adlandırma:</b> Bölüm A ve B. Davranış değişmez, sadece paket + ad değişir. En güvenli kısım; IDE refactor ile referanslar otomatik güncellenir.</div>
+<div class="phase"><b>Faz 2 — Webhook Dedup:</b> Bölüm C. Ortak mapper'a çekme; <code>normalizeUniversalServiceId</code> tutarsızlığı için tek davranış seçilir ve test edilir.</div>
+<div class="phase"><b>Faz 3 — Ölü Kod Temizliği:</b> Bölüm D. Her silme adayı tek tek onaya sunulur; <code>carcat-service/</code> kopya klasörü de bu fazda <code>git rm</code> ile temizlenir.</div>
+
+<footer>Carland Service — Proje Düzenleme Planı · 1 Ağustos 2026 · Analiz raporudur, kod değişikliği içermez</footer>
+
+</body>
+</html>

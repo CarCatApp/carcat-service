@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 
+/**
+ * tr: Bir aracın servis kalemi bazında bakım yüzdesi durumunu (km/ay yüzdesi, kalan km, son/sonraki servis) döndüren yanıt DTO'su (percentage akışı).
+ * en: Response DTO returning a car's per-service maintenance percentage status (km/month percentage, remaining km, last/next service) in the percentage flow.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

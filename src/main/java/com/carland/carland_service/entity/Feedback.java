@@ -6,6 +6,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 
+/**
+ * tr: "feedbacks" tablosunu modelleyen entity; müşterinin gönderdiği geri bildirimi (tip, konu, açıklama, puan) saklar.
+ * en: Entity modeling the "feedbacks" table; stores feedback submitted by a customer (type, subject, description, rating).
+ */
 @Entity
 @Data
 @Builder

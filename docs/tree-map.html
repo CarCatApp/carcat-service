@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carland service — code tree map</title>
+<style>
+  :root{
+    --blue:#2F6FBF; --purple:#6A5FCF; --green:#4E8A1F;
+    --ink:#1F2937; --muted:#6B7280; --line:#E3E7EE; --bg:#F6F8FA;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:40px 20px 80px;background:var(--bg);color:var(--ink);
+       font:16px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto}
+  h1{font-size:28px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 26px;max-width:70ch}
+  code,.code{font-family:Consolas,"Cascadia Mono",Menlo,monospace}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin:0 0 30px;padding:14px 18px;
+          background:#fff;border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--muted)}
+  .legend .key{display:flex;align-items:center;gap:8px}
+  .swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+  /* namespace card */
+  .ns{background:#fff;border:1px solid var(--line);border-left:6px solid var(--blue);
+      border-radius:12px;padding:22px 22px 14px;margin:0 0 30px}
+  .ns > .nshead{margin:0 0 4px}
+  .ns > .nshead .nsname{color:var(--blue);font-size:20px;font-weight:700}
+  .ns > .nshead .nsdesc{display:block;color:var(--muted);font-size:15px;margin:2px 0 14px}
+  /* class card */
+  .cls{background:#FCFCFF;border:1px solid var(--line);border-left:6px solid var(--purple);
+       border-radius:12px;padding:16px 18px 10px;margin:0 0 16px}
+  .cls .clshead{margin:0 0 10px}
+  .cls .clsname{color:var(--purple);font-size:17px;font-weight:700}
+  .cls .clsdesc{display:block;color:var(--muted);font-size:14.5px;margin-top:2px}
+  /* function rows */
+  .row{display:flex;align-items:baseline;gap:10px;padding:8px 4px;border-top:1px dashed var(--line);flex-wrap:wrap}
+  .row:first-of-type{border-top:none}
+  .sq{width:10px;height:10px;border-radius:2px;background:var(--green);flex:0 0 auto;align-self:center}
+  .desc{flex:1 1 320px;min-width:260px}
+  .code{color:var(--muted);font-size:13.5px;flex:1 1 340px;min-width:280px;text-align:right;word-break:break-word}
+  .chip{flex:0 0 auto;font-size:12.5px;text-decoration:none;border-radius:999px;padding:2px 10px;white-space:nowrap;
+        border:1px solid rgba(78,138,31,.35);color:var(--green);background:#F1F7EA}
+  .chip.zero{border-color:#D3D8E0;color:var(--muted);background:#F2F4F7}
+  .chip:hover{filter:brightness(.95)}
+  footer{color:var(--muted);font-size:13.5px;margin-top:36px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Carland service — code tree map</h1>
+<p class="sub">Every package, class and public method that does real work in this Spring&nbsp;Boot service, each with a plain-English description. The "N checks" badge on a method links to its validation ladder in <a href="validations.html">validations.html</a>. Getters, setters, constructors and boilerplate are omitted.</p>
+
+<div class="legend">
+  <span class="key"><span class="swatch" style="background:#2F6FBF"></span> namespace (package)</span>
+  <span class="key"><span class="swatch" style="background:#6A5FCF"></span> class</span>
+  <span class="key"><span class="swatch" style="background:#4E8A1F"></span> function (public method)</span>
+  <span class="key">badge = number of validations, linked to <span class="code">validations.html</span></span>
+</div>
+
+<!-- ================= SECURITY ================= -->
+<section class="ns">
+  <div class="nshead">
+    <span class="nsname code">com.carland.carland_service.security</span>
+    <span class="nsdesc">The gate of the service. These filters and validators run before any controller — they check tokens and webhook signatures, so their checks are always the first ones a request meets.</span>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">ContentCachingFilter</span><span class="clsdesc">Wraps every request so its body can be read more than once (needed for signature checking and then again by the controller). Runs at highest precedence.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Wraps the request in a re-readable body wrapper and continues the chain.</span><span class="code">doFilterInternal(request, response, filterChain)</span><a class="chip zero" href="validations.html#sec-contentcachingfilter-dofilterinternal">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CustomFilter</span><span class="clsdesc">Security filter on every request; lets webhook and public paths (Swagger, admin UI, legal, etc.) through and returns 401 when the Authorization: Bearer header is missing on protected paths. Actual JWT validation happens at the Kong gateway.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Inspects the request path, lets public/webhook paths through, otherwise requires a Bearer token before continuing.</span><span class="code">doFilterInternal(request, response, filterChain)</span><a class="chip" href="validations.html#sec-customfilter-dofilterinternal">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">WebhookSignatureFilter</span><span class="clsdesc">Authentication filter for /webhook/partner/* requests; validates the internal service token first, then the partner's HMAC signature, and writes a 401 JSON response on failure.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Runs the internal-token and HMAC-signature validations in order; either failure stops the request with 401.</span><span class="code">doFilterInternal(request, response, filterChain)</span><a class="chip" href="validations.html#sec-webhooksignaturefilter-dofilterinternal">2 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">InternalTokenValidator</span><span class="clsdesc">Validates the X-Internal-Token header of service-to-service webhook requests against configuration, using a constant-time comparison.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Checks that the internal token is configured, present and matching; returns a success or failure result.</span><span class="code">validate(request)</span><a class="chip" href="validations.html#sec-internaltokenvalidator-validate">3 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerWebhookSignatureService</span><span class="clsdesc">Performs the HMAC signature validation of partner webhook requests: resolves the partner, checks it is active and configured, then verifies the X-Signature header.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Resolves the partner from the request and verifies the request signature step by step.</span><span class="code">validate(request, body)</span><a class="chip" href="validations.html#sec-partnerwebhooksignatureservice-validate">6 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HmacSignatureValidator</span><span class="clsdesc">Computes and compares HMAC-SHA256 signatures for webhook requests, in constant time to resist timing attacks.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Decides what data to sign: the body when present, otherwise the sorted query parameters.</span><span class="code">resolvePayload(request, body)</span><a class="chip zero" href="validations.html#sec-hmacsignaturevalidator-resolvepayload">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Computes the expected signature and compares it with the one the partner sent.</span><span class="code">isValid(secret, payload, providedSignature)</span><a class="chip" href="validations.html#sec-hmacsignaturevalidator-isvalid">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns a short fingerprint of the payload, used only for debugging in logs.</span><span class="code">sha256Prefix(payload)</span><a class="chip zero" href="validations.html#sec-hmacsignaturevalidator-sha256prefix">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">WebhookAuthResponseWriter</span><span class="clsdesc">Produces the 401 JSON response when webhook authentication fails; puts the error code into the X-Webhook-Auth-Error header.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds the error body from a validation result and writes it as a 401 response.</span><span class="code">writeUnauthorized(response, result)</span><a class="chip zero" href="validations.html#sec-webhookauthresponsewriter-writeunauthorized-1">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Writes a 401 response from failure info alone, without a partner id.</span><span class="code">writeUnauthorized(response, failure)</span><a class="chip zero" href="validations.html#sec-webhookauthresponsewriter-writeunauthorized-2">no checks</a></div>
+  </div>
+</section>
+
+<!-- ================= CONTROLLER ================= -->
+<section class="ns">
+  <div class="nshead">
+    <span class="nsname code">com.carland.carland_service.controller</span>
+    <span class="nsdesc">The HTTP entry points. Controllers receive requests, check that the required headers and body arrived, and hand the real work to the service layer — so most of their business checks live in the matching service implementation.</span>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AdminController</span><span class="clsdesc">MVC controller for the admin panel; handles login/logout, shows paginated car and user lists, and provides Excel (XLSX) exports.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the admin login page, adding an error flag when the error parameter is present.</span><span class="code">loginPage(error, model)</span><a class="chip zero" href="validations.html#ctrl-admin-loginpage">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Validates the username/password against fixed values; success stores an admin session and opens the car list.</span><span class="code">login(username, password, session)</span><a class="chip" href="validations.html#ctrl-admin-login">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Shows the car list page by page with an optional user filter.</span><span class="code">cars(page, userId, session, model)</span><a class="chip" href="validations.html#ctrl-admin-cars">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Downloads all cars as an XLSX file with VIN, plate, brand, model and mileage columns.</span><span class="code">exportCars(session, response)</span><a class="chip" href="validations.html#ctrl-admin-exportcars">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Fetches the user list from the auth service (optionally filtered by date) and paginates it in memory.</span><span class="code">users(page, from, to, session, model)</span><a class="chip" href="validations.html#ctrl-admin-users">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Downloads the auth-service users as an XLSX file, with optional date filters.</span><span class="code">exportUsers(from, to, session, response)</span><a class="chip" href="validations.html#ctrl-admin-exportusers">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Ends the admin session and redirects to the login page.</span><span class="code">logout(session)</span><a class="chip zero" href="validations.html#ctrl-admin-logout">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AppointmentController</span><span class="clsdesc">REST controller for appointments; exposes endpoints to list bookings by date and to create an appointment from the reception. Both delegate to AppointmentService (currently a stub).</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the booking list for a given date; delegates to AppointmentService.getBookingListByDate.</span><span class="code">getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-appointment-getbookinglistbydate">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates an appointment from the reception for a time slot; delegates to AppointmentService.setAppointmentFromReception.</span><span class="code">setAppointmentFromReception(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-appointment-setappointmentfromreception">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AutoServiceController</span><span class="clsdesc">REST endpoints for auto service centers: creating a center, inserting service history, reading a service and adding a service amount. All delegate to AutoServiceService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new auto service center; delegates to AutoServiceServiceImpl.createAutoService.</span><span class="code">createAutoService(autoServiceRequest, token, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-autoservice-createautoservice">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a service history record to a car; delegates to AutoServiceServiceImpl.insertServiceHistory.</span><span class="code">insertServiceHistory(token, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-autoservice-insertservicehistory">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the details of a service record; delegates to AutoServiceServiceImpl.getService.</span><span class="code">getService(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-autoservice-getservice">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds an amount to an existing service record; delegates to AutoServiceServiceImpl.addServiceAmount (currently a stub).</span><span class="code">addServiceAmount(token, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-autoservice-addserviceamount">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CalendarController</span><span class="clsdesc">REST endpoints for the appointment calendar of auto services: create a calendar for a day and read one back. Delegates to CalendarService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a calendar (day plus time slots) for an auto service; delegates to CalendarServiceImpl.createCalendar.</span><span class="code">createCalendar(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-calendar-createcalendar">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the calendar of an auto service for a given day; delegates to CalendarServiceImpl.getCalendarByAutoServiceId.</span><span class="code">getCalendarByDoctorId(token, request, timezone, acceptLanguage, role, phoneNumber, userIdHeader)</span><a class="chip" href="validations.html#ctrl-calendar-getcalendarbydoctorid">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CarController</span><span class="clsdesc">The main REST controller for car management: add/edit/remove cars, VIN lookups, mileage updates, service records, maintenance percentages and service history. Nearly every endpoint delegates to CarService or a history service.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Test endpoint that calls the Hyper partner API directly and returns the raw answer; any error is returned as text.</span><span class="code">testHyperApi(requestk)</span><a class="chip zero" href="validations.html#ctrl-car-testhyperapi">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new car for the customer; delegates to CarServiceImpl.addCar.</span><span class="code">addCar(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-addcar">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Edits the details of an existing car (plate, engine, body, year, etc.); delegates to CarServiceImpl.editCarDetails.</span><span class="code">editCarDetails(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-editcardetails">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Checks whether a VIN is already registered and decodes it when it is new; delegates to CarServiceImpl.checkVin.</span><span class="code">checkVin(vin, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-checkvin">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Removes a car from the customer; delegates to CarServiceImpl.removeCar.</span><span class="code">removeCar(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-removecar">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates the mileage of a car; delegates to CarServiceImpl.updateMileage.</span><span class="code">updateMileage(carRequest, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-updatemileage">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Finds a car by its VIN and returns its details; delegates to CarServiceImpl.getCarByVinCode.</span><span class="code">getCarByVinCode(vin, token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getcarbyvincode">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all cars belonging to the calling customer; delegates to CarServiceImpl.getCarListByUserId.</span><span class="code">getCarListByUserId(token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getcarlistbyuserid">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Recalculates and saves the car's maintenance percentages; delegates to CarServiceImpl.executeServicePercentages.</span><span class="code">executeServicePercentages(token, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-executeservicepercentages">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of maintenance percentages for a car; delegates to CarServiceImpl.getServicePercentageList.</span><span class="code">getServicePercentageList(token, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getservicepercentagelist">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Edits one maintenance percentage record (last/next service date and km); delegates to CarServiceImpl.editPercentage.</span><span class="code">editPercentage(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-editpercentage">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a service record to a car; delegates to CarServiceImpl.addRecord.</span><span class="code">addRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-addrecord">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates an existing service record; delegates to CarServiceImpl.updateRecord.</span><span class="code">updateRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-updaterecord">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns one service record for a car; delegates to CarServiceImpl.getRecord.</span><span class="code">getRecord(token, request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getrecord">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of car colors translated to the requested language; delegates to CarServiceImpl.getColors.</span><span class="code">getColors(acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getcolors">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all service records of a car; delegates to CarServiceImpl.getServiceRecords.</span><span class="code">getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getservicerecords">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the service history of a car by VIN (v1 model); delegates to CarVinHistoryServiceImpl.getServiceHistoryByVin.</span><span class="code">getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getservicehistorybyvin">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the service history of a car by VIN (v2, visit-based model); delegates to VisitHistoryServiceImpl.getServiceHistoryByVin.</span><span class="code">getServiceHistoryByVinV2(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-car-getservicehistorybyvinv2">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Detaches a simulated customer from a car found by VIN (test utility, runs in a transaction).</span><span class="code">removeSimulatedCustomer(vin)</span><a class="chip" href="validations.html#ctrl-car-removesimulatedcustomer">2 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">DeviceTokenController</span><span class="clsdesc">REST endpoints for device push tokens: saving/updating a token and sending a bulk push notification. Delegates to DeviceTokenService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Saves the device token or updates it when it already exists; delegates to DeviceTokenServiceImpl.saveOrUpdateToken.</span><span class="code">saveOrUpdateToken(request)</span><a class="chip" href="validations.html#ctrl-devicetoken-saveorupdatetoken">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Sends a bulk push notification to a list of customers; delegates to DeviceTokenServiceImpl.sendBulk.</span><span class="code">sendBulk(bulkRequest, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-devicetoken-sendbulk">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">FeedbackController</span><span class="clsdesc">REST endpoints for user feedback: submitting feedback (with an optional file) and listing the available feedback types.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Receives the user's feedback with an optional attachment and forwards it by e-mail; delegates to FeedbackServiceImpl.pushFeedback.</span><span class="code">pushFeedback(file, feedbackRequest, rawBody, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-feedback-pushfeedback">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of allowed feedback types (feedback, support, bug report).</span><span class="code">getFeedbackTypeList()</span><a class="chip zero" href="validations.html#ctrl-feedback-getfeedbacktypelist">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">GroupByController</span><span class="clsdesc">Reference-data endpoints for the add-car screen: brands, models, body types, transmissions, engine types and model years. Delegates to GroupByService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of all car brands; delegates to GroupByServiceImpl.getAllBrands.</span><span class="code">getAllBrands(token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-getallbrands">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all brands together with their models (public endpoint); delegates to GroupByServiceImpl.getAllBrandsWithModels.</span><span class="code">getAllBrandsWithModels()</span><a class="chip zero" href="validations.html#ctrl-groupby-getallbrandswithmodels">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the models of a given brand; delegates to GroupByServiceImpl.getModelsByBrand.</span><span class="code">getModelsByBrand(brandId, token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-getmodelsbybrand">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of body types; delegates to GroupByServiceImpl.getBodyTypes.</span><span class="code">getBodyTypes(token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-getbodytypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of transmission types; delegates to GroupByServiceImpl.getTransmissionTypes.</span><span class="code">getTransmissionTypes(token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-gettransmissiontypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of engine types; delegates to GroupByServiceImpl.getEngineTypes.</span><span class="code">getEngineTypes(token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-getenginetypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of model years; delegates to GroupByServiceImpl.getYearList.</span><span class="code">getYearList(token, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-groupby-getyearlist">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">LegalController</span><span class="clsdesc">Public endpoints that serve the terms &amp; conditions and privacy policy as embedded JSON, in Azerbaijani or English.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the terms and conditions JSON in the requested language.</span><span class="code">getTerms(lang)</span><a class="chip" href="validations.html#ctrl-legal-getterms">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the privacy policy JSON in the requested language.</span><span class="code">getPolicy(lang)</span><a class="chip" href="validations.html#ctrl-legal-getpolicy">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Simple liveness test endpoint that returns a fixed string.</span><span class="code">get()</span><a class="chip zero" href="validations.html#ctrl-legal-get">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">MaintenanceTemplateController</span><span class="clsdesc">REST endpoints for maintenance templates: creating one, listing them and adding a service item to a template. Delegates to MaintenanceTemplateService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new maintenance template; delegates to MaintenanceTemplateServiceImpl.createMaintenanceTemplate (currently disabled).</span><span class="code">createMaintenanceTemplate(maintenanceTemplateRequest, token, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-template-createmaintenancetemplate">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all defined maintenance templates; delegates to MaintenanceTemplateServiceImpl.getMaintenanceTemplateList.</span><span class="code">getMaintenanceTemplateList(token, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-template-getmaintenancetemplatelist">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new service item to an existing template; delegates to MaintenanceTemplateServiceImpl.addServiceToTemplate.</span><span class="code">addServiceToTemplate(token, templateId, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-template-addservicetotemplate">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">NotificationController</span><span class="clsdesc">REST endpoints for user notifications: mark as read, soft-delete and list by customer. Delegates to NotificationService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Marks a notification as read; delegates to NotificationServiceImpl.editNotification.</span><span class="code">editNotification(notificationId, setRead, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-notification-editnotification">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Soft-deletes a notification; delegates to NotificationServiceImpl.deleteNotification.</span><span class="code">deleteNotification(notificationId, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-notification-deletenotification">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Lists the active notifications of the calling customer; delegates to NotificationServiceImpl.getNotificationListByCustomerId.</span><span class="code">getNotificationListByCustomerId(userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-notification-getnotificationlistbycustomerid">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerController</span><span class="clsdesc">REST endpoints for business partner records: create and update a partner. Delegates to PartnerService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new partner record; delegates to PartnerServiceImpl.createPartner.</span><span class="code">createPartner(request, token, phoneNumber, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-partner-createpartner">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates an existing partner record; delegates to PartnerServiceImpl.updatePartner.</span><span class="code">updatePartner(request, token, phoneNumber, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-partner-updatepartner">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PhotoController</span><span class="clsdesc">REST endpoints for photos: car photos, user profile pictures, partner logos and partner badge logos (upload, fetch, delete). Delegates to PhotoService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads a photo for a car; delegates to PhotoServiceImpl.uploadCarPhoto.</span><span class="code">uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-uploadcarphoto">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the photo of one of the caller's cars; delegates to PhotoServiceImpl.deleteCarPhoto.</span><span class="code">deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-deletecarphoto">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes a car photo without ownership checks (admin utility); delegates to PhotoServiceImpl.deleteOtherCarPhoto.</span><span class="code">deleteOtherCarPhoto(carId, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-deleteothercarphoto">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the photo of a car as raw image bytes; delegates to PhotoServiceImpl.getCarPhoto.</span><span class="code">getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-getcarphoto">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the logo of a partner; delegates to PhotoServiceImpl.uploadPartnerPhoto.</span><span class="code">uploadPartnerPhoto(file, partnerId)</span><a class="chip" href="validations.html#ctrl-photo-uploadpartnerphoto">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the logo of a partner as raw image bytes; delegates to PhotoServiceImpl.getPartnerPhotoById.</span><span class="code">getPartnerPhotoById(partnerId)</span><a class="chip" href="validations.html#ctrl-photo-getpartnerphotobyid">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the badge logo of a partner; delegates to PhotoServiceImpl.uploadPartnerBadgeLogo.</span><span class="code">uploadPartnerBadgeLogo(file, partnerId)</span><a class="chip" href="validations.html#ctrl-photo-uploadpartnerbadgelogo">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the badge logo of a partner as raw image bytes; delegates to PhotoServiceImpl.getPartnerBadgeLogoById.</span><span class="code">getPartnerBadgeLogoById(partnerId)</span><a class="chip" href="validations.html#ctrl-photo-getpartnerbadgelogobyid">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the caller's profile picture; delegates to PhotoServiceImpl.uploadUserPP.</span><span class="code">uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-uploaduserpp">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the caller's profile picture; delegates to PhotoServiceImpl.deleteUserPP.</span><span class="code">deletePP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-deletepp">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's profile picture as raw image bytes; delegates to PhotoServiceImpl.getUserPP.</span><span class="code">getProfilePicture(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-photo-getprofilepicture">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">RangeController</span><span class="clsdesc">REST endpoints for booking time slots: book an appointment, decide on a booking and cancel a booking. Delegates to RangeService.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Books the given time slot for the calling customer; delegates to RangeServiceImpl.bookAppointment.</span><span class="code">bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-range-bookappointment">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Accepts or rejects a booking; delegates to RangeServiceImpl.decideOnBooking (currently a stub).</span><span class="code">decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-range-decideonbooking">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Cancels a booking on behalf of the customer; delegates to RangeServiceImpl.deleteBookingByCustomer (currently a stub).</span><span class="code">deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-range-deletebookingbycustomer">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">UserController</span><span class="clsdesc">REST endpoints around users: registering user details after sign-up, listing notifications, and two export/report endpoints that read the database directly.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns every customer together with their cars (reads the database directly, no checks).</span><span class="code">getCustomersWithCars()</span><a class="chip zero" href="validations.html#ctrl-user-getcustomerswithcars">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Registers the calling user's details after sign-up; delegates to UserServiceImpl.userAddDetails.</span><span class="code">userAddDetails(token, role, phoneNumber, userIdHeader, timezone, acceptLanguage, inviterId)</span><a class="chip" href="validations.html#ctrl-user-useradddetails">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's notification list; delegates to UserServiceImpl.getNotificationList.</span><span class="code">getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#ctrl-user-getnotificationlist">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Exports all customers and their cars as an XLSX file (public export endpoint).</span><span class="code">exportCustomerCars(response)</span><a class="chip zero" href="validations.html#ctrl-user-exportcustomercars">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">WebhookController</span><span class="clsdesc">Partner webhook endpoints under /webhook/partner. Before any of these run, WebhookSignatureFilter has already verified the internal token and the partner's HMAC signature.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Test endpoint confirming the webhook channel works.</span><span class="code">test()</span><a class="chip zero" href="validations.html#ctrl-webhook-test">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Tells the partner whether a car with the given VIN is registered (200 when found, 404 otherwise).</span><span class="code">findCarByVin(vin, partnerId)</span><a class="chip" href="validations.html#ctrl-webhook-findcarbyvin">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Receives a NEW service visit from the partner; delegates to PartnerServiceVisitIngestServiceImpl.ingest and answers 409 when nothing was created.</span><span class="code">newServiceVisit(httpRequest, request)</span><a class="chip" href="validations.html#ctrl-webhook-newservicevisit">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Receives an UPDATE to an existing service visit; delegates to PartnerServiceVisitUpdateServiceImpl.update and answers 409 when nothing changed.</span><span class="code">updateServiceVisit(httpRequest, request)</span><a class="chip" href="validations.html#ctrl-webhook-updateservicevisit">2 checks</a></div>
+  </div>
+</section>
+
+<!-- ================= SERVICE ================= -->
+<section class="ns">
+  <div class="nshead">
+    <span class="nsname code">com.carland.carland_service.service</span>
+    <span class="nsdesc">The service layer contracts (interfaces) plus three concrete helper services. Interfaces only declare what an operation does — the actual validations live in the implementations in service.impl.</span>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AfterAddCarSyncService</span><span class="clsdesc">Runs the percentage calculation and Hyper partner sync AFTER a car is added — asynchronously and best-effort, so a slow partner never delays the add-car response.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Recalculates percentages and pulls partner history for a freshly added car; every error is caught and logged.</span><span class="code">syncAfterAddCar(carId, vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-afteraddcarsync-syncafteraddcar">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AppointmentService</span><span class="clsdesc">Service contract for appointment operations: listing bookings by date and creating an appointment from the reception desk.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of bookings for the given date, scoped by role and user info.</span><span class="code">getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-appointmentservice-getbookinglistbydate">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates an appointment from the reception desk for the given time slot.</span><span class="code">setAppointmentFromReception(role, phoneNumber, rangeId, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-appointmentservice-setappointmentfromreception">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AutoServiceService</span><span class="clsdesc">Contract for auto service (service point) management: creating a service center, inserting service history, querying service info and adding a service amount.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new auto service record and returns it.</span><span class="code">createAutoService(autoServiceRequest, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-autoserviceservice-createautoservice">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Inserts a service history record for a car and returns it.</span><span class="code">insertServiceHistory(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-autoserviceservice-insertservicehistory">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the details of the requested service record.</span><span class="code">getService(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-autoserviceservice-getservice">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds an amount to an existing service record and returns the updated service.</span><span class="code">addServiceAmount(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-autoserviceservice-addserviceamount">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CalendarService</span><span class="clsdesc">Contract for creating and querying the appointment calendar of auto services.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a calendar (days and time slots) for an auto service and returns it.</span><span class="code">createCalendar(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-calendarservice-createcalendar">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the calendar for the given auto service id, scoped by role.</span><span class="code">getCalendarByAutoServiceId(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-calendarservice-getcalendarbyautoserviceid">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CarService</span><span class="clsdesc">Main contract for car management: adding, removing and updating cars, VIN lookup, mileage updates, service records and maintenance percentage calculation.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new car for the customer and returns the added car.</span><span class="code">addCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-addcar">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Finds a car by its VIN code and returns its details.</span><span class="code">getCarByVinCode(vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getcarbyvincode">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of all cars belonging to the customer.</span><span class="code">getCarListByUserId(phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getcarlistbyuserid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Calculates and saves the car's service percentages based on its maintenance template.</span><span class="code">executeServicePercentages(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-executeservicepercentages">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates the car's mileage and returns the updated car.</span><span class="code">updateMileage(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-updatemileage">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new service record to a car and returns it.</span><span class="code">addRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-addrecord">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates an existing service record and returns the updated record.</span><span class="code">updateRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-updaterecord">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the details of the requested service record.</span><span class="code">getRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getrecord">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Removes (deletes) the car from the customer and returns the result.</span><span class="code">removeCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-removecar">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Checks whether the VIN code is already registered in the system.</span><span class="code">checkVin(vin, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-checkvin">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of defined car colors.</span><span class="code">getColors(acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getcolors">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of service records for a car.</span><span class="code">getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getservicerecords">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Edits the car details (plate, color, etc.) and returns the updated car.</span><span class="code">editCarDetails(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-editcardetails">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of service percentages for a car.</span><span class="code">getServicePercentageList(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-getservicepercentagelist">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Edits a service percentage record (last service date/km, etc.) and returns the updated percentage.</span><span class="code">editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carservice-editpercentage">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Scheduled task: recalculates all cars' percentages and sends the necessary push notifications.</span><span class="code">calculateAndPushNotification()</span><a class="chip zero" href="validations.html#svc-carservice-calculateandpushnotification">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CarVinHistoryService</span><span class="clsdesc">Service contract that returns a car's service history by VIN (v1 model).</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the service history by VIN; customer and car ownership are validated in the implementation.</span><span class="code">getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-carvinhistoryservice-getservicehistorybyvin">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">DeviceTokenService</span><span class="clsdesc">Service contract for saving/updating device push tokens and sending bulk push notifications.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Saves the device token, or updates it if it already exists.</span><span class="code">saveOrUpdateToken(request)</span><a class="chip zero" href="validations.html#svc-devicetokenservice-saveorupdatetoken">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Sends a bulk push notification to registered devices and returns the send result.</span><span class="code">sendBulk(bulkRequest, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-devicetokenservice-sendbulk">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">FeedbackService</span><span class="clsdesc">Service contract for receiving and forwarding user feedback (with an optional file attachment).</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Receives the user's feedback, forwards it by e-mail, and returns the result.</span><span class="code">pushFeedback(file, feedbackRequest, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-feedbackservice-pushfeedback">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">GroupByService</span><span class="clsdesc">Contract providing reference (lookup) data for the add-car screen: brands, models, body types, transmission types, engine types and model years.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of models for the given brand.</span><span class="code">getModelsByBrand(brandId, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-getmodelsbybrand">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of all car brands.</span><span class="code">getAllBrands(timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-getallbrands">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of body types.</span><span class="code">getBodyTypes(timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-getbodytypes">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of transmission types.</span><span class="code">getTransmissionTypes(timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-gettransmissiontypes">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of engine types.</span><span class="code">getEngineTypes(timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-getenginetypes">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of model years.</span><span class="code">getYearList(timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-groupbyservice-getyearlist">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all brands together with their models.</span><span class="code">getAllBrandsWithModels()</span><a class="chip zero" href="validations.html#svc-groupbyservice-getallbrandswithmodels">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HyperPercentageSyncService</span><span class="clsdesc">Applies Hyper (partner) service history onto a car's maintenance percentages. Skips silently instead of failing, so it never breaks the calling flow.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Applies a list of partner visits onto the car's percentages.</span><span class="code">syncFromVisits(car, visits)</span><a class="chip zero" href="validations.html#svc-hyperpercentagesync-syncfromvisits">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Applies a single partner visit onto the car's percentages, forcing re-application.</span><span class="code">syncFromVisit(car, visit)</span><a class="chip zero" href="validations.html#svc-hyperpercentagesync-syncfromvisit">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Read-only lookup of the best matching partner visit line for one service, used when building list views.</span><span class="code">findBestPartnerLineForService(car, serviceNameEn, intervalKm, intervalMonth)</span><a class="chip zero" href="validations.html#svc-hyperpercentagesync-findbestpartnerlineforservice">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">MailService</span><span class="clsdesc">Service contract for e-mail sending operations (feedback mail).</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Sends the feedback content (with a file attachment if provided) to the target address by e-mail.</span><span class="code">sendFeedbackMail(feedbackRequest, file, ticketId, customerPhone)</span><a class="chip zero" href="validations.html#svc-mailservice-sendfeedbackmail">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">MaintenanceTemplateService</span><span class="clsdesc">Contract for creating and listing maintenance templates and adding services to a template.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new maintenance template and returns it.</span><span class="code">createMaintenanceTemplate(maintenanceTemplateRequest, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-maintenancetemplateservice-createmaintenancetemplate">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the list of defined maintenance templates.</span><span class="code">getMaintenanceTemplateList(phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-maintenancetemplateservice-getmaintenancetemplatelist">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new service item to an existing template and returns the updated template.</span><span class="code">addServiceToTemplate(templateId, request, phoneNumber, userIdHeader, roel, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-maintenancetemplateservice-addservicetotemplate">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">NotificationService</span><span class="clsdesc">Contract for marking user notifications as read, deleting them and listing them.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates the read/unread state of a notification and returns it.</span><span class="code">editNotification(notificationId, setRead, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-notificationservice-editnotification">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes a notification and returns the deleted notification.</span><span class="code">deleteNotification(notificationId, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-notificationservice-deletenotification">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the notification list of the customer.</span><span class="code">getNotificationListByCustomerId(userIdHeader, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-notificationservice-getnotificationlistbycustomerid">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerLookupService</span><span class="clsdesc">Looks up partner records and converts them into response objects; also enforces "partner must exist and be active" for webhook flows.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Finds a partner by id; empty result when the id is null or unknown.</span><span class="code">findById(partnerId)</span><a class="chip zero" href="validations.html#svc-partnerlookup-findbyid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the partner only if it exists and is active — otherwise stops the request.</span><span class="code">requireActivePartner(partnerId)</span><a class="chip" href="validations.html#svc-partnerlookup-requireactivepartner">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Finds a partner by its well-known enum id.</span><span class="code">find(partnerId)</span><a class="chip zero" href="validations.html#svc-partnerlookup-find">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Bulk-loads several partners by id, logging any that are missing.</span><span class="code">loadByIds(partnerIds)</span><a class="chip zero" href="validations.html#svc-partnerlookup-loadbyids">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds a partner response for the given id using loaded partners with an enum fallback.</span><span class="code">toDataResponse(partnerId, partnerById)</span><a class="chip zero" href="validations.html#svc-partnerlookup-todataresponse-1">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds a partner response from a partner record or its enum fallback.</span><span class="code">toDataResponse(partner, enumPartner)</span><a class="chip zero" href="validations.html#svc-partnerlookup-todataresponse-2">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the stored partner id or the fallback id when none is stored.</span><span class="code">resolvePartnerId(storedPartnerId, fallback)</span><a class="chip zero" href="validations.html#svc-partnerlookup-resolvepartnerid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Resolves the display name of a partner from the record, the stored name or the fallback.</span><span class="code">resolvePartnerName(storedPartnerId, storedName, partnerById, fallback)</span><a class="chip zero" href="validations.html#svc-partnerlookup-resolvepartnername">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerService</span><span class="clsdesc">Service contract for creating and updating partner records.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new partner record and returns the created partner.</span><span class="code">createPartner(request, phoneNumber, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-partnerservice-createpartner">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates an existing partner record and returns the updated partner.</span><span class="code">updatePartner(request, phoneNumber, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-partnerservice-updatepartner">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerServiceVisitIngestService</span><span class="clsdesc">Contract for ingesting a NEW service visit sent by a partner webhook.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Processes a new-service-visit webhook payload and returns what was created.</span><span class="code">ingest(request)</span><a class="chip zero" href="validations.html#svc-partnervisitingestservice-ingest">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerServiceVisitUpdateService</span><span class="clsdesc">Contract for applying an UPDATE to an existing service visit sent by a partner webhook.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Processes an update-service-visit webhook payload and returns what changed.</span><span class="code">update(request)</span><a class="chip zero" href="validations.html#svc-partnervisitupdateservice-update">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PhotoService</span><span class="clsdesc">Contract for photo management: car photos, user profile pictures, partner logos and badge logos.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads a photo for a car.</span><span class="code">uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-uploadcarphoto">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the photo of one of the caller's cars.</span><span class="code">deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-deletecarphoto">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the caller's profile picture.</span><span class="code">uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-uploaduserpp">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the caller's profile picture.</span><span class="code">deleteUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-deleteuserpp">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the photo of a car as raw image bytes.</span><span class="code">getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-getcarphoto">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's profile picture as raw image bytes.</span><span class="code">getUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-getuserpp">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the logo of a partner.</span><span class="code">uploadPartnerPhoto(file, partnerId)</span><a class="chip zero" href="validations.html#svc-photoservice-uploadpartnerphoto">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the logo of a partner as raw image bytes.</span><span class="code">getPartnerPhotoById(partnerId)</span><a class="chip zero" href="validations.html#svc-photoservice-getpartnerphotobyid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the badge logo of a partner.</span><span class="code">uploadPartnerBadgeLogo(file, partnerId)</span><a class="chip zero" href="validations.html#svc-photoservice-uploadpartnerbadgelogo">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the badge logo of a partner as raw image bytes.</span><span class="code">getPartnerBadgeLogoById(partnerId)</span><a class="chip zero" href="validations.html#svc-photoservice-getpartnerbadgelogobyid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes a car photo without ownership checks (admin utility).</span><span class="code">deleteOtherCarPhoto(carId, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-photoservice-deleteothercarphoto">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PushNotificationService</span><span class="clsdesc">Contract for sending a single push notification to a device.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Sends one push notification with a title and body to the given device token.</span><span class="code">send(title, body, deviceToken)</span><a class="chip zero" href="validations.html#svc-pushnotificationservice-send">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">RangeService</span><span class="clsdesc">Contract for time-slot bookings: book a slot, decide on a booking and cancel a booking.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Books the given time slot for the customer.</span><span class="code">bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-rangeservice-bookappointment">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Accepts or rejects a booking.</span><span class="code">decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-rangeservice-decideonbooking">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Cancels a booking on behalf of the customer.</span><span class="code">deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-rangeservice-deletebookingbycustomer">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">UserService</span><span class="clsdesc">Contract for user registration details and the user's notification list.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Registers or verifies the user record after sign-up, based on the user's role.</span><span class="code">userAddDetails(userId, role, phoneNumber, timezone, acceptLanguage, inviterId)</span><a class="chip zero" href="validations.html#svc-userservice-useradddetails">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's notification list.</span><span class="code">getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-userservice-getnotificationlist">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">VisitHistoryService</span><span class="clsdesc">Service contract that returns a car's service visit history by VIN (visit-based model); reads from the local cache first, otherwise fetches from the Hyper API.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the service history by VIN, validating customer and car ownership in the implementation.</span><span class="code">getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip zero" href="validations.html#svc-visithistoryservice-getservicehistorybyvin">no checks</a></div>
+  </div>
+</section>
+
+<!-- ================= SERVICE.IMPL ================= -->
+<section class="ns">
+  <div class="nshead">
+    <span class="nsname code">com.carland.carland_service.service.impl</span>
+    <span class="nsdesc">The implementations — this is where the business rules and almost all validations physically live. Each method's ladder of checks is listed in validations.html.</span>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AppointmentServiceImpl</span><span class="clsdesc">Implementation of AppointmentService. Both methods are currently stubs that return null.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Stub — returns null; the booking list feature is not implemented yet.</span><span class="code">getBookingListByDate(date, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-appointment-getbookinglistbydate">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Stub — returns null; reception appointment creation is not implemented yet.</span><span class="code">setAppointmentFromReception(role, phoneNumber, rangeId, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-appointment-setappointmentfromreception">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">AutoServiceServiceImpl</span><span class="clsdesc">Implementation of AutoServiceService: creates auto service centers (super admin only) and records service history entered by an admin.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new auto service center owned by the calling super admin.</span><span class="code">createAutoService(autoServiceRequest, phoneNumber, role, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-autoservice-createautoservice">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a service history record for a car, entered by an admin of a service center.</span><span class="code">insertServiceHistory(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-autoservice-insertservicehistory">6 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Reads a service record by name; the body is mostly disabled and returns null.</span><span class="code">getService(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-autoservice-getservice">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Stub — returns null; adding a service amount is not implemented yet.</span><span class="code">addServiceAmount(request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-autoservice-addserviceamount">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">BrevoMailServiceImpl</span><span class="clsdesc">Implementation of MailService that sends the feedback e-mail through the Brevo API, attaching the uploaded file when present.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds the feedback e-mail (subject, HTML body, optional attachment) and posts it to Brevo.</span><span class="code">sendFeedbackMail(request, file, ticketId, customerPhone)</span><a class="chip" href="validations.html#impl-brevomail-sendfeedbackmail">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CalendarServiceImpl</span><span class="clsdesc">Implementation of CalendarService: creates a day calendar with time slots for an auto service and reads calendars back, converting between the client timezone and UTC.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a calendar for one day and slices it into bookable time slots.</span><span class="code">createCalendar(calendarRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-calendar-createcalendar">8 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the calendar of an auto service for a given day and service category.</span><span class="code">getCalendarByAutoServiceId(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-calendar-getcalendarbyautoserviceid">3 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CarServiceImpl</span><span class="clsdesc">The heart of the service: implementation of CarService covering VIN checks, car CRUD, mileage, service records and the maintenance percentage engine.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Checks whether a VIN already exists; returns stored data when it does, otherwise decodes the VIN via the NHTSA service.</span><span class="code">checkVin(vin, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-checkvin">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the color catalog translated and sorted for the requested language.</span><span class="code">getColors(acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getcolors">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all service records of one of the caller's cars.</span><span class="code">getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getservicerecords">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Edits car details field by field (only sent fields change) and saves the car.</span><span class="code">editCarDetails(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-editcardetails">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Scheduled reminder job: sends a service reminder push to every customer with a registered device.</span><span class="code">calculateAndPushNotification()</span><a class="chip zero" href="validations.html#impl-car-calculateandpushnotification">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds the maintenance percentage list for a car, merging template data, customer records, service history and partner data.</span><span class="code">getServicePercentageList(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getservicepercentagelist">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Lets the customer edit one percentage record (dates and km) unless a partner has locked it.</span><span class="code">editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-editpercentage">6 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Recomputes and saves every percentage of a car, preserving manually edited ones and applying partner data when available.</span><span class="code">executeServicePercentages(carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-executeservicepercentages">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new car: validates the request, links or creates the car, seeds its percentage and record rows, then schedules the async partner sync.</span><span class="code">addCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-addcar">14 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Detaches a car from the customer (the car record itself is kept).</span><span class="code">removeCar(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-removecar">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Finds a car by VIN for the calling customer and returns its details.</span><span class="code">getCarByVinCode(vin, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getcarbyvincode">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's cars, newest first, and writes an access log entry.</span><span class="code">getCarListByUserId(phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getcarlistbyuserid">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates a car's mileage; the owner may update their own car, an admin may update any car.</span><span class="code">updateMileage(carRequest, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-updatemileage">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a service record for a car from a template service.</span><span class="code">addRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-addrecord">5 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Updates the date, km and status of an existing service record.</span><span class="code">updateRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-updaterecord">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns one service record found by service id or service name.</span><span class="code">getRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-car-getrecord">4 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">CarVinHistoryServiceImpl</span><span class="clsdesc">Implementation of CarVinHistoryService (v1): serves service history from the local cache and, when empty, fetches it from the Hyper API and persists it.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the service history for a VIN, from cache when possible, otherwise live from Hyper (under a per-car lock).</span><span class="code">getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#impl-carvinhistory-getservicehistorybyvin">3 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">DeviceTokenServiceImpl</span><span class="clsdesc">Implementation of DeviceTokenService: reconciles device tokens (one per user) and sends bulk push notifications, recording each as a notification.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Saves or updates the caller's device token, removing the token from any other user first.</span><span class="code">saveOrUpdateToken(requestToken)</span><a class="chip zero" href="validations.html#impl-devicetoken-saveorupdatetoken">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Sends a push notification to every listed customer with a device, counting successes and failures.</span><span class="code">sendBulk(bulkRequest, acceptLanguage)</span><a class="chip" href="validations.html#impl-devicetoken-sendbulk">3 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">FeedbackServiceImpl</span><span class="clsdesc">Implementation of FeedbackService: stores the feedback, sends it by e-mail and returns a ticket id to the user.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Saves the feedback, e-mails it via the mail service and returns the ticket number.</span><span class="code">pushFeedback(file, feedbackRequest, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#impl-feedback-pushfeedback">2 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">GroupByServiceImpl</span><span class="clsdesc">Implementation of GroupByService: loads reference lists (brands, models, body types, transmissions, engines, years) with translation and an optional "new data set" switch.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the models of a brand from the active data set.</span><span class="code">getModelsByBrand(brandId, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-getmodelsbybrand">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all brands from the active data set.</span><span class="code">getAllBrands(timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-getallbrands">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the active body types, translated to the requested language.</span><span class="code">getBodyTypes(timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-getbodytypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the active transmission types.</span><span class="code">getTransmissionTypes(timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-gettransmissiontypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the active engine types, translated to the requested language.</span><span class="code">getEngineTypes(timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-getenginetypes">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the active model years, newest first.</span><span class="code">getYearList(timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-groupby-getyearlist">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns all brands with their models attached.</span><span class="code">getAllBrandsWithModels()</span><a class="chip zero" href="validations.html#impl-groupby-getallbrandswithmodels">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">Helper</span><span class="clsdesc">Helper service with two jobs: checking/creating user records by role (ADMIN, SUPER_ADMIN, USER) and timezone/date-format utilities used by the calendar and appointment flows.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Checks the user for the given role and creates the record when absent; ADMIN creation requires an inviting super admin with an auto service.</span><span class="code">checkOrCreateUserByRole(userId, role, phoneNumber, name, surname, acceptLanguage, inviterId)</span><a class="chip" href="validations.html#impl-helper-checkorcreateuserbyrole">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Converts a date, time and timezone into a UTC timestamp.</span><span class="code">getUtcTimeFromDayAndTimeAndTimeZone(date, time, timezone)</span><a class="chip zero" href="validations.html#impl-helper-getutctime">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the day part of a UTC timestamp.</span><span class="code">getUtcDayFromUtcTime(utcTime)</span><a class="chip zero" href="validations.html#impl-helper-getutcday">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Converts a UTC timestamp to the local time in the given timezone.</span><span class="code">getLocalTimeFromUtcUseTZ(utcDateTime, timezone)</span><a class="chip zero" href="validations.html#impl-helper-getlocaltime">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Formats an appointment time as "dd MMM yyyy HH:mm" in the requested language.</span><span class="code">formatAppointmentDate(dateTime, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-helper-formatappointmentdate-1">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Converts a UTC timestamp to a timestamp in the given timezone (system default when timezone is null).</span><span class="code">getLocalDateTimeFromUtcUseTZ(utcDateTime, timezone)</span><a class="chip zero" href="validations.html#impl-helper-getlocaldatetime">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Formats an appointment date-time as "dd MMM yyyy HH:mm" in the requested language.</span><span class="code">formatAppointmentDate(dateTime, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-helper-formatappointmentdate-2">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HyperTokenService</span><span class="clsdesc">Manages OAuth tokens for outbound partner API calls (currently Hyper); caches tokens and refreshes them every 59 minutes.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Scheduled refresh: fetches a fresh token for the Hyper partner and caches it.</span><span class="code">refreshToken()</span><a class="chip zero" href="validations.html#impl-hypertoken-refreshtoken">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the cached Hyper token, fetching a new one when the cache is empty.</span><span class="code">getToken()</span><a class="chip zero" href="validations.html#impl-hypertoken-gettoken-1">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the cached token for a partner, fetching and validating credentials when needed; failures are logged and null is returned.</span><span class="code">getToken(partnerId)</span><a class="chip" href="validations.html#impl-hypertoken-gettoken-2">4 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">MaintenanceTemplateServiceImpl</span><span class="clsdesc">Implementation of MaintenanceTemplateService: lists templates and adds service items to a template. Template creation is currently disabled.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Disabled — the creation logic is commented out and the method always returns null.</span><span class="code">createMaintenanceTemplate(request, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-template-createmaintenancetemplate">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Fetches all maintenance templates and converts them to language-aware responses.</span><span class="code">getMaintenanceTemplateList(phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-template-getmaintenancetemplatelist">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Adds a new service item to the given template and returns the updated template with its service list.</span><span class="code">addServiceToTemplate(templateId, request, phoneNumber, userIdHeader, role, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-template-addservicetotemplate">4 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">NotificationServiceImpl</span><span class="clsdesc">Implementation of NotificationService: marks notifications as read, soft-deletes them and lists a customer's active notifications.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Marks the notification as read and saves it.</span><span class="code">editNotification(notificationId, setRead, acceptLanguage)</span><a class="chip" href="validations.html#impl-notification-editnotification">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Soft-deletes the notification by setting its status to inactive.</span><span class="code">deleteNotification(notificationId, acceptLanguage)</span><a class="chip" href="validations.html#impl-notification-deletenotification">1 check</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Lists the customer's notifications that are still active.</span><span class="code">getNotificationListByCustomerId(userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#impl-notification-getnotificationlistbycustomerid">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerServiceImpl</span><span class="clsdesc">Implementation of PartnerService: creates and updates partner records with super-admin authorization, enforcing uniqueness of the name + source pair.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Creates a new partner; the active flag defaults to true when not provided.</span><span class="code">createPartner(request, phoneNumber, acceptLanguage)</span><a class="chip" href="validations.html#impl-partner-createpartner">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Partially updates an existing partner — only sent fields change.</span><span class="code">updatePartner(request, phoneNumber, acceptLanguage)</span><a class="chip" href="validations.html#impl-partner-updatepartner">4 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerServiceVisitIngestServiceImpl</span><span class="clsdesc">Handles NEW service visits arriving from the partner webhook: validates the payload, resolves partner and car, persists the visit and refreshes the car's totals and percentage sync.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Processes the webhook payload, saves the new visit with its lines and parts, and returns the created record counts.</span><span class="code">ingest(request)</span><a class="chip" href="validations.html#impl-partnervisitingest-ingest">4 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerServiceVisitUpdateServiceImpl</span><span class="clsdesc">Handles UPDATES to existing service visits from the partner webhook: finds the visit by record id, writes only changed fields, merges lines and parts, and re-syncs totals when something changed.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Processes the update payload, merges visit fields, lines and parts, and reports what changed.</span><span class="code">update(request)</span><a class="chip" href="validations.html#impl-partnervisitupdate-update">5 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PhotoServiceImpl</span><span class="clsdesc">Implementation of PhotoService for car, user and partner photos. Uploads verify the real content type with Tika and check the file name for path-traversal attacks.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the car photo as image bytes with the right content type.</span><span class="code">getCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-getcarphoto">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's profile picture as image bytes with the right content type.</span><span class="code">getUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-getuserpp">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the partner logo, replacing any existing one after safety and image-type checks.</span><span class="code">uploadPartnerPhoto(file, partnerId)</span><a class="chip" href="validations.html#impl-photo-uploadpartnerphoto">5 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the partner logo as image bytes.</span><span class="code">getPartnerPhotoById(partnerId)</span><a class="chip" href="validations.html#impl-photo-getpartnerphotobyid">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the partner badge logo, replacing any existing one after safety and image-type checks.</span><span class="code">uploadPartnerBadgeLogo(file, partnerId)</span><a class="chip" href="validations.html#impl-photo-uploadpartnerbadgelogo">5 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the partner badge logo as image bytes.</span><span class="code">getPartnerBadgeLogoById(partnerId)</span><a class="chip" href="validations.html#impl-photo-getpartnerbadgelogobyid">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes a car photo without checking ownership (admin utility).</span><span class="code">deleteOtherCarPhoto(carId, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-deleteothercarphoto">3 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads a photo for one of the caller's cars, replacing any existing photo.</span><span class="code">uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-uploadcarphoto">7 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the photo of one of the caller's cars.</span><span class="code">deleteCarPhoto(role, carId, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-deletecarphoto">5 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Uploads the caller's profile picture, replacing any existing one.</span><span class="code">uploadUserPP(file, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-uploaduserpp">4 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Deletes the caller's profile picture.</span><span class="code">deleteUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-deleteuserpp">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Rejects uploaded files whose name contains ".." (path-traversal protection).</span><span class="code">checkAttack(file, acceptLanguage)</span><a class="chip" href="validations.html#impl-photo-checkattack">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PushNotificationServiceImpl</span><span class="clsdesc">Implementation of PushNotificationService that sends a single push notification through Firebase Cloud Messaging.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Builds and sends one Firebase message to the given device token.</span><span class="code">send(title, body, deviceToken)</span><a class="chip" href="validations.html#impl-pushnotification-send">1 check</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">RangeServiceImpl</span><span class="clsdesc">Implementation of RangeService: books time slots for customers, enforcing capacity, break times and one-booking-per-day rules. Decision and cancellation are currently stubs.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Books the given time slot for the customer and marks the slot full when capacity is reached.</span><span class="code">bookAppointment(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-range-bookappointment">8 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Stub — returns null; booking decision handling is disabled.</span><span class="code">decideOnBooking(rangeId, accepted, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-range-decideonbooking">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Stub — returns null; customer cancellation is disabled.</span><span class="code">deleteBookingByCustomer(rangeId, role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-range-deletebookingbycustomer">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Converts an appointment entity into the response model with local times and formatted dates.</span><span class="code">convertToResponse(appointment, timezone, acceptLanguage)</span><a class="chip zero" href="validations.html#impl-range-converttoresponse">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">UserServiceImpl</span><span class="clsdesc">Implementation of UserService: registers the user record by role after sign-up (fetching name/surname from the auth service) and lists the user's notifications.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Fetches the user's name from the auth service and creates or verifies the role-specific user record.</span><span class="code">userAddDetails(userId, role, phoneNumber, timezone, acceptLanguage, inviterId)</span><a class="chip" href="validations.html#impl-user-useradddetails">2 checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the caller's notifications as lightweight response objects.</span><span class="code">getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage)</span><a class="chip" href="validations.html#impl-user-getnotificationlist">2 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">VinService</span><span class="clsdesc">Decodes VIN numbers through the public NHTSA API and maps the raw answer to brand, model, year, body, transmission, engine volume and engine type.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Calls the NHTSA decoder for a VIN and returns the raw result.</span><span class="code">decodeVin(vin)</span><a class="chip zero" href="validations.html#impl-vin-decodevin">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Extracts the useful car fields (brand, model, year, engine, etc.) from the decoder answer.</span><span class="code">extractFieldsFromVin(vin)</span><a class="chip zero" href="validations.html#impl-vin-extractfieldsfromvin">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Converts an engine displacement value (liters or cc) into cubic centimeters; returns null when unparseable.</span><span class="code">parseEngineVolumeCc(raw)</span><a class="chip zero" href="validations.html#impl-vin-parseenginevolumecc">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">VisitHistoryServiceImpl</span><span class="clsdesc">Implementation of VisitHistoryService (v2): uses the visits table as a cache, fetches live data from the Hyper API when empty, and triggers percentage sync and partner-list refresh.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Returns the visit-based service history for a VIN, from cache or live from Hyper, then syncs percentages.</span><span class="code">getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage)</span><a class="chip" href="validations.html#impl-visithistory-getservicehistorybyvin">3 checks</a></div>
+  </div>
+</section>
+
+<!-- ================= SERVICE.WEBHOOK ================= -->
+<section class="ns">
+  <div class="nshead">
+    <span class="nsname code">com.carland.carland_service.service.webhook</span>
+    <span class="nsdesc">Support classes for the partner webhook flows: payload validation, duplicate guards, DTO-to-entity mapping and shared cost calculations.</span>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HyperServiceVisitValidator</span><span class="clsdesc">Static validator for incoming webhook payloads: enforces that exactly one complete service visit is present with all required fields.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Validates the whole webhook payload field by field before any processing happens.</span><span class="code">validateSingleVisit(request)</span><a class="chip" href="validations.html#whk-validator-validatesinglevisit">12 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HyperWebhookCarMetadataApplier</span><span class="clsdesc">Copies non-empty car fields (plate, mileage, brand, model, year, body, engine) from the webhook payload onto the stored car and saves it when anything changed.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Applies the partner's car metadata onto the stored car record.</span><span class="code">apply(car, hyper)</span><a class="chip zero" href="validations.html#whk-metadataapplier-apply">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">HyperWebhookIngestMapper</span><span class="clsdesc">Static mapper converting the raw Hyper webhook payload into the internal visit-history model.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Maps the single visit in the payload to an internal visit item.</span><span class="code">toSingleVisitItem(hyper, partner)</span><a class="chip zero" href="validations.html#whk-ingestmapper-tosinglevisititem">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Maps the whole payload to the internal ingest request model.</span><span class="code">toIngestRequest(hyper, partner)</span><a class="chip zero" href="validations.html#whk-ingestmapper-toingestrequest">no checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">PartnerVisitIngestGuard</span><span class="clsdesc">Guard that stops duplicate webhook ingests: rejects visits whose record id already exists and payloads that repeat a service code.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Asserts that the incoming visit is genuinely new for this car.</span><span class="code">assertNewVisit(carId, item)</span><a class="chip" href="validations.html#whk-guard-assertnewvisit">2 checks</a></div>
+  </div>
+
+  <div class="cls">
+    <div class="clshead"><span class="clsname code">VisitWebhookSupport</span><span class="clsdesc">Shared helpers of the webhook ingest and update services: DTO-to-entity mapping, id normalization and total-cost recalculation.</span></div>
+    <div class="row"><span class="sq"></span><span class="desc">Maps a webhook service line to its database entity.</span><span class="code">mapLineToEntity(line)</span><a class="chip zero" href="validations.html#whk-support-maplinetoentity">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Maps a webhook part to its database entity.</span><span class="code">mapPartToEntity(part)</span><a class="chip zero" href="validations.html#whk-support-mapparttoentity">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Normalizes the universal service id — blanks and the "other" placeholder become an empty string.</span><span class="code">normalizeUniversalServiceId(raw)</span><a class="chip zero" href="validations.html#whk-support-normalizeuniversalserviceid">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Recalculates and saves the car's all-time cost by summing all its visits.</span><span class="code">recalculateAllTimeCost(car)</span><a class="chip zero" href="validations.html#whk-support-recalculatealltimecost">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Resolves one visit's total (final cost first, then cost, else zero).</span><span class="code">resolveVisitFinalCost(visit)</span><a class="chip zero" href="validations.html#whk-support-resolvevisitfinalcost">no checks</a></div>
+    <div class="row"><span class="sq"></span><span class="desc">Compares two decimal amounts ignoring scale; two nulls count as equal.</span><span class="code">decimalEquals(left, right)</span><a class="chip zero" href="validations.html#whk-support-decimalequals">no checks</a></div>
+  </div>
+</section>
+
+<footer>Generated from <span class="code">src/main/java/com/carland/carland_service</span> — 5 packages, 72 classes, 254 functions. Companion file: <a href="validations.html">validations.html</a> (291 validation rules).</footer>
+</div>
+</body>
+</html>

@@ -2,14 +2,13 @@ package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.entity.*;
-import com.carland.carland_service.enums.EnumMessagesLangValues;
-import com.carland.carland_service.enums.EnumUserRoles;
-import com.carland.carland_service.enums.EnumUserStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.UserRoles;
+import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
-import com.carland.carland_service.service.interfaces.PhotoService;
+import com.carland.carland_service.service.PhotoService;
 
-import com.carland.carland_service.util.CustomImageCrop;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +21,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 
+/**
+ * tr: Araç, kullanıcı profil ve partner fotoğraflarını (logo ve badge logo dahil) yöneten servis; fotoğraf yükleme, getirme ve silme işlemlerini yapar. Yüklemelerde Tika ile içerik tipini doğrular ve dosya adında path traversal saldırısı kontrolü yapar.
+ * en: Service managing car, user profile and partner photos (including logo and badge logo); handles upload, retrieval and deletion. On uploads it verifies the content type with Tika and checks the file name for path traversal attacks.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,6 +37,10 @@ public class PhotoServiceImpl implements PhotoService {
     private final PartnerRepository partnerRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
+    /**
+     * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
+     * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
+     */
     @Override
     public ResponseEntity<byte[]> getCarPhoto(
             String role,
@@ -45,14 +52,14 @@ public class PhotoServiceImpl implements PhotoService {
 
         if (role == null || phoneNumber == null || userIdHeader == null) {
             throw new MissingFieldException(
-                    EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         CarPhoto carPhoto = carPhotoRepository.findByCarId(carId);
 
         if (carPhoto == null) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.CAR_PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.CAR_PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         String fileType = carPhoto.getFileType();
         log.info("file type ============================== {}", fileType);
@@ -72,18 +79,22 @@ public class PhotoServiceImpl implements PhotoService {
                 .body(carPhoto.getImageData());
     }
 
+    /**
+     * tr: Kullanıcının profil fotoğrafını userId + telefon numarasıyla bulup uygun Content-Type ile döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
+     * en: Finds the user's profile photo by userId + phone number and returns it with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
+     */
     @Override
     public ResponseEntity<byte[]> getUserPP(String role, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
         if (role == null || phoneNumber == null || userIdHeader == null) {
             throw new MissingFieldException(
-                    EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         UserPhoto userPhoto = userPhotoRepository.findByUserIdAndUserPhoneNumber(Long.valueOf(userIdHeader), phoneNumber);
 
         if (userPhoto == null) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.CAR_PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.CAR_PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         String fileType = userPhoto.getFileType();
@@ -104,11 +115,15 @@ public class PhotoServiceImpl implements PhotoService {
                 .body(userPhoto.getImageData());
     }
 
+    /**
+     * tr: Partner logosunu yükler; mevcut fotoğraf varsa siler, Tika ile içerik tipini kontrol eder (görsel değilse InvalidStatusException) ve yenisini kaydeder. file/partnerId eksikse MissingFieldException, partner bulunamazsa ResourceNotFoundException, IO hatasında FileStorageException fırlatır.
+     * en: Uploads the partner logo; deletes the existing photo if present, verifies the content type with Tika (InvalidStatusException if not an image), and saves the new one. Throws MissingFieldException when file/partnerId is missing, ResourceNotFoundException when the partner is not found, and FileStorageException on IO errors.
+     */
     @Override
     @Transactional
     public PhotoResponse uploadPartnerPhoto(MultipartFile file, Long partnerId) {
         if (file == null || partnerId == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(null));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
         Partner partner = partnerRepository.findById(partnerId)
@@ -127,7 +142,7 @@ public class PhotoServiceImpl implements PhotoService {
             String detectedType = tika.detect(file.getBytes());
 
             if (!detectedType.startsWith("image/")) {
-                throw new InvalidStatusException(EnumMessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
+                throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
             }
 
             String fileType = detectedType.substring("image/".length());
@@ -142,24 +157,28 @@ public class PhotoServiceImpl implements PhotoService {
             partnerPhotoRepository.save(partnerPhoto);
 
             return PhotoResponse.builder()
-                    .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
                     .build();
         } catch (IOException e) {
-            throw new FileStorageException(EnumMessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
         }
     }
 
+    /**
+     * tr: Verilen partnerId'ye ait partner logosunu uygun Content-Type ile döner. partnerId null ise MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
+     * en: Returns the partner logo for the given partnerId with the proper Content-Type. Throws MissingFieldException if partnerId is null and ResourceNotFoundException if the photo does not exist.
+     */
     @Override
     public ResponseEntity<byte[]> getPartnerPhotoById(Long partnerId) {
         if (partnerId == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(null));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
         PartnerPhoto partnerPhoto = partnerPhotoRepository.findByPartnerId(partnerId);
 
         if (partnerPhoto == null) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+                    MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
         }
 
         String fileType = partnerPhoto.getFileType();
@@ -181,11 +200,15 @@ public class PhotoServiceImpl implements PhotoService {
                 .body(partnerPhoto.getImageData());
     }
 
+    /**
+     * tr: Partner badge (rozet) logosunu yükler; mevcut logo varsa siler, Tika ile içerik tipini kontrol eder (görsel değilse InvalidStatusException) ve yenisini kaydeder. file/partnerId eksikse MissingFieldException, partner bulunamazsa ResourceNotFoundException, IO hatasında FileStorageException fırlatır.
+     * en: Uploads the partner badge logo; deletes the existing logo if present, verifies the content type with Tika (InvalidStatusException if not an image), and saves the new one. Throws MissingFieldException when file/partnerId is missing, ResourceNotFoundException when the partner is not found, and FileStorageException on IO errors.
+     */
     @Override
     @Transactional
     public PhotoResponse uploadPartnerBadgeLogo(MultipartFile file, Long partnerId) {
         if (file == null || partnerId == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(null));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
         Partner partner = partnerRepository.findById(partnerId)
@@ -204,7 +227,7 @@ public class PhotoServiceImpl implements PhotoService {
             String detectedType = tika.detect(file.getBytes());
 
             if (!detectedType.startsWith("image/")) {
-                throw new InvalidStatusException(EnumMessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
+                throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
             }
 
             String fileType = detectedType.substring("image/".length());
@@ -219,24 +242,28 @@ public class PhotoServiceImpl implements PhotoService {
             partnerBadgeLogoRepository.save(partnerBadgeLogo);
 
             return PhotoResponse.builder()
-                    .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
                     .build();
         } catch (IOException e) {
-            throw new FileStorageException(EnumMessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
         }
     }
 
+    /**
+     * tr: Verilen partnerId'ye ait badge logosunu uygun Content-Type ile döner. partnerId null ise MissingFieldException, logo yoksa ResourceNotFoundException fırlatır.
+     * en: Returns the badge logo for the given partnerId with the proper Content-Type. Throws MissingFieldException if partnerId is null and ResourceNotFoundException if the logo does not exist.
+     */
     @Override
     public ResponseEntity<byte[]> getPartnerBadgeLogoById(Long partnerId) {
         if (partnerId == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(null));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
         PartnerBadgeLogo partnerBadgeLogo = partnerBadgeLogoRepository.findByPartnerId(partnerId);
 
         if (partnerBadgeLogo == null) {
             throw new ResourceNotFoundException(
-                    EnumMessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+                    MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
         }
 
         String fileType = partnerBadgeLogo.getFileType();
@@ -258,10 +285,14 @@ public class PhotoServiceImpl implements PhotoService {
                 .body(partnerBadgeLogo.getImageData());
     }
 
+    /**
+     * tr: Sahiplik kontrolü yapmadan verilen carId'ye ait araç fotoğrafını siler (admin/dahili kullanım). acceptLanguage null ise MissingFieldException, araç veya fotoğraf bulunamazsa ResourceNotFoundException fırlatır.
+     * en: Deletes the car photo for the given carId without ownership checks (admin/internal use). Throws MissingFieldException if acceptLanguage is null and ResourceNotFoundException if the car or photo is not found.
+     */
     @Override
     public PhotoResponse deleteOtherCarPhoto(Long carId, String acceptLanguage) {
         if ( acceptLanguage == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
 
@@ -269,46 +300,50 @@ public class PhotoServiceImpl implements PhotoService {
         Car car = carRepository.findByCarId(carId);
 
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         CarPhoto carPhoto = carPhotoRepository.findByCarId(carId);
 
         if (carPhoto == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         carPhotoRepository.delete(carPhoto);
 
         return PhotoResponse.builder()
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
 
+    /**
+     * tr: Kullanıcının kendi aracına fotoğraf yükler; rolün USER olmasını şart koşar (değilse InvalidStatusException), aktif müşteriyi ve müşteriye ait aracı doğrular (UserNotFoundException/ResourceNotFoundException), mevcut fotoğrafı silip Tika kontrolünden geçen yenisini kaydeder. Parametreler eksikse MissingFieldException, IO hatasında FileStorageException fırlatır.
+     * en: Uploads a photo to the user's own car; requires the USER role (InvalidStatusException otherwise), validates the active customer and that the car belongs to them (UserNotFoundException/ResourceNotFoundException), deletes any existing photo and saves the new Tika-verified one. Throws MissingFieldException for missing parameters and FileStorageException on IO errors.
+     */
     @Override
     @Transactional
     public PhotoResponse uploadCarPhoto(MultipartFile file, Long carId, String role, String phoneNumber, String userIdHeader,
                                         String timezone, String acceptLanguage) {
         if (file == null || role == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        if (!role.equals(EnumUserRoles.USER.name())) {
-            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        if (!role.equals(UserRoles.USER.name())) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
 
         Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
-                phoneNumber, EnumUserStatus.ACTIVE.name());
+                phoneNumber, UserStatus.ACTIVE.name());
 
         if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car car = carRepository.findByCarIdAndCustomer(carId, customer);
 
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         try {
@@ -324,7 +359,7 @@ public class PhotoServiceImpl implements PhotoService {
             String detectedType = tika.detect(file.getBytes());
 
             if (!detectedType.startsWith("image/")) {
-                throw new InvalidStatusException(EnumMessagesLangValues.INVALID_PHOTO_FORMAT
+                throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT
                         .getMessageByLang(acceptLanguage));
             }
 
@@ -343,52 +378,60 @@ public class PhotoServiceImpl implements PhotoService {
             carPhotoRepository.save(carPhoto);
 
             return PhotoResponse.builder()
-                    .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                     .build();
         } catch (IOException e) {
-            throw new FileStorageException(EnumMessagesLangValues.FILE_CANT_SET.getMessageByLang(acceptLanguage));
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(acceptLanguage));
         }
     }
 
+    /**
+     * tr: Kullanıcının kendi aracının fotoğrafını siler; USER rolü şarttır (InvalidStatusException), aktif müşteri ve müşteriye ait araç doğrulanır (UserNotFoundException/ResourceNotFoundException), fotoğraf yoksa ResourceNotFoundException fırlatır. Header'lar eksikse MissingFieldException oluşur.
+     * en: Deletes the photo of the user's own car; requires the USER role (InvalidStatusException), validates the active customer and car ownership (UserNotFoundException/ResourceNotFoundException), and throws ResourceNotFoundException if no photo exists. Missing headers cause a MissingFieldException.
+     */
     @Override
     public PhotoResponse deleteCarPhoto(String role, Long carId, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
 
         if (role == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
-        if (!role.equals(EnumUserRoles.USER.name())) {
-            throw new InvalidStatusException(EnumMessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        if (!role.equals(UserRoles.USER.name())) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
 
         Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
-                phoneNumber, EnumUserStatus.ACTIVE.name());
+                phoneNumber, UserStatus.ACTIVE.name());
 
         if (customer == null) {
-            throw new UserNotFoundException(EnumMessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         Car car = carRepository.findByCarIdAndCustomer(carId, customer);
 
         if (car == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         CarPhoto carPhoto = carPhotoRepository.findByCarId(carId);
 
         if (carPhoto == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         carPhotoRepository.delete(carPhoto);
 
         return PhotoResponse.builder()
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
+    /**
+     * tr: Kullanıcının profil fotoğrafını yükler; mevcut fotoğraf varsa siler, Tika ile içerik tipini doğrular (görsel değilse InvalidStatusException) ve yenisini kaydeder. Parametreler eksikse MissingFieldException, IO hatasında FileStorageException fırlatır.
+     * en: Uploads the user's profile photo; deletes the existing one if present, verifies the content type with Tika (InvalidStatusException if not an image), and saves the new photo. Throws MissingFieldException for missing parameters and FileStorageException on IO errors.
+     */
     @Override
     public PhotoResponse uploadUserPP(MultipartFile file, String role, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
         if (file == null || role == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
         try {
             checkAttack(file, acceptLanguage);
@@ -401,7 +444,7 @@ public class PhotoServiceImpl implements PhotoService {
             String detectedType = tika.detect(file.getBytes());
 
             if (!detectedType.startsWith("image/")) {
-                throw new InvalidStatusException(EnumMessagesLangValues.INVALID_PHOTO_FORMAT
+                throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT
                         .getMessageByLang(acceptLanguage));
             }
 
@@ -421,38 +464,46 @@ public class PhotoServiceImpl implements PhotoService {
             userPhotoRepository.save(newPhoto);
 
             return PhotoResponse.builder()
-                    .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                     .build();
 
         } catch (IOException e) {
-            throw new FileStorageException(EnumMessagesLangValues.FILE_CANT_SET.getMessageByLang(acceptLanguage));
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(acceptLanguage));
         }
     }
 
+    /**
+     * tr: Kullanıcının profil fotoğrafını siler. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır; başarıda mesaj içeren PhotoResponse döner.
+     * en: Deletes the user's profile photo. Throws MissingFieldException for missing headers and ResourceNotFoundException if no photo exists; returns a PhotoResponse with a success message.
+     */
     @Override
     public PhotoResponse deleteUserPP(String role, String phoneNumber, String userIdHeader, String timezone,
                                       String acceptLanguage) {
         if (role == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
-            throw new MissingFieldException(EnumMessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         UserPhoto userPhoto = userPhotoRepository.findByUserIdAndUserPhoneNumber(Long.valueOf(userIdHeader), phoneNumber);
 
         if (userPhoto == null) {
-            throw new ResourceNotFoundException(EnumMessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         userPhotoRepository.delete(userPhoto);
 
         return PhotoResponse.builder()
-                .message(EnumMessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
 
+    /**
+     * tr: Yüklenen dosyanın adında ".." (path traversal) olup olmadığını kontrol eder; varsa MissingFieldException fırlatır.
+     * en: Checks whether the uploaded file's name contains ".." (path traversal); throws MissingFieldException if it does.
+     */
     public void checkAttack(MultipartFile file, String acceptLanguage) {
         if (file.getOriginalFilename().contains("..")) {
-            throw new MissingFieldException(EnumMessagesLangValues.INVALID_PHOTO_NAME.getMessageByLang(acceptLanguage));
+            throw new MissingFieldException(MessagesLangValues.INVALID_PHOTO_NAME.getMessageByLang(acceptLanguage));
 
         }
     }

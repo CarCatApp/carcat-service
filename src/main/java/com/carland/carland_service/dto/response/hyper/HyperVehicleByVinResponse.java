@@ -6,6 +6,10 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * tr: Hyper API'nin VIN ile araç sorgusu endpoint'inden dönen yanıtı (araç bilgileri ve servis geçmişi) eşleyen DTO.
+ * en: DTO mapping the response of the Hyper API vehicle-by-VIN lookup endpoint (vehicle info and service history).
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonPropertyOrder({

@@ -1,16 +1,16 @@
 package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
-import com.carland.carland_service.dto.response.v2.LineUpdateDetail;
-import com.carland.carland_service.dto.response.v2.MoneyResponse;
-import com.carland.carland_service.dto.response.v2.PartUpdateDetail;
-import com.carland.carland_service.dto.response.v2.PartnerUpdateServiceVisitResult;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryLineV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryPartV2;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryPartV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryVisitV2Response;
-import com.carland.carland_service.dto.response.v2.ServiceHistoryV2;
-import com.carland.carland_service.dto.response.v2.Visit;
+import com.carland.carland_service.dto.webhook.LineUpdateDetail;
+import com.carland.carland_service.dto.response.MoneyResponse;
+import com.carland.carland_service.dto.webhook.PartUpdateDetail;
+import com.carland.carland_service.dto.webhook.PartnerUpdateServiceVisitResult;
+import com.carland.carland_service.dto.response.VisitServiceLineResponse;
+import com.carland.carland_service.entity.VisitPart;
+import com.carland.carland_service.dto.response.VisitPartResponse;
+import com.carland.carland_service.dto.response.VisitHistoryItemResponse;
+import com.carland.carland_service.entity.VisitServiceLine;
+import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -19,9 +19,10 @@ import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitUpdateService;
-import com.carland.carland_service.service.mapper.HyperWebhookIngestMapper;
-import com.carland.carland_service.service.validation.HyperServiceVisitValidator;
+import com.carland.carland_service.service.webhook.HyperWebhookIngestMapper;
+import com.carland.carland_service.service.webhook.HyperServiceVisitValidator;
 import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
+import com.carland.carland_service.service.webhook.VisitWebhookSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * tr: Partner webhook'undan gelen MEVCUT servis ziyareti güncellemelerini işleyen servistir; ziyareti
+ *     partnerRecordId ile bulur, alan-alan karşılaştırarak sadece değişenleri yazar, satır ve parçaları
+ *     merge eder, değişiklik olduysa toplam maliyet ve percentage senkronunu tetikler.
+ * en: Service handling EXISTING service visit updates arriving from the partner webhook; finds the visit
+ *     by partnerRecordId, writes only changed fields via field-by-field comparison, merges lines and parts,
+ *     and triggers total-cost plus percentage sync when anything changed.
+ */
 @Service
 @RequiredArgsConstructor
 public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisitUpdateService {
@@ -40,7 +49,16 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
     private final PartnerLookupService partnerLookupService;
     private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
     private final HyperPercentageSyncService hyperPercentageSyncService;
+    private final VisitWebhookSupport visitWebhookSupport;
 
+    /**
+     * tr: Güncelleme isteğini işler: payload'ı doğrular, aktif partner'ı ve VIN ile aracı bulur,
+     *     ziyareti partnerRecordId ile getirir (yoksa veya başka partner'a aitse ResourceNotFoundException),
+     *     ziyaret alanlarını/satırları/parçaları merge eder, değişiklik varsa kaydedip senkronları çalıştırır.
+     * en: Processes the update request: validates the payload, resolves the active partner and the car by
+     *     VIN, loads the visit by partnerRecordId (ResourceNotFoundException when missing or owned by
+     *     another partner), merges visit fields/lines/parts, persists and runs syncs when anything changed.
+     */
     @Override
     @Transactional
     public PartnerUpdateServiceVisitResult update(HyperVehicleByVinResponse request) {
@@ -56,7 +74,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
 
         hyperWebhookCarMetadataApplier.apply(car, request);
 
-        ServiceHistoryVisitV2Response item = HyperWebhookIngestMapper.toSingleVisitItem(request, partner);
+        VisitHistoryItemResponse item = HyperWebhookIngestMapper.toSingleVisitItem(request, partner);
         Long recordId = item.getPartnerRecordId();
 
         Visit visit = visitRepository.findWithDetailsByCarIdAndHyperRecordId(car.getCarId(), recordId)
@@ -87,7 +105,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         boolean changed = visitFieldsUpdated > 0 || linesUpdated > 0 || partsUpdated > 0;
         if (changed) {
             visitRepository.saveAndFlush(visit);
-            recalculateAllTimeCost(car);
+            visitWebhookSupport.recalculateAllTimeCost(car);
             visitRepository.findWithDetailsByCarIdAndHyperRecordId(car.getCarId(), recordId)
                     .ifPresent(freshVisit -> hyperPercentageSyncService.syncFromVisit(car, freshVisit));
             result.setMessage("Visit and service lines updated");
@@ -98,7 +116,13 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return result;
     }
 
-    private int applyVisitSnapshot(Visit visit, ServiceHistoryVisitV2Response item) {
+    /**
+     * tr: Ziyaret üst alanlarını (tip, tarih, km, dealer, fatura no, gruplar, maliyetler) DTO ile
+     *     karşılaştırıp farklı olanları günceller; değişen alan sayısını döner.
+     * en: Compares the visit's top-level fields (type, date, mileage, dealer, invoice no, groups, costs)
+     *     with the DTO and updates differing ones; returns the changed field count.
+     */
+    private int applyVisitSnapshot(Visit visit, VisitHistoryItemResponse item) {
         int changed = 0;
 
         if (!Objects.equals(visit.getServiceType(), item.getType())) {
@@ -131,7 +155,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         MoneyResponse cost = item.getCost();
         BigDecimal costAmount = cost != null ? cost.getAmount() : null;
         String costCurrency = cost != null ? cost.getCurrency() : null;
-        if (!decimalEquals(visit.getCostAmount(), costAmount)) {
+        if (!visitWebhookSupport.decimalEquals(visit.getCostAmount(), costAmount)) {
             visit.setCostAmount(costAmount);
             changed++;
         }
@@ -143,7 +167,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         MoneyResponse amount = item.getAmount();
         BigDecimal finalCostAmount = amount != null ? amount.getAmount() : null;
         String finalCostCurrency = amount != null ? amount.getCurrency() : null;
-        if (!decimalEquals(visit.getFinalCostAmount(), finalCostAmount)) {
+        if (!visitWebhookSupport.decimalEquals(visit.getFinalCostAmount(), finalCostAmount)) {
             visit.setFinalCostAmount(finalCostAmount);
             changed++;
         }
@@ -155,12 +179,18 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return changed;
     }
 
-    private int mergeLines(Visit visit, ServiceHistoryVisitV2Response item, PartnerUpdateServiceVisitResult result) {
+    /**
+     * tr: DTO'daki servis satırlarını mevcut ziyaretle merge eder: serviceCode eşleşmesi yoksa yeni satır
+     *     ekler, varsa alanları karşılaştırıp günceller; güncellenen satır sayısını döner.
+     * en: Merges the DTO's service lines into the existing visit: adds a new line when no serviceCode
+     *     match exists, otherwise compares and updates fields; returns the updated line count.
+     */
+    private int mergeLines(Visit visit, VisitHistoryItemResponse item, PartnerUpdateServiceVisitResult result) {
         int updated = 0;
-        for (ServiceHistoryLineV2Response lineRequest : item.getServices()) {
-            ServiceHistoryV2 existingLine = findLineByServiceCode(visit, lineRequest.getServiceCode());
+        for (VisitServiceLineResponse lineRequest : item.getServices()) {
+            VisitServiceLine existingLine = findLineByServiceCode(visit, lineRequest.getServiceCode());
             if (existingLine == null) {
-                ServiceHistoryV2 createdLine = mapLineToEntity(lineRequest);
+                VisitServiceLine createdLine = visitWebhookSupport.mapLineToEntity(lineRequest);
                 visit.addService(createdLine);
                 updated++;
                 result.getLines().add(LineUpdateDetail.builder()
@@ -184,16 +214,22 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return updated;
     }
 
-    private int mergeParts(Visit visit, ServiceHistoryVisitV2Response item, PartnerUpdateServiceVisitResult result) {
+    /**
+     * tr: DTO'daki parçaları mevcut ziyaretle merge eder: ad+miktar+birim anahtarına göre eşleşme yoksa
+     *     yeni parça ekler, varsa günceller; güncellenen parça sayısını döner.
+     * en: Merges the DTO's parts into the existing visit: adds a new part when no name+qty+unit key match
+     *     exists, updates otherwise; returns the updated part count.
+     */
+    private int mergeParts(Visit visit, VisitHistoryItemResponse item, PartnerUpdateServiceVisitResult result) {
         if (item.getParts() == null || item.getParts().isEmpty()) {
             return 0;
         }
 
         int updated = 0;
-        for (ServiceHistoryPartV2Response partRequest : item.getParts()) {
-            ServiceHistoryPartV2 existingPart = findPartByIdentity(visit, partRequest);
+        for (VisitPartResponse partRequest : item.getParts()) {
+            VisitPart existingPart = findPartByIdentity(visit, partRequest);
             if (existingPart == null) {
-                ServiceHistoryPartV2 createdPart = mapPartToEntity(partRequest);
+                VisitPart createdPart = visitWebhookSupport.mapPartToEntity(partRequest);
                 visit.addPart(createdPart);
                 updated++;
                 result.getParts().add(PartUpdateDetail.builder()
@@ -221,7 +257,13 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return updated;
     }
 
-    private boolean applyLineSnapshot(ServiceHistoryV2 target, ServiceHistoryLineV2Response source) {
+    /**
+     * tr: Tek servis satırının alanlarını DTO ile karşılaştırıp farklı olanları günceller;
+     *     en az bir alan değiştiyse true döner.
+     * en: Compares a single service line's fields with the DTO and updates differing ones;
+     *     returns true when at least one field changed.
+     */
+    private boolean applyLineSnapshot(VisitServiceLine target, VisitServiceLineResponse source) {
         int changed = 0;
 
         if (!Objects.equals(target.getServiceName(), source.getServiceName())) {
@@ -229,7 +271,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
             changed++;
         }
 
-        String normalizedUniversalServiceId = normalizeUniversalServiceId(source.getUniversalServiceId());
+        String normalizedUniversalServiceId = visitWebhookSupport.normalizeUniversalServiceId(source.getUniversalServiceId());
         if (!Objects.equals(target.getUniversalServiceId(), normalizedUniversalServiceId)) {
             target.setUniversalServiceId(normalizedUniversalServiceId);
             changed++;
@@ -246,7 +288,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         MoneyResponse cost = source.getCost();
         BigDecimal costAmount = cost != null ? cost.getAmount() : null;
         String costCurrency = cost != null ? cost.getCurrency() : null;
-        if (!decimalEquals(target.getCostAmount(), costAmount)) {
+        if (!visitWebhookSupport.decimalEquals(target.getCostAmount(), costAmount)) {
             target.setCostAmount(costAmount);
             changed++;
         }
@@ -266,14 +308,20 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return changed > 0;
     }
 
-    private boolean applyPartSnapshot(ServiceHistoryPartV2 target, ServiceHistoryPartV2Response source) {
+    /**
+     * tr: Tek parçanın alanlarını (ad, miktar, birim) DTO ile karşılaştırıp günceller;
+     *     en az bir alan değiştiyse true döner.
+     * en: Compares and updates a single part's fields (name, qty, unit) against the DTO;
+     *     returns true when at least one field changed.
+     */
+    private boolean applyPartSnapshot(VisitPart target, VisitPartResponse source) {
         int changed = 0;
 
         if (!Objects.equals(target.getName(), source.getName())) {
             target.setName(source.getName());
             changed++;
         }
-        if (!decimalEquals(target.getQty(), source.getQty())) {
+        if (!visitWebhookSupport.decimalEquals(target.getQty(), source.getQty())) {
             target.setQty(source.getQty());
             changed++;
         }
@@ -285,14 +333,22 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         return changed > 0;
     }
 
-    private ServiceHistoryV2 findLineByServiceCode(Visit visit, Integer serviceCode) {
+    /**
+     * tr: Ziyaretin satırları arasında verilen serviceCode'a sahip olanı bulur; yoksa null döner.
+     * en: Finds the visit line with the given serviceCode; returns null when absent.
+     */
+    private VisitServiceLine findLineByServiceCode(Visit visit, Integer serviceCode) {
         return visit.getServices().stream()
                 .filter(line -> Objects.equals(line.getServiceCode(), serviceCode))
                 .findFirst()
                 .orElse(null);
     }
 
-    private ServiceHistoryPartV2 findPartByIdentity(Visit visit, ServiceHistoryPartV2Response partRequest) {
+    /**
+     * tr: Ziyaretin parçaları arasında ad+miktar+birim anahtarı eşleşenini bulur; yoksa null döner.
+     * en: Finds the visit part matching by the name+qty+unit key; returns null when absent.
+     */
+    private VisitPart findPartByIdentity(Visit visit, VisitPartResponse partRequest) {
         String key = partKey(partRequest);
         return visit.getParts().stream()
                 .filter(part -> partKey(part).equals(key))
@@ -300,70 +356,34 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
                 .orElse(null);
     }
 
-    private ServiceHistoryV2 mapLineToEntity(ServiceHistoryLineV2Response line) {
-        MoneyResponse cost = line.getCost();
-        return ServiceHistoryV2.builder()
-                .serviceCode(line.getServiceCode())
-                .serviceName(line.getServiceName())
-                .universalServiceId(normalizeUniversalServiceId(line.getUniversalServiceId()))
-                .serviceGroups(line.getServiceGroups() != null ? new ArrayList<>(line.getServiceGroups()) : new ArrayList<>())
-                .costAmount(cost != null ? cost.getAmount() : null)
-                .costCurrency(cost != null ? cost.getCurrency() : null)
-                .nextServiceDate(line.getNextServiceDate())
-                .nextServiceMileage(line.getNextServiceMileage())
-                .build();
-    }
-
-    private ServiceHistoryPartV2 mapPartToEntity(ServiceHistoryPartV2Response part) {
-        return ServiceHistoryPartV2.builder()
-                .name(part.getName())
-                .qty(part.getQty())
-                .unit(part.getUnit())
-                .build();
-    }
-
-    private String partKey(ServiceHistoryPartV2Response part) {
+    /**
+     * tr: Parça DTO'sundan karşılaştırma anahtarı üretir (ad|miktar|birim).
+     * en: Builds the comparison key (name|qty|unit) from the part DTO.
+     */
+    private String partKey(VisitPartResponse part) {
         return Objects.toString(part.getName(), "")
                 + "|" + normalizeQty(part.getQty())
                 + "|" + Objects.toString(part.getUnit(), "");
     }
 
-    private String partKey(ServiceHistoryPartV2 part) {
+    /**
+     * tr: Parça entity'sinden karşılaştırma anahtarı üretir (ad|miktar|birim).
+     * en: Builds the comparison key (name|qty|unit) from the part entity.
+     */
+    private String partKey(VisitPart part) {
         return Objects.toString(part.getName(), "")
                 + "|" + normalizeQty(part.getQty())
                 + "|" + Objects.toString(part.getUnit(), "");
     }
 
+    /**
+     * tr: Miktarı anahtar üretimi için normalize eder: null ise boş string, değilse sondaki sıfırlar atılmış hali.
+     * en: Normalizes the quantity for key building: empty string for null, trailing-zero-stripped plain string otherwise.
+     */
     private String normalizeQty(BigDecimal qty) {
         if (qty == null) {
             return "";
         }
         return qty.stripTrailingZeros().toPlainString();
-    }
-
-    private String normalizeUniversalServiceId(String raw) {
-        if (raw == null || raw.isBlank() || "other".equalsIgnoreCase(raw.trim())) {
-            return "";
-        }
-        return raw.trim();
-    }
-
-    private boolean decimalEquals(BigDecimal left, BigDecimal right) {
-        if (left == null && right == null) {
-            return true;
-        }
-        if (left == null || right == null) {
-            return false;
-        }
-        return left.compareTo(right) == 0;
-    }
-
-    private void recalculateAllTimeCost(Car car) {
-        BigDecimal total = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
-                .map(visit -> visit.getFinalCostAmount() != null ? visit.getFinalCostAmount()
-                        : visit.getCostAmount() != null ? visit.getCostAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        car.setAllTimeCost(total);
-        carRepository.save(car);
     }
 }

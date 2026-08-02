@@ -8,6 +8,10 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * tr: Araç servis geçmişi sorgularında dönen tek kayıtlık yanıt DTO'su (servis adı, tarih, km, tutar, servis merkezi).
+ * en: Single-entry response DTO returned by car service history queries (service name, date, km, amount, service center).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

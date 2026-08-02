@@ -7,6 +7,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 
 import java.sql.Types;
 
+/**
+ * tr: "partner_photos" tablosunu modelleyen entity; iş ortağına ait fotoğrafı/logoyu ikili veri olarak saklar.
+ * en: Entity modeling the "partner_photos" table; stores a partner's photo/logo as binary data.
+ */
 @Entity
 @Data
 @Builder

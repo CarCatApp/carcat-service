@@ -7,6 +7,10 @@ import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
 
 
+/**
+ * tr: "appointments" tablosunu modelleyen entity; müşterinin servis merkezine aldığı randevuyu (tarih, durum, zaman aralığı) temsil eder.
+ * en: Entity modeling the "appointments" table; represents a customer's appointment at an auto service center (date, status, time range).
+ */
 @Entity
 @Data
 @Builder

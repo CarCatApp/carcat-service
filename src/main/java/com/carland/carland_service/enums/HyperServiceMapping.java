@@ -3,6 +3,10 @@ package com.carland.carland_service.enums;
 import java.util.Optional;
 
 /**
+ * tr: Hyper'ın universalServiceId değerlerini veritabanındaki servis adlarına (services.name_en) eşleyen enum.
+ * en: Enum mapping Hyper's universalServiceId values to service names in the database (services.name_en).
+ */
+/**
  * Maps Hyper's raw {@code universalServiceId} to {@code services.name_en}.
  *
  * <p>Sync matches {@code Percentage.serviceNameEn} via {@link #matches(String, String)}.</p>

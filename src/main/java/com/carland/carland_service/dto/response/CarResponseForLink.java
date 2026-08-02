@@ -9,6 +9,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * tr: Müşteri-araç eşleştirme (link) akışında kullanılan sadeleştirilmiş araç yanıt DTO'su; CustomerWithCarResponse içinde döner.
+ * en: Simplified car response DTO used in the customer-car linking flow; returned inside CustomerWithCarResponse.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -1,7 +1,7 @@
 package com.carland.carland_service.service;
 
-import com.carland.carland_service.dto.response.v2.ServiceHistoryV2;
-import com.carland.carland_service.dto.response.v2.Visit;
+import com.carland.carland_service.entity.VisitServiceLine;
+import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Percentage;
 import com.carland.carland_service.entity.ServiceEntity;
@@ -23,6 +23,13 @@ import java.util.Optional;
 
 /**
  * Applies Hyper (partner) service history onto a car's percentages.
+ *
+ * tr: Hyper (partner) servis geçmişini aracın bakım yüzdelerine uygular: her yüzde için en güncel
+ *     eşleşen ziyaret satırını bulur, son/sonraki servis tarih-km bilgilerini ve km/ay yüzdelerini
+ *     hesaplayıp EDITED_BY_PARTNER durumuyla kaydeder.
+ * en: Applies Hyper (partner) service history onto a car's percentages: finds the latest matching
+ *     visit line per percentage, computes last/next service date-km values and km/month percentages,
+ *     and persists them with the EDITED_BY_PARTNER status.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,10 +48,22 @@ public class HyperPercentageSyncService {
     ) {
     }
 
+    /**
+     * tr: Verilen ziyaret listesini aracın yüzdelerine uygular (zorla yeniden uygulama yapmaz;
+     *     EDITED_BY_PARTNER olan ve daha yeni verisi olmayan yüzdeler atlanır).
+     * en: Applies the given list of visits onto the car's percentages (no forced reapply;
+     *     percentages already EDITED_BY_PARTNER without newer data are skipped).
+     */
     public void syncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, false);
     }
 
+    /**
+     * tr: Tek bir ziyareti zorla yeniden uygulama modunda senkronlar; ziyaret null ise hiçbir şey yapmaz.
+     *     Bu servis için daha yeni bir satır varsa uygulamayı atlar.
+     * en: Syncs a single visit in forced-reapply mode; does nothing when the visit is null.
+     *     Skips applying if a newer line exists for the same service.
+     */
     public void syncFromVisit(Car car, Visit visit) {
         if (visit == null) {
             return;
@@ -54,6 +73,13 @@ public class HyperPercentageSyncService {
 
     /**
      * Read-only: best matching partner visit line for list display (CREATED percentages).
+     *
+     * tr: Salt-okunur: liste görünümü için (CREATED durumundaki yüzdeler) servise en iyi eşleşen
+     *     partner ziyaret satırının son/sonraki servis tarih-km özetini döner; servis adı boşsa
+     *     veya kullanılabilir veri yoksa Optional.empty döner.
+     * en: Read-only: returns the last/next service date-km snapshot of the best matching partner
+     *     visit line for list display (CREATED percentages); returns Optional.empty when the
+     *     service name is blank or no usable data exists.
      */
     public Optional<PartnerLineSnapshot> findBestPartnerLineForService(
             Car car,
@@ -146,7 +172,7 @@ public class HyperPercentageSyncService {
 
     private PartnerLineSnapshot toSnapshot(HyperServiceMatch match, Long intervalKm, Integer intervalMonth) {
         Visit visit = match.visit();
-        ServiceHistoryV2 line = match.line();
+        VisitServiceLine line = match.line();
 
         LocalDate lastServiceDate = visit.getLastServiceDate();
         Integer lastServiceKm = visit.getLastServiceMileage();
@@ -180,7 +206,7 @@ public class HyperPercentageSyncService {
             if (visit.getServices() == null) {
                 continue;
             }
-            for (ServiceHistoryV2 line : visit.getServices()) {
+            for (VisitServiceLine line : visit.getServices()) {
                 if (!HyperServiceMapping.matches(line.getUniversalServiceId(), nameEn)) {
                     continue;
                 }
@@ -195,7 +221,7 @@ public class HyperPercentageSyncService {
 
     private boolean hasUsableData(HyperServiceMatch match) {
         Visit visit = match.visit();
-        ServiceHistoryV2 line = match.line();
+        VisitServiceLine line = match.line();
         return visit.getLastServiceDate() != null
                 || visit.getLastServiceMileage() != null
                 || line.getNextServiceDate() != null
@@ -254,7 +280,7 @@ public class HyperPercentageSyncService {
 
     private void applyPartnerData(Car car, Percentage percentage, HyperServiceMatch match, String matchedRecordId) {
         Visit visit = match.visit();
-        ServiceHistoryV2 line = match.line();
+        VisitServiceLine line = match.line();
 
         LocalDate lastServiceDate = visit.getLastServiceDate();
         Integer lastServiceKm = visit.getLastServiceMileage();
@@ -336,6 +362,6 @@ public class HyperPercentageSyncService {
         return visit.getHyperRecordId() != null ? String.valueOf(visit.getHyperRecordId()) : null;
     }
 
-    private record HyperServiceMatch(Visit visit, ServiceHistoryV2 line) {
+    private record HyperServiceMatch(Visit visit, VisitServiceLine line) {
     }
 }
