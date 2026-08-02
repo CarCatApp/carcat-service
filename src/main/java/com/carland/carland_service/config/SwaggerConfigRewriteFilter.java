@@ -21,9 +21,9 @@ import java.util.List;
 
 /**
  * tr: /v3/api-docs/swagger-config cevabındaki definition listesini tam 4 maddeye indirger
- *     (yaml urls + GroupedOpenApi birleşince oluşan duplicate'leri temizler).
- * en: Rewrites /v3/api-docs/swagger-config so the definition list is exactly 4 entries
- *     (removes duplicates from merging yaml urls with GroupedOpenApi).
+ *     ve URL'lere reverse-proxy context prefix'ini korur (örn. /carland-docs).
+ * en: Rewrites /v3/api-docs/swagger-config to exactly 4 definitions and preserves the
+ *     reverse-proxy context prefix on URLs (e.g. /carland-docs).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -62,11 +62,12 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
                 return;
             }
 
+            String prefix = resolveUrlPrefix(objectNode, request);
             ArrayNode urls = objectMapper.createArrayNode();
             for (Definition def : definitions()) {
                 ObjectNode entry = objectMapper.createObjectNode();
                 entry.put("name", def.name());
-                entry.put("url", def.url());
+                entry.put("url", prefix + def.path());
                 urls.add(entry);
             }
             objectNode.set("urls", urls);
@@ -86,6 +87,34 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Prefer prefix already present in springdoc's urls (works with nginx/Kong path rewrite);
+     * fall back to servlet context path.
+     */
+    private static String resolveUrlPrefix(ObjectNode objectNode, HttpServletRequest request) {
+        JsonNode originalUrls = objectNode.get("urls");
+        if (originalUrls != null && originalUrls.isArray()) {
+            for (JsonNode item : originalUrls) {
+                String sample = item.path("url").asText("");
+                int idx = sample.indexOf("/v3/api-docs");
+                if (idx > 0) {
+                    return sample.substring(0, idx);
+                }
+            }
+        }
+        String ctx = request.getContextPath();
+        if (ctx != null && !ctx.isBlank()) {
+            return ctx;
+        }
+        String forwardedPrefix = request.getHeader("X-Forwarded-Prefix");
+        if (forwardedPrefix != null && !forwardedPrefix.isBlank()) {
+            return forwardedPrefix.endsWith("/")
+                    ? forwardedPrefix.substring(0, forwardedPrefix.length() - 1)
+                    : forwardedPrefix;
+        }
+        return "";
+    }
+
     private static List<Definition> definitions() {
         return List.of(
                 new Definition(AUTH, "/v3/api-docs/external/carland-auth"),
@@ -95,5 +124,5 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
         );
     }
 
-    private record Definition(String name, String url) {}
+    private record Definition(String name, String path) {}
 }
