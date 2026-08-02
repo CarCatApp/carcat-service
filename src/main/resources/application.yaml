@@ -59,7 +59,7 @@ springdoc:
     persist-authorization: true
     try-it-out-enabled: true
     custom-js: /swagger-custom.js
-    # Final list is locked to these 4 by SwaggerUiDefinitionCustomizer (drops GroupedOpenApi duplicates)
+    # Also enforced at runtime by SwaggerUiUrlsConfig
     urls-primary-name: "1. Auth — Login / Register / Tokens"
     urls:
       - name: "1. Auth — Login / Register / Tokens"
