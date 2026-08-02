@@ -1,4 +1,4 @@
-/* Carland Swagger: login → Bearer authorize + refresh + default headers */
+/* Carland Swagger: login → Bearer + refresh + defaults (context-path safe) */
 (function () {
   const STORAGE = {
     access: 'carland.swagger.accessToken',
@@ -10,20 +10,37 @@
 
   function qs(sel, root) { return (root || document).querySelector(sel); }
 
+  /** e.g. /carland-docs when UI is under /carland-docs/swagger-ui/... */
+  function appBase() {
+    var path = window.location.pathname || '';
+    var idx = path.indexOf('/swagger-ui');
+    if (idx > 0) return path.substring(0, idx);
+    idx = path.indexOf('/swagger-ui.html');
+    if (idx > 0) return path.substring(0, idx);
+    return '';
+  }
+
   function authorizeBearer(token) {
-    if (!token || !window.ui || !ui.authActions) return;
-    ui.authActions.authorize({
-      bearerAuth: {
-        name: 'bearerAuth',
-        schema: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-        value: token
+    if (!token || !window.ui) return;
+    try {
+      if (ui.authActions && typeof ui.authActions.authorize === 'function') {
+        ui.authActions.authorize({
+          bearerAuth: {
+            name: 'bearerAuth',
+            schema: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+            value: token
+          }
+        });
       }
-    });
+      if (typeof ui.preauthorizeApiKey === 'function') {
+        ui.preauthorizeApiKey('bearerAuth', token);
+      }
+    } catch (e) { /* ignore */ }
   }
 
   async function loadConfig() {
     try {
-      const res = await fetch('/swagger-auth-config', { credentials: 'same-origin' });
+      var res = await fetch(appBase() + '/swagger-auth-config', { credentials: 'same-origin' });
       if (!res.ok) throw new Error('config ' + res.status);
       return await res.json();
     } catch (e) {
@@ -43,7 +60,7 @@
   }
 
   async function login(cfg, phoneNumber, password) {
-    const res = await fetch(cfg.loginUrl, {
+    var res = await fetch(cfg.loginUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,28 +68,31 @@
       },
       body: JSON.stringify({ phoneNumber: phoneNumber, password: password })
     });
-    const body = await res.json().catch(function () { return {}; });
+    var body = await res.json().catch(function () { return {}; });
     if (!res.ok) {
       throw new Error(body.message || body.error || ('Login failed: ' + res.status));
     }
     if (!body.accessToken) throw new Error('Login response has no accessToken');
     persistTokens(body.accessToken, body.refreshToken, cfg.accessTtlSeconds || 900);
     authorizeBearer(body.accessToken);
+    // Swagger UI sometimes mounts auth after definition switch — re-apply shortly
+    setTimeout(function () { authorizeBearer(body.accessToken); }, 300);
+    setTimeout(function () { authorizeBearer(body.accessToken); }, 1200);
     return body;
   }
 
   async function refresh(cfg) {
-    const refreshToken = localStorage.getItem(STORAGE.refresh);
+    var refreshToken = localStorage.getItem(STORAGE.refresh);
     if (!refreshToken) return false;
-    const bearer = refreshToken.startsWith('Bearer ') ? refreshToken : ('Bearer ' + refreshToken);
-    const res = await fetch(cfg.refreshUrl, {
+    var bearer = refreshToken.startsWith('Bearer ') ? refreshToken : ('Bearer ' + refreshToken);
+    var res = await fetch(cfg.refreshUrl, {
       method: 'POST',
       headers: {
         'Authorization': bearer,
         'Accept-Language': cfg.acceptLanguage || 'az'
       }
     });
-    const body = await res.json().catch(function () { return {}; });
+    var body = await res.json().catch(function () { return {}; });
     if (!res.ok || !body.accessToken) return false;
     persistTokens(body.accessToken, body.refreshToken || refreshToken, cfg.accessTtlSeconds || 900);
     authorizeBearer(body.accessToken);
@@ -80,28 +100,43 @@
   }
 
   function applyDefaultHeaders(headers, cfg) {
-    const access = localStorage.getItem(STORAGE.access);
+    var access = localStorage.getItem(STORAGE.access);
     if (access) {
       headers.set('Authorization', 'Bearer ' + access);
     }
     headers.set('Accept-Language', cfg.acceptLanguage || 'az');
     headers.set('X-Client-Timezone', 'Asia/Baku');
 
-    // Let Kong Lua inject identity headers from JWT — do not send empty Swagger placeholders
     KONG_HEADERS.forEach(function (name) {
-      const value = headers.get(name);
+      var value = headers.get(name);
       if (value == null || value === '' || value === 'injected-by-kong-from-jwt' || value === 'string') {
         headers.delete(name);
       }
     });
   }
 
+  function fillTryItOutDefaults() {
+    // Best-effort: fill visible Try-it-out header inputs after Expand
+    document.querySelectorAll('.parameters input[type="text"], .parameters input:not([type])').forEach(function (input) {
+      var row = input.closest('tr') || input.closest('.parameter');
+      var label = (row && row.textContent) ? row.textContent : '';
+      if (/Accept-Language/i.test(label) && (!input.value || input.value === 'string')) {
+        input.value = 'az';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (/X-Client-Timezone/i.test(label) && (!input.value || input.value === 'string')) {
+        input.value = 'Asia/Baku';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+  }
+
   function ensurePanel(cfg) {
     if (qs('#carland-swagger-login')) return;
-    const topbar = qs('.swagger-ui .topbar') || qs('.swagger-ui');
+    var topbar = qs('.swagger-ui .topbar') || qs('.swagger-ui');
     if (!topbar) return;
 
-    const panel = document.createElement('div');
+    var panel = document.createElement('div');
     panel.id = 'carland-swagger-login';
     panel.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:#1b1b1b;color:#fff;font-family:sans-serif;font-size:13px;';
     panel.innerHTML =
@@ -120,28 +155,28 @@
       topbar.insertBefore(panel, topbar.firstChild);
     }
 
-    const status = qs('#cl-status', panel);
+    var status = qs('#cl-status', panel);
     qs('#cl-login', panel).onclick = async function () {
       status.textContent = 'Logging in…';
       try {
         await login(cfg, qs('#cl-phone', panel).value.trim(), qs('#cl-pass', panel).value);
-        status.textContent = 'Authorized — access JWT set (~15 min). Refresh auto on 401.';
+        status.textContent = 'Authorized — Bearer set (~15 min). Auto-refresh on 401.';
       } catch (e) {
         status.textContent = e.message || String(e);
       }
     };
     qs('#cl-refresh', panel).onclick = async function () {
       status.textContent = 'Refreshing…';
-      const ok = await refresh(cfg);
+      var ok = await refresh(cfg);
       status.textContent = ok ? 'Access token renewed' : 'Refresh failed — login again';
     };
     qs('#cl-logout', panel).onclick = function () {
       localStorage.removeItem(STORAGE.access);
       localStorage.removeItem(STORAGE.refresh);
       localStorage.removeItem(STORAGE.expAt);
-      if (window.ui && ui.authActions) {
-        ui.authActions.logout();
-      }
+      try {
+        if (window.ui && ui.authActions) ui.authActions.logout(['bearerAuth']);
+      } catch (e) { /* ignore */ }
       status.textContent = 'Tokens cleared';
     };
   }
@@ -149,22 +184,26 @@
   function installFetchInterceptor(cfg) {
     if (window.__carlandFetchWrapped) return;
     window.__carlandFetchWrapped = true;
-    const originalFetch = window.fetch.bind(window);
+    var originalFetch = window.fetch.bind(window);
     window.fetch = async function (input, init) {
       init = init || {};
-      const headers = new Headers(init.headers || {});
-      applyDefaultHeaders(headers, cfg);
+      var headers = new Headers(init.headers || {});
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var isDocOrAsset = /\/v3\/api-docs|swagger-config|swagger-ui|swagger-custom|swagger-auth-config/i.test(url);
+
+      if (!isDocOrAsset) {
+        applyDefaultHeaders(headers, cfg);
+      }
       init.headers = headers;
 
-      let response = await originalFetch(input, init);
-      const status = response.status;
-      if (status === 401 || status === 403) {
-        const url = typeof input === 'string' ? input : (input && input.url) || '';
-        const isAuthCall = url.indexOf('/users/login') !== -1 || url.indexOf('/users/refresh') !== -1;
+      var response = await originalFetch(input, init);
+      var status = response.status;
+      if ((status === 401 || status === 403) && !isDocOrAsset) {
+        var isAuthCall = url.indexOf('/users/login') !== -1 || url.indexOf('/users/refresh') !== -1;
         if (!isAuthCall) {
-          const ok = await refresh(cfg);
+          var ok = await refresh(cfg);
           if (ok) {
-            const retryHeaders = new Headers(init.headers || {});
+            var retryHeaders = new Headers(init.headers || {});
             applyDefaultHeaders(retryHeaders, cfg);
             init.headers = retryHeaders;
             response = await originalFetch(input, init);
@@ -176,18 +215,19 @@
   }
 
   async function boot() {
-    const cfg = await loadConfig();
+    var cfg = await loadConfig();
     installFetchInterceptor(cfg);
 
-    const existing = localStorage.getItem(STORAGE.access);
-    if (existing && window.ui) authorizeBearer(existing);
+    var existing = localStorage.getItem(STORAGE.access);
+    if (existing) authorizeBearer(existing);
 
-    const timer = setInterval(async function () {
+    var timer = setInterval(async function () {
       ensurePanel(cfg);
+      fillTryItOutDefaults();
       if (window.ui && localStorage.getItem(STORAGE.access)) {
         authorizeBearer(localStorage.getItem(STORAGE.access));
       }
-      const expAt = Number(localStorage.getItem(STORAGE.expAt) || 0);
+      var expAt = Number(localStorage.getItem(STORAGE.expAt) || 0);
       if (expAt && Date.now() >= expAt) {
         await refresh(cfg);
       }

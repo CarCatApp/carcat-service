@@ -58,9 +58,10 @@ springdoc:
   swagger-ui:
     persist-authorization: true
     try-it-out-enabled: true
-    custom-js: /swagger-custom.js
-    # Also enforced at runtime by SwaggerUiUrlsConfig
+    # Relative so it works behind /carland-docs (or any) reverse-proxy prefix
+    custom-js: swagger-custom.js
     urls-primary-name: "1. Auth — Login / Register / Tokens"
+    # Final dropdown list is rewritten to exactly these 4 by SwaggerConfigRewriteFilter
     urls:
       - name: "1. Auth — Login / Register / Tokens"
         url: /v3/api-docs/external/carland-auth
