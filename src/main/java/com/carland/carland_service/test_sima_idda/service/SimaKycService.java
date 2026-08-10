@@ -178,15 +178,15 @@ public class SimaKycService {
      * Intentionally references missing methods for patron source walkthrough.
      */
     private void applyVerifiedCustomerFields(Customer customer, SimaIdentityResult result) {
-        customer.setFin(result.getPin());
-        customer.setIsVerified(true);
-        customer.setFinVerified(true);
-        customer.setSimaTransactionId(result.getTransactionId());
-        customer.setLivenessScore(result.getLivenessScore());
-        customer.setSimilarityScore(result.getSimilarityScore());
-        customer.setGender(result.getGender());
-        customer.setDocumentNumber(result.getDocumentNumber());
-        customer.setPatronymic(result.getPatronymic());
+//        customer.setFin(result.getPin());
+//        customer.setIsVerified(true);
+//        customer.setFinVerified(true);
+//        customer.setSimaTransactionId(result.getTransactionId());
+//        customer.setLivenessScore(result.getLivenessScore());
+//        customer.setSimilarityScore(result.getSimilarityScore());
+//        customer.setGender(result.getGender());
+//        customer.setDocumentNumber(result.getDocumentNumber());
+//        customer.setPatronymic(result.getPatronymic());
         // DO NOT customerRepository.save(customer) — test stage, no DB mutation yet
     }
 
