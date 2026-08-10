@@ -51,7 +51,8 @@ carland:
     auth-server-url: ${SWAGGER_AUTH_SERVER_URL:https://digital-innovation.agency/auth/server}
     webhook-server-url: ${SWAGGER_WEBHOOK_SERVER_URL:https://digital-innovation.agency}
     # Where this service fetches OpenAPI JSON (Docker internal preferred)
-    auth-docs-url: ${SWAGGER_AUTH_DOCS_URL:http://auth-service:9090/v3/api-docs}
+    auth-docs-url: ${SWAGGER_AUTH_DOCS_URL:http://auth-service:9090/v3/api-docs/legacy-users}
+    auth-new-docs-url: ${SWAGGER_AUTH_NEW_DOCS_URL:http://auth-service:9090/v3/api-docs/new-users}
     webhook-docs-url: ${SWAGGER_WEBHOOK_DOCS_URL:http://webhook-service:8080/v3/api-docs}
 
 springdoc:
@@ -60,11 +61,13 @@ springdoc:
     try-it-out-enabled: true
     # Relative so it works behind /carland-docs (or any) reverse-proxy prefix
     custom-js: swagger-custom.js
-    urls-primary-name: "1. Auth — Login / Register / Tokens"
-    # Final dropdown list is rewritten to exactly these 4 by SwaggerConfigRewriteFilter
+    urls-primary-name: "1A. Auth — Legacy (/users)"
+    # Final dropdown list is rewritten by SwaggerConfigRewriteFilter
     urls:
-      - name: "1. Auth — Login / Register / Tokens"
+      - name: "1A. Auth — Legacy (/users)"
         url: /v3/api-docs/external/carland-auth
+      - name: "1B. Auth — NewUsers"
+        url: /v3/api-docs/external/carland-auth-new
       - name: "2. Carland — Mobile API"
         url: /v3/api-docs/mobile-api
       - name: "3. Carland — Partner Webhook Receiver"

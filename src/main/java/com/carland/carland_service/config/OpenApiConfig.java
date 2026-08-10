@@ -53,7 +53,7 @@ public class OpenApiConfig {
                 Internal API documentation for **carland-service** (core domain microservice).
 
                 ### How to use this Swagger UI
-                1. Open **1. Auth — Login / Register / Tokens** (top-right dropdown) — **login or register first**.
+                1. Open **1A. Auth — Legacy** (or **1B. Auth — NewUsers**) — **login or register first**.
                 2. Use the black **Carland Login** bar (phone + password). It stores `accessToken` + `refreshToken`
                    and auto-fills **Authorize → bearerAuth** for all JWT-protected Try-it-out calls.
                 3. Access JWT TTL ≈ **15 minutes**. On **401** (or near expiry) the UI renews via `/refresh`.
@@ -62,7 +62,8 @@ public class OpenApiConfig {
                 ### Select a definition (catalogue)
                 | Definition | Microservice | Role |
                 |---|---|---|
-                | **1. Auth — Login / Register / Tokens** | **auth-service** | Identity: login, register, OTP, refresh |
+                | **1A. Auth — Legacy** | **auth-service** | Current app: `/api/v1/users`, `/api/v1/otp` |
+                | **1B. Auth — NewUsers** | **auth-service** | Parallel PO flow: `/api/v1/newUsers` |
                 | **2. Carland — Mobile API** | **carland-service** | Mobile / app APIs (`/api/v1/**`) |
                 | **3. Carland — Partner Webhook Receiver** | **carland-service** | Internal **receiver** for partner visit ingest/update (`/webhook/**`) |
                 | **4. Webhook Gateway — Partner Edge Adapter** | **webhook-service** | Public **edge adapter**: partners call here; forwards to carland; queues in RabbitMQ if carland is down |

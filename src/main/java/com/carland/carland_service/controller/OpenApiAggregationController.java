@@ -26,8 +26,11 @@ public class OpenApiAggregationController {
 
     private final ObjectMapper objectMapper;
 
-    @Value("${carland.swagger.auth-docs-url:http://carland-auth:9090/v3/api-docs}")
+    @Value("${carland.swagger.auth-docs-url:http://carland-auth:9090/v3/api-docs/legacy-users}")
     private String authDocsUrl;
+
+    @Value("${carland.swagger.auth-new-docs-url:http://carland-auth:9090/v3/api-docs/new-users}")
+    private String authNewDocsUrl;
 
     @Value("${carland.swagger.webhook-docs-url:http://webhook:8080/v3/api-docs}")
     private String webhookDocsUrl;
@@ -42,7 +45,12 @@ public class OpenApiAggregationController {
 
     @GetMapping(value = "/v3/api-docs/external/carland-auth", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> carlandAuthDocs() {
-        return fetchAndSetServer(authDocsUrl, authServerUrl, "Carland Auth (public gateway)");
+        return fetchAndSetServer(authDocsUrl, authServerUrl, "Carland Auth legacy (public gateway)");
+    }
+
+    @GetMapping(value = "/v3/api-docs/external/carland-auth-new", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> carlandAuthNewDocs() {
+        return fetchAndSetServer(authNewDocsUrl, authServerUrl, "Carland Auth NewUsers (public gateway)");
     }
 
     @GetMapping(value = "/v3/api-docs/external/webhook", produces = MediaType.APPLICATION_JSON_VALUE)

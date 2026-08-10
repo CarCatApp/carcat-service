@@ -20,17 +20,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * tr: /v3/api-docs/swagger-config cevabındaki definition listesini tam 4 maddeye indirger
- *     ve URL'lere reverse-proxy context prefix'ini korur (örn. /carland-docs).
- * en: Rewrites /v3/api-docs/swagger-config to exactly 4 definitions and preserves the
- *     reverse-proxy context prefix on URLs (e.g. /carland-docs).
+ * Rewrites /v3/api-docs/swagger-config to the curated definition list and preserves
+ * the reverse-proxy context prefix on URLs (e.g. /carland-docs).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 @RequiredArgsConstructor
 public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
 
-    private static final String AUTH = "1. Auth — Login / Register / Tokens";
+    private static final String AUTH_LEGACY = "1A. Auth — Legacy (/users)";
+    private static final String AUTH_NEW = "1B. Auth — NewUsers";
     private static final String MOBILE = "2. Carland — Mobile API";
     private static final String RECEIVER = "3. Carland — Partner Webhook Receiver";
     private static final String GATEWAY = "4. Webhook Gateway — Partner Edge Adapter";
@@ -71,7 +70,7 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
                 urls.add(entry);
             }
             objectNode.set("urls", urls);
-            objectNode.put("urls.primaryName", AUTH);
+            objectNode.put("urls.primaryName", AUTH_LEGACY);
             objectNode.put("persistAuthorization", true);
 
             byte[] rewritten = objectMapper.writeValueAsBytes(objectNode);
@@ -87,10 +86,6 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * Prefer prefix already present in springdoc's urls (works with nginx/Kong path rewrite);
-     * fall back to servlet context path.
-     */
     private static String resolveUrlPrefix(ObjectNode objectNode, HttpServletRequest request) {
         JsonNode originalUrls = objectNode.get("urls");
         if (originalUrls != null && originalUrls.isArray()) {
@@ -117,7 +112,8 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
 
     private static List<Definition> definitions() {
         return List.of(
-                new Definition(AUTH, "/v3/api-docs/external/carland-auth"),
+                new Definition(AUTH_LEGACY, "/v3/api-docs/external/carland-auth"),
+                new Definition(AUTH_NEW, "/v3/api-docs/external/carland-auth-new"),
                 new Definition(MOBILE, "/v3/api-docs/mobile-api"),
                 new Definition(RECEIVER, "/v3/api-docs/partner-webhooks"),
                 new Definition(GATEWAY, "/v3/api-docs/external/webhook")

@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMA KYC — API Roadmap (Swagger-style)</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #a371f7;
+    --code-bg: #0d1117;
+    --post: #49cc90;
+    --get: #61affe;
+    --warn-bg: rgba(210, 153, 34, 0.12);
+    --ok-bg: rgba(63, 185, 80, 0.1);
+    --err-bg: rgba(248, 81, 73, 0.1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header {
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, #1a2230 0%, var(--panel) 100%);
+    border-radius: 10px;
+    padding: 28px 28px 22px;
+    margin-bottom: 22px;
+  }
+  header .eyebrow {
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  header p { color: var(--muted); max-width: 820px; font-size: 14.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .chip {
+    font-size: 12px; color: var(--muted); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 999px; background: var(--panel-2);
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  nav.toc {
+    border: 1px solid var(--border); background: var(--panel);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 22px;
+  }
+  nav.toc h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  nav.toc ol { margin-left: 18px; font-size: 14px; }
+  nav.toc li { margin: 4px 0; }
+
+  .section {
+    border: 1px solid var(--border); background: var(--panel);
+    border-radius: 10px; margin-bottom: 18px; overflow: hidden;
+  }
+  .section > .head {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .section > .head h2 { font-size: 18px; }
+  .section > .body { padding: 18px 20px 22px; }
+  .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .tag.carcat { background: rgba(88,166,255,.15); color: var(--blue); }
+  .tag.sima { background: rgba(163,113,247,.15); color: var(--purple); }
+  .tag.info { background: rgba(139,148,158,.15); color: var(--muted); }
+
+  .lead { color: var(--muted); font-size: 14.5px; margin-bottom: 14px; }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  h4 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 14px 0 8px; }
+  p, li { font-size: 14px; color: #c9d1d9; }
+  ul, ol { margin: 6px 0 10px 20px; }
+  li { margin: 4px 0; }
+  code.inline {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px; background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 4px; color: #ffa657;
+  }
+
+  .endpoint {
+    display: flex; align-items: stretch; gap: 0; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; margin: 10px 0 14px; background: var(--code-bg);
+  }
+  .method {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 800; font-size: 13px; letter-spacing: 0.04em;
+    padding: 12px 14px; color: #0d1117; min-width: 72px; text-align: center;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .method.post { background: var(--post); }
+  .method.get { background: var(--get); }
+  .path {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13.5px; padding: 12px 14px; color: var(--text);
+    display: flex; align-items: center; flex: 1; word-break: break-all;
+  }
+
+  .callout {
+    border: 1px solid var(--border); border-left: 3px solid var(--orange);
+    background: var(--warn-bg); border-radius: 0 8px 8px 0;
+    padding: 12px 14px; margin: 12px 0; font-size: 13.5px; color: #e6edf3;
+  }
+  .callout.ok { border-left-color: var(--green); background: var(--ok-bg); }
+  .callout.err { border-left-color: var(--red); background: var(--err-bg); }
+  .callout strong { color: var(--text); }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 8px 0 14px;
+    font-size: 13px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  }
+  th {
+    text-align: left; background: var(--panel-2); color: var(--muted);
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    vertical-align: top; color: #c9d1d9;
+  }
+  tr:last-child td { border-bottom: none; }
+  td .name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #79c0ff; font-size: 12.5px;
+  }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+  }
+  .badge.req { background: rgba(248,81,73,.2); color: #ff7b72; }
+  .badge.opt { background: rgba(139,148,158,.2); color: var(--muted); }
+
+  .tabs { display: flex; gap: 6px; margin: 10px 0 0; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+    padding: 6px 12px; border-radius: 6px 6px 0 0; font-size: 12.5px; cursor: pointer;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--panel); background: var(--code-bg); }
+  .panel-code {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 0 8px 8px 8px;
+    padding: 14px 16px; overflow-x: auto; margin-bottom: 10px;
+  }
+  pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.55; color: #c9d1d9; white-space: pre; margin: 0;
+  }
+  .k { color: #7ee787; }
+  .s { color: #a5d6ff; }
+  .n { color: #ffa657; }
+  .c { color: #8b949e; font-style: italic; }
+  .b { color: #79c0ff; }
+  .null { color: #ff7b72; }
+
+  .flow {
+    display: grid; gap: 8px; margin: 10px 0 14px;
+  }
+  .flow .row {
+    display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start;
+    padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .flow .n {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #0d1117;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;
+  }
+  .flow .t { font-size: 13.5px; color: #c9d1d9; }
+  .flow .t b { color: var(--text); }
+
+  footer {
+    margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center;
+  }
+
+  details.op {
+    border: 1px solid var(--border); border-radius: 8px; margin: 12px 0; background: var(--panel-2);
+  }
+  details.op > summary {
+    list-style: none; cursor: pointer; padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  details.op > summary::-webkit-details-marker { display: none; }
+  details.op[open] > summary { border-bottom: 1px solid var(--border); }
+  details.op .op-body { padding: 14px 16px 18px; background: var(--panel); }
+
+  @media (max-width: 700px) {
+    header h1 { font-size: 22px; }
+    .endpoint { flex-direction: column; }
+    .method { min-width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">CarCat · Internal API Docs</div>
+  <h1>SIMA KYC — API Roadmap</h1>
+  <p>
+    Swagger tarzı request / response / header / HMAC imzalama rehberi.
+    Mobile → CarCat Backend → SIMA akışını uçtan uca anlatır.
+    v1 kapsamı: <b>Verify Citizen Identity</b> only.
+  </p>
+  <div class="chips">
+    <span class="chip">Versiyon · <b>v1 draft</b></span>
+    <span class="chip">Dil · <b>TR</b></span>
+    <span class="chip">Kaynak · <b>AzInTelecom SIMA KYC 17.03.2026</b></span>
+    <span class="chip">İlgili · <b>SIMA_ROADMAP.pdf</b></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>İçindekiler</h2>
+  <ol>
+    <li><a href="#overview">Genel bakış &amp; akış</a></li>
+    <li><a href="#hmac">HMAC imzalama (şifreleme değil — imza)</a></li>
+    <li><a href="#carcat-verify">CarCat API — POST /api/v1/kyc/sima/verify</a></li>
+    <li><a href="#carcat-status">CarCat API — GET /api/v1/kyc/status</a></li>
+    <li><a href="#sima-verify">SIMA API — POST /api/v1/kyc/identity/verify</a></li>
+    <li><a href="#errors">Hata kodları &amp; mapping</a></li>
+    <li><a href="#photo">Foto / livePhoto kuralları</a></li>
+    <li><a href="#env">Env &amp; config</a></li>
+  </ol>
+</nav>
+
+<!-- OVERVIEW -->
+<section class="section" id="overview">
+  <div class="head">
+    <h2>1. Genel bakış</h2>
+    <span class="tag info">Architecture</span>
+  </div>
+  <div class="body">
+    <p class="lead">
+      Flutter SIMA’yı <b>doğrudan çağırmaz</b>. HMAC secret sadece backend’de kalır.
+      Mobile bizim KYC API’lerimize gider; backend SIMA’ya proxy + imza + sonuç kaydı yapar.
+    </p>
+
+    <div class="flow">
+      <div class="row"><div class="n">1</div><div class="t"><b>Flutter</b> FIN + documentNumber/birthDate + selfie toplar</div></div>
+      <div class="row"><div class="n">2</div><div class="t"><b>POST /api/v1/kyc/sima/verify</b> (Bearer JWT) → CarCat backend</div></div>
+      <div class="row"><div class="n">3</div><div class="t">Backend minify JSON + <b>HMAC-SHA256</b> imzalar</div></div>
+      <div class="row"><div class="n">4</div><div class="t"><b>POST {SIMA}/api/v1/kyc/identity/verify</b></div></div>
+      <div class="row"><div class="n">5</div><div class="t">Gate: <code class="inline">isSuccess && livenessStatus && similarityStatus</code></div></div>
+      <div class="row"><div class="n">6</div><div class="t">DB’ye FIN metadata yaz · selfie discard · response dön</div></div>
+      <div class="row"><div class="n">7</div><div class="t"><b>GET /api/v1/kyc/status</b> ile UI durumu günceller</div></div>
+    </div>
+
+    <div class="callout">
+      <strong>Dikkat:</strong> Bu dokümanda “şifreleme” kelimesi HMAC <em>imza</em> anlamına gelir.
+      Body AES ile şifrelenmez. SIMA, minify edilmiş JSON body’nin HMAC-SHA256 Base64 hash’ini
+      <code class="inline">Signature</code> header’ında ister.
+    </div>
+
+    <h3>FIN = pin</h3>
+    <p>7 karakterlik kişisel kimlik numarası. SIMA request body alanı: <code class="inline">pin</code>. CarCat tarafında alan adı genelde <code class="inline">fin</code>.</p>
+  </div>
+</section>
+
+<!-- HMAC -->
+<section class="section" id="hmac">
+  <div class="head">
+    <h2>2. HMAC imzalama (server-side only)</h2>
+    <span class="tag sima">SIMA Auth</span>
+  </div>
+  <div class="body">
+    <p class="lead">HyperService HMAC ailesiyle aynı tuzak: imzaladığın baytlar ≠ gönderdiğin baytlar ise hash uyuşmaz.</p>
+
+    <h3>Adımlar</h3>
+    <ol>
+      <li>Request body map oluştur (<code class="inline">idempotencyKey</code> dahil, her istekte yeni UUID).</li>
+      <li>JSON’u <b>bir kez minify</b> et — whitespace yok, pretty-print kapalı.</li>
+      <li>Aynı minified string’i hem HMAC’le hem HTTP body olarak gönder.</li>
+      <li><code class="inline">Auth-Scheme: HMACSHA256</code> (veya SIMA’nın verdiği HMACSHA1).</li>
+      <li><code class="inline">HMAC-SHA256(secretKey, minifiedBodyBytes)</code> → Base64 → <code class="inline">Signature</code>.</li>
+      <li><code class="inline">Identifier</code> = partner id (SIMA’dan alınan int/string).</li>
+    </ol>
+
+    <h4>Pretty → Minified örnek</h4>
+    <div class="tabs">
+      <span class="tab active">Pretty (İMZALAMA)</span>
+    </div>
+    <div class="panel-code">
+<pre><span class="c">// BUNU İMZALAMA — whitespace yüzünden hash kırılır</span>
+{
+  <span class="k">"pin"</span>: <span class="s">"10AAABC"</span>,
+  <span class="k">"documentNumber"</span>: <span class="s">"AA0012345"</span>,
+  <span class="k">"livePhoto"</span>: <span class="s">"ImageBASE64"</span>,
+  <span class="k">"idempotencyKey"</span>: <span class="s">"3c166e1a-9bff-414c-8e0d-aefe97cd33e4"</span>
+}</pre>
+    </div>
+    <div class="tabs">
+      <span class="tab active">Minified (DOĞRU — imza + send)</span>
+    </div>
+    <div class="panel-code">
+<pre><span class="s">{"pin":"10AAABC","documentNumber":"AA0012345","livePhoto":"ImageBASE64","idempotencyKey":"3c166e1a-9bff-414c-8e0d-aefe97cd33e4"}</span></pre>
+    </div>
+
+    <h4>Java (Spring) örnek mantık</h4>
+    <div class="panel-code">
+<pre><span class="c">// 1) minify bir kez</span>
+<span class="b">String</span> body = objectMapper.writeValueAsString(requestDto); <span class="c">// SerializationFeature.INDENT_OUTPUT kapalı</span>
+
+<span class="c">// 2) HMAC</span>
+<span class="b">Mac</span> mac = Mac.getInstance(<span class="s">"HmacSHA256"</span>);
+mac.init(<span class="b">new</span> SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), <span class="s">"HmacSHA256"</span>));
+<span class="b">byte</span>[] raw = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));
+<span class="b">String</span> signature = Base64.getEncoder().encodeToString(raw);
+
+<span class="c">// 3) aynı body'yi gönder</span>
+headers.set(<span class="s">"Content-Type"</span>, <span class="s">"application/json"</span>);
+headers.set(<span class="s">"Auth-Scheme"</span>, <span class="s">"HMACSHA256"</span>);
+headers.set(<span class="s">"Signature"</span>, signature);
+headers.set(<span class="s">"Identifier"</span>, identifier);
+restClient.post().uri(url).headers(h -&gt; h.addAll(headers)).body(body)...;</pre>
+    </div>
+
+    <div class="callout err">
+      <strong>Asla:</strong> Flutter’a HMAC key koyma · Signature’ı client üretme · selfie’yi loglama ·
+      isSuccess=true görünce hemen verified yazma.
+    </div>
+  </div>
+</section>
+
+<!-- CARCAT VERIFY -->
+<section class="section" id="carcat-verify">
+  <div class="head">
+    <h2>3. CarCat API — KYC Verify</h2>
+    <span class="tag carcat">Mobile → Backend</span>
+  </div>
+  <div class="body">
+    <p class="lead">Mobile’ın çağırdığı ana endpoint. Path proje convention’ına göre uyarlanabilir; kontrat budur.</p>
+
+    <details class="op" open>
+      <summary>
+        <span class="method post" style="border-radius:4px;padding:6px 10px;min-width:auto;">POST</span>
+        <code class="inline">/api/v1/kyc/sima/verify</code>
+        <span class="chip">Bearer JWT</span>
+      </summary>
+      <div class="op-body">
+        <div class="endpoint">
+          <div class="method post">POST</div>
+          <div class="path">/api/v1/kyc/sima/verify</div>
+        </div>
+
+        <h4>Headers</h4>
+        <table>
+          <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="name">Authorization</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td><code class="inline">Bearer &lt;access_token | register_token&gt;</code> — kullanıcı kimliği buradan alınır.</td>
+            </tr>
+            <tr>
+              <td><span class="name">Content-Type</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td><code class="inline">application/json</code></td>
+            </tr>
+            <tr>
+              <td><span class="name">Accept-Language</span> <span class="badge opt">optional</span></td>
+              <td>string</td>
+              <td>Örn. <code class="inline">az</code> / <code class="inline">tr</code> — hata mesajı dili.</td>
+            </tr>
+            <tr>
+              <td><span class="name">X-Client-Timezone</span> <span class="badge opt">optional</span></td>
+              <td>string</td>
+              <td>Örn. <code class="inline">Asia/Baku</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Request body</h4>
+        <table>
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="name">fin</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>FIN (= SIMA <code class="inline">pin</code>). 7 karakter.</td>
+            </tr>
+            <tr>
+              <td><span class="name">documentNumber</span> <span class="badge opt">XOR</span></td>
+              <td>string | null</td>
+              <td>Vesika no. Yeni nesil: <code class="inline">AA</code>/<code class="inline">AB</code> prefix. Eski: <code class="inline">AZE</code> strip.</td>
+            </tr>
+            <tr>
+              <td><span class="name">birthDate</span> <span class="badge opt">XOR</span></td>
+              <td>string | null</td>
+              <td><code class="inline">yyyy-MM-dd</code>. documentNumber ile <b>tam biri</b> dolu olmalı.</td>
+            </tr>
+            <tr>
+              <td><span class="name">livePhotoBase64</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>JPEG selfie base64 (data-URI prefix’siz tercih edilir).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout">
+          <strong>XOR kuralı:</strong> <code class="inline">documentNumber</code> doluysa <code class="inline">birthDate = null</code>.
+          Tersi de geçerli. İkisi birden veya ikisi boş → <b>400</b> (SIMA 713/714 öncesi bizde yakala).
+        </div>
+
+        <h4>Request example</h4>
+        <div class="panel-code">
+<pre><span class="c">POST /api/v1/kyc/sima/verify HTTP/1.1</span>
+<span class="k">Authorization</span>: Bearer eyJhbGciOiJIUzI1NiIs...
+<span class="k">Content-Type</span>: application/json
+<span class="k">Accept-Language</span>: az
+
+{
+  <span class="k">"fin"</span>: <span class="s">"10AAABC"</span>,
+  <span class="k">"documentNumber"</span>: <span class="s">"AA0012345"</span>,
+  <span class="k">"birthDate"</span>: <span class="null">null</span>,
+  <span class="k">"livePhotoBase64"</span>: <span class="s">"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDA..."</span>
+}</pre>
+        </div>
+
+        <h4>Backend iç işlem sırası</h4>
+        <ol>
+          <li>JWT → userId</li>
+          <li>Input validate (FIN, XOR, photo boş değil)</li>
+          <li>FIN collision: başka verified hesapta varsa → <b>409</b></li>
+          <li>UUID <code class="inline">idempotencyKey</code> üret</li>
+          <li>SIMA body map: pin=fin, livePhoto=livePhotoBase64, …</li>
+          <li>Minify + HMAC + SIMA call</li>
+          <li>Gate: isSuccess && livenessStatus && similarityStatus</li>
+          <li>OK → DB update (finVerified=true + scores + transactionId); selfie discard</li>
+          <li>Fail → verified=false + mapped code; DB’ye verified yazma</li>
+        </ol>
+
+        <h4>Response 200 — verified</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"verified"</span>: <span class="b">true</span>,
+  <span class="k">"fin"</span>: <span class="s">"10AAABC"</span>,
+  <span class="k">"name"</span>: <span class="s">"ARAZ"</span>,
+  <span class="k">"surname"</span>: <span class="s">"ƏLIYEV"</span>,
+  <span class="k">"patronymic"</span>: <span class="s">"ANAR OĞLU"</span>,
+  <span class="k">"livenessScore"</span>: <span class="n">0.9904</span>,
+  <span class="k">"similarityScore"</span>: <span class="n">0.9998</span>,
+  <span class="k">"transactionId"</span>: <span class="s">"100550"</span>,
+  <span class="k">"finVerifiedAt"</span>: <span class="s">"2026-08-05T10:15:00Z"</span>
+}</pre>
+        </div>
+
+        <h4>Response 200 — not verified (business fail)</h4>
+        <p style="margin-bottom:8px;font-size:13px;color:var(--muted);">
+          Teknik 5xx değil. SIMA biometric fail kullanıcıya business response olarak döner.
+        </p>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"verified"</span>: <span class="b">false</span>,
+  <span class="k">"code"</span>: <span class="s">"SIMA_752"</span>,
+  <span class="k">"message"</span>: <span class="s">"Üz uyğun gəlmədi. Yenidən cəhd edin."</span>,
+  <span class="k">"simaErrorCode"</span>: <span class="n">752</span>,
+  <span class="k">"transactionId"</span>: <span class="s">"100551"</span>
+}</pre>
+        </div>
+
+        <h4>Diğer HTTP status</h4>
+        <table>
+          <thead><tr><th>HTTP</th><th>Ne zaman</th><th>Body örneği</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>400</b></td>
+              <td>Validation / XOR ihlali</td>
+              <td><code class="inline">code: VALIDATION_ERROR</code></td>
+            </tr>
+            <tr>
+              <td><b>401</b></td>
+              <td>JWT yok / geçersiz</td>
+              <td>standart auth error</td>
+            </tr>
+            <tr>
+              <td><b>409</b></td>
+              <td>FIN başka verified hesapta</td>
+              <td><code class="inline">code: FIN_COLLISION</code></td>
+            </tr>
+            <tr>
+              <td><b>429</b></td>
+              <td>Rate limit</td>
+              <td><code class="inline">code: RATE_LIMITED</code></td>
+            </tr>
+            <tr>
+              <td><b>502 / 503</b></td>
+              <td>SIMA 710/750/timeout (sistem)</td>
+              <td><code class="inline">code: SIMA_UNAVAILABLE</code> — generic mesaj</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>409 example</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"verified"</span>: <span class="b">false</span>,
+  <span class="k">"code"</span>: <span class="s">"FIN_COLLISION"</span>,
+  <span class="k">"message"</span>: <span class="s">"Bu FIN artıq başqa hesaba bağlıdır."</span>
+}</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- CARCAT STATUS -->
+<section class="section" id="carcat-status">
+  <div class="head">
+    <h2>4. CarCat API — KYC Status</h2>
+    <span class="tag carcat">Mobile → Backend</span>
+  </div>
+  <div class="body">
+    <details class="op" open>
+      <summary>
+        <span class="method get" style="border-radius:4px;padding:6px 10px;min-width:auto;">GET</span>
+        <code class="inline">/api/v1/kyc/status</code>
+        <span class="chip">Bearer JWT</span>
+      </summary>
+      <div class="op-body">
+        <div class="endpoint">
+          <div class="method get">GET</div>
+          <div class="path">/api/v1/kyc/status</div>
+        </div>
+
+        <h4>Headers</h4>
+        <table>
+          <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="name">Authorization</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td><code class="inline">Bearer &lt;token&gt;</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Response 200 — verified</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"finVerified"</span>: <span class="b">true</span>,
+  <span class="k">"fin"</span>: <span class="s">"10***BC"</span>,
+  <span class="k">"finMasked"</span>: <span class="b">true</span>,
+  <span class="k">"finVerifiedAt"</span>: <span class="s">"2026-08-05T10:15:00Z"</span>,
+  <span class="k">"name"</span>: <span class="s">"ARAZ"</span>,
+  <span class="k">"surname"</span>: <span class="s">"ƏLIYEV"</span>
+}</pre>
+        </div>
+
+        <h4>Response 200 — not verified</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"finVerified"</span>: <span class="b">false</span>,
+  <span class="k">"fin"</span>: <span class="null">null</span>,
+  <span class="k">"finVerifiedAt"</span>: <span class="null">null</span>
+}</pre>
+        </div>
+
+        <div class="callout ok">
+          <strong>UI kuralı:</strong> Ekranda “doğrulanmış” rozeti sadece bu endpoint’teki
+          <code class="inline">finVerified: true</code> ile gösterilir. Client SIMA sonucuna güvenmez.
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- SIMA EXTERNAL -->
+<section class="section" id="sima-verify">
+  <div class="head">
+    <h2>5. SIMA API — Verify Citizen Identity</h2>
+    <span class="tag sima">Backend → SIMA</span>
+  </div>
+  <div class="body">
+    <p class="lead">
+      AzInTelecom resmi endpoint. Sadece server-side çağrılır.
+      Base URL staging/prod SIMA’dan alınır.
+    </p>
+
+    <details class="op" open>
+      <summary>
+        <span class="method post" style="border-radius:4px;padding:6px 10px;min-width:auto;">POST</span>
+        <code class="inline">{SIMA_BASE_URL}/api/v1/kyc/identity/verify</code>
+      </summary>
+      <div class="op-body">
+        <div class="endpoint">
+          <div class="method post">POST</div>
+          <div class="path">{SIMA_BASE_URL}/api/v1/kyc/identity/verify</div>
+        </div>
+
+        <h4>Headers</h4>
+        <table>
+          <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="name">Content-Type</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td><code class="inline">application/json</code></td>
+            </tr>
+            <tr>
+              <td><span class="name">Identifier</span> <span class="badge req">required</span></td>
+              <td>int / string</td>
+              <td>Partner identifier (SIMA issued).</td>
+            </tr>
+            <tr>
+              <td><span class="name">Auth-Scheme</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>Tam olarak <code class="inline">HMACSHA256</code> veya <code class="inline">HMACSHA1</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="name">Signature</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>Minified body HMAC → Base64.</td>
+            </tr>
+            <tr>
+              <td><span class="name">DeviceInfo</span> <span class="badge opt">optional</span></td>
+              <td>string</td>
+              <td>Ek cihaz bilgisi.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Request body schema</h4>
+        <table>
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="name">pin</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>Personal Identification Number (FIN).</td>
+            </tr>
+            <tr>
+              <td><span class="name">documentNumber</span> <span class="badge opt">XOR</span></td>
+              <td>string | null</td>
+              <td>Vesika no. Yeni: AA/AB. Eski: AZE prefix kaldır.</td>
+            </tr>
+            <tr>
+              <td><span class="name">birthDate</span> <span class="badge opt">XOR</span></td>
+              <td>date | null</td>
+              <td><code class="inline">yyyy-MM-dd</code>. documentNumber ile XOR.</td>
+            </tr>
+            <tr>
+              <td><span class="name">livePhoto</span> <span class="badge req">required</span></td>
+              <td>string</td>
+              <td>Image Base64.</td>
+            </tr>
+            <tr>
+              <td><span class="name">idempotencyKey</span> <span class="badge req">required</span></td>
+              <td>string (UUID)</td>
+              <td>Her request’te yeni. Body içinde; header değil. İmzaya dahildir.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4>Request example (minified gönderilir)</h4>
+        <div class="panel-code">
+<pre><span class="c">POST /api/v1/kyc/identity/verify HTTP/1.1</span>
+<span class="k">Content-Type</span>: application/json
+<span class="k">Auth-Scheme</span>: HMACSHA256
+<span class="k">Identifier</span>: 12345
+<span class="k">Signature</span>: dGhpc0lzQmFzZTY0SG1hY1NpZ25hdHVyZQ==
+
+{
+  <span class="k">"pin"</span>: <span class="s">"10AAABC"</span>,
+  <span class="k">"documentNumber"</span>: <span class="s">"AA0012345"</span>,
+  <span class="k">"birthDate"</span>: <span class="null">null</span>,
+  <span class="k">"livePhoto"</span>: <span class="s">"ImageBASE64..."</span>,
+  <span class="k">"idempotencyKey"</span>: <span class="s">"3c166e1a-9bff-414c-8e0d-aefe97cd33e4"</span>
+}</pre>
+        </div>
+
+        <h4>Success response (isSuccess=true — teknik başarı)</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"result"</span>: {
+    <span class="k">"pin"</span>: <span class="s">"10AAABC"</span>,
+    <span class="k">"documentNumber"</span>: <span class="s">"AA0012345"</span>,
+    <span class="k">"name"</span>: <span class="s">"ARAZ"</span>,
+    <span class="k">"surname"</span>: <span class="s">"ƏLIYEV"</span>,
+    <span class="k">"patronymic"</span>: <span class="s">"ANAR OĞLU"</span>,
+    <span class="k">"birthDate"</span>: <span class="s">"1990-01-25"</span>,
+    <span class="k">"birthAddress"</span>: <span class="s">"Azərbaycan Respublikası,BAKI"</span>,
+    <span class="k">"address"</span>: <span class="s">"BAKI ŞƏHƏRİ, XƏTAİ RAYONU, EV 10, MƏNZİL 500"</span>,
+    <span class="k">"gender"</span>: <span class="s">"MALE"</span>,
+    <span class="k">"expDate"</span>: <span class="s">"2028-01-20"</span>,
+    <span class="k">"livenessScore"</span>: <span class="n">0.9904289245605469</span>,
+    <span class="k">"livenessStatus"</span>: <span class="b">true</span>,
+    <span class="k">"livenessFailureReason"</span>: <span class="null">null</span>,
+    <span class="k">"similarityScore"</span>: <span class="n">0.9998284578</span>,
+    <span class="k">"similarityStatus"</span>: <span class="b">true</span>,
+    <span class="k">"transactionId"</span>: <span class="s">"100550"</span>,
+    <span class="k">"idempotencyKey"</span>: <span class="s">"9b8231a2-e784-4fba-a638-41acb9c09ca"</span>,
+    <span class="k">"processTime"</span>: <span class="s">"2024-12-20T16:37:51.496082+04:00"</span>
+  },
+  <span class="k">"error"</span>: <span class="null">null</span>,
+  <span class="k">"isSuccess"</span>: <span class="b">true</span>
+}</pre>
+        </div>
+
+        <div class="callout err">
+          <strong>KRİTİK:</strong> <code class="inline">isSuccess: true</code> ≠ kimlik doğrulandı.
+          Gerçek verified karar:
+          <code class="inline">isSuccess && result.livenessStatus && result.similarityStatus</code>.
+          Threshold önerisi: liveness <b>0.9</b>, similarity <b>0.9</b> (SIMA partner config).
+          Default SIMA: liveness 0.8 / similarity 0.9 — biz ikisini 0.9 isteyeceğiz.
+        </div>
+
+        <h4>Error response örneği</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"result"</span>: <span class="null">null</span>,
+  <span class="k">"error"</span>: {
+    <span class="k">"httpStatus"</span>: <span class="n">403</span>,
+    <span class="k">"errorCode"</span>: <span class="n">710</span>,
+    <span class="k">"errorMessage"</span>: <span class="s">"Access to this service is not allowed"</span>,
+    <span class="k">"errorOriginCode"</span>: <span class="n">750</span>,
+    <span class="k">"validationErrors"</span>: <span class="null">null</span>,
+    <span class="k">"transactionId"</span>: <span class="s">"100550"</span>,
+    <span class="k">"idempotencyKey"</span>: <span class="s">"9b8231a2-e784-4fba-a638-41acb9c09ca"</span>,
+    <span class="k">"processTime"</span>: <span class="s">"2025-12-20T16:37:51.496082+04:00"</span>
+  },
+  <span class="k">"isSuccess"</span>: <span class="b">false</span>
+}</pre>
+        </div>
+
+        <h4>Validation error örneği</h4>
+        <div class="panel-code">
+<pre>{
+  <span class="k">"result"</span>: <span class="null">null</span>,
+  <span class="k">"error"</span>: {
+    <span class="k">"httpStatus"</span>: <span class="n">400</span>,
+    <span class="k">"errorCode"</span>: <span class="n">70004</span>,
+    <span class="k">"errorMessage"</span>: <span class="s">"Validation exception occured"</span>,
+    <span class="k">"errorOriginCode"</span>: <span class="n">750</span>,
+    <span class="k">"validationErrors"</span>: [
+      <span class="s">"The Pin field is required."</span>,
+      <span class="s">"The DocumentNumber field is required."</span>,
+      <span class="s">"The LivePhoto field is required."</span>
+    ]
+  },
+  <span class="k">"isSuccess"</span>: <span class="b">false</span>
+}</pre>
+        </div>
+
+        <h4>Response result alanları (özet)</h4>
+        <table>
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><span class="name">pin</span></td><td>string</td><td>FIN</td></tr>
+            <tr><td><span class="name">documentNumber</span></td><td>string</td><td>Vesika no</td></tr>
+            <tr><td><span class="name">name / surname / patronymic</span></td><td>string</td><td>Kimlik bilgileri</td></tr>
+            <tr><td><span class="name">birthDate / birthAddress / address</span></td><td>string</td><td>Doğum / adres</td></tr>
+            <tr><td><span class="name">gender</span></td><td>string</td><td>Örn. MALE</td></tr>
+            <tr><td><span class="name">expDate</span></td><td>string</td><td>Vesika bitiş</td></tr>
+            <tr><td><span class="name">livenessScore / livenessStatus</span></td><td>double / bool</td><td>Canlılık</td></tr>
+            <tr><td><span class="name">similarityScore / similarityStatus</span></td><td>double / bool</td><td>Yüz eşleşme</td></tr>
+            <tr><td><span class="name">transactionId</span></td><td>string</td><td>SIMA işlem id — sakla</td></tr>
+            <tr><td><span class="name">idempotencyKey / processTime</span></td><td>string</td><td>İzleme</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout">
+          <strong>v1 dışı (şimdilik yazma):</strong>
+          <code class="inline">/verify/passport</code>,
+          <code class="inline">/verify/foreign</code>,
+          Global Identification. Sadece citizen verify.
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ERRORS -->
+<section class="section" id="errors">
+  <div class="head">
+    <h2>6. Hata kodları &amp; CarCat mapping</h2>
+    <span class="tag info">Errors</span>
+  </div>
+  <div class="body">
+    <p class="lead">SIMA <code class="inline">error.errorCode</code> → bizim API <code class="inline">code</code> + kullanıcı mesajı.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>SIMA code</th>
+          <th>Anlam</th>
+          <th>CarCat code</th>
+          <th>HTTP</th>
+          <th>Kullanıcıya</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="name">722</span></td>
+          <td>Bu FIN/vesika için aktif kayıt yok</td>
+          <td>SIMA_722</td>
+          <td>200</td>
+          <td>Kayıt bulunamadı, tekrar dene</td>
+        </tr>
+        <tr>
+          <td><span class="name">721</span></td>
+          <td>Vesikada foto yok</td>
+          <td>SIMA_721</td>
+          <td>200</td>
+          <td>Doğrulama yapılamaz (net mesaj)</td>
+        </tr>
+        <tr>
+          <td><span class="name">751</span></td>
+          <td>Liveness fail</td>
+          <td>SIMA_751</td>
+          <td>200</td>
+          <td>Yeni selfie (ışık/mesafe)</td>
+        </tr>
+        <tr>
+          <td><span class="name">752</span></td>
+          <td>Similarity fail</td>
+          <td>SIMA_752</td>
+          <td>200</td>
+          <td>Yüz eşleşmedi — 1 retry</td>
+        </tr>
+        <tr>
+          <td><span class="name">7530</span></td>
+          <td>Birden fazla yüz</td>
+          <td>SIMA_7530</td>
+          <td>200</td>
+          <td>Tek yüz iste</td>
+        </tr>
+        <tr>
+          <td><span class="name">7080–7082</span></td>
+          <td>Foto/base64 sorunlu</td>
+          <td>SIMA_708x</td>
+          <td>200 / 400</td>
+          <td>Yeniden çek</td>
+        </tr>
+        <tr>
+          <td><span class="name">713 / 714</span></td>
+          <td>documentNumber / birthDate kuralı</td>
+          <td>VALIDATION_ERROR</td>
+          <td>400</td>
+          <td>Alanları düzelt</td>
+        </tr>
+        <tr>
+          <td><span class="name">70002</span></td>
+          <td>Validation exception</td>
+          <td>VALIDATION_ERROR</td>
+          <td>400</td>
+          <td>Input kontrol</td>
+        </tr>
+        <tr>
+          <td><span class="name">710</span></td>
+          <td>Access not allowed</td>
+          <td>SIMA_UNAVAILABLE</td>
+          <td>502</td>
+          <td>Generic — credential/config, kullanıcıya detay yok</td>
+        </tr>
+        <tr>
+          <td><span class="name">750</span></td>
+          <td>Biometric service error</td>
+          <td>SIMA_UNAVAILABLE</td>
+          <td>502</td>
+          <td>Backoff retry + support log</td>
+        </tr>
+        <tr>
+          <td><span class="name">70000 / 716</span></td>
+          <td>Unexpected / system</td>
+          <td>SIMA_UNAVAILABLE</td>
+          <td>502</td>
+          <td>Generic</td>
+        </tr>
+        <tr>
+          <td><span class="name">70001</span></td>
+          <td>Not authorized (imza?)</td>
+          <td>SIMA_UNAVAILABLE</td>
+          <td>502</td>
+          <td>Minify/HMAC kontrol et — alert</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PHOTO -->
+<section class="section" id="photo">
+  <div class="head">
+    <h2>7. Foto / livePhoto kuralları</h2>
+    <span class="tag info">Flutter enforce</span>
+  </div>
+  <div class="body">
+    <p class="lead">Capture tarafında enforce edilmezse fail rate backend’e yansır.</p>
+    <ul>
+      <li>Yüz kadrajın <b>%70–80</b>’i; kenardan min 20px boşluk</li>
+      <li><b>Tek yüz</b> (7530 aksi halde)</li>
+      <li>Format: <b>JPEG</b></li>
+      <li>Çözünürlük: 640×480 – 1080×1920; dosya ≤ <b>1 MB</b></li>
+      <li>Face bounding box genişliği &gt; 200px</li>
+      <li>Kafa pozu pitch/yaw/roll ±20°</li>
+      <li>Nötr ifade, gözler açık, kamera bakışı</li>
+      <li>Filtre / crop / mask yok — sadece <b>downscale</b> izinli</li>
+    </ul>
+    <div class="callout ok">
+      <strong>Saklama:</strong> livePhoto DB/disk/S3/log’a yazılmaz. Sadece skor + transactionId + FIN metadata kalır.
+    </div>
+  </div>
+</section>
+
+<!-- ENV -->
+<section class="section" id="env">
+  <div class="head">
+    <h2>8. Env &amp; config</h2>
+    <span class="tag info">Ops</span>
+  </div>
+  <div class="body">
+    <div class="panel-code">
+<pre><span class="c"># Staging örneği — değerler gerçek değil</span>
+<span class="k">SIMA_BASE_URL</span>=https://sima-staging.example.az
+<span class="k">SIMA_IDENTIFIER</span>=12345
+<span class="k">SIMA_HMAC_KEY</span>=********
+<span class="k">SIMA_AUTH_SCHEME</span>=HMACSHA256
+<span class="k">SIMA_LIVENESS_THRESHOLD</span>=0.9
+<span class="k">SIMA_SIMILARITY_THRESHOLD</span>=0.9
+<span class="k">SIMA_KYC_ENABLED</span>=true
+<span class="k">SIMA_VERIFY_RATE_LIMIT_PER_USER</span>=5/hour</pre>
+    </div>
+    <ul>
+      <li>Key’ler secret store / env_file; repo’ya commit yok</li>
+      <li>Log: FIN maskele, photo asla loglama, transactionId + errorCode yaz</li>
+      <li>Feature flag ile prod kontrollü açılış</li>
+    </ul>
+
+    <h3>DB alanları (verify success sonrası)</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Örnek</th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">fin</span></td><td>10AAABC</td></tr>
+        <tr><td><span class="name">fin_verified</span></td><td>true</td></tr>
+        <tr><td><span class="name">fin_verified_at</span></td><td>timestamptz</td></tr>
+        <tr><td><span class="name">sima_transaction_id</span></td><td>100550</td></tr>
+        <tr><td><span class="name">liveness_score / similarity_score</span></td><td>0.99 / 0.99</td></tr>
+        <tr><td><span class="name">liveness_threshold / similarity_threshold</span></td><td>0.9 / 0.9</td></tr>
+      </tbody>
+    </table>
+    <p>Constraint: verified FIN unique. Collision → 409 FIN_COLLISION.</p>
+  </div>
+</section>
+
+<footer>
+  CarCat · SIMA KYC API Roadmap · Internal ·
+  Yenilemek için bu HTML’i düzenle · İlgili PDF: docs/SIMA_ROADMAP.pdf
+</footer>
+
+</div>
+</body>
+</html>
