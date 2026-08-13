@@ -1271,13 +1271,32 @@ public class CarServiceImpl implements CarService {
             Optional<Car> plateOwner = carRepository.findByPlateNumberIgnoreCase(plateNumber);
             if (plateOwner.isPresent()) {
                 Car conflictingCar = plateOwner.get();
-                throwAddCarFailure(logUserId,
-                        "plateNumber already exists | plateNumber=" + plateNumber
-                                + ", existingCarId=" + conflictingCar.getCarId()
-                                + ", existingVin=" + conflictingCar.getVin()
-                                + ", requestVin=" + vin,
-                        new AlreadyExistsException(
-                                MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                // Only block when plate is already owned; orphan cars (no customer) can be claimed.
+                if (conflictingCar.getCustomer() != null) {
+                    throwAddCarFailure(logUserId,
+                            "plateNumber already exists | plateNumber=" + plateNumber
+                                    + ", existingCarId=" + conflictingCar.getCarId()
+                                    + ", existingVin=" + conflictingCar.getVin()
+                                    + ", ownerUserId=" + conflictingCar.getCustomer().getUserId()
+                                    + ", requestVin=" + vin,
+                            new AlreadyExistsException(
+                                    MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                }
+                log.info("[addCar] BRANCH existing plate without customer | linking carId={} to customerUserId={}, plateNumber={}, existingVin={}, requestVin={}",
+                        conflictingCar.getCarId(), customer.getUserId(), plateNumber, conflictingCar.getVin(), vin);
+                conflictingCar.setCustomer(customer);
+                if (customer.getCars() == null) {
+                    customer.setCars(new ArrayList<>());
+                }
+                if (!customer.getCars().contains(conflictingCar)) {
+                    customer.getCars().add(conflictingCar);
+                }
+                carRepository.save(conflictingCar);
+                customerRepository.save(customer);
+                CarResponse response = convertCarEntityToResponse(conflictingCar, acceptLanguage, "fromDb");
+                log.info("[addCar] END success (existing plate car linked) | carId={}, vin={}, plateNumber={}",
+                        response.getCarId(), response.getVin(), response.getPlateNumber());
+                return response;
             }
             log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
 
