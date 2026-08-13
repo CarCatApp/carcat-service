@@ -20,7 +20,9 @@ import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -38,24 +40,36 @@ public class SimaKycService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Raw SIMA proxy for Postman / curl parity — no Customer / X-User-Id.
-     * Posts to pre-biosign {@code /api/v1/kyc/identity/verify} with fresh UUID + HMAC.
+     * Raw SIMA proxy for Postman / Flutter — multipart photo → Base64, then HMAC + fresh UUID.
+     * Posts to pre-biosign {@code /api/v1/kyc/identity/verify}. No Customer / X-User-Id.
      */
-    public SimaApiEnvelope testIdentityVerify(SimaCitizenVerifyRequest request) {
+    public SimaApiEnvelope testIdentityVerify(
+            String pin,
+            String documentNumber,
+            String birthDate,
+            MultipartFile photo
+    ) {
+        SimaCitizenVerifyRequest request = SimaCitizenVerifyRequest.builder()
+                .pin(pin)
+                .documentNumber(blankToNull(documentNumber))
+                .birthDate(blankToNull(birthDate))
+                .livePhoto(toJpegBase64(photo))
+                .build();
         validateCitizenXor(request);
+
         String idempotencyKey = UUID.randomUUID().toString();
         SimaCitizenFeignBody body = SimaCitizenFeignBody.builder()
                 .pin(request.getPin())
-                .documentNumber(blankToNull(request.getDocumentNumber()))
-                .birthDate(blankToNull(request.getBirthDate()))
+                .documentNumber(request.getDocumentNumber())
+                .birthDate(request.getBirthDate())
                 .livePhoto(request.getLivePhoto())
                 .idempotencyKey(idempotencyKey)
                 .build();
 
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
-        log.info("SIMA test/identity/verify idempotencyKey={} bodyBytes={} signature={}",
-                idempotencyKey, minified.length(), signature);
+        log.info("SIMA test/identity/verify idempotencyKey={} photoBytes={} bodyBytes={} signature={}",
+                idempotencyKey, photo.getSize(), minified.length(), signature);
 
         try {
             return simaFeign.verifyCitizen(
@@ -67,6 +81,27 @@ public class SimaKycService {
             );
         } catch (FeignException e) {
             return parseFeignErrorEnvelope(e, idempotencyKey);
+        }
+    }
+
+    /** Multipart JPEG → Base64 for SIMA livePhoto (no data: prefix). */
+    private String toJpegBase64(MultipartFile photo) {
+        if (photo == null || photo.isEmpty()) {
+            throw new IllegalArgumentException("photo file required");
+        }
+        try {
+            byte[] bytes = photo.getBytes();
+            if (bytes.length > 1024 * 1024) {
+                throw new IllegalArgumentException("photo must be <= 1MB (SIMA limit)");
+            }
+            if (bytes.length < 2 || bytes[0] != (byte) 0xFF || bytes[1] != (byte) 0xD8) {
+                throw new IllegalArgumentException("photo must be JPEG (SOI FF D8)");
+            }
+            return Base64.getEncoder().encodeToString(bytes);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to read photo: " + e.getMessage(), e);
         }
     }
 

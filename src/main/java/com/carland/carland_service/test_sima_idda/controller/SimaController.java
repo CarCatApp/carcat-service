@@ -7,11 +7,15 @@ import com.carland.carland_service.test_sima_idda.dto.response.SimaVerifyRespons
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
 import com.carland.carland_service.test_sima_idda.service.SimaKycService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * CarCat SIMA KYC demo APIs — HTML-aligned verify channels.
@@ -25,14 +29,21 @@ public class SimaController {
     private final SimaKycService simaKycService;
 
     /**
-     * Curl/Postman parity test — HMAC + fresh UUID inside service, then POST SIMA staging
-     * {@code https://pre-biosign-biometric-kyc.sima.az/api/v1/kyc/identity/verify}.
-     * No X-User-Id / Customer required. Body: pin + (documentNumber XOR birthDate) + livePhoto.
+     * Postman/Flutter test — multipart photo; service converts JPEG → Base64, HMAC + fresh UUID,
+     * then POST SIMA staging {@code /api/v1/kyc/identity/verify}.
+     * Form: pin, documentNumber XOR birthDate, photo (file).
+     * Staging defaults: pin=62HJ5KQ, documentNumber=AB0668397.
      */
-    @PostMapping("/test/identity/verify")
-    public SimaApiEnvelope testIdentityVerify(@RequestBody SimaCitizenVerifyRequest request) {
-        return simaKycService.testIdentityVerify(request);
+    @PostMapping(value = "/test/identity/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public SimaApiEnvelope testIdentityVerify(
+            @RequestParam("pin") String pin,
+            @RequestParam(value = "documentNumber", required = false) String documentNumber,
+            @RequestParam(value = "birthDate", required = false) String birthDate,
+            @RequestPart("photo") MultipartFile photo
+    ) {
+        return simaKycService.testIdentityVerify(pin, documentNumber, birthDate, photo);
     }
+
 
     /**
      * Verify Citizen Identity — AZ ID card.

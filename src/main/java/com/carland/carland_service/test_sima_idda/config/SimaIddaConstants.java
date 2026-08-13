@@ -26,6 +26,10 @@ public final class SimaIddaConstants {
     /** Optional DeviceInfo header (same as curl tests). */
     public static final String EXAMPLE_SIMA_DEVICE_INFO = "carland-sima-test";
 
+    /** Staging test person — Postman / Swagger defaults (not auto-filled on request). */
+    public static final String EXAMPLE_TEST_PIN = "62HJ5KQ";
+    public static final String EXAMPLE_TEST_DOCUMENT_NUMBER = "AB0668397";
+
     /** Recommended partner thresholds (configured on SIMA side; documented for gate clarity). */
     public static final double EXAMPLE_LIVENESS_THRESHOLD = 0.9;
     public static final double EXAMPLE_SIMILARITY_THRESHOLD = 0.9;
