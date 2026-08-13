@@ -4,6 +4,7 @@ import com.carland.carland_service.test_sima_idda.dto.request.SimaCitizenVerifyR
 import com.carland.carland_service.test_sima_idda.dto.request.SimaForeignVerifyRequest;
 import com.carland.carland_service.test_sima_idda.dto.request.SimaPassportVerifyRequest;
 import com.carland.carland_service.test_sima_idda.dto.response.SimaVerifyResponse;
+import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
 import com.carland.carland_service.test_sima_idda.service.SimaKycService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class SimaController {
 
     private final SimaKycService simaKycService;
+
+    /**
+     * Curl/Postman parity test — HMAC + fresh UUID inside service, then POST SIMA staging
+     * {@code https://pre-biosign-biometric-kyc.sima.az/api/v1/kyc/identity/verify}.
+     * No X-User-Id / Customer required. Body: pin + (documentNumber XOR birthDate) + livePhoto.
+     */
+    @PostMapping("/test/identity/verify")
+    public SimaApiEnvelope testIdentityVerify(@RequestBody SimaCitizenVerifyRequest request) {
+        return simaKycService.testIdentityVerify(request);
+    }
 
     /**
      * Verify Citizen Identity — AZ ID card.

@@ -13,7 +13,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.ALWAYS)
+/** Omit null XOR field (documentNumber | birthDate) so body matches curl minify. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SimaCitizenFeignBody {
     private String pin;
     private String documentNumber;

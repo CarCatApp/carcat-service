@@ -24,6 +24,7 @@ public interface SimaFeign {
             @RequestHeader("Identifier") String identifier,
             @RequestHeader("Auth-Scheme") String authScheme,
             @RequestHeader("Signature") String signature,
+            @RequestHeader(value = "DeviceInfo", required = false) String deviceInfo,
             @RequestBody String minifiedJsonBody
     );
 
@@ -32,6 +33,7 @@ public interface SimaFeign {
             @RequestHeader("Identifier") String identifier,
             @RequestHeader("Auth-Scheme") String authScheme,
             @RequestHeader("Signature") String signature,
+            @RequestHeader(value = "DeviceInfo", required = false) String deviceInfo,
             @RequestBody String minifiedJsonBody
     );
 
@@ -40,6 +42,7 @@ public interface SimaFeign {
             @RequestHeader("Identifier") String identifier,
             @RequestHeader("Auth-Scheme") String authScheme,
             @RequestHeader("Signature") String signature,
+            @RequestHeader(value = "DeviceInfo", required = false) String deviceInfo,
             @RequestBody String minifiedJsonBody
     );
 }

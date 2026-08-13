@@ -12,8 +12,11 @@ import com.carland.carland_service.test_sima_idda.dto.sima.SimaCitizenFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaForeignFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaIdentityResult;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaPassportFeignBody;
+import com.carland.carland_service.test_sima_idda.dto.sima.SimaErrorBody;
 import com.carland.carland_service.test_sima_idda.feign.SimaFeign;
 import com.carland.carland_service.test_sima_idda.hmac.SimaHmacSigner;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,40 @@ public class SimaKycService {
 
     private final SimaFeign simaFeign;
     private final CustomerRepository customerRepository;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Raw SIMA proxy for Postman / curl parity — no Customer / X-User-Id.
+     * Posts to pre-biosign {@code /api/v1/kyc/identity/verify} with fresh UUID + HMAC.
+     */
+    public SimaApiEnvelope testIdentityVerify(SimaCitizenVerifyRequest request) {
+        validateCitizenXor(request);
+        String idempotencyKey = UUID.randomUUID().toString();
+        SimaCitizenFeignBody body = SimaCitizenFeignBody.builder()
+                .pin(request.getPin())
+                .documentNumber(blankToNull(request.getDocumentNumber()))
+                .birthDate(blankToNull(request.getBirthDate()))
+                .livePhoto(request.getLivePhoto())
+                .idempotencyKey(idempotencyKey)
+                .build();
+
+        String minified = SimaHmacSigner.minify(body);
+        String signature = SimaHmacSigner.signBase64(minified);
+        log.info("SIMA test/identity/verify idempotencyKey={} bodyBytes={} signature={}",
+                idempotencyKey, minified.length(), signature);
+
+        try {
+            return simaFeign.verifyCitizen(
+                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
+                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    signature,
+                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    minified
+            );
+        } catch (FeignException e) {
+            return parseFeignErrorEnvelope(e, idempotencyKey);
+        }
+    }
 
     public SimaVerifyResponse verifyCitizen(String userIdHeader, SimaCitizenVerifyRequest request) {
         Customer customer = requireCustomer(userIdHeader);
@@ -40,8 +77,8 @@ public class SimaKycService {
         String idempotencyKey = UUID.randomUUID().toString();
         SimaCitizenFeignBody body = SimaCitizenFeignBody.builder()
                 .pin(request.getPin())
-                .documentNumber(request.getDocumentNumber())
-                .birthDate(request.getBirthDate())
+                .documentNumber(blankToNull(request.getDocumentNumber()))
+                .birthDate(blankToNull(request.getBirthDate()))
                 .livePhoto(request.getLivePhoto())
                 .idempotencyKey(idempotencyKey)
                 .build();
@@ -49,12 +86,18 @@ public class SimaKycService {
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
 
-        SimaApiEnvelope envelope = simaFeign.verifyCitizen(
-                SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
-                signature,
-                minified
-        );
+        SimaApiEnvelope envelope;
+        try {
+            envelope = simaFeign.verifyCitizen(
+                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
+                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    signature,
+                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    minified
+            );
+        } catch (FeignException e) {
+            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
+        }
         return handleEnvelope(customer, envelope, "citizen");
     }
 
@@ -72,12 +115,18 @@ public class SimaKycService {
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
 
-        SimaApiEnvelope envelope = simaFeign.verifyPassport(
-                SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
-                signature,
-                minified
-        );
+        SimaApiEnvelope envelope;
+        try {
+            envelope = simaFeign.verifyPassport(
+                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
+                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    signature,
+                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    minified
+            );
+        } catch (FeignException e) {
+            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
+        }
         return handleEnvelope(customer, envelope, "passport");
     }
 
@@ -95,13 +144,44 @@ public class SimaKycService {
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
 
-        SimaApiEnvelope envelope = simaFeign.verifyForeign(
-                SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
-                signature,
-                minified
-        );
+        SimaApiEnvelope envelope;
+        try {
+            envelope = simaFeign.verifyForeign(
+                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
+                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    signature,
+                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    minified
+            );
+        } catch (FeignException e) {
+            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
+        }
         return handleEnvelope(customer, envelope, "foreign");
+    }
+
+    private SimaApiEnvelope parseFeignErrorEnvelope(FeignException e, String idempotencyKey) {
+        String content = e.contentUTF8();
+        log.warn("SIMA Feign status={} bodySnippet={}", e.status(),
+                content != null && content.length() > 400 ? content.substring(0, 400) : content);
+        if (content != null && !content.isBlank()) {
+            try {
+                return objectMapper.readValue(content, SimaApiEnvelope.class);
+            } catch (Exception parseEx) {
+                log.warn("SIMA error body parse failed: {}", parseEx.getMessage());
+            }
+        }
+        return SimaApiEnvelope.builder()
+                .isSuccess(false)
+                .error(SimaErrorBody.builder()
+                        .httpStatus(e.status())
+                        .errorMessage(e.getMessage())
+                        .idempotencyKey(idempotencyKey)
+                        .build())
+                .build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private SimaVerifyResponse handleEnvelope(Customer customer, SimaApiEnvelope envelope, String channel) {
