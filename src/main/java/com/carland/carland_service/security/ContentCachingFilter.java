@@ -29,6 +29,12 @@ public class ContentCachingFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        // Multipart must not be wrapped — ContentCachingRequestWrapper can yield empty MultipartFile parts.
+        String contentType = request.getContentType();
+        if (contentType != null && contentType.toLowerCase().startsWith("multipart/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         HttpServletRequest wrapped = request instanceof ContentCachingRequestWrapper
                 ? request
                 : new ContentCachingRequestWrapper(request);

@@ -2,12 +2,12 @@
   "info": {
     "_postman_id": "a1b2c3d4-sima-test-0001",
     "name": "testSIMA",
-    "description": "SIMA KYC tests (defaults: pin=62HJ5KQ, documentNumber=AB0668397). Carland request: form-data photo file (service → Base64 → SIMA). Direct SIMA: still needs livePhoto Base64 (SIMA API).",
+    "description": "Postman → Carland (Kong) → Feign → SIMA. URL: https://digital-innovation.agency/carland/server-carland/api/v1/sima/test/identity/verify. Defaults pin=62HJ5KQ, documentNumber=AB0668397. form-data photo file; service Base64+HMAC.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Carland — /api/v1/sima/test/identity/verify (photo file)",
+      "name": "Carland — test/identity/verify (photo file)",
       "request": {
         "method": "POST",
         "header": [],
@@ -29,24 +29,25 @@
               "value": "",
               "type": "text",
               "disabled": true,
-              "description": "XOR with documentNumber — leave disabled when documentNumber set"
+              "description": "XOR — documentNumber varken kapali tut"
             },
             {
               "key": "photo",
               "type": "file",
               "src": "",
-              "description": "Select JPEG file in Postman (File). Service converts to Base64 for SIMA."
+              "description": "JPEG Sec (File). Carland Feign ile SIMA-ya gider."
             }
           ]
         },
         "url": {
-          "raw": "http://localhost:9091/api/v1/sima/test/identity/verify",
-          "protocol": "http",
+          "raw": "https://digital-innovation.agency/carland/server-carland/api/v1/sima/test/identity/verify",
+          "protocol": "https",
           "host": [
-            "localhost"
+            "digital-innovation.agency"
           ],
-          "port": "9091",
           "path": [
+            "carland",
+            "server-carland",
             "api",
             "v1",
             "sima",
@@ -55,7 +56,7 @@
             "verify"
           ]
         },
-        "description": "multipart/form-data: pin + documentNumber + photo (JPEG file). Controller receives photo; service Base64-encodes and POSTs to SIMA pre-biosign with HMAC 1155. In Body → form-data → photo → Select Files."
+        "description": "Public Carland microservice. Controller photo alir, service Base64 + HMAC, SimaFeign → https://pre-biosign-biometric-kyc.sima.az/api/v1/kyc/identity/verify"
       },
       "response": []
     },

@@ -87,12 +87,17 @@ public class SimaKycService {
     /** Multipart JPEG → Base64 for SIMA livePhoto (no data: prefix). */
     private String toJpegBase64(MultipartFile photo) {
         if (photo == null || photo.isEmpty()) {
-            throw new IllegalArgumentException("photo file required");
+            String name = photo == null ? "null" : photo.getOriginalFilename();
+            long size = photo == null ? -1 : photo.getSize();
+            String ct = photo == null ? "null" : photo.getContentType();
+            throw new IllegalArgumentException(
+                    "photo file required/empty (name=" + name + ", size=" + size + ", contentType=" + ct
+                            + "). Postman: form-data key must be 'photo', type File.");
         }
         try {
             byte[] bytes = photo.getBytes();
             if (bytes.length > 1024 * 1024) {
-                throw new IllegalArgumentException("photo must be <= 1MB (SIMA limit)");
+                throw new IllegalArgumentException("photo must be <= 1MB (SIMA limit), got=" + bytes.length);
             }
             if (bytes.length < 2 || bytes[0] != (byte) 0xFF || bytes[1] != (byte) 0xD8) {
                 throw new IllegalArgumentException("photo must be JPEG (SOI FF D8)");

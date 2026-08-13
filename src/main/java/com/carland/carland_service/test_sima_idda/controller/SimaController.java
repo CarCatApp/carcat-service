@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,7 +38,7 @@ public class SimaController {
             @RequestParam("pin") String pin,
             @RequestParam(value = "documentNumber", required = false) String documentNumber,
             @RequestParam(value = "birthDate", required = false) String birthDate,
-            @RequestPart("photo") MultipartFile photo
+            @RequestParam("photo") MultipartFile photo
     ) {
         return simaKycService.testIdentityVerify(pin, documentNumber, birthDate, photo);
     }
