@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature Flags — Carland Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --green: #16a34a;
+      --red: #dc2626;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .topbar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+    .brand .logo {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+    }
+    .nav-links { display: flex; align-items: center; gap: 4px; margin-left: 10px; }
+    .nav-link {
+      padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      text-decoration: none; color: var(--text-muted);
+    }
+    .nav-link:hover { background: #f1f5f9; color: var(--text); }
+    .nav-link.active { background: #eff6ff; color: var(--primary); }
+    .btn-logout {
+      display: inline-flex; padding: 9px 16px; border-radius: 8px;
+      border: 1px solid var(--border); text-decoration: none; color: var(--text-muted); font-weight: 600;
+    }
+    .btn-logout:hover { border-color: var(--red); color: var(--red); }
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px 48px; }
+    .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .page-head h1 { font-size: 22px; }
+    .muted { color: var(--text-muted); font-size: 13px; }
+    .version-bar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 14px;
+    }
+    .ver-btn {
+      border: 1px solid var(--border); background: #fff; border-radius: 999px;
+      padding: 6px 14px; font-weight: 700; cursor: pointer; font-size: 13px;
+    }
+    .ver-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .ver-btn.current { box-shadow: 0 0 0 2px #bfdbfe; }
+    .new-ver { display: flex; gap: 6px; margin-left: auto; }
+    .new-ver input {
+      border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 110px;
+    }
+    .new-ver button {
+      background: var(--primary); color: #fff; border: 0; border-radius: 8px;
+      padding: 6px 12px; font-weight: 700; cursor: pointer;
+    }
+    .table-wrap {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      overflow: auto; max-height: calc(100vh - 280px);
+    }
+    table { border-collapse: collapse; min-width: 980px; width: 100%; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; vertical-align: middle; }
+    th { position: sticky; top: 0; background: #0f172a; color: #fff; z-index: 5; }
+    td.path { position: sticky; left: 0; background: #fff; font-family: Consolas, monospace; font-size: 12px; white-space: nowrap; z-index: 2; }
+    .method {
+      display: inline-block; min-width: 52px; text-align: center; font-size: 11px; font-weight: 800;
+      border-radius: 4px; padding: 2px 6px; margin-right: 8px; color: #fff;
+    }
+    .GET { background: #2563eb; } .POST { background: #16a34a; } .PUT { background: #d97706; }
+    .PATCH { background: #7c3aed; } .DELETE { background: #dc2626; }
+    .cell { display: flex; gap: 4px; }
+    .chip {
+      border: 0; border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 800;
+      cursor: pointer; color: #fff; min-width: 68px;
+    }
+    .chip.on { background: var(--green); }
+    .chip.off { background: var(--red); opacity: 0.9; }
+    .chip:disabled { cursor: default; opacity: 0.45; }
+    .never { font-size: 11px; color: #b45309; font-weight: 700; margin-left: 6px; }
+    .audit {
+      margin-top: 18px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px;
+    }
+    .audit h2 { font-size: 16px; margin-bottom: 10px; }
+    .audit table td { font-size: 12px; }
+    .err { color: var(--red); font-weight: 600; margin: 8px 0; }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">&#128663;</span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link active" href="/admin/feature-flags">Feature Flags</a>
+    </nav>
+  </div>
+  <a class="btn-logout" href="/admin/logout">Logout</a>
+</header>
+
+<div class="container">
+  <div class="page-head">
+    <h1>Feature Flags</h1>
+    <span class="muted">Rows = Spring APIs · Columns = roles · Selected = green, others = red</span>
+  </div>
+
+  <div class="version-bar" id="versionBar"></div>
+  <div class="err" id="errorBox" hidden></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr id="headRow">
+          <th>API</th>
+        </tr>
+      </thead>
+      <tbody id="gridBody">
+        <tr><td class="muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="audit">
+    <h2>Change history</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>When</th><th>Who</th><th>Endpoint</th><th>Role</th><th>Change</th>
+        </tr>
+      </thead>
+      <tbody id="auditBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let currentVersion = null;
+  const STATES = ["HIDDEN", "ENABLED", "DISABLED"];
+  const LABELS = { HIDDEN: "Hidden", ENABLED: "Enable", DISABLED: "Disable" };
+
+  function showError(msg) {
+    const box = document.getElementById("errorBox");
+    if (!msg) { box.hidden = true; box.textContent = ""; return; }
+    box.hidden = false;
+    box.textContent = msg;
+  }
+
+  async function loadGrid(version) {
+    showError("");
+    const qs = version ? ("?version=" + encodeURIComponent(version)) : "";
+    const res = await fetch("/admin/api/feature-flags/grid" + qs, { credentials: "same-origin" });
+    if (res.status === 401) { window.location.href = "/admin/"; return; }
+    if (!res.ok) { showError("Grid load failed"); return; }
+    const data = await res.json();
+    currentVersion = data.version;
+    renderVersions(data.versions || [], data.version);
+    renderTable(data.roles || [], data.endpoints || []);
+    renderAudit(data.audit || []);
+  }
+
+  function renderVersions(versions, selected) {
+    const bar = document.getElementById("versionBar");
+    const last5 = versions.slice(0, 5);
+    bar.innerHTML = last5.map(v => {
+      const cls = ["ver-btn", v.semver === selected ? "active" : "", v.current ? "current" : ""].join(" ");
+      return `<button class="${cls}" data-v="${v.semver}">${v.semver}${v.current ? " · current" : ""}</button>`;
+    }).join("") + `
+      <form class="new-ver" id="newVerForm">
+        <input name="semver" placeholder="2.2.0" required />
+        <button type="submit">Add version</button>
+      </form>`;
+    bar.querySelectorAll(".ver-btn").forEach(btn => {
+      btn.onclick = () => loadGrid(btn.dataset.v);
+    });
+    document.getElementById("newVerForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const semver = e.target.semver.value.trim();
+      const res = await fetch("/admin/api/feature-flags/versions", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ semver, copyFrom: currentVersion })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { showError(body.error || "Create version failed"); return; }
+      loadGrid(semver);
+    };
+  }
+
+  function renderTable(roles, endpoints) {
+    const head = document.getElementById("headRow");
+    head.innerHTML = "<th>API</th>" + roles.map(r => `<th>${r}</th>`).join("");
+    const body = document.getElementById("gridBody");
+    if (!endpoints.length) {
+      body.innerHTML = `<tr><td class="muted">No endpoints</td></tr>`;
+      return;
+    }
+    body.innerHTML = endpoints.map(ep => {
+      const never = ep.neverGuard ? `<span class="never">never-guard</span>` : "";
+      const cells = roles.map(role => cellHtml(ep, role)).join("");
+      return `<tr>
+        <td class="path"><span class="method ${ep.method}">${ep.method}</span>${ep.path}${never}</td>
+        ${cells}
+      </tr>`;
+    }).join("");
+    body.querySelectorAll(".chip").forEach(chip => {
+      chip.onclick = () => setState(chip);
+    });
+  }
+
+  function cellHtml(ep, role) {
+    const selected = (ep.states && ep.states[role]) || "ENABLED";
+    const disabled = ep.neverGuard ? "disabled" : "";
+    const chips = STATES.map(st => {
+      const on = st === selected ? "on" : "off";
+      return `<button class="chip ${on}" ${disabled}
+        data-method="${ep.method}" data-path="${ep.path}" data-role="${role}" data-state="${st}">${LABELS[st]}</button>`;
+    }).join("");
+    return `<td><div class="cell">${chips}</div></td>`;
+  }
+
+  async function setState(chip) {
+    if (chip.disabled) return;
+    const payload = {
+      version: currentVersion,
+      method: chip.dataset.method,
+      path: chip.dataset.path,
+      role: chip.dataset.role,
+      state: chip.dataset.state
+    };
+    const res = await fetch("/admin/api/feature-flags/state", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { showError(body.error || "Update failed"); return; }
+    const wrap = chip.parentElement;
+    wrap.querySelectorAll(".chip").forEach(c => {
+      c.classList.toggle("on", c.dataset.state === payload.state);
+      c.classList.toggle("off", c.dataset.state !== payload.state);
+    });
+    loadGrid(currentVersion);
+  }
+
+  function renderAudit(rows) {
+    const body = document.getElementById("auditBody");
+    if (!rows.length) {
+      body.innerHTML = `<tr><td class="muted" colspan="5">No changes yet</td></tr>`;
+      return;
+    }
+    body.innerHTML = rows.map(r => `<tr>
+      <td>${r.at || ""}</td>
+      <td>${r.actor || ""}</td>
+      <td>${r.method || ""} ${r.path || ""}</td>
+      <td>${r.role || ""}</td>
+      <td>${r.oldState || "—"} → ${r.newState || ""}</td>
+    </tr>`).join("");
+  }
+
+  loadGrid();
+</script>
+</body>
+</html>

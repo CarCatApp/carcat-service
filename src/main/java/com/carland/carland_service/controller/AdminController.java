@@ -76,9 +76,15 @@ public class AdminController {
             HttpSession session
     ) {
 
-        if ("nemet".equals(username) && "nemet".equals(password)) {
+        if ("nemet".equals(username) && "nemet".equals(password)
+                || "aziz".equals(username) && "aziz".equals(password)
+                || "jeyhun".equals(username) && "jeyhun".equals(password)
+                || "rasul".equals(username) && "rasul".equals(password)
+                || "ismayil".equals(username) && "ismayil".equals(password)
+                || "tale".equals(username) && "tale".equals(password)) {
 
             session.setAttribute("ADMIN_LOGIN", true);
+            session.setAttribute("ADMIN_USERNAME", username);
 
             return "redirect:" + ADMIN_URL + "/admin/cars";
         }
