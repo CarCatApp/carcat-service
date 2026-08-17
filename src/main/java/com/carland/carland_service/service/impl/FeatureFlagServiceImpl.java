@@ -54,34 +54,29 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FeatureFlagMeItem> me(String appVersionHeader) {
-        AppVersion version = resolveVersion(appVersionHeader);
-        List<FeatureFlagRoleState> rows = roleStateRepository.findByVersionFetchEndpoint(version);
-        String evaluatedAt = Instant.now().toString();
-
-        Map<UserRoles, Map<String, FeatureFlagState>> byRole = new LinkedHashMap<>();
-        for (UserRoles role : GRID_ROLES) {
-            byRole.put(role, new LinkedHashMap<>());
+    public FeatureFlagMeItem me(String roleHeader, String appVersionHeader) {
+        UserRoles role = parseRole(roleHeader);
+        if (role == null) {
+            throw new IllegalArgumentException("role header required (USER|ADMIN|SUPER_ADMIN|BOSS)");
         }
-        for (FeatureFlagRoleState row : rows) {
+        AppVersion version = resolveVersion(appVersionHeader);
+        Map<String, FeatureFlagState> flags = new LinkedHashMap<>();
+        for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchEndpoint(version)) {
+            if (row.getRole() != role) {
+                continue;
+            }
             FeatureFlagEndpoint ep = row.getEndpoint();
             if (ep.isNeverGuard()) {
                 continue;
             }
-            String key = ep.getHttpMethod() + " " + ep.getPathPattern();
-            byRole.get(row.getRole()).put(key, row.getState());
+            flags.put(ep.getHttpMethod() + " " + ep.getPathPattern(), row.getState());
         }
-
-        List<FeatureFlagMeItem> out = new ArrayList<>();
-        for (UserRoles role : GRID_ROLES) {
-            out.add(FeatureFlagMeItem.builder()
-                    .role(role.name())
-                    .appVersion(version.getSemver())
-                    .evaluatedAt(evaluatedAt)
-                    .flags(byRole.get(role))
-                    .build());
-        }
-        return out;
+        return FeatureFlagMeItem.builder()
+                .role(role.name())
+                .appVersion(version.getSemver())
+                .evaluatedAt(Instant.now().toString())
+                .flags(flags)
+                .build();
     }
 
     @Override
@@ -189,14 +184,17 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 : appVersionRepository.findByCurrentTrue()
                 .orElseThrow(() -> new IllegalArgumentException("No current version"));
 
-        appVersionRepository.findByCurrentTrue().ifPresent(current -> {
-            current.setCurrent(false);
-            appVersionRepository.save(current);
-        });
+        boolean makeCurrent = request.isMakeCurrent();
+        if (makeCurrent) {
+            appVersionRepository.findByCurrentTrue().ifPresent(current -> {
+                current.setCurrent(false);
+                appVersionRepository.save(current);
+            });
+        }
 
         AppVersion created = appVersionRepository.save(AppVersion.builder()
                 .semver(semver)
-                .current(true)
+                .current(makeCurrent)
                 .createdAt(LocalDateTime.now())
                 .build());
 
@@ -211,6 +209,26 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         reloadCache();
         return created;
+    }
+
+    @Override
+    @Transactional
+    public AppVersion setCurrentVersion(String semver) {
+        if (semver == null || semver.isBlank()) {
+            throw new IllegalArgumentException("semver required");
+        }
+        AppVersion target = appVersionRepository.findBySemver(semver.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Unknown version " + semver));
+        if (!target.isCurrent()) {
+            appVersionRepository.findByCurrentTrue().ifPresent(current -> {
+                current.setCurrent(false);
+                appVersionRepository.save(current);
+            });
+            target.setCurrent(true);
+            appVersionRepository.save(target);
+            reloadCache();
+        }
+        return target;
     }
 
     @Override

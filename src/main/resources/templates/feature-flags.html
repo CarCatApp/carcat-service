@@ -68,7 +68,12 @@
     }
     .ver-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
     .ver-btn.current { box-shadow: 0 0 0 2px #bfdbfe; }
-    .new-ver { display: flex; gap: 6px; margin-left: auto; }
+    .new-ver { display: flex; gap: 8px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+    .new-ver label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+    .set-current {
+      border: 1px solid var(--primary); background: #eff6ff; color: var(--primary);
+      border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 12px;
+    }
     .new-ver input {
       border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 110px;
     }
@@ -185,25 +190,45 @@
   function renderVersions(versions, selected) {
     const bar = document.getElementById("versionBar");
     const last5 = versions.slice(0, 5);
+    const selectedMeta = last5.find(v => v.semver === selected);
+    const setCurrentBtn = (selectedMeta && !selectedMeta.current)
+      ? `<button type="button" class="set-current" id="setCurrentBtn">Set current</button>`
+      : "";
     bar.innerHTML = last5.map(v => {
       const cls = ["ver-btn", v.semver === selected ? "active" : "", v.current ? "current" : ""].join(" ");
-      return `<button class="${cls}" data-v="${v.semver}">${v.semver}${v.current ? " · current" : ""}</button>`;
-    }).join("") + `
+      return `<button type="button" class="${cls}" data-v="${v.semver}">${v.semver}${v.current ? " · current" : ""}</button>`;
+    }).join("") + setCurrentBtn + `
       <form class="new-ver" id="newVerForm">
         <input name="semver" placeholder="2.2.0" required />
+        <label><input type="checkbox" name="makeCurrent" /> Make current</label>
         <button type="submit">Add version</button>
       </form>`;
     bar.querySelectorAll(".ver-btn").forEach(btn => {
       btn.onclick = () => loadGrid(btn.dataset.v);
     });
+    const setBtn = document.getElementById("setCurrentBtn");
+    if (setBtn) {
+      setBtn.onclick = async () => {
+        const res = await fetch("/admin/api/feature-flags/versions/current", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ semver: currentVersion })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { showError(body.error || "Set current failed"); return; }
+        loadGrid(currentVersion);
+      };
+    }
     document.getElementById("newVerForm").onsubmit = async (e) => {
       e.preventDefault();
       const semver = e.target.semver.value.trim();
+      const makeCurrent = e.target.makeCurrent.checked;
       const res = await fetch("/admin/api/feature-flags/versions", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ semver, copyFrom: currentVersion })
+        body: JSON.stringify({ semver, copyFrom: currentVersion, makeCurrent })
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { showError(body.error || "Create version failed"); return; }
@@ -237,7 +262,7 @@
     const disabled = ep.neverGuard ? "disabled" : "";
     const chips = STATES.map(st => {
       const on = st === selected ? "on" : "off";
-      return `<button class="chip ${on}" ${disabled}
+      return `<button type="button" class="chip ${on}" ${disabled}
         data-method="${ep.method}" data-path="${ep.path}" data-role="${role}" data-state="${st}">${LABELS[st]}</button>`;
     }).join("");
     return `<td><div class="cell">${chips}</div></td>`;
@@ -253,13 +278,15 @@
       state: chip.dataset.state
     };
     const res = await fetch("/admin/api/feature-flags/state", {
-      method: "PATCH",
+      method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) { showError(body.error || "Update failed"); return; }
+    const raw = await res.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw.slice(0, 180) }; }
+    if (!res.ok) { showError(body.error || body.message || ("Update failed HTTP " + res.status)); return; }
     const wrap = chip.parentElement;
     wrap.querySelectorAll(".chip").forEach(c => {
       c.classList.toggle("on", c.dataset.state === payload.state);

@@ -7,8 +7,8 @@ import lombok.Value;
 import java.util.Map;
 
 /**
- * tr: Flutter /me cevabında bir rolün flag map'i.
- * en: One role's flag map in the Flutter /me response.
+ * tr: Flutter /me cevabı; çağıran kullanıcının rolü + o role ait API state map'i.
+ * en: Flutter /me response; caller role plus that role's API state map.
  */
 @Value
 @Builder

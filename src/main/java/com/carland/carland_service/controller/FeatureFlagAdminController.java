@@ -2,6 +2,7 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
+import com.carland.carland_service.dto.request.FeatureFlagVersionCurrentRequest;
 import com.carland.carland_service.entity.AppVersion;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.service.FeatureFlagService;
@@ -47,7 +48,7 @@ public class FeatureFlagAdminController {
         return ResponseEntity.ok(featureFlagService.grid(version));
     }
 
-    @PatchMapping("/admin/api/feature-flags/state")
+    @PostMapping("/admin/api/feature-flags/state")
     @ResponseBody
     public ResponseEntity<?> updateState(
             @RequestBody FeatureFlagStateUpdateRequest request,
@@ -59,14 +60,17 @@ public class FeatureFlagAdminController {
         String actor = (String) session.getAttribute("ADMIN_USERNAME");
         try {
             FeatureFlagAudit audit = featureFlagService.updateState(request, actor);
-            return ResponseEntity.ok(Map.of(
-                    "ok", true,
-                    "actor", audit.getActor(),
-                    "oldState", audit.getOldState() != null ? audit.getOldState().name() : null,
-                    "newState", audit.getNewState().name()
-            ));
+            Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("actor", audit.getActor());
+            body.put("oldState", audit.getOldState() != null ? audit.getOldState().name() : null);
+            body.put("newState", audit.getNewState() != null ? audit.getNewState().name() : null);
+            return ResponseEntity.ok(body);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
         }
     }
 
@@ -90,7 +94,25 @@ public class FeatureFlagAdminController {
         }
     }
 
-    @GetMapping("/admin/api/feature-flags/audit")
+    @PostMapping("/admin/api/feature-flags/versions/current")
+    @ResponseBody
+    public ResponseEntity<?> setCurrent(
+            @RequestBody FeatureFlagVersionCurrentRequest request,
+            HttpSession session
+    ) {
+        if (!isLoggedIn(session)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "login required"));
+        }
+        try {
+            AppVersion updated = featureFlagService.setCurrentVersion(request.getSemver());
+            return ResponseEntity.ok(Map.of(
+                    "semver", updated.getSemver(),
+                    "current", updated.isCurrent()
+            ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
     @ResponseBody
     public ResponseEntity<?> audit(
             @RequestParam(required = false) String version,

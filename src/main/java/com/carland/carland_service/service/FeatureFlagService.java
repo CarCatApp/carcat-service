@@ -17,13 +17,15 @@ import java.util.Map;
  */
 public interface FeatureFlagService {
 
-    List<FeatureFlagMeItem> me(String appVersionHeader);
+    FeatureFlagMeItem me(String roleHeader, String appVersionHeader);
 
     Map<String, Object> grid(String semver);
 
     FeatureFlagAudit updateState(FeatureFlagStateUpdateRequest request, String actor);
 
     AppVersion createVersion(FeatureFlagVersionCreateRequest request);
+
+    AppVersion setCurrentVersion(String semver);
 
     List<AppVersion> latestVersions();
 
