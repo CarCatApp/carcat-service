@@ -76,18 +76,24 @@ public class AdminAccessService {
         return claims.getSubject();
     }
 
+    /**
+     * Bearer first (Swagger/Postman), then ADMIN_ACCESS cookie (HTML panel).
+     * Cookie array being null must not skip the Authorization header.
+     */
     private String readToken(HttpServletRequest request) {
-        if (request.getCookies() == null) {
-            return null;
-        }
-        for (Cookie cookie : request.getCookies()) {
-            if (COOKIE.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
-                return cookie.getValue();
-            }
-        }
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
-            return header.substring(7);
+            String bearer = header.substring(7).trim();
+            if (!bearer.isEmpty()) {
+                return bearer;
+            }
+        }
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (COOKIE.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                    return cookie.getValue();
+                }
+            }
         }
         return null;
     }
