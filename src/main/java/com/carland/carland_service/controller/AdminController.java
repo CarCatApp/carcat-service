@@ -1,9 +1,13 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.response.AdminAuthLoginResponse;
 import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.security.AdminAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +28,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * tr: Admin panelinin MVC controller'ı; login/logout, araç ve kullanıcı listelerini sayfalayarak gösterir ve Excel (XLSX) export sağlar.
@@ -38,6 +44,10 @@ public class AdminController {
     private final CarRepository carRepository;
 
     private final AuthUsersFeign authUsersFeign;
+
+    private final AuthNewUsersFeign authNewUsersFeign;
+
+    private final AdminAccessService adminAccessService;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -54,42 +64,49 @@ public class AdminController {
     @GetMapping({"/admin", "/admin/"})
     public String loginPage(
             @RequestParam(required = false) String error,
+            HttpServletRequest request,
             Model model
     ) {
-
+        if (adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/cars";
+        }
         if (error != null) {
             model.addAttribute("error", true);
         }
-
         return "login";
     }
 
 
     /**
-     * tr: Kullanıcı adı/şifreyi sabit değerlerle doğrular; başarılıysa session'a ADMIN_LOGIN yazıp araç listesine, değilse error=true ile login sayfasına yönlendirir.
-     * en: Validates the username/password against hardcoded values; on success stores ADMIN_LOGIN in the session and redirects to the car list, otherwise redirects back to the login page with error=true.
+     * tr: Auth JWT login; yalnızca +994000000000 / ADMIN panele girer, diğer herkes "Admin not found".
+     * en: Auth JWT login; only +994000000000 / ADMIN may enter the panel, everyone else gets "Admin not found".
      */
     @PostMapping("/admin/login")
     public String login(
-            @RequestParam String username,
-            @RequestParam String password,
-            HttpSession session
+            @RequestParam String phoneNumber,
+            @RequestParam String pin,
+            HttpServletResponse response
     ) {
-
-        if ("nemet".equals(username) && "nemet".equals(password)
-                || "aziz".equals(username) && "aziz".equals(password)
-                || "jeyhun".equals(username) && "jeyhun".equals(password)
-                || "rasul".equals(username) && "rasul".equals(password)
-                || "ismayil".equals(username) && "ismayil".equals(password)
-                || "tale".equals(username) && "tale".equals(password)) {
-
-            session.setAttribute("ADMIN_LOGIN", true);
-            session.setAttribute("ADMIN_USERNAME", username);
-
+        try {
+            Map<String, String> body = new LinkedHashMap<>();
+            body.put("phoneNumber", phoneNumber);
+            body.put("pinCode", pin);
+            body.put("deviceId", "admin-panel");
+            body.put("platform", "ADMIN_PANEL");
+            AdminAuthLoginResponse auth = authNewUsersFeign.login(body, "az");
+            if (auth == null
+                    || auth.getAccessToken() == null
+                    || auth.getAccessToken().isBlank()
+                    || !AdminAccessService.PANEL_PHONE.equals(auth.getPhoneNumber())
+                    || !"ADMIN".equalsIgnoreCase(auth.getRole())) {
+                return "redirect:" + ADMIN_URL + "/admin/?error=not_found";
+            }
+            adminAccessService.writeCookie(response, auth.getAccessToken());
             return "redirect:" + ADMIN_URL + "/admin/cars";
+        } catch (Exception ex) {
+            log.warn("Admin panel login rejected: {}", ex.getMessage());
+            return "redirect:" + ADMIN_URL + "/admin/?error=not_found";
         }
-
-        return "redirect:" + ADMIN_URL + "/admin/?error=true";
     }
 
 
@@ -103,11 +120,11 @@ public class AdminController {
     public String cars(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) Long userId,
-            HttpSession session,
+            HttpServletRequest request,
             Model model
     ) {
 
-        if (!isLoggedIn(session)) {
+        if (!adminAccessService.isPanelAdmin(request)) {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
 
@@ -135,11 +152,11 @@ public class AdminController {
      */
     @GetMapping("/admin/cars/export")
     public void exportCars(
-            HttpSession session,
+            HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
 
-        if (!isLoggedIn(session)) {
+        if (!adminAccessService.isPanelAdmin(request)) {
             response.sendRedirect(ADMIN_URL + "/admin/");
             return;
         }
@@ -195,11 +212,11 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            HttpSession session,
+            HttpServletRequest request,
             Model model
     ) {
 
-        if (!isLoggedIn(session)) {
+        if (!adminAccessService.isPanelAdmin(request)) {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
 
@@ -249,11 +266,11 @@ public class AdminController {
     public void exportUsers(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            HttpSession session,
+            HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
 
-        if (!isLoggedIn(session)) {
+        if (!adminAccessService.isPanelAdmin(request)) {
             response.sendRedirect(ADMIN_URL + "/admin/");
             return;
         }
@@ -293,19 +310,17 @@ public class AdminController {
      * en: Invalidates the admin session and redirects to the login page.
      */
     @GetMapping("/admin/logout")
-    public String logout(HttpSession session) {
-
-        session.invalidate();
-
+    public String logout(HttpServletRequest request, HttpServletResponse response) {
+        adminAccessService.clearCookie(response);
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
         return "redirect:" + ADMIN_URL + "/admin/";
     }
 
 
     // ==================== helpers ====================
-
-    private boolean isLoggedIn(HttpSession session) {
-        return Boolean.TRUE.equals(session.getAttribute("ADMIN_LOGIN"));
-    }
 
     private List<AuthUser> fetchUsers(LocalDate from, LocalDate to) {
         return authUsersFeign.getUserList(

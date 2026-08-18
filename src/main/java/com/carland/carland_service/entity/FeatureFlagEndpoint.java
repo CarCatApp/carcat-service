@@ -5,8 +5,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 /**
- * tr: Guard edilebilen Spring path (method + path_pattern); version'dan bağımsız.
- * en: Guardable Spring path (method + path_pattern); independent of app version.
+ * tr: Guard edilebilir Spring path; flag_id doluysa bir feature flag'e aittir (claimed).
+ * en: Guardable Spring path; non-null flag_id means claimed by a feature flag.
  */
 @Entity
 @Data
@@ -32,4 +32,12 @@ public class FeatureFlagEndpoint {
 
     @Column(name = "never_guard", nullable = false)
     boolean neverGuard;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "flag_id")
+    FeatureFlag flag;
+
+    public boolean isClaimed() {
+        return flag != null;
+    }
 }

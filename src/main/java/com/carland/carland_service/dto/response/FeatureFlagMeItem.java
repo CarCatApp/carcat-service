@@ -7,8 +7,8 @@ import lombok.Value;
 import java.util.Map;
 
 /**
- * tr: Flutter /me cevabı; çağıran kullanıcının rolü + o role ait API state map'i.
- * en: Flutter /me response; caller role plus that role's API state map.
+ * tr: Flutter /me — çağıran rol için named flag grupları (içinde API listesi).
+ * en: Flutter /me — named flag groups (with API list) for the caller role.
  */
 @Value
 @Builder
@@ -17,5 +17,5 @@ public class FeatureFlagMeItem {
     String role;
     String appVersion;
     String evaluatedAt;
-    Map<String, FeatureFlagState> flags;
+    Map<String, FeatureFlagMeGroup> flags;
 }

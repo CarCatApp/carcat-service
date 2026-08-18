@@ -1,6 +1,5 @@
 package com.carland.carland_service.service;
 
-import com.carland.carland_service.entity.FeatureFlagEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
@@ -14,8 +13,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * tr: Boot'ta Spring route tablosunu tarar; feature_flag_endpoint + current version rol state (ENABLED) insert eder.
- * en: Scans Spring's route table at boot; inserts feature_flag_endpoint rows and ENABLED role states for the current version.
+ * tr: Boot'ta Spring route tablosunu tarar; yalnızca feature_flag_endpoint kataloğunu günceller (flag attach admin'de).
+ * en: Scans Spring's route table at boot; upserts the endpoint catalog only (flag attach is admin-driven).
  */
 @Slf4j
 @Component
@@ -49,9 +48,7 @@ public class FeatureFlagEndpointScanner implements ApplicationRunner {
                 }
                 boolean neverGuard = isNeverGuardPath(path);
                 for (RequestMethod method : methods) {
-                    FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint(
-                            method.name(), path, neverGuard);
-                    featureFlagService.ensureRoleStatesForCurrentVersion(endpoint);
+                    featureFlagService.upsertEndpoint(method.name(), path, neverGuard);
                     inserted++;
                 }
             }

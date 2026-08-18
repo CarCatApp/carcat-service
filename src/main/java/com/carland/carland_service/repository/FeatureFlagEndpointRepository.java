@@ -2,6 +2,7 @@ package com.carland.carland_service.repository;
 
 import com.carland.carland_service.entity.FeatureFlagEndpoint;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,4 +18,11 @@ public interface FeatureFlagEndpointRepository extends JpaRepository<FeatureFlag
     Optional<FeatureFlagEndpoint> findByHttpMethodAndPathPattern(String httpMethod, String pathPattern);
 
     List<FeatureFlagEndpoint> findAllByOrderByPathPatternAscHttpMethodAsc();
+
+    List<FeatureFlagEndpoint> findByFlagIsNullOrderByPathPatternAscHttpMethodAsc();
+
+    List<FeatureFlagEndpoint> findByFlag_Id(Long flagId);
+
+    @Query("select e from FeatureFlagEndpoint e left join fetch e.flag")
+    List<FeatureFlagEndpoint> findAllWithFlag();
 }

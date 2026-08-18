@@ -133,29 +133,31 @@
     <p class="subtitle">Panele erişmek için giriş yapın</p>
 
     <div class="error-box" th:if="${error}">
-        Kullanıcı adı veya şifre hatalı
+        Admin not found
     </div>
 
     <form method="post" action="/admin/login">
 
         <div class="field">
-            <label for="username">Username</label>
+            <label for="phoneNumber">Phone</label>
             <input
-                    id="username"
-                    name="username"
-                    placeholder="username"
-                    autocomplete="username"
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    placeholder="+994000000000"
+                    autocomplete="tel"
                     required
             />
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
+            <label for="pin">PIN</label>
             <input
-                    id="password"
+                    id="pin"
                     type="password"
-                    name="password"
-                    placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
+                    name="pin"
+                    inputmode="numeric"
+                    maxlength="4"
+                    placeholder="••••"
                     autocomplete="current-password"
                     required
             />

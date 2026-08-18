@@ -43,6 +43,8 @@ server:
 
 carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
+  admin:
+    auth-base-url: ${ADMIN_AUTH_BASE_URL:https://digital-innovation.agency/auth/server/api/v1/newUsers}
   swagger:
     auth-login-url: ${SWAGGER_AUTH_LOGIN_URL:https://digital-innovation.agency/auth/server/api/v1/users/login}
     auth-refresh-url: ${SWAGGER_AUTH_REFRESH_URL:https://digital-innovation.agency/auth/server/api/v1/users/refresh}
@@ -87,3 +89,7 @@ hyper:
 
 brevo:
   api-key: ${BREVO_API_KEY}
+
+access:
+  token:
+    secret-key: ${ACCESS_TOKEN_SECRET_KEY:7f4a9c63f339110c36111661b1a568b342a1e5ab675b67a09a2e4986a2a4224a}

@@ -1,6 +1,5 @@
 package com.carland.carland_service.controller;
 
-import com.carland.carland_service.dto.response.FeatureFlagMeItem;
 import com.carland.carland_service.service.FeatureFlagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,10 +27,13 @@ public class FeatureFlagMeController {
             @RequestHeader(value = "role", required = false) String role,
             @RequestHeader(value = "X-App-Version", required = false) String appVersion
     ) {
+        if (role == null || role.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "role header required"));
+        }
         try {
             return ResponseEntity.ok(featureFlagService.me(role, appVersion));
         } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ex.getMessage()));
         }
     }
 }

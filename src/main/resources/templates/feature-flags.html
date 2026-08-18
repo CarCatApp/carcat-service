@@ -11,10 +11,11 @@
       --card: #ffffff;
       --border: #e2e8f0;
       --text: #0f172a;
-      --text-muted: #64748b;
+      --muted: #64748b;
       --primary: #2563eb;
       --green: #16a34a;
       --red: #dc2626;
+      --amber: #d97706;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -44,22 +45,24 @@
     .nav-links { display: flex; align-items: center; gap: 4px; margin-left: 10px; }
     .nav-link {
       padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
-      text-decoration: none; color: var(--text-muted);
+      text-decoration: none; color: var(--muted);
     }
     .nav-link:hover { background: #f1f5f9; color: var(--text); }
     .nav-link.active { background: #eff6ff; color: var(--primary); }
     .btn-logout {
       display: inline-flex; padding: 9px 16px; border-radius: 8px;
-      border: 1px solid var(--border); text-decoration: none; color: var(--text-muted); font-weight: 600;
+      border: 1px solid var(--border); text-decoration: none; color: var(--muted); font-weight: 600;
     }
     .btn-logout:hover { border-color: var(--red); color: var(--red); }
-    .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px 48px; }
-    .page-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px 48px; }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
     .page-head h1 { font-size: 22px; }
-    .muted { color: var(--text-muted); font-size: 13px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .version-bar, .create-card, .flag, .audit {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    }
     .version-bar {
       display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
       padding: 12px 14px; margin-bottom: 14px;
     }
     .ver-btn {
@@ -69,48 +72,71 @@
     .ver-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
     .ver-btn.current { box-shadow: 0 0 0 2px #bfdbfe; }
     .new-ver { display: flex; gap: 8px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-    .new-ver label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+    .new-ver label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; align-items: center; }
     .set-current {
       border: 1px solid var(--primary); background: #eff6ff; color: var(--primary);
       border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 12px;
     }
-    .new-ver input {
-      border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; width: 110px;
+    input, select, textarea {
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+      font-size: 13px; background: #fff; color: var(--text);
     }
-    .new-ver button {
-      background: var(--primary); color: #fff; border: 0; border-radius: 8px;
-      padding: 6px 12px; font-weight: 700; cursor: pointer;
+    textarea { width: 100%; min-height: 64px; resize: vertical; }
+    button, .btn {
+      border: 0; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: 13px;
     }
-    .table-wrap {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-      overflow: auto; max-height: calc(100vh - 280px);
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-ghost { background: #f8fafc; border: 1px solid var(--border); color: var(--text); }
+    .btn-danger { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
+    .err { color: var(--red); font-weight: 600; margin: 8px 0; }
+    .create-card { padding: 16px; margin-bottom: 16px; }
+    .create-card h2 { font-size: 15px; margin-bottom: 12px; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
+    .field label { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .field.grow { flex: 1; min-width: 240px; }
+    .flags { display: flex; flex-direction: column; gap: 10px; }
+    .flag-head {
+      width: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 14px 16px; background: transparent; text-align: left; border: 0; cursor: pointer;
     }
-    table { border-collapse: collapse; min-width: 980px; width: 100%; }
-    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; vertical-align: middle; }
-    th { position: sticky; top: 0; background: #0f172a; color: #fff; z-index: 5; }
-    td.path { position: sticky; left: 0; background: #fff; font-family: Consolas, monospace; font-size: 12px; white-space: nowrap; z-index: 2; }
+    .flag-head:hover { background: #f8fafc; border-radius: 12px; }
+    .chev { width: 18px; color: var(--muted); transition: transform .15s ease; }
+    .flag.open .chev { transform: rotate(90deg); }
+    .flag-name { font-weight: 800; letter-spacing: .02em; }
+    .badge {
+      font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; color: #fff;
+    }
+    .ENABLED { background: var(--green); }
+    .DISABLED { background: var(--red); }
+    .HIDDEN { background: var(--amber); }
+    .count { font-size: 12px; color: var(--muted); font-weight: 700; }
+    .flag-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+    .flag.open .flag-body { display: block; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+    .box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #f8fafc; }
+    .box h3 { font-size: 13px; margin-bottom: 10px; }
+    .state-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .ep {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+    }
     .method {
       display: inline-block; min-width: 52px; text-align: center; font-size: 11px; font-weight: 800;
       border-radius: 4px; padding: 2px 6px; margin-right: 8px; color: #fff;
     }
     .GET { background: #2563eb; } .POST { background: #16a34a; } .PUT { background: #d97706; }
     .PATCH { background: #7c3aed; } .DELETE { background: #dc2626; }
-    .cell { display: flex; gap: 4px; }
-    .chip {
-      border: 0; border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 800;
-      cursor: pointer; color: #fff; min-width: 68px;
-    }
-    .chip.on { background: var(--green); }
-    .chip.off { background: var(--red); opacity: 0.9; }
-    .chip:disabled { cursor: default; opacity: 0.45; }
-    .never { font-size: 11px; color: #b45309; font-weight: 700; margin-left: 6px; }
-    .audit {
-      margin-top: 18px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 12px; padding: 14px;
-    }
+    .path { font-family: Consolas, monospace; font-size: 12px; }
+    .picker { max-height: 220px; overflow: auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+    .picker label { display: flex; gap: 8px; align-items: center; padding: 6px; font-size: 12px; cursor: pointer; }
+    .picker label:hover { background: #eff6ff; }
+    .locked { background: #f1f5f9; color: var(--muted); }
+    .audit { padding: 14px; margin-top: 18px; }
     .audit h2 { font-size: 16px; margin-bottom: 10px; }
-    .audit table td { font-size: 12px; }
-    .err { color: var(--red); font-weight: 600; margin: 8px 0; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 12px; text-align: left; }
   </style>
 </head>
 <body>
@@ -129,33 +155,45 @@
 
 <div class="container">
   <div class="page-head">
-    <h1>Feature Flags</h1>
-    <span class="muted">Rows = Spring APIs · Columns = roles · Selected = green, others = red</span>
+    <div>
+      <h1>Feature Flags</h1>
+      <p class="muted">Named flags hold APIs. Each role has ENABLED / DISABLED / HIDDEN for the selected app version.</p>
+    </div>
   </div>
 
   <div class="version-bar" id="versionBar"></div>
   <div class="err" id="errorBox" hidden></div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr id="headRow">
-          <th>API</th>
-        </tr>
-      </thead>
-      <tbody id="gridBody">
-        <tr><td class="muted">Loading…</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <section class="create-card">
+    <h2>Create flag</h2>
+    <form id="createForm" class="form-row">
+      <div class="field">
+        <label>Name</label>
+        <input name="name" placeholder="SIMA_KYC_FLOW" required />
+      </div>
+      <div class="field grow">
+        <label>Description</label>
+        <input name="description" placeholder="KYC verify / control screens" />
+      </div>
+      <div class="field">
+        <label>Default state</label>
+        <select name="defaultState">
+          <option value="HIDDEN" selected>HIDDEN</option>
+          <option value="DISABLED">DISABLED</option>
+          <option value="ENABLED">ENABLED</option>
+        </select>
+      </div>
+      <button class="btn-primary" type="submit">Create</button>
+    </form>
+  </section>
+
+  <div class="flags" id="flagList"></div>
 
   <div class="audit">
     <h2>Change history</h2>
     <table>
       <thead>
-        <tr>
-          <th>When</th><th>Who</th><th>Endpoint</th><th>Role</th><th>Change</th>
-        </tr>
+        <tr><th>When</th><th>Who</th><th>Action</th><th>Change</th></tr>
       </thead>
       <tbody id="auditBody"></tbody>
     </table>
@@ -164,26 +202,44 @@
 
 <script>
   let currentVersion = null;
-  const STATES = ["HIDDEN", "ENABLED", "DISABLED"];
+  let snapshot = { flags: [], availableEndpoints: [], roles: [], versions: [], audit: [] };
   const LABELS = { HIDDEN: "Hidden", ENABLED: "Enable", DISABLED: "Disable" };
+  const ERRORS = {
+    FLAG_EXISTS: "This flag name already exists",
+    HAS_ENDPOINTS: "Detach all APIs before deleting this flag",
+    ENDPOINT_CLAIMED: "This API is already attached to another flag",
+    NOT_ATTACHED: "This API is not attached to the flag"
+  };
 
   function showError(msg) {
     const box = document.getElementById("errorBox");
     if (!msg) { box.hidden = true; box.textContent = ""; return; }
     box.hidden = false;
-    box.textContent = msg;
+    box.textContent = ERRORS[msg] || msg;
   }
 
-  async function loadGrid(version) {
+  async function api(url, options = {}) {
+    const res = await fetch(url, { credentials: "same-origin", ...options });
+    if (res.status === 401) { window.location.href = "/admin/"; return null; }
+    const raw = await res.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw.slice(0, 180) }; }
+    if (!res.ok) {
+      showError(body.error || body.message || ("Request failed HTTP " + res.status));
+      return null;
+    }
+    return body;
+  }
+
+  async function loadSnapshot(version) {
     showError("");
     const qs = version ? ("?version=" + encodeURIComponent(version)) : "";
-    const res = await fetch("/admin/api/feature-flags/grid" + qs, { credentials: "same-origin" });
-    if (res.status === 401) { window.location.href = "/admin/"; return; }
-    if (!res.ok) { showError("Grid load failed"); return; }
-    const data = await res.json();
+    const data = await api("/admin/api/feature-flags/snapshot" + qs);
+    if (!data) return;
+    snapshot = data;
     currentVersion = data.version;
     renderVersions(data.versions || [], data.version);
-    renderTable(data.roles || [], data.endpoints || []);
+    renderFlags(data.flags || [], data.availableEndpoints || [], data.roles || []);
     renderAudit(data.audit || []);
   }
 
@@ -201,116 +257,229 @@
       <form class="new-ver" id="newVerForm">
         <input name="semver" placeholder="2.2.0" required />
         <label><input type="checkbox" name="makeCurrent" /> Make current</label>
-        <button type="submit">Add version</button>
+        <button class="btn-primary" type="submit">Add version</button>
       </form>`;
     bar.querySelectorAll(".ver-btn").forEach(btn => {
-      btn.onclick = () => loadGrid(btn.dataset.v);
+      btn.onclick = () => loadSnapshot(btn.dataset.v);
     });
     const setBtn = document.getElementById("setCurrentBtn");
     if (setBtn) {
       setBtn.onclick = async () => {
-        const res = await fetch("/admin/api/feature-flags/versions/current", {
+        const ok = await api("/admin/api/feature-flags/versions/current", {
           method: "POST",
-          credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ semver: currentVersion })
         });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) { showError(body.error || "Set current failed"); return; }
-        loadGrid(currentVersion);
+        if (ok) loadSnapshot(currentVersion);
       };
     }
     document.getElementById("newVerForm").onsubmit = async (e) => {
       e.preventDefault();
       const semver = e.target.semver.value.trim();
       const makeCurrent = e.target.makeCurrent.checked;
-      const res = await fetch("/admin/api/feature-flags/versions", {
+      const ok = await api("/admin/api/feature-flags/versions", {
         method: "POST",
-        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ semver, copyFrom: currentVersion, makeCurrent })
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(body.error || "Create version failed"); return; }
-      loadGrid(semver);
+      if (ok) loadSnapshot(semver);
     };
   }
 
-  function renderTable(roles, endpoints) {
-    const head = document.getElementById("headRow");
-    head.innerHTML = "<th>API</th>" + roles.map(r => `<th>${r}</th>`).join("");
-    const body = document.getElementById("gridBody");
-    if (!endpoints.length) {
-      body.innerHTML = `<tr><td class="muted">No endpoints</td></tr>`;
+  function optionHtml(values, selected) {
+    return values.map(v => `<option value="${v}" ${v === selected ? "selected" : ""}>${LABELS[v] || v}</option>`).join("");
+  }
+
+  function renderFlags(flags, available, roles) {
+    const list = document.getElementById("flagList");
+    if (!flags.length) {
+      list.innerHTML = `<div class="create-card muted">No flags yet. Create SIMA_KYC_FLOW or PERSONAL_DETAILS to start grouping APIs.</div>`;
       return;
     }
-    body.innerHTML = endpoints.map(ep => {
-      const never = ep.neverGuard ? `<span class="never">never-guard</span>` : "";
-      const cells = roles.map(role => cellHtml(ep, role)).join("");
-      return `<tr>
-        <td class="path"><span class="method ${ep.method}">${ep.method}</span>${ep.path}${never}</td>
-        ${cells}
-      </tr>`;
+    list.innerHTML = flags.map(flag => {
+      const states = flag.states || {};
+      const eps = flag.endpoints || [];
+      const roleOptions = (roles.length ? roles : Object.keys(states)).map(r => `<option value="${r}">${r}</option>`).join("");
+      const stateChips = Object.keys(states).map(role =>
+        `<span class="badge ${states[role]}">${role}: ${LABELS[states[role]] || states[role]}</span>`
+      ).join("");
+      const attached = eps.length ? eps.map(ep => `
+        <div class="ep">
+          <div><span class="method ${ep.method}">${ep.method}</span><span class="path">${ep.path}</span></div>
+          <button type="button" class="btn-danger detach" data-flag="${flag.id}" data-ep="${ep.id}">Detach</button>
+        </div>`).join("") : `<p class="muted">No APIs attached yet.</p>`;
+      const free = (available || []).map(ep => `
+        <label>
+          <input type="checkbox" name="endpointIds" value="${ep.id}" />
+          <span class="method ${ep.method}">${ep.method}</span>
+          <span class="path">${ep.path}</span>
+        </label>`).join("");
+      return `
+        <article class="flag" data-id="${flag.id}">
+          <button type="button" class="flag-head toggle">
+            <span class="chev">&#9656;</span>
+            <span class="flag-name">${flag.name}</span>
+            <span class="badge ${flag.defaultState}">default ${flag.defaultState}</span>
+            <span class="count">${eps.length} API</span>
+            ${stateChips}
+          </button>
+          <div class="flag-body">
+            <div class="grid-2">
+              <div class="box">
+                <h3>Flag details</h3>
+                <form class="edit-form" data-id="${flag.id}">
+                  <div class="field">
+                    <label>Name (locked)</label>
+                    <input class="locked" value="${flag.name}" disabled />
+                  </div>
+                  <div class="field">
+                    <label>Description</label>
+                    <textarea name="description">${flag.description || ""}</textarea>
+                  </div>
+                  <div class="field">
+                    <label>Default state</label>
+                    <select name="defaultState">${optionHtml(["HIDDEN","DISABLED","ENABLED"], flag.defaultState)}</select>
+                  </div>
+                  <div class="form-row" style="margin-top:10px">
+                    <button class="btn-primary" type="submit">Save</button>
+                    <button class="btn-danger delete-flag" type="button" data-id="${flag.id}">Delete flag</button>
+                  </div>
+                </form>
+              </div>
+              <div class="box">
+                <h3>Role visibility</h3>
+                <p class="muted" style="margin-bottom:10px">Pick a role, then pick ENABLED / DISABLED / HIDDEN for version ${currentVersion}.</p>
+                <form class="state-form" data-id="${flag.id}">
+                  <div class="form-row">
+                    <div class="field">
+                      <label>Role</label>
+                      <select name="role">${roleOptions}</select>
+                    </div>
+                    <div class="field">
+                      <label>State</label>
+                      <select name="state">${optionHtml(["HIDDEN","DISABLED","ENABLED"], states.USER || flag.defaultState)}</select>
+                    </div>
+                    <button class="btn-primary" type="submit">Apply</button>
+                  </div>
+                </form>
+                <div class="state-row" style="margin-top:12px">${stateChips}</div>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="box">
+                <h3>Attached APIs</h3>
+                ${attached}
+              </div>
+              <div class="box">
+                <h3>Add unclaimed APIs</h3>
+                <p class="muted" style="margin-bottom:8px">Only APIs that are not inside another flag are listed. Path cannot be edited.</p>
+                <form class="attach-form" data-id="${flag.id}">
+                  <div class="picker">${free || '<p class="muted">No free APIs left.</p>'}</div>
+                  <button class="btn-primary" type="submit" style="margin-top:10px" ${free ? "" : "disabled"}>Attach selected</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </article>`;
     }).join("");
-    body.querySelectorAll(".chip").forEach(chip => {
-      chip.onclick = () => setState(chip);
+
+    list.querySelectorAll(".toggle").forEach(btn => {
+      btn.onclick = () => btn.parentElement.classList.toggle("open");
+    });
+    list.querySelectorAll(".edit-form").forEach(form => {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const ok = await api("/admin/api/feature-flags/" + form.dataset.id, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: form.description.value,
+            defaultState: form.defaultState.value
+          })
+        });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+    list.querySelectorAll(".delete-flag").forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm("Delete this flag? Detach APIs first.")) return;
+        const ok = await api("/admin/api/feature-flags/" + btn.dataset.id, { method: "DELETE" });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+    list.querySelectorAll(".state-form").forEach(form => {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const ok = await api("/admin/api/feature-flags/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            flagId: Number(form.dataset.id),
+            role: form.role.value,
+            state: form.state.value,
+            version: currentVersion
+          })
+        });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+    list.querySelectorAll(".attach-form").forEach(form => {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const ids = [...form.querySelectorAll("input[name=endpointIds]:checked")].map(i => Number(i.value));
+        if (!ids.length) { showError("Select at least one API"); return; }
+        const ok = await api("/admin/api/feature-flags/" + form.dataset.id + "/endpoints", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpointIds: ids })
+        });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+    list.querySelectorAll(".detach").forEach(btn => {
+      btn.onclick = async () => {
+        const ok = await api("/admin/api/feature-flags/" + btn.dataset.flag + "/endpoints/" + btn.dataset.ep, {
+          method: "DELETE"
+        });
+        if (ok) loadSnapshot(currentVersion);
+      };
     });
   }
 
-  function cellHtml(ep, role) {
-    const selected = (ep.states && ep.states[role]) || "ENABLED";
-    const disabled = ep.neverGuard ? "disabled" : "";
-    const chips = STATES.map(st => {
-      const on = st === selected ? "on" : "off";
-      return `<button type="button" class="chip ${on}" ${disabled}
-        data-method="${ep.method}" data-path="${ep.path}" data-role="${role}" data-state="${st}">${LABELS[st]}</button>`;
-    }).join("");
-    return `<td><div class="cell">${chips}</div></td>`;
-  }
-
-  async function setState(chip) {
-    if (chip.disabled) return;
-    const payload = {
-      version: currentVersion,
-      method: chip.dataset.method,
-      path: chip.dataset.path,
-      role: chip.dataset.role,
-      state: chip.dataset.state
-    };
-    const res = await fetch("/admin/api/feature-flags/state", {
+  document.getElementById("createForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const ok = await api("/admin/api/feature-flags", {
       method: "POST",
-      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        name: form.name.value,
+        description: form.description.value,
+        defaultState: form.defaultState.value
+      })
     });
-    const raw = await res.text();
-    let body = {};
-    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw.slice(0, 180) }; }
-    if (!res.ok) { showError(body.error || body.message || ("Update failed HTTP " + res.status)); return; }
-    const wrap = chip.parentElement;
-    wrap.querySelectorAll(".chip").forEach(c => {
-      c.classList.toggle("on", c.dataset.state === payload.state);
-      c.classList.toggle("off", c.dataset.state !== payload.state);
-    });
-    loadGrid(currentVersion);
-  }
+    if (ok) {
+      form.reset();
+      form.defaultState.value = "HIDDEN";
+      loadSnapshot(currentVersion);
+    }
+  };
 
   function renderAudit(rows) {
     const body = document.getElementById("auditBody");
     if (!rows.length) {
-      body.innerHTML = `<tr><td class="muted" colspan="5">No changes yet</td></tr>`;
+      body.innerHTML = `<tr><td class="muted" colspan="4">No changes yet</td></tr>`;
       return;
     }
     body.innerHTML = rows.map(r => `<tr>
       <td>${r.at || ""}</td>
       <td>${r.actor || ""}</td>
       <td>${r.method || ""} ${r.path || ""}</td>
-      <td>${r.role || ""}</td>
       <td>${r.oldState || "—"} → ${r.newState || ""}</td>
     </tr>`).join("");
   }
 
-  loadGrid();
+  loadSnapshot();
 </script>
 </body>
 </html>
