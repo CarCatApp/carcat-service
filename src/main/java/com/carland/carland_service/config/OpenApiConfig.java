@@ -149,7 +149,7 @@ public class OpenApiConfig {
                 .group("admin-feature-flags")
                 .displayName("5. Carland — Admin Feature Flags")
                 .addOpenApiMethodFilter(method ->
-                        method.getBeanType().equals(FeatureFlagAdminRestController.class))
+                        FeatureFlagAdminRestController.class.equals(method.getDeclaringClass()))
                 .addOperationCustomizer((operation, handlerMethod) -> {
                     String existing = operation.getDescription();
                     operation.setDescription(existing == null || existing.isBlank()
