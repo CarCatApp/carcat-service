@@ -31,6 +31,7 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
     private static final String AUTH_LEGACY = "1A. Auth — Legacy (/users)";
     private static final String AUTH_NEW = "1B. Auth — NewUsers";
     private static final String MOBILE = "2. Carland — Mobile API";
+    private static final String ADMIN_FLAGS = "5. Carland — Admin Feature Flags";
     private static final String RECEIVER = "3. Carland — Partner Webhook Receiver";
     private static final String GATEWAY = "4. Webhook Gateway — Partner Edge Adapter";
 
@@ -115,6 +116,7 @@ public class SwaggerConfigRewriteFilter extends OncePerRequestFilter {
                 new Definition(AUTH_LEGACY, "/v3/api-docs/external/carland-auth"),
                 new Definition(AUTH_NEW, "/v3/api-docs/external/carland-auth-new"),
                 new Definition(MOBILE, "/v3/api-docs/mobile-api"),
+                new Definition(ADMIN_FLAGS, "/v3/api-docs/admin-feature-flags"),
                 new Definition(RECEIVER, "/v3/api-docs/partner-webhooks"),
                 new Definition(GATEWAY, "/v3/api-docs/external/webhook")
         );

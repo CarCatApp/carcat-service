@@ -50,6 +50,7 @@ carland:
     auth-refresh-url: ${SWAGGER_AUTH_REFRESH_URL:https://digital-innovation.agency/auth/server/api/v1/users/refresh}
     # Public Try-it-out bases (browser → nginx/Kong)
     service-server-url: ${SWAGGER_SERVICE_SERVER_URL:https://digital-innovation.agency/carland/server-carland}
+    admin-server-url: ${SWAGGER_ADMIN_SERVER_URL:https://digital-innovation.agency}
     auth-server-url: ${SWAGGER_AUTH_SERVER_URL:https://digital-innovation.agency/auth/server}
     webhook-server-url: ${SWAGGER_WEBHOOK_SERVER_URL:https://digital-innovation.agency}
     # Where this service fetches OpenAPI JSON (Docker internal preferred)
@@ -72,6 +73,8 @@ springdoc:
         url: /v3/api-docs/external/carland-auth-new
       - name: "2. Carland — Mobile API"
         url: /v3/api-docs/mobile-api
+      - name: "5. Carland — Admin Feature Flags"
+        url: /v3/api-docs/admin-feature-flags
       - name: "3. Carland — Partner Webhook Receiver"
         url: /v3/api-docs/partner-webhooks
       - name: "4. Webhook Gateway — Partner Edge Adapter"

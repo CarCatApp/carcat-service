@@ -1,5 +1,6 @@
 package com.carland.carland_service.config;
 
+import com.carland.carland_service.controller.FeatureFlagAdminRestController;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -31,6 +32,9 @@ public class OpenApiConfig {
 
     @Value("${carland.swagger.service-server-url:https://digital-innovation.agency/carland/server-carland}")
     private String serviceServerUrl;
+
+    @Value("${carland.swagger.admin-server-url:https://digital-innovation.agency}")
+    private String adminServerUrl;
 
     private static final Set<String> KONG_INJECTED_HEADERS = Set.of(
             "X-User-Id", "phoneNumber", "role", "inviterId"
@@ -65,6 +69,7 @@ public class OpenApiConfig {
                 | **1A. Auth — Legacy** | **auth-service** | Current app: `/api/v1/users`, `/api/v1/otp` |
                 | **1B. Auth — NewUsers** | **auth-service** | Parallel PO flow: `/api/v1/newUsers` |
                 | **2. Carland — Mobile API** | **carland-service** | Mobile / app APIs (`/api/v1/**`) |
+                | **5. Carland — Admin Feature Flags** | **carland-service** | Panel REST (`/admin/feature-flags`, `/admin/endpoints`). **Panel ADMIN JWT only** |
                 | **3. Carland — Partner Webhook Receiver** | **carland-service** | Internal **receiver** for partner visit ingest/update (`/webhook/**`) |
                 | **4. Webhook Gateway — Partner Edge Adapter** | **webhook-service** | Public **edge adapter**: partners call here; forwards to carland; queues in RabbitMQ if carland is down |
 
@@ -101,6 +106,9 @@ public class OpenApiConfig {
                 .tags(List.of(
                         new Tag().name("car-controller").description("Cars, percentages, records, VIN history"),
                         new Tag().name("user-controller").description("User details and notifications"),
+                        new Tag().name("feature-flags-me").description("Mobile `/me` — caller JWT role, not panel admin"),
+                        new Tag().name("admin-feature-flags").description(
+                                "Panel feature-flag REST. **Required: panel ADMIN JWT.** Other JWTs → 403."),
                         new Tag().name("photo-controller").description("Photos for cars, users, partners"),
                         new Tag().name("group-by-controller").description("Reference lookups"),
                         new Tag().name("webhook-controller").description(
@@ -121,6 +129,51 @@ public class OpenApiConfig {
                                 Requires access JWT from **1. Auth**. Use the **Carland Login** bar first.
                                 Kong injects `X-User-Id` / `phoneNumber` from the JWT (read-only fields in Swagger).
                                 """))
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi adminFeatureFlagsGroup() {
+        String adminNote = """
+                **Required role: panel ADMIN only.**
+
+                - JWT claim `role=ADMIN` for the designated panel account
+                - `Authorization: Bearer <accessToken>` or cookie `ADMIN_ACCESS`
+                - Any other user / role → **403 Admin not found**
+                - Missing/invalid token → **401 JWT token required**
+
+                Try it out uses the **admin host** (`digital-innovation.agency`), not `/carland/server-carland`.
+                Log in with the panel admin account first (not a regular app user).
+                """;
+        return GroupedOpenApi.builder()
+                .group("admin-feature-flags")
+                .displayName("5. Carland — Admin Feature Flags")
+                .addOpenApiMethodFilter(method ->
+                        method.getBeanType().equals(FeatureFlagAdminRestController.class))
+                .addOperationCustomizer((operation, handlerMethod) -> {
+                    String existing = operation.getDescription();
+                    operation.setDescription(existing == null || existing.isBlank()
+                            ? adminNote
+                            : existing + "\n\n" + adminNote);
+                    if (operation.getParameters() != null) {
+                        operation.getParameters().removeIf(param ->
+                                param.getName() != null
+                                        && (param.getName().equalsIgnoreCase("request")
+                                        || param.getName().equalsIgnoreCase("httpServletRequest")));
+                    }
+                    return operation;
+                })
+                .addOpenApiCustomizer(openApi -> {
+                    openApi.setServers(List.of(new Server()
+                            .url(adminServerUrl)
+                            .description("Admin panel host (not the mobile /carland/server-carland prefix)")));
+                    openApi.getInfo()
+                            .title("Carland — Admin Feature Flags")
+                            .description("""
+                                    PO feature-flag REST plus API catalog CRUD on **carland-service**.
+
+                                    """ + adminNote);
+                })
                 .build();
     }
 
@@ -188,6 +241,12 @@ public class OpenApiConfig {
                             ._default("Asia/Baku")
                             .example("Asia/Baku")
                             .readOnly(true));
+                    continue;
+                }
+
+                if ("X-App-Version".equalsIgnoreCase(name)) {
+                    param.setDescription("App semver for `/me` and role-state snapshot. Unknown falls back to current.");
+                    param.setSchema(new StringSchema().example("2.1.0"));
                 }
             }
             return operation;

@@ -11,6 +11,9 @@ import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.FeatureFlagService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +28,8 @@ import java.util.Map;
  * tr: PO sözleşmeli feature-flag REST (id path, Bearer veya cookie). Panel HTML ayrı kalır.
  * en: PO-shaped feature-flag REST (id in path, Bearer or cookie). HTML page stays separate.
  */
+@Tag(name = "admin-feature-flags", description = "Panel ADMIN JWT only. Other JWTs → 403 Admin not found.")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor
 public class FeatureFlagAdminRestController {
@@ -32,6 +37,7 @@ public class FeatureFlagAdminRestController {
     private final FeatureFlagService featureFlagService;
     private final AdminAccessService adminAccessService;
 
+    @Operation(summary = "List flags", description = "Live flags (soft-deleted hidden). Accept: application/json required.")
     @GetMapping(value = "/admin/feature-flags", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> list(HttpServletRequest request) {
         ResponseEntity<?> denied = guard(request);
@@ -41,6 +47,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.listFlags());
     }
 
+    @Operation(summary = "Get flag by id")
     @GetMapping(value = "/admin/feature-flags/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getOne(
             @PathVariable Long id,
@@ -58,6 +65,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Create flag")
     @PostMapping(value = "/admin/feature-flags", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> create(
             @RequestBody FeatureFlagWriteRequest body,
@@ -77,6 +85,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Update flag (name immutable)")
     @PutMapping(value = "/admin/feature-flags/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> update(
             @PathVariable Long id,
@@ -95,6 +104,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Soft-delete flag")
     @DeleteMapping("/admin/feature-flags/{id:\\d+}")
     public ResponseEntity<?> delete(
             @PathVariable Long id,
@@ -114,6 +124,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Attach APIs to flag")
     @PostMapping(value = "/admin/feature-flags/{id:\\d+}/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> attach(
             @PathVariable Long id,
@@ -134,6 +145,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Detach API from flag")
     @DeleteMapping("/admin/feature-flags/{id:\\d+}/endpoints/{endpointId:\\d+}")
     public ResponseEntity<?> detach(
             @PathVariable Long id,
@@ -154,6 +166,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "List unclaimed catalog APIs")
     @GetMapping(value = "/admin/available-endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> available(HttpServletRequest request) {
         ResponseEntity<?> denied = guard(request);
@@ -163,6 +176,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.availableEndpoints());
     }
 
+    @Operation(summary = "List all catalog APIs")
     @GetMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> listEndpoints(HttpServletRequest request) {
         ResponseEntity<?> denied = guard(request);
@@ -172,6 +186,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.listEndpoints());
     }
 
+    @Operation(summary = "Create catalog API")
     @PostMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> createEndpoint(
             @RequestBody FeatureFlagEndpointWriteRequest body,
@@ -191,6 +206,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Update catalog API")
     @PutMapping(value = "/admin/endpoints/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> updateEndpoint(
             @PathVariable Long id,
@@ -210,6 +226,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Delete catalog API")
     @DeleteMapping("/admin/endpoints/{id:\\d+}")
     public ResponseEntity<?> deleteEndpoint(
             @PathVariable Long id,
@@ -229,6 +246,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Set role state (PATCH)")
     @PatchMapping(value = "/admin/feature-flags/{id:\\d+}/state", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> patchState(
             @PathVariable Long id,
@@ -238,6 +256,7 @@ public class FeatureFlagAdminRestController {
         return writeState(id, body, request);
     }
 
+    @Operation(summary = "Set role state (POST if nginx blocks PATCH)")
     @PostMapping(value = "/admin/feature-flags/{id:\\d+}/state", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> postState(
             @PathVariable Long id,
@@ -247,6 +266,7 @@ public class FeatureFlagAdminRestController {
         return writeState(id, body, request);
     }
 
+    @Operation(summary = "Flag audit (includes soft-deleted)")
     @GetMapping(value = "/admin/feature-flags/{id:\\d+}/audit", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> audit(
             @PathVariable Long id,
@@ -263,6 +283,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Admin snapshot (panel one-shot)")
     @GetMapping(value = "/admin/feature-flags/snapshot", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> snapshot(
             @RequestParam(required = false) String version,
@@ -275,6 +296,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.adminSnapshot(version));
     }
 
+    @Operation(summary = "List app versions")
     @GetMapping(value = "/admin/feature-flags/versions", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> versions(HttpServletRequest request) {
         ResponseEntity<?> denied = guard(request);
@@ -284,6 +306,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.listVersions());
     }
 
+    @Operation(summary = "Create app version")
     @PostMapping(value = "/admin/feature-flags/versions", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> createVersion(
             @RequestBody FeatureFlagVersionCreateRequest body,
@@ -304,6 +327,7 @@ public class FeatureFlagAdminRestController {
         }
     }
 
+    @Operation(summary = "Set current app version")
     @PostMapping(value = "/admin/feature-flags/versions/current", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> setCurrent(
             @RequestBody FeatureFlagVersionCurrentRequest body,

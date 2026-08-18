@@ -42,9 +42,11 @@ import java.util.stream.Collectors;
  * tr: VIN'e göre servis geçmişini getiren implementasyondur: önce lokal cache'e (service_history tablosu)
  *     bakar, boşsa Hyper partner API'den geçmişi çekip parça detaylarıyla birlikte kaydeder. Araç bazlı
  *     kilitleme ile eşzamanlı isteklerde çift kayıt oluşmasını engeller.
+ *     HTTP girişi kapatıldı (CarController v1 mapping comment); bean duruyor, dışarıdan çağrılmaz.
  * en: Implementation that returns service history by VIN: reads the local cache (service_history table)
  *     first, and when empty fetches the history from the Hyper partner API and persists it together with
  *     part details. Uses per-car locking to prevent duplicate inserts under concurrent requests.
+ *     HTTP entry is disabled (v1 mapping commented in CarController); bean remains, not called from API.
  */
 @Service
 @RequiredArgsConstructor

@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import com.carland.carland_service.security.AdminAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * tr: Feature-flag admin HTML sayfası. JSON REST ayrı controller'dadır.
  * en: Feature-flag admin HTML page. JSON REST lives in a separate controller.
  */
+@Hidden
 @Controller
 @RequiredArgsConstructor
 public class FeatureFlagAdminController {

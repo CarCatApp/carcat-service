@@ -14,10 +14,10 @@ import com.carland.carland_service.repository.MaintenanceTemplateRepository;
 import com.carland.carland_service.service.impl.HyperTokenService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.dto.response.VisitHistoryResponse;
-import com.carland.carland_service.service.CarVinHistoryService;
 import com.carland.carland_service.service.VisitHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.*;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +36,8 @@ import java.util.List;
 public class CarController {
 
     private final CarService carService;
-    private final CarVinHistoryService carVinHistoryService;
+    // v1 HTTP kapalı; Flutter / partner visit modeli v2 (VisitHistoryService).
+    // private final CarVinHistoryService carVinHistoryService;
     private final VisitHistoryService visitHistoryService;
     private final MaintenanceTemplateRepository maintenanceTemplateRepository;
     private final CarRepository carRepository;
@@ -314,21 +315,38 @@ public class CarController {
     }
 
     /**
+     * v1 GET /{vin}/service-history kapatıldı. Canlı yol: GET /{vin}/service-history/v2 (visits).
+     *
      * tr: Path'teki VIN koduna göre aracın servis geçmişini (v1 format) döner.
      * en: Returns the car's service history (v1 format) for the VIN code in the path.
      */
-    @GetMapping("/{vin}/service-history")
-    public CarVinServiceHistoryResponse getServiceHistoryByVin(@PathVariable String vin,
-                                                                @RequestHeader("phoneNumber") String phoneNumber,
-                                                                @RequestHeader("X-User-Id") String userIdHeader,
-                                                                @RequestHeader("Accept-Language") String acceptLanguage) {
-        return carVinHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
-    }
+//    @Operation(
+//            summary = "Service history v1 (legacy flat rows)",
+//            description = """
+//                    Legacy Hyper flatten into `service_histories`. Still callable; percentages still read this table.
+//                    **Current mobile/partner visit model is v2** (`GET .../service-history/v2`, `visits` table).
+//                    After add-car Hyper sync uses v2, not this endpoint.
+//                    """
+//    )
+//    @GetMapping("/{vin}/service-history")
+//    public CarVinServiceHistoryResponse getServiceHistoryByVin(@PathVariable String vin,
+//                                                                @RequestHeader("phoneNumber") String phoneNumber,
+//                                                                @RequestHeader("X-User-Id") String userIdHeader,
+//                                                                @RequestHeader("Accept-Language") String acceptLanguage) {
+//        return carVinHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
+//    }
 
     /**
      * tr: Path'teki VIN koduna göre aracın ziyaret bazlı servis geçmişini (v2 format) döner.
      * en: Returns the car's visit-based service history (v2 format) for the VIN code in the path.
      */
+    @Operation(
+            summary = "Service history (visit-based)",
+            description = """
+                    Current model: `visits` + lines/parts. Used by add-car Hyper sync and partner webhooks.
+                    Hyper `GET /partner/v1/vehicles/by-vin/{vin}` is cached into `visits` when empty.
+                    """
+    )
     @GetMapping("/{vin}/service-history/v2")
     public VisitHistoryResponse getServiceHistoryByVinV2(@PathVariable String vin,
                                                                    @RequestHeader("phoneNumber") String phoneNumber,
