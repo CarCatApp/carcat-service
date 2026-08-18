@@ -20,6 +20,16 @@ public interface FeatureFlagService {
 
     Map<String, Object> adminSnapshot(String semver);
 
+    List<Map<String, Object>> listFlags();
+
+    Map<String, Object> flagDetail(Long id, String semver);
+
+    List<Map<String, Object>> availableEndpoints();
+
+    List<Map<String, Object>> auditForFlag(Long id);
+
+    List<Map<String, Object>> listVersions();
+
     FeatureFlag createFlag(FeatureFlagWriteRequest request, String actor);
 
     FeatureFlag updateFlag(Long id, FeatureFlagWriteRequest request, String actor);

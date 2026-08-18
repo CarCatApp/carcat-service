@@ -40,14 +40,32 @@ public class AdminAccessService {
         response.addCookie(cookie);
     }
 
-    public boolean isPanelAdmin(HttpServletRequest request) {
-        Claims claims = parse(readToken(request));
+    public enum Status {
+        MISSING,
+        INVALID,
+        FORBIDDEN,
+        OK
+    }
+
+    public Status inspect(HttpServletRequest request) {
+        String token = readToken(request);
+        if (token == null || token.isBlank()) {
+            return Status.MISSING;
+        }
+        Claims claims = parse(token);
         if (claims == null) {
-            return false;
+            return Status.INVALID;
         }
         String phone = claims.getSubject();
         String role = stringClaim(claims, "role");
-        return PANEL_PHONE.equals(phone) && "ADMIN".equalsIgnoreCase(role);
+        if (PANEL_PHONE.equals(phone) && "ADMIN".equalsIgnoreCase(role)) {
+            return Status.OK;
+        }
+        return Status.FORBIDDEN;
+    }
+
+    public boolean isPanelAdmin(HttpServletRequest request) {
+        return inspect(request) == Status.OK;
     }
 
     public String actor(HttpServletRequest request) {

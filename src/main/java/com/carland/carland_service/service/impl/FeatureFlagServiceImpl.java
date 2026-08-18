@@ -160,6 +160,106 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listFlags() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (FeatureFlag flag : flagRepository.findByDeletedAtIsNullOrderByNameAsc()) {
+            out.add(flagSummary(flag));
+        }
+        return out;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> flagDetail(Long id, String semver) {
+        FeatureFlag flag = liveFlag(id);
+        AppVersion version = resolveVersion(semver);
+        Map<String, FeatureFlagState> stateIndex = new LinkedHashMap<>();
+        for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
+            if (row.getFlag() != null && row.getFlag().getId().equals(id)) {
+                stateIndex.put(row.getRole().name(), row.getState());
+            }
+        }
+        Map<String, String> states = new LinkedHashMap<>();
+        for (UserRoles role : GRID_ROLES) {
+            FeatureFlagState st = stateIndex.get(role.name());
+            states.put(role.name(), (st != null ? st : flag.getDefaultState()).name());
+        }
+        List<Map<String, Object>> eps = new ArrayList<>();
+        for (FeatureFlagEndpoint ep : endpointRepository.findByFlag_Id(flag.getId())) {
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("id", ep.getId());
+            e.put("method", ep.getHttpMethod());
+            e.put("path", ep.getPathPattern());
+            eps.add(e);
+        }
+        Map<String, Object> dto = flagSummary(flag);
+        dto.put("version", version.getSemver());
+        dto.put("states", states);
+        dto.put("endpoints", eps);
+        return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> availableEndpoints() {
+        List<Map<String, Object>> catalog = new ArrayList<>();
+        for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
+            if (ep.isNeverGuard() || ep.getFlag() != null) {
+                continue;
+            }
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("id", ep.getId());
+            e.put("method", ep.getHttpMethod());
+            e.put("path", ep.getPathPattern());
+            e.put("claimed", false);
+            e.put("inFlag", false);
+            catalog.add(e);
+        }
+        return catalog;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> auditForFlag(Long id) {
+        FeatureFlag flag = flagRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Flag not found"));
+        String name = flag.getName();
+        List<FeatureFlagAudit> matched = new ArrayList<>();
+        for (FeatureFlagAudit row : auditRepository.findTop100ByOrderByCreatedAtDesc()) {
+            String path = row.getPathPattern() != null ? row.getPathPattern() : "";
+            if (path.contains(name)) {
+                matched.add(row);
+            }
+        }
+        return toAuditDtos(matched);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listVersions() {
+        List<Map<String, Object>> versions = new ArrayList<>();
+        for (AppVersion v : appVersionRepository.findAllByOrderByCreatedAtDesc()) {
+            Map<String, Object> vd = new LinkedHashMap<>();
+            vd.put("semver", v.getSemver());
+            vd.put("current", v.isCurrent());
+            versions.add(vd);
+        }
+        return versions;
+    }
+
+    private Map<String, Object> flagSummary(FeatureFlag flag) {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("id", flag.getId());
+        dto.put("name", flag.getName());
+        dto.put("description", flag.getDescription());
+        dto.put("defaultState", flag.getDefaultState() != null ? flag.getDefaultState().name() : null);
+        dto.put("createdAt", flag.getCreatedAt() != null ? flag.getCreatedAt().toString() : null);
+        dto.put("updatedAt", flag.getUpdatedAt() != null ? flag.getUpdatedAt().toString() : null);
+        return dto;
+    }
+
+    @Override
     @Transactional
     public FeatureFlag createFlag(FeatureFlagWriteRequest request, String actor) {
         if (request.getName() == null || request.getName().isBlank()) {

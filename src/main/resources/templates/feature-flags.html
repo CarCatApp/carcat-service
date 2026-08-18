@@ -219,8 +219,10 @@
   }
 
   async function api(url, options = {}) {
-    const res = await fetch(url, { credentials: "same-origin", ...options });
-    if (res.status === 401) { window.location.href = "/admin/"; return null; }
+    const headers = { Accept: "application/json", ...(options.headers || {}) };
+    const res = await fetch(url, { credentials: "same-origin", ...options, headers });
+    if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return null; }
+    if (res.status === 204) return {};
     const raw = await res.text();
     let body = {};
     try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw.slice(0, 180) }; }
@@ -234,7 +236,7 @@
   async function loadSnapshot(version) {
     showError("");
     const qs = version ? ("?version=" + encodeURIComponent(version)) : "";
-    const data = await api("/admin/api/feature-flags/snapshot" + qs);
+    const data = await api("/admin/feature-flags/snapshot" + qs);
     if (!data) return;
     snapshot = data;
     currentVersion = data.version;
@@ -265,7 +267,7 @@
     const setBtn = document.getElementById("setCurrentBtn");
     if (setBtn) {
       setBtn.onclick = async () => {
-        const ok = await api("/admin/api/feature-flags/versions/current", {
+        const ok = await api("/admin/feature-flags/versions/current", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ semver: currentVersion })
@@ -277,7 +279,7 @@
       e.preventDefault();
       const semver = e.target.semver.value.trim();
       const makeCurrent = e.target.makeCurrent.checked;
-      const ok = await api("/admin/api/feature-flags/versions", {
+      const ok = await api("/admin/feature-flags/versions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ semver, copyFrom: currentVersion, makeCurrent })
@@ -389,7 +391,7 @@
     list.querySelectorAll(".edit-form").forEach(form => {
       form.onsubmit = async (e) => {
         e.preventDefault();
-        const ok = await api("/admin/api/feature-flags/" + form.dataset.id, {
+        const ok = await api("/admin/feature-flags/" + form.dataset.id, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -403,18 +405,17 @@
     list.querySelectorAll(".delete-flag").forEach(btn => {
       btn.onclick = async () => {
         if (!confirm("Delete this flag? Detach APIs first.")) return;
-        const ok = await api("/admin/api/feature-flags/" + btn.dataset.id, { method: "DELETE" });
+        const ok = await api("/admin/feature-flags/" + btn.dataset.id, { method: "DELETE" });
         if (ok) loadSnapshot(currentVersion);
       };
     });
     list.querySelectorAll(".state-form").forEach(form => {
       form.onsubmit = async (e) => {
         e.preventDefault();
-        const ok = await api("/admin/api/feature-flags/state", {
+        const ok = await api("/admin/feature-flags/" + form.dataset.id + "/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            flagId: Number(form.dataset.id),
             role: form.role.value,
             state: form.state.value,
             version: currentVersion
@@ -428,7 +429,7 @@
         e.preventDefault();
         const ids = [...form.querySelectorAll("input[name=endpointIds]:checked")].map(i => Number(i.value));
         if (!ids.length) { showError("Select at least one API"); return; }
-        const ok = await api("/admin/api/feature-flags/" + form.dataset.id + "/endpoints", {
+        const ok = await api("/admin/feature-flags/" + form.dataset.id + "/endpoints", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpointIds: ids })
@@ -438,7 +439,7 @@
     });
     list.querySelectorAll(".detach").forEach(btn => {
       btn.onclick = async () => {
-        const ok = await api("/admin/api/feature-flags/" + btn.dataset.flag + "/endpoints/" + btn.dataset.ep, {
+        const ok = await api("/admin/feature-flags/" + btn.dataset.flag + "/endpoints/" + btn.dataset.ep, {
           method: "DELETE"
         });
         if (ok) loadSnapshot(currentVersion);
@@ -449,7 +450,7 @@
   document.getElementById("createForm").onsubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
-    const ok = await api("/admin/api/feature-flags", {
+    const ok = await api("/admin/feature-flags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
