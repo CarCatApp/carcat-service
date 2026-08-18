@@ -78,8 +78,8 @@ public class AdminController {
 
 
     /**
-     * tr: Auth JWT login; yalnızca +994000000000 / ADMIN panele girer, diğer herkes "Admin not found".
-     * en: Auth JWT login; only +994000000000 / ADMIN may enter the panel, everyone else gets "Admin not found".
+     * tr: Auth JWT login; yalnızca +994500000000 / ADMIN panele girer, diğer herkes "Admin not found".
+     * en: Auth JWT login; only +994500000000 / ADMIN may enter the panel, everyone else gets "Admin not found".
      */
     @PostMapping("/admin/login")
     public String login(

@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 public class AdminAccessService {
 
     public static final String COOKIE = "ADMIN_ACCESS";
-    public static final String PANEL_PHONE = "+994000000000";
+    public static final String PANEL_PHONE = "+994500000000";
 
     @Value("${access.token.secret-key}")
     private String accessTokenSecretKey;
