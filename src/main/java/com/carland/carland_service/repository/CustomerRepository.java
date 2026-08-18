@@ -21,4 +21,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     /** tr: Kullanıcı id ve telefona göre müşteriyi bulur. / en: Finds a customer by user id and phone number. */
     Customer findByUserIdAndPhoneNumber(Long aLong, String phoneNumber);
+
+    /** tr: FIN koduna göre müşteriyi bulur. / en: Finds a customer by FIN (pin). */
+    Customer findByPinIgnoreCase(String pin);
+
+    /** tr: E-posta adresine göre müşteriyi bulur. / en: Finds a customer by e-mail. */
+    Customer findByMailIgnoreCase(String mail);
 }

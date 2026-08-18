@@ -187,6 +187,29 @@
     </form>
   </section>
 
+  <section class="create-card">
+    <h2>API catalog</h2>
+    <p class="muted">Add extra APIs here instead of SQL. Attached APIs cannot be edited or deleted until detached.</p>
+    <form id="createEpForm" class="form-row">
+      <div class="field">
+        <label>Method</label>
+        <select name="method">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>PATCH</option>
+          <option>DELETE</option>
+        </select>
+      </div>
+      <div class="field grow">
+        <label>Path</label>
+        <input name="path" placeholder="/api/v1/example" required />
+      </div>
+      <button class="btn-primary" type="submit">Create API</button>
+    </form>
+    <div id="catalogList" style="margin-top:12px"></div>
+  </section>
+
   <div class="flags" id="flagList"></div>
 
   <div class="audit">
@@ -207,7 +230,8 @@
   const ERRORS = {
     FLAG_EXISTS: "This flag name already exists",
     HAS_ENDPOINTS: "Detach all APIs before deleting this flag",
-    ENDPOINT_CLAIMED: "This API is already attached to another flag",
+    ENDPOINT_CLAIMED: "This API is already attached to a flag — detach first",
+    ENDPOINT_EXISTS: "This method + path already exists",
     NOT_ATTACHED: "This API is not attached to the flag"
   };
 
@@ -242,6 +266,7 @@
     currentVersion = data.version;
     renderVersions(data.versions || [], data.version);
     renderFlags(data.flags || [], data.availableEndpoints || [], data.roles || []);
+    renderCatalog(data.catalog || []);
     renderAudit(data.audit || []);
   }
 
@@ -447,6 +472,48 @@
     });
   }
 
+  function renderCatalog(rows) {
+    const box = document.getElementById("catalogList");
+    if (!box) return;
+    if (!rows.length) {
+      box.innerHTML = `<p class="muted">No catalog rows yet.</p>`;
+      return;
+    }
+    box.innerHTML = rows.map(ep => {
+      const claimed = ep.claimed || ep.inFlag;
+      const locked = claimed || ep.neverGuard;
+      const actions = locked
+        ? `<span class="muted">${claimed ? "in a flag" : "never-guard"}</span>`
+        : `<button type="button" class="btn-ghost edit-ep" data-id="${ep.id}" data-method="${ep.method}" data-path="${ep.path}">Edit</button>
+           <button type="button" class="btn-danger del-ep" data-id="${ep.id}">Delete</button>`;
+      return `<div class="ep">
+        <div><span class="method ${ep.method}">${ep.method}</span><span class="path">${ep.path}</span></div>
+        <div>${actions}</div>
+      </div>`;
+    }).join("");
+    box.querySelectorAll(".edit-ep").forEach(btn => {
+      btn.onclick = async () => {
+        const path = prompt("Path", btn.dataset.path);
+        if (path == null || !path.trim()) return;
+        const method = prompt("Method", btn.dataset.method);
+        if (method == null || !method.trim()) return;
+        const ok = await api("/admin/endpoints/" + btn.dataset.id, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ method: method.trim(), path: path.trim() })
+        });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+    box.querySelectorAll(".del-ep").forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm("Delete this API from the catalog?")) return;
+        const ok = await api("/admin/endpoints/" + btn.dataset.id, { method: "DELETE" });
+        if (ok) loadSnapshot(currentVersion);
+      };
+    });
+  }
+
   document.getElementById("createForm").onsubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -462,6 +529,20 @@
     if (ok) {
       form.reset();
       form.defaultState.value = "HIDDEN";
+      loadSnapshot(currentVersion);
+    }
+  };
+
+  document.getElementById("createEpForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const ok = await api("/admin/endpoints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method: form.method.value, path: form.path.value })
+    });
+    if (ok) {
+      form.reset();
       loadSnapshot(currentVersion);
     }
   };

@@ -290,6 +290,36 @@ public enum MessagesLangValues {
             "Данные успешно сохранены"
     ),
 
+    CUSTOMER_INFORMATION_MISSING(
+            "Ad, soyad, e-poçt və FIN kodu boş ola bilməz",
+            "Name, surname, e-mail and FIN code cannot be empty",
+            "Имя, фамилия, электронная почта и код FIN не могут быть пустыми"
+    ),
+
+    INVALID_MAIL(
+            "E-poçt ünvanı düzgün deyil",
+            "Invalid e-mail address",
+            "Неверный адрес электронной почты"
+    ),
+
+    INVALID_PIN(
+            "FIN kodu düzgün deyil",
+            "Invalid FIN code",
+            "Неверный код FIN"
+    ),
+
+    MAIL_ALREADY_EXISTS(
+            "Bu e-poçt ünvanı artıq istifadə olunur",
+            "This e-mail address is already in use",
+            "Этот адрес электронной почты уже используется"
+    ),
+
+    PIN_ALREADY_EXISTS(
+            "Bu FIN kodu artıq istifadə olunur",
+            "This FIN code is already in use",
+            "Этот код FIN уже используется"
+    ),
+
     INVALID_PHOTO_NAME(
             "Şəkil adı qəbul edilmədi",
             "Invalid photo name",

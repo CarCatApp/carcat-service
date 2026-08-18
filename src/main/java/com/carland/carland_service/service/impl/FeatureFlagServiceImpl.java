@@ -1,6 +1,7 @@
 package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
+import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
@@ -29,6 +30,7 @@ import org.springframework.util.AntPathMatcher;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -217,6 +219,104 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             catalog.add(e);
         }
         return catalog;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listEndpoints() {
+        List<Map<String, Object>> catalog = new ArrayList<>();
+        for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
+            catalog.add(endpointDto(ep));
+        }
+        return catalog;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> createEndpoint(FeatureFlagEndpointWriteRequest request, String actor) {
+        String method = normalizeMethod(request.getMethod());
+        String path = normalizePath(request.getPath());
+        if (endpointRepository.findByHttpMethodAndPathPattern(method, path).isPresent()) {
+            throw new IllegalStateException("ENDPOINT_EXISTS");
+        }
+        boolean neverGuard = Boolean.TRUE.equals(request.getNeverGuard()) || isNeverGuard(path);
+        FeatureFlagEndpoint saved = endpointRepository.save(FeatureFlagEndpoint.builder()
+                .httpMethod(method)
+                .pathPattern(path)
+                .neverGuard(neverGuard)
+                .build());
+        audit(actor, "CREATE", method, path, null, null, currentSemverCache.get());
+        reloadCache();
+        return endpointDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> updateEndpoint(Long id, FeatureFlagEndpointWriteRequest request, String actor) {
+        FeatureFlagEndpoint ep = endpointRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown endpoint id"));
+        if (ep.getFlag() != null) {
+            throw new IllegalStateException("ENDPOINT_CLAIMED");
+        }
+        String method = request.getMethod() != null ? normalizeMethod(request.getMethod()) : ep.getHttpMethod();
+        String path = request.getPath() != null ? normalizePath(request.getPath()) : ep.getPathPattern();
+        endpointRepository.findByHttpMethodAndPathPattern(method, path)
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> {
+                    throw new IllegalStateException("ENDPOINT_EXISTS");
+                });
+        ep.setHttpMethod(method);
+        ep.setPathPattern(path);
+        if (request.getNeverGuard() != null) {
+            ep.setNeverGuard(request.getNeverGuard());
+        }
+        endpointRepository.save(ep);
+        audit(actor, "UPDATE", method, path, null, null, currentSemverCache.get());
+        reloadCache();
+        return endpointDto(ep);
+    }
+
+    @Override
+    @Transactional
+    public void deleteEndpoint(Long id, String actor) {
+        FeatureFlagEndpoint ep = endpointRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown endpoint id"));
+        if (ep.getFlag() != null) {
+            throw new IllegalStateException("ENDPOINT_CLAIMED");
+        }
+        audit(actor, "DELETE", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get());
+        endpointRepository.delete(ep);
+        reloadCache();
+    }
+
+    private Map<String, Object> endpointDto(FeatureFlagEndpoint ep) {
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("id", ep.getId());
+        e.put("method", ep.getHttpMethod());
+        e.put("path", ep.getPathPattern());
+        e.put("neverGuard", ep.isNeverGuard());
+        boolean claimed = ep.getFlag() != null;
+        e.put("claimed", claimed);
+        e.put("inFlag", claimed);
+        return e;
+    }
+
+    private String normalizeMethod(String method) {
+        if (method == null || method.isBlank()) {
+            throw new IllegalArgumentException("method required");
+        }
+        return method.trim().toUpperCase();
+    }
+
+    private String normalizePath(String path) {
+        if (path == null || path.isBlank()) {
+            throw new IllegalArgumentException("path required");
+        }
+        String p = path.trim();
+        if (!p.startsWith("/")) {
+            p = "/" + p;
+        }
+        return p;
     }
 
     @Override
@@ -490,6 +590,29 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                         .build());
         endpoint.setNeverGuard(neverGuard);
         return endpointRepository.save(endpoint);
+    }
+
+    @Override
+    @Transactional
+    public int syncScannedEndpoints(List<FeatureFlagEndpoint> scanned) {
+        Map<String, FeatureFlagEndpoint> existing = new HashMap<>();
+        for (FeatureFlagEndpoint ep : endpointRepository.findAll()) {
+            existing.put(ep.getHttpMethod() + " " + ep.getPathPattern(), ep);
+        }
+        int inserted = 0;
+        for (FeatureFlagEndpoint incoming : scanned) {
+            FeatureFlagEndpoint current = existing.get(incoming.getHttpMethod() + " " + incoming.getPathPattern());
+            if (current == null) {
+                endpointRepository.save(incoming);
+                inserted++;
+                continue;
+            }
+            if (current.isNeverGuard() != incoming.isNeverGuard()) {
+                current.setNeverGuard(incoming.isNeverGuard());
+                endpointRepository.save(current);
+            }
+        }
+        return inserted;
     }
 
     @Override

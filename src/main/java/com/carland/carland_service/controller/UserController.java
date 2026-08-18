@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.*;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Color;
@@ -135,6 +136,31 @@ public class UserController {
                                                           @RequestHeader("X-Client-Timezone") String timezone,
                                                           @RequestHeader("Accept-Language") String acceptLanguage) {
         return userService.getNotificationList(role, phoneNumber, userIdHeader, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: "Məlumatlarım" ekranı için müşteri profilini döner (ad, soyad, e-posta, FIN, salt-okunur telefon).
+     * en: Returns the customer profile for the "My information" screen (name, surname, e-mail, FIN, read-only phone).
+     */
+    @GetMapping("/information")
+    public CustomerInformationResponse getCustomerInformation(@RequestHeader("role") String role,
+                                                              @RequestHeader("phoneNumber") String phoneNumber,
+                                                              @RequestHeader("X-User-Id") String userIdHeader,
+                                                              @RequestHeader("Accept-Language") String acceptLanguage) {
+        return userService.getCustomerInformation(role, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
+    /**
+     * tr: Müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder/günceller. Telefon gövdeden alınmaz ve değişmez.
+     * en: Saves/updates the customer's name, surname, e-mail and FIN. Phone is not taken from the body and is never changed.
+     */
+    @PutMapping("/information")
+    public CustomerInformationResponse saveCustomerInformation(@RequestBody CustomerInformationRequest request,
+                                                               @RequestHeader("role") String role,
+                                                               @RequestHeader("phoneNumber") String phoneNumber,
+                                                               @RequestHeader("X-User-Id") String userIdHeader,
+                                                               @RequestHeader("Accept-Language") String acceptLanguage) {
+        return userService.saveCustomerInformation(request, role, phoneNumber, userIdHeader, acceptLanguage);
     }
 
 

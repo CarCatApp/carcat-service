@@ -1,6 +1,7 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
+import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
@@ -25,6 +26,14 @@ public interface FeatureFlagService {
     Map<String, Object> flagDetail(Long id, String semver);
 
     List<Map<String, Object>> availableEndpoints();
+
+    List<Map<String, Object>> listEndpoints();
+
+    Map<String, Object> createEndpoint(FeatureFlagEndpointWriteRequest request, String actor);
+
+    Map<String, Object> updateEndpoint(Long id, FeatureFlagEndpointWriteRequest request, String actor);
+
+    void deleteEndpoint(Long id, String actor);
 
     List<Map<String, Object>> auditForFlag(Long id);
 
@@ -51,6 +60,8 @@ public interface FeatureFlagService {
     boolean isNeverGuard(String requestPath);
 
     FeatureFlagEndpoint upsertEndpoint(String httpMethod, String pathPattern, boolean neverGuard);
+
+    int syncScannedEndpoints(List<FeatureFlagEndpoint> scanned);
 
     AppVersion ensureCurrentVersion();
 

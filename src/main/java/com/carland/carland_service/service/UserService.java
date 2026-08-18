@@ -1,5 +1,7 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.request.CustomerInformationRequest;
+import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 
@@ -21,5 +23,18 @@ public interface UserService {
      * en: Returns the notification list belonging to the user.
      */
     List<NotificationResponse> getNotificationList(String role, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage);
+
+    /**
+     * tr: Müşterinin "Məlumatlarım" profilini (ad, soyad, e-posta, FIN) döner; telefon salt-okunur.
+     * en: Returns the customer's "My information" profile (name, surname, e-mail, FIN); phone is read-only.
+     */
+    CustomerInformationResponse getCustomerInformation(String role, String phoneNumber, String userIdHeader, String acceptLanguage);
+
+    /**
+     * tr: Müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder/günceller; telefon değişmez.
+     * en: Saves/updates the customer's name, surname, e-mail and FIN; phone is never changed.
+     */
+    CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
+                                                        String phoneNumber, String userIdHeader, String acceptLanguage);
 
 }

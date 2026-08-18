@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.entity.FeatureFlagEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
@@ -9,7 +10,9 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -35,7 +38,7 @@ public class FeatureFlagEndpointScanner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         featureFlagService.ensureCurrentVersion();
 
-        int inserted = 0;
+        List<FeatureFlagEndpoint> scanned = new ArrayList<>();
         for (RequestMappingInfo info : requestMappingHandlerMapping.getHandlerMethods().keySet()) {
             Set<String> paths = pathsOf(info);
             Set<RequestMethod> methods = info.getMethodsCondition().getMethods();
@@ -48,13 +51,17 @@ public class FeatureFlagEndpointScanner implements ApplicationRunner {
                 }
                 boolean neverGuard = isNeverGuardPath(path);
                 for (RequestMethod method : methods) {
-                    featureFlagService.upsertEndpoint(method.name(), path, neverGuard);
-                    inserted++;
+                    scanned.add(FeatureFlagEndpoint.builder()
+                            .httpMethod(method.name())
+                            .pathPattern(path)
+                            .neverGuard(neverGuard)
+                            .build());
                 }
             }
         }
+        int inserted = featureFlagService.syncScannedEndpoints(scanned);
         featureFlagService.reloadCache();
-        log.info("Feature-flag scan finished, processed {} method/path pairs", inserted);
+        log.info("Feature-flag scan finished: {} Spring pairs, {} new catalog rows", scanned.size(), inserted);
     }
 
     private Set<String> pathsOf(RequestMappingInfo info) {

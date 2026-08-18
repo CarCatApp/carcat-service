@@ -1,6 +1,7 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
+import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagVersionCurrentRequest;
@@ -160,6 +161,72 @@ public class FeatureFlagAdminRestController {
             return denied;
         }
         return ResponseEntity.ok(featureFlagService.availableEndpoints());
+    }
+
+    @GetMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listEndpoints(HttpServletRequest request) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        return ResponseEntity.ok(featureFlagService.listEndpoints());
+    }
+
+    @PostMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> createEndpoint(
+            @RequestBody FeatureFlagEndpointWriteRequest body,
+            HttpServletRequest request
+    ) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(featureFlagService.createEndpoint(body, adminAccessService.actor(request)));
+        } catch (IllegalStateException ex) {
+            return conflict(ex);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PutMapping(value = "/admin/endpoints/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> updateEndpoint(
+            @PathVariable Long id,
+            @RequestBody FeatureFlagEndpointWriteRequest body,
+            HttpServletRequest request
+    ) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        try {
+            return ResponseEntity.ok(featureFlagService.updateEndpoint(id, body, adminAccessService.actor(request)));
+        } catch (IllegalStateException ex) {
+            return conflict(ex);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/admin/endpoints/{id:\\d+}")
+    public ResponseEntity<?> deleteEndpoint(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        try {
+            featureFlagService.deleteEndpoint(id, adminAccessService.actor(request));
+            return ResponseEntity.noContent().build();
+        } catch (IllegalStateException ex) {
+            return conflict(ex);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 
     @PatchMapping(value = "/admin/feature-flags/{id:\\d+}/state", produces = MediaType.APPLICATION_JSON_VALUE)

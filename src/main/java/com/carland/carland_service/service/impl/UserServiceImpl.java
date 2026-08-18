@@ -1,5 +1,7 @@
 package com.carland.carland_service.service.impl;
 
+import com.carland.carland_service.dto.request.CustomerInformationRequest;
+import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NameSurname;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.UserResponse;
@@ -7,7 +9,10 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Notification;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
+import com.carland.carland_service.exceptions.AlreadyExistsException;
+import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.NotMatchException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
 import com.carland.carland_service.feign.NameSurnameFeign;
@@ -19,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * tr: Kullanıcı işlemlerini yöneten servis; yeni kullanıcı detaylarını dış servisten (Feign) alınan ad-soyad ile oluşturur/kontrol eder ve kullanıcının bildirim listesini döner.
@@ -28,6 +34,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl implements UserService {
+
+    private static final Pattern MAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    /** Azerbaijan FIN: 7 alphanumeric characters (SIMA pin). */
+    private static final Pattern PIN_PATTERN = Pattern.compile("^[A-Za-z0-9]{7}$");
 
     private final Helper helper;
     private final CustomerRepository customerRepository;
@@ -86,5 +97,102 @@ public class UserServiceImpl implements UserService {
                         .notificationText(n.getNotificationText())
                         .build())
                 .toList();
+    }
+
+    /**
+     * tr: Aktif müşterinin "Məlumatlarım" profilini döner. USER rolü şarttır; müşteri yoksa UserNotFoundException.
+     * en: Returns the active customer's "My information" profile. Requires USER role; throws UserNotFoundException if missing.
+     */
+    @Override
+    public CustomerInformationResponse getCustomerInformation(String role, String phoneNumber, String userIdHeader,
+                                                              String acceptLanguage) {
+        Customer customer = requireActiveCustomer(role, phoneNumber, userIdHeader, acceptLanguage);
+        return toInformationResponse(customer);
+    }
+
+    /**
+     * tr: Aktif müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder. Telefon güncellenmez. FIN ve e-posta başka müşteride varsa AlreadyExistsException.
+     * en: Saves the active customer's name, surname, e-mail and FIN. Phone is never updated. Throws AlreadyExistsException when FIN or e-mail belongs to another customer.
+     */
+    @Override
+    public CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
+                                                               String phoneNumber, String userIdHeader,
+                                                               String acceptLanguage) {
+        Customer customer = requireActiveCustomer(role, phoneNumber, userIdHeader, acceptLanguage);
+
+        if (request == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+
+        String name = trimToNull(request.getName());
+        String surname = trimToNull(request.getSurname());
+        String mail = trimToNull(request.getMail());
+        String pin = trimToNull(request.getPin());
+
+        if (name == null || surname == null || mail == null || pin == null) {
+            throw new MissingFieldException(MessagesLangValues.CUSTOMER_INFORMATION_MISSING.getMessageByLang(acceptLanguage));
+        }
+
+        mail = mail.toLowerCase();
+        pin = pin.toUpperCase();
+
+        if (!MAIL_PATTERN.matcher(mail).matches()) {
+            throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
+        }
+        if (!PIN_PATTERN.matcher(pin).matches()) {
+            throw new NotMatchException(MessagesLangValues.INVALID_PIN.getMessageByLang(acceptLanguage));
+        }
+
+        Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
+        if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
+            throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+        }
+
+        Customer mailOwner = customerRepository.findByMailIgnoreCase(mail);
+        if (mailOwner != null && !mailOwner.getUserId().equals(customer.getUserId())) {
+            throw new AlreadyExistsException(MessagesLangValues.MAIL_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+        }
+
+        customer.setName(name);
+        customer.setSurname(surname);
+        customer.setMail(mail);
+        customer.setPin(pin);
+        customerRepository.save(customer);
+
+        return toInformationResponse(customer);
+    }
+
+    private Customer requireActiveCustomer(String role, String phoneNumber, String userIdHeader, String acceptLanguage) {
+        if (userIdHeader == null || userIdHeader.isBlank() || phoneNumber == null || phoneNumber.isBlank()) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_FIELDS.getMessageByLang(acceptLanguage));
+        }
+        if (role == null || !"USER".equalsIgnoreCase(role)) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        }
+
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
+                Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
+        if (customer == null) {
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        return customer;
+    }
+
+    private static CustomerInformationResponse toInformationResponse(Customer customer) {
+        return CustomerInformationResponse.builder()
+                .name(customer.getName())
+                .surname(customer.getSurname())
+                .mail(customer.getMail())
+                .pin(customer.getPin())
+                .phoneNumber(customer.getPhoneNumber())
+                .build();
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
