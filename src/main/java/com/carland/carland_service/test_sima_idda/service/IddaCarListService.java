@@ -3,7 +3,7 @@ package com.carland.carland_service.test_sima_idda.service;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.repository.CustomerRepository;
-import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
+import com.carland.carland_service.test_sima_idda.config.SimaIddaProperties;
 import com.carland.carland_service.test_sima_idda.dto.idda.IddaCarItem;
 import com.carland.carland_service.test_sima_idda.dto.response.IddaCarListResponse;
 import com.carland.carland_service.test_sima_idda.feign.IddaFeign;
@@ -30,6 +30,7 @@ public class IddaCarListService {
 
     private final IddaFeign iddaFeign;
     private final CustomerRepository customerRepository;
+    private final SimaIddaProperties simaIddaProperties;
 
     public IddaCarListResponse getCarsByFin(String userIdHeader, String fin) {
         if (fin == null || fin.isBlank()) {
@@ -39,8 +40,8 @@ public class IddaCarListService {
         Customer customer = requireCustomer(userIdHeader);
 
         List<IddaCarItem> iddaCars = iddaFeign.getCarsByFin(
-                SimaIddaConstants.EXAMPLE_IDDA_PARTNER_CODE,
-                SimaIddaConstants.EXAMPLE_IDDA_API_KEY,
+                simaIddaProperties.getIddaPartnerCode(),
+                simaIddaProperties.getIddaApiKey(),
                 fin
         );
         if (iddaCars == null) {

@@ -44,6 +44,7 @@ server:
 carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
   admin:
+    panel-phone: ${ADMIN_PANEL_PHONE}
     auth-base-url: ${ADMIN_AUTH_BASE_URL:https://digital-innovation.agency/auth/server/api/v1/newUsers}
   swagger:
     auth-login-url: ${SWAGGER_AUTH_LOGIN_URL:https://digital-innovation.agency/auth/server/api/v1/users/login}
@@ -95,4 +96,16 @@ brevo:
 
 access:
   token:
-    secret-key: ${ACCESS_TOKEN_SECRET_KEY:7f4a9c63f339110c36111661b1a568b342a1e5ab675b67a09a2e4986a2a4224a}
+    secret-key: ${ACCESS_TOKEN_SECRET_KEY}
+
+sima:
+  base-url: ${SIMA_BASE_URL:https://pre-biosign-biometric-kyc.sima.az}
+  identifier: ${SIMA_IDENTIFIER}
+  hmac-secret: ${SIMA_HMAC_SECRET}
+  auth-scheme: ${SIMA_AUTH_SCHEME:HMACSHA256}
+  device-info: ${SIMA_DEVICE_INFO:carland-sima-test}
+
+idda:
+  base-url: ${IDDA_BASE_URL:https://example-idda-staging.local}
+  partner-code: ${IDDA_PARTNER_CODE:}
+  api-key: ${IDDA_API_KEY:}

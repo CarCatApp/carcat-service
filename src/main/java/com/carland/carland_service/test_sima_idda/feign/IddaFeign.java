@@ -1,6 +1,5 @@
 package com.carland.carland_service.test_sima_idda.feign;
 
-import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
 import com.carland.carland_service.test_sima_idda.dto.idda.IddaCarItem;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +14,7 @@ import java.util.List;
  */
 @FeignClient(
         name = "testIddaClient",
-        url = SimaIddaConstants.EXAMPLE_IDDA_BASE_URL
+        url = "${idda.base-url}"
 )
 public interface IddaFeign {
 

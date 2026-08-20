@@ -20,10 +20,16 @@ import java.nio.charset.StandardCharsets;
 public class AdminAccessService {
 
     public static final String COOKIE = "ADMIN_ACCESS";
-    public static final String PANEL_PHONE = "+994500000000";
+
+    @Value("${carland.admin.panel-phone}")
+    private String panelPhone;
 
     @Value("${access.token.secret-key}")
     private String accessTokenSecretKey;
+
+    public String getPanelPhone() {
+        return panelPhone;
+    }
 
     public void writeCookie(HttpServletResponse response, String accessToken) {
         Cookie cookie = new Cookie(COOKIE, accessToken);
@@ -58,7 +64,7 @@ public class AdminAccessService {
         }
         String phone = claims.getSubject();
         String role = stringClaim(claims, "role");
-        if (PANEL_PHONE.equals(phone) && "ADMIN".equalsIgnoreCase(role)) {
+        if (panelPhone.equals(phone) && "ADMIN".equalsIgnoreCase(role)) {
             return Status.OK;
         }
         return Status.FORBIDDEN;

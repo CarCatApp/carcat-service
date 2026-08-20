@@ -1,6 +1,5 @@
 package com.carland.carland_service.test_sima_idda.feign;
 
-import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
  */
 @FeignClient(
         name = "testSimaKycClient",
-        url = SimaIddaConstants.EXAMPLE_SIMA_BASE_URL,
+        url = "${sima.base-url}",
         configuration = SimaFeignConfig.class
 )
 public interface SimaFeign {

@@ -4,7 +4,7 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CustomerRepository;
-import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
+import com.carland.carland_service.test_sima_idda.config.SimaIddaProperties;
 import com.carland.carland_service.test_sima_idda.dto.request.SimaCitizenVerifyRequest;
 import com.carland.carland_service.test_sima_idda.dto.response.SimaVerifyResponse;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
@@ -37,6 +37,8 @@ public class SimaKycService {
     private final SimaFeign simaFeign;
     private final CustomerRepository customerRepository;
     private final ObjectMapper objectMapper;
+    private final SimaHmacSigner simaHmacSigner;
+    private final SimaIddaProperties simaIddaProperties;
 
     /**
      * Raw SIMA proxy for Postman / Flutter — multipart photo → Base64, then HMAC + fresh UUID.
@@ -66,16 +68,16 @@ public class SimaKycService {
                 .build();
 
         String minified = SimaHmacSigner.minify(body);
-        String signature = SimaHmacSigner.signBase64(minified);
+        String signature = simaHmacSigner.signBase64(minified);
         log.info("SIMA test/identity/verify idempotencyKey={} photoBytes={} bodyBytes={} signature={}",
                 idempotencyKey, photo.getSize(), minified.length(), signature);
 
         try {
             return simaFeign.verifyCitizen(
-                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    simaIddaProperties.getSimaIdentifier(),
+                    simaIddaProperties.getSimaAuthScheme(),
                     signature,
-                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    simaIddaProperties.getSimaDeviceInfo(),
                     minified
             );
         } catch (FeignException e) {
@@ -139,15 +141,15 @@ public class SimaKycService {
 //                .build();
 //
 //        String minified = SimaHmacSigner.minify(body);
-//        String signature = SimaHmacSigner.signBase64(minified);
+//        String signature = simaHmacSigner.signBase64(minified);
 //
 //        SimaApiEnvelope envelope;
 //        try {
 //            envelope = simaFeign.verifyPassport(
-//                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-//                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+//                    simaIddaProperties.getSimaIdentifier(),
+//                    simaIddaProperties.getSimaAuthScheme(),
 //                    signature,
-//                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+//                    simaIddaProperties.getSimaDeviceInfo(),
 //                    minified
 //            );
 //        } catch (FeignException e) {
@@ -174,17 +176,17 @@ public class SimaKycService {
                 .build();
 
         String minified = SimaHmacSigner.minify(body);
-        String signature = SimaHmacSigner.signBase64(minified);
+        String signature = simaHmacSigner.signBase64(minified);
         log.info("[sima-debug] verify/foreign userId={} pin={} documentType={} photoBytes={} idempotencyKey={}",
                 userIdHeader, pin, body.getDocumentType(), photo.getSize(), idempotencyKey);
 
         SimaApiEnvelope envelope;
         try {
             envelope = simaFeign.verifyForeign(
-                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+                    simaIddaProperties.getSimaIdentifier(),
+                    simaIddaProperties.getSimaAuthScheme(),
                     signature,
-                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+                    simaIddaProperties.getSimaDeviceInfo(),
                     minified
             );
         } catch (FeignException e) {

@@ -33,5 +33,7 @@ out/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
-.vscode/
+### secrets / local env (never commit)
+.env
+*.env
+!*.env.example

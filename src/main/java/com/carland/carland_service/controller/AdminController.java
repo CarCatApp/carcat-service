@@ -97,7 +97,7 @@ public class AdminController {
             if (auth == null
                     || auth.getAccessToken() == null
                     || auth.getAccessToken().isBlank()
-                    || !AdminAccessService.PANEL_PHONE.equals(auth.getPhoneNumber())
+                    || !adminAccessService.getPanelPhone().equals(auth.getPhoneNumber())
                     || !"ADMIN".equalsIgnoreCase(auth.getRole())) {
                 return "redirect:" + ADMIN_URL + "/admin/?error=not_found";
             }
