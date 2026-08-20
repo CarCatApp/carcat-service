@@ -9,6 +9,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -26,6 +27,17 @@ public class CustomExceptionHandler {
         ResponseException responseException=ResponseException.builder()
                 .error("Param is required")
                 .message("Məlumatlar əksikdir!")
+                .timeStamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .build();
+        return new ResponseEntity<>(responseException, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ResponseException> handleMissingServletRequestPartException(MissingServletRequestPartException ex) {
+        ResponseException responseException = ResponseException.builder()
+                .error("Missed required fields")
+                .message(ex.getRequestPartName() + " file is required (form-data, type File)")
                 .timeStamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .build();

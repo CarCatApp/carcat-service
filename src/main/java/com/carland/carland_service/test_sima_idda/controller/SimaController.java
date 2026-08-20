@@ -47,14 +47,14 @@ public class SimaController {
      * Form: pin, documentNumber XOR birthDate, photo (JPEG file). JWT + X-User-Id required.
      */
     @Operation(summary = "SIMA verify citizen (vesika)",
-            description = "Multipart JPEG photo. Exactly one of documentNumber or birthDate. HMAC is signed in-service.")
+            description = "Same form-data as /test/identity/verify: pin, documentNumber XOR birthDate, photo (JPEG File). Extra: JWT + X-User-Id.")
     @PostMapping(value = "/verify/citizen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SimaVerifyResponse verifyCitizen(
-            @RequestHeader("X-User-Id") String userIdHeader,
             @RequestParam("pin") String pin,
             @RequestParam(value = "documentNumber", required = false) String documentNumber,
             @RequestParam(value = "birthDate", required = false) String birthDate,
-            @RequestParam("photo") MultipartFile photo
+            @RequestParam("photo") MultipartFile photo,
+            @RequestHeader("X-User-Id") String userIdHeader
     ) {
         return simaKycService.verifyCitizen(userIdHeader, pin, documentNumber, birthDate, photo);
     }
@@ -78,13 +78,13 @@ public class SimaController {
      * Form: pin, documentType, photo (JPEG file). JWT + X-User-Id required.
      */
     @Operation(summary = "SIMA verify foreign (TRC|PRC|ERP)",
-            description = "Multipart JPEG photo. documentType must be TRC, PRC or ERP. HMAC is signed in-service.")
+            description = "Same photo File as /test/identity/verify. Form: pin, documentType (TRC|PRC|ERP), photo. Extra: JWT + X-User-Id.")
     @PostMapping(value = "/verify/foreign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SimaVerifyResponse verifyForeign(
-            @RequestHeader("X-User-Id") String userIdHeader,
             @RequestParam("pin") String pin,
             @RequestParam("documentType") String documentType,
-            @RequestParam("photo") MultipartFile photo
+            @RequestParam("photo") MultipartFile photo,
+            @RequestHeader("X-User-Id") String userIdHeader
     ) {
         return simaKycService.verifyForeign(userIdHeader, pin, documentType, photo);
     }

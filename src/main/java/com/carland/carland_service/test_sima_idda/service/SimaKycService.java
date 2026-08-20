@@ -1,6 +1,8 @@
 package com.carland.carland_service.test_sima_idda.service;
 
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
 import com.carland.carland_service.test_sima_idda.dto.request.SimaCitizenVerifyRequest;
@@ -87,26 +89,29 @@ public class SimaKycService {
             String name = photo == null ? "null" : photo.getOriginalFilename();
             long size = photo == null ? -1 : photo.getSize();
             String ct = photo == null ? "null" : photo.getContentType();
-            throw new IllegalArgumentException(
+            throw new MissingFieldException(
                     "photo file required/empty (name=" + name + ", size=" + size + ", contentType=" + ct
                             + "). Postman: form-data key must be 'photo', type File.");
         }
         try {
             byte[] bytes = photo.getBytes();
             if (bytes.length > 1024 * 1024) {
-                throw new IllegalArgumentException("photo must be <= 1MB (SIMA limit), got=" + bytes.length);
+                throw new MissingFieldException("photo must be <= 1MB (SIMA limit), got=" + bytes.length);
             }
             if (bytes.length < 2 || bytes[0] != (byte) 0xFF || bytes[1] != (byte) 0xD8) {
-                throw new IllegalArgumentException("photo must be JPEG (SOI FF D8)");
+                throw new MissingFieldException("photo must be JPEG (SOI FF D8)");
             }
             return Base64.getEncoder().encodeToString(bytes);
-        } catch (IllegalArgumentException e) {
+        } catch (MissingFieldException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to read photo: " + e.getMessage(), e);
+            throw new MissingFieldException("Failed to read photo: " + e.getMessage());
         }
     }
 
+    /**
+     * Same multipart photo pipeline as {@link #testIdentityVerify}; then maps SIMA envelope for the logged-in customer.
+     */
     public SimaVerifyResponse verifyCitizen(
             String userIdHeader,
             String pin,
@@ -115,41 +120,7 @@ public class SimaKycService {
             MultipartFile photo
     ) {
         Customer customer = requireCustomer(userIdHeader);
-        SimaCitizenVerifyRequest request = SimaCitizenVerifyRequest.builder()
-                .pin(pin)
-                .documentNumber(blankToNull(documentNumber))
-                .birthDate(blankToNull(birthDate))
-                .livePhoto(toJpegBase64(photo))
-                .build();
-        validateCitizenXor(request);
-
-        String idempotencyKey = UUID.randomUUID().toString();
-        SimaCitizenFeignBody body = SimaCitizenFeignBody.builder()
-                .pin(request.getPin())
-                .documentNumber(request.getDocumentNumber())
-                .birthDate(request.getBirthDate())
-                .livePhoto(request.getLivePhoto())
-                .idempotencyKey(idempotencyKey)
-                .build();
-
-        String minified = SimaHmacSigner.minify(body);
-        String signature = SimaHmacSigner.signBase64(minified);
-        log.info("[sima-debug] verify/citizen userId={} pin={} hasDoc={} hasBirth={} photoBytes={} idempotencyKey={}",
-                userIdHeader, pin, request.getDocumentNumber() != null, request.getBirthDate() != null,
-                photo.getSize(), idempotencyKey);
-
-        SimaApiEnvelope envelope;
-        try {
-            envelope = simaFeign.verifyCitizen(
-                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
-                    signature,
-                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
-                    minified
-            );
-        } catch (FeignException e) {
-            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
-        }
+        SimaApiEnvelope envelope = testIdentityVerify(pin, documentNumber, birthDate, photo);
         return handleEnvelope(customer, envelope, "citizen");
     }
 
@@ -335,11 +306,11 @@ public class SimaKycService {
 
     private Customer requireCustomer(String userIdHeader) {
         if (userIdHeader == null || userIdHeader.isBlank()) {
-            throw new IllegalArgumentException("X-User-Id header required");
+            throw new MissingFieldException("X-User-Id header required");
         }
         Customer customer = customerRepository.findByUserId(Long.valueOf(userIdHeader));
         if (customer == null) {
-            throw new IllegalArgumentException("Customer not found for userId=" + userIdHeader);
+            throw new ResourceNotFoundException("Customer not found for userId=" + userIdHeader);
         }
         return customer;
     }
@@ -348,18 +319,18 @@ public class SimaKycService {
         boolean hasDoc = request.getDocumentNumber() != null && !request.getDocumentNumber().isBlank();
         boolean hasBirth = request.getBirthDate() != null && !request.getBirthDate().isBlank();
         if (hasDoc == hasBirth) {
-            throw new IllegalArgumentException(
+            throw new MissingFieldException(
                     "Exactly one of documentNumber or birthDate must be filled (HTML XOR rule; SIMA 713/714)");
         }
     }
 
     private void validateForeignDocumentType(String documentType) {
         if (documentType == null || documentType.isBlank()) {
-            throw new IllegalArgumentException("documentType required: TRC, PRC or ERP");
+            throw new MissingFieldException("documentType required: TRC, PRC or ERP");
         }
         String normalized = documentType.trim().toUpperCase();
         if (!normalized.equals("TRC") && !normalized.equals("PRC") && !normalized.equals("ERP")) {
-            throw new IllegalArgumentException("documentType must be one of: TRC, PRC, ERP");
+            throw new MissingFieldException("documentType must be one of: TRC, PRC, ERP");
         }
     }
 }
