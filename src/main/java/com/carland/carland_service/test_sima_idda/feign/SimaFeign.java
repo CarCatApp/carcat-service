@@ -28,14 +28,15 @@ public interface SimaFeign {
             @RequestBody String minifiedJsonBody
     );
 
-    @PostMapping(value = "/api/v1/kyc/identity/verify/passport", consumes = MediaType.APPLICATION_JSON_VALUE)
-    SimaApiEnvelope verifyPassport(
-            @RequestHeader("Identifier") String identifier,
-            @RequestHeader("Auth-Scheme") String authScheme,
-            @RequestHeader("Signature") String signature,
-            @RequestHeader(value = "DeviceInfo", required = false) String deviceInfo,
-            @RequestBody String minifiedJsonBody
-    );
+    // PO: passport channel not needed for now.
+//    @PostMapping(value = "/api/v1/kyc/identity/verify/passport", consumes = MediaType.APPLICATION_JSON_VALUE)
+//    SimaApiEnvelope verifyPassport(
+//            @RequestHeader("Identifier") String identifier,
+//            @RequestHeader("Auth-Scheme") String authScheme,
+//            @RequestHeader("Signature") String signature,
+//            @RequestHeader(value = "DeviceInfo", required = false) String deviceInfo,
+//            @RequestBody String minifiedJsonBody
+//    );
 
     @PostMapping(value = "/api/v1/kyc/identity/verify/foreign", consumes = MediaType.APPLICATION_JSON_VALUE)
     SimaApiEnvelope verifyForeign(

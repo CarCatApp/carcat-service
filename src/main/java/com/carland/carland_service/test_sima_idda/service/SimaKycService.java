@@ -4,14 +4,11 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.test_sima_idda.config.SimaIddaConstants;
 import com.carland.carland_service.test_sima_idda.dto.request.SimaCitizenVerifyRequest;
-import com.carland.carland_service.test_sima_idda.dto.request.SimaForeignVerifyRequest;
-import com.carland.carland_service.test_sima_idda.dto.request.SimaPassportVerifyRequest;
 import com.carland.carland_service.test_sima_idda.dto.response.SimaVerifyResponse;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaCitizenFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaForeignFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaIdentityResult;
-import com.carland.carland_service.test_sima_idda.dto.sima.SimaPassportFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaErrorBody;
 import com.carland.carland_service.test_sima_idda.feign.SimaFeign;
 import com.carland.carland_service.test_sima_idda.hmac.SimaHmacSigner;
@@ -110,21 +107,36 @@ public class SimaKycService {
         }
     }
 
-    public SimaVerifyResponse verifyCitizen(String userIdHeader, SimaCitizenVerifyRequest request) {
+    public SimaVerifyResponse verifyCitizen(
+            String userIdHeader,
+            String pin,
+            String documentNumber,
+            String birthDate,
+            MultipartFile photo
+    ) {
         Customer customer = requireCustomer(userIdHeader);
+        SimaCitizenVerifyRequest request = SimaCitizenVerifyRequest.builder()
+                .pin(pin)
+                .documentNumber(blankToNull(documentNumber))
+                .birthDate(blankToNull(birthDate))
+                .livePhoto(toJpegBase64(photo))
+                .build();
         validateCitizenXor(request);
 
         String idempotencyKey = UUID.randomUUID().toString();
         SimaCitizenFeignBody body = SimaCitizenFeignBody.builder()
                 .pin(request.getPin())
-                .documentNumber(blankToNull(request.getDocumentNumber()))
-                .birthDate(blankToNull(request.getBirthDate()))
+                .documentNumber(request.getDocumentNumber())
+                .birthDate(request.getBirthDate())
                 .livePhoto(request.getLivePhoto())
                 .idempotencyKey(idempotencyKey)
                 .build();
 
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
+        log.info("[sima-debug] verify/citizen userId={} pin={} hasDoc={} hasBirth={} photoBytes={} idempotencyKey={}",
+                userIdHeader, pin, request.getDocumentNumber() != null, request.getBirthDate() != null,
+                photo.getSize(), idempotencyKey);
 
         SimaApiEnvelope envelope;
         try {
@@ -141,48 +153,59 @@ public class SimaKycService {
         return handleEnvelope(customer, envelope, "citizen");
     }
 
-    public SimaVerifyResponse verifyPassport(String userIdHeader, SimaPassportVerifyRequest request) {
+    /**
+     * PO: passport channel not needed for now. Mapping commented in SimaController / SimaFeign.
+     */
+//    public SimaVerifyResponse verifyPassport(String userIdHeader, SimaPassportVerifyRequest request) {
+//        Customer customer = requireCustomer(userIdHeader);
+//
+//        String idempotencyKey = UUID.randomUUID().toString();
+//        SimaPassportFeignBody body = SimaPassportFeignBody.builder()
+//                .pin(request.getPin())
+//                .documentNumber(request.getDocumentNumber())
+//                .livePhoto(request.getLivePhoto())
+//                .idempotencyKey(idempotencyKey)
+//                .build();
+//
+//        String minified = SimaHmacSigner.minify(body);
+//        String signature = SimaHmacSigner.signBase64(minified);
+//
+//        SimaApiEnvelope envelope;
+//        try {
+//            envelope = simaFeign.verifyPassport(
+//                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
+//                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
+//                    signature,
+//                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
+//                    minified
+//            );
+//        } catch (FeignException e) {
+//            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
+//        }
+//        return handleEnvelope(customer, envelope, "passport");
+//    }
+
+    public SimaVerifyResponse verifyForeign(
+            String userIdHeader,
+            String pin,
+            String documentType,
+            MultipartFile photo
+    ) {
         Customer customer = requireCustomer(userIdHeader);
-
-        String idempotencyKey = UUID.randomUUID().toString();
-        SimaPassportFeignBody body = SimaPassportFeignBody.builder()
-                .pin(request.getPin())
-                .documentNumber(request.getDocumentNumber())
-                .livePhoto(request.getLivePhoto())
-                .idempotencyKey(idempotencyKey)
-                .build();
-
-        String minified = SimaHmacSigner.minify(body);
-        String signature = SimaHmacSigner.signBase64(minified);
-
-        SimaApiEnvelope envelope;
-        try {
-            envelope = simaFeign.verifyPassport(
-                    SimaIddaConstants.EXAMPLE_SIMA_IDENTIFIER,
-                    SimaIddaConstants.EXAMPLE_SIMA_AUTH_SCHEME,
-                    signature,
-                    SimaIddaConstants.EXAMPLE_SIMA_DEVICE_INFO,
-                    minified
-            );
-        } catch (FeignException e) {
-            envelope = parseFeignErrorEnvelope(e, idempotencyKey);
-        }
-        return handleEnvelope(customer, envelope, "passport");
-    }
-
-    public SimaVerifyResponse verifyForeign(String userIdHeader, SimaForeignVerifyRequest request) {
-        Customer customer = requireCustomer(userIdHeader);
+        validateForeignDocumentType(documentType);
 
         String idempotencyKey = UUID.randomUUID().toString();
         SimaForeignFeignBody body = SimaForeignFeignBody.builder()
-                .pin(request.getPin())
-                .livePhoto(request.getLivePhoto())
-                .documentType(request.getDocumentType())
+                .pin(pin)
+                .livePhoto(toJpegBase64(photo))
+                .documentType(documentType.trim().toUpperCase())
                 .idempotencyKey(idempotencyKey)
                 .build();
 
         String minified = SimaHmacSigner.minify(body);
         String signature = SimaHmacSigner.signBase64(minified);
+        log.info("[sima-debug] verify/foreign userId={} pin={} documentType={} photoBytes={} idempotencyKey={}",
+                userIdHeader, pin, body.getDocumentType(), photo.getSize(), idempotencyKey);
 
         SimaApiEnvelope envelope;
         try {
@@ -327,6 +350,16 @@ public class SimaKycService {
         if (hasDoc == hasBirth) {
             throw new IllegalArgumentException(
                     "Exactly one of documentNumber or birthDate must be filled (HTML XOR rule; SIMA 713/714)");
+        }
+    }
+
+    private void validateForeignDocumentType(String documentType) {
+        if (documentType == null || documentType.isBlank()) {
+            throw new IllegalArgumentException("documentType required: TRC, PRC or ERP");
+        }
+        String normalized = documentType.trim().toUpperCase();
+        if (!normalized.equals("TRC") && !normalized.equals("PRC") && !normalized.equals("ERP")) {
+            throw new IllegalArgumentException("documentType must be one of: TRC, PRC, ERP");
         }
     }
 }
