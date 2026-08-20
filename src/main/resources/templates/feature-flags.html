@@ -523,7 +523,8 @@
       body: JSON.stringify({
         name: form.name.value,
         description: form.description.value,
-        defaultState: form.defaultState.value
+        defaultState: form.defaultState.value,
+        version: currentVersion
       })
     });
     if (ok) {

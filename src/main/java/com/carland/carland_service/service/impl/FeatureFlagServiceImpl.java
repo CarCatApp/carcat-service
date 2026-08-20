@@ -75,7 +75,10 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         Map<String, FeatureFlagMeGroup> out = new LinkedHashMap<>();
         for (FeatureFlag flag : flags) {
-            FeatureFlagState state = stateByFlag.getOrDefault(flag.getName(), flag.getDefaultState());
+            FeatureFlagState state = stateByFlag.get(flag.getName());
+            if (state == null) {
+                continue;
+            }
             List<FeatureFlagEndpoint> attached = endpointRepository.findByFlag_Id(flag.getId());
             List<FeatureFlagEndpointView> views = new ArrayList<>();
             for (FeatureFlagEndpoint ep : attached) {
@@ -108,10 +111,20 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         List<Map<String, Object>> flagDtos = new ArrayList<>();
         for (FeatureFlag flag : flags) {
+            boolean inVersion = false;
+            for (UserRoles role : GRID_ROLES) {
+                if (stateIndex.containsKey(flag.getId() + "|" + role.name())) {
+                    inVersion = true;
+                    break;
+                }
+            }
+            if (!inVersion) {
+                continue;
+            }
             Map<String, String> states = new LinkedHashMap<>();
             for (UserRoles role : GRID_ROLES) {
                 FeatureFlagState st = stateIndex.get(flag.getId() + "|" + role.name());
-                states.put(role.name(), (st != null ? st : flag.getDefaultState()).name());
+                states.put(role.name(), (st != null ? st : FeatureFlagState.HIDDEN).name());
             }
             List<Map<String, Object>> eps = new ArrayList<>();
             for (FeatureFlagEndpoint ep : endpointRepository.findByFlag_Id(flag.getId())) {
@@ -176,6 +189,9 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     public Map<String, Object> flagDetail(Long id, String semver) {
         FeatureFlag flag = liveFlag(id);
         AppVersion version = resolveVersion(semver);
+        if (!roleStateRepository.existsByFlagAndVersion(flag, version)) {
+            throw new IllegalArgumentException("FLAG_NOT_IN_VERSION");
+        }
         Map<String, FeatureFlagState> stateIndex = new LinkedHashMap<>();
         for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
             if (row.getFlag() != null && row.getFlag().getId().equals(id)) {
@@ -378,7 +394,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build());
-        seedRoleStates(flag, defaultState);
+        seedRoleStates(flag, defaultState, request.getVersion());
         audit(actor, "CREATE", "FLAG", name, null, defaultState, currentSemverCache.get());
         reloadCache();
         return flag;
@@ -467,12 +483,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         FeatureFlag flag = liveFlag(request.getFlagId());
         FeatureFlagRoleState row = roleStateRepository
                 .findByFlagAndVersionAndRole(flag, version, request.getRole())
-                .orElseGet(() -> FeatureFlagRoleState.builder()
-                        .flag(flag)
-                        .version(version)
-                        .role(request.getRole())
-                        .state(flag.getDefaultState())
-                        .build());
+                .orElseThrow(() -> new IllegalArgumentException("FLAG_NOT_IN_VERSION"));
         FeatureFlagState oldState = row.getState();
         row.setState(request.getState());
         roleStateRepository.save(row);
@@ -558,8 +569,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         if (cached != null) {
             return cached;
         }
-        FeatureFlagState def = flagDefaultCache.get().get(matched.getFlag().getId());
-        return def != null ? def : FeatureFlagState.HIDDEN;
+        return FeatureFlagState.HIDDEN;
     }
 
     @Override
@@ -658,19 +668,21 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         log.info("Feature-flag cache reloaded: {} endpoints, {} flag-states", endpoints.size(), states.size());
     }
 
-    private void seedRoleStates(FeatureFlag flag, FeatureFlagState defaultState) {
-        for (AppVersion version : appVersionRepository.findAll()) {
-            if (roleStateRepository.existsByFlagAndVersion(flag, version)) {
-                continue;
-            }
-            for (UserRoles role : GRID_ROLES) {
-                roleStateRepository.save(FeatureFlagRoleState.builder()
-                        .flag(flag)
-                        .version(version)
-                        .role(role)
-                        .state(defaultState)
-                        .build());
-            }
+    /**
+     * Seeds role states for one version only (current if semver blank). Does not write older versions.
+     */
+    private void seedRoleStates(FeatureFlag flag, FeatureFlagState defaultState, String semver) {
+        AppVersion version = resolveVersion(semver);
+        if (roleStateRepository.existsByFlagAndVersion(flag, version)) {
+            return;
+        }
+        for (UserRoles role : GRID_ROLES) {
+            roleStateRepository.save(FeatureFlagRoleState.builder()
+                    .flag(flag)
+                    .version(version)
+                    .role(role)
+                    .state(defaultState)
+                    .build());
         }
     }
 

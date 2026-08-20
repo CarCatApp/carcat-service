@@ -91,9 +91,12 @@ public class HyperPercentageSyncService {
             return Optional.empty();
         }
         List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
-        return findLatestMatch(serviceNameEn.trim(), visits)
+        Optional<PartnerLineSnapshot> snapshot = findLatestMatch(serviceNameEn.trim(), visits)
                 .filter(this::hasUsableData)
                 .map(match -> toSnapshot(match, intervalKm, intervalMonth));
+        log.info("[hist-debug] partner line lookup | carId={} nameEn={} visitCount={} match={}",
+                car.getCarId(), serviceNameEn, visits.size(), snapshot.isPresent());
+        return snapshot;
     }
 
     private void syncInternal(Car car, List<Visit> visits, boolean forceReapply) {

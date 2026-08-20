@@ -42,11 +42,11 @@ import java.util.stream.Collectors;
  * tr: VIN'e göre servis geçmişini getiren implementasyondur: önce lokal cache'e (service_history tablosu)
  *     bakar, boşsa Hyper partner API'den geçmişi çekip parça detaylarıyla birlikte kaydeder. Araç bazlı
  *     kilitleme ile eşzamanlı isteklerde çift kayıt oluşmasını engeller.
- *     HTTP girişi kapatıldı (CarController v1 mapping comment); bean duruyor, dışarıdan çağrılmaz.
+ *     HTTP: GET /api/v1/car/{vin}/service-history.
  * en: Implementation that returns service history by VIN: reads the local cache (service_history table)
  *     first, and when empty fetches the history from the Hyper partner API and persists it together with
  *     part details. Uses per-car locking to prevent duplicate inserts under concurrent requests.
- *     HTTP entry is disabled (v1 mapping commented in CarController); bean remains, not called from API.
+ *     HTTP: GET /api/v1/car/{vin}/service-history.
  */
 @Service
 @RequiredArgsConstructor
@@ -82,37 +82,50 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
     @Override
     @Transactional
     public CarVinServiceHistoryResponse getServiceHistoryByVin(String vin, String phoneNumber, String userIdHeader, String acceptLanguage) {
+        log.info("[hist-debug] v1 getServiceHistoryByVin start | vin={} userId={}", vin, userIdHeader);
         if (vin == null || vin.isBlank() || phoneNumber == null || userIdHeader == null) {
+            log.warn("[hist-debug] v1 missing field | vinBlank={} phoneNull={} userIdNull={}",
+                    vin == null || vin.isBlank(), phoneNumber == null, userIdHeader == null);
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
         if (customer == null) {
+            log.warn("[hist-debug] v1 customer not found | userId={}", userIdHeader);
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car car = carRepository.findByVinAndCustomer(vin, customer);
         if (car == null) {
+            log.warn("[hist-debug] v1 car not found for customer | vin={} userId={}", vin, userIdHeader);
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         List<ServiceHistory> cachedRows = serviceHistoryRepository.findAllByCarOrderByDoneDateDescIdDesc(car);
+        log.info("[hist-debug] v1 cache lookup | carId={} cachedRows={}", car.getCarId(), cachedRows.size());
         if (!cachedRows.isEmpty()) {
+            log.info("[hist-debug] v1 returning cache | carId={} source={}", car.getCarId(), CACHE_SOURCE);
             return buildResponse(vin, CACHE_SOURCE, cachedRows, acceptLanguage);
         }
 
         synchronized (lockForCar(car.getCarId())) {
             cachedRows = serviceHistoryRepository.findAllByCarOrderByDoneDateDescIdDesc(car);
             if (!cachedRows.isEmpty()) {
+                log.info("[hist-debug] v1 returning cache after lock | carId={} rows={}", car.getCarId(), cachedRows.size());
                 return buildResponse(vin, CACHE_SOURCE, cachedRows, acceptLanguage);
             }
 
             HyperVehicleByVinResponse hyperResponse = fetchHyperHistory(vin);
+            int hyperCount = hyperResponse != null && hyperResponse.getServiceHistory() != null
+                    ? hyperResponse.getServiceHistory().size() : 0;
+            log.info("[hist-debug] v1 hyper fetch | carId={} vin={} hyperItems={}", car.getCarId(), vin, hyperCount);
             if (hyperResponse == null || hyperResponse.getServiceHistory() == null || hyperResponse.getServiceHistory().isEmpty()) {
+                log.info("[hist-debug] v1 hyper empty | carId={} vin={}", car.getCarId(), vin);
                 return buildResponse(vin, HYPERSERVICE_SOURCE, Collections.emptyList(), acceptLanguage);
             }
 
             List<ServiceHistory> persisted = persistHyperRows(car, hyperResponse.getServiceHistory());
+            log.info("[hist-debug] v1 persisted hyper rows | carId={} persisted={}", car.getCarId(), persisted.size());
             return buildResponse(vin, HYPERSERVICE_SOURCE, persisted, acceptLanguage);
         }
     }

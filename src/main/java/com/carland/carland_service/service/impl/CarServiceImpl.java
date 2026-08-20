@@ -267,8 +267,11 @@ public class CarServiceImpl implements CarService {
         log.info("car id : {}", car.getCarId());
 
         List<CustomerServiceRecord> customerServiceRecordList = car.getServiceRecordList();
+        log.info("[hist-debug] getServiceRecords | carId={} recordCount={}",
+                car.getCarId(), customerServiceRecordList != null ? customerServiceRecordList.size() : null);
 
         if (customerServiceRecordList == null || customerServiceRecordList.isEmpty()) {
+            log.info("[hist-debug] getServiceRecords empty | carId={}", car.getCarId());
             log.info("customer service record list bosdur");
             throw new ResourceNotFoundException(MessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
@@ -292,6 +295,10 @@ public class CarServiceImpl implements CarService {
                         .build())
                 .toList();
         log.info("responses: {}", responses);
+        log.info("[hist-debug] getServiceRecords mapped | carId={} ids={} names={} (servicedStatus NOT in this response)",
+                car.getCarId(),
+                responses.stream().map(RecordResponse::getId).toList(),
+                responses.stream().map(RecordResponse::getServiceName).toList());
         return responses;
     }
 
@@ -472,8 +479,15 @@ public class CarServiceImpl implements CarService {
         log.info("service entities names,{}", serviceEntities.stream().map(serviceEntity -> serviceEntity.getServiceName() + " , ").toList());
         List<CustomerServiceRecord> customerServiceRecordList = customerServiceRecordRepository.findAllByCar(car);
         log.info("customerServiceRecordList, {}", customerServiceRecordList.stream().map(customerServiceRecord -> customerServiceRecord.getServiceName() + " , ").toList());
+        log.info("[hist-debug] percentages CSR statuses | carId={} statuses={}",
+                car.getCarId(),
+                customerServiceRecordList.stream()
+                        .map(r -> r.getServiceName() + "=" + r.getServicedStatus())
+                        .toList());
         List<ServiceHistory> serviceHistories = serviceHistoryRepository.findAllByCar(car);
         log.info("serviceHistories {}", serviceHistories.stream().map(serviceHistory -> serviceHistory.getServiceName() + " , ").toList());
+        log.info("[hist-debug] percentages tables | carId={} csrCount={} v1HistoryCount={} mileage={}",
+                car.getCarId(), customerServiceRecordList.size(), serviceHistories.size(), car.getMileage());
         for (ServiceEntity serviceEntity : serviceEntities) {
             CustomerServiceRecord record = customerServiceRecordRepository.findByServiceIdAndCar(serviceEntity.getId(), car);
 
@@ -540,6 +554,13 @@ public class CarServiceImpl implements CarService {
 
             if (partnerLine.isPresent()) {
                 HyperPercentageSyncService.PartnerLineSnapshot snap = partnerLine.get();
+                log.info("[hist-debug] percentages using partner visit line | carId={} serviceId={} nameEn={} lastDate={} lastKm={} csrStatus={}",
+                        car.getCarId(),
+                        serviceEntity.getId(),
+                        serviceEntity.getNameEn(),
+                        snap.lastServiceDate(),
+                        snap.lastServiceKm(),
+                        record != null ? record.getServicedStatus() : null);
                 LocalDate lastServiceDate = snap.lastServiceDate() != null
                         ? snap.lastServiceDate()
                         : car.getCreatedAt().toLocalDate();
@@ -590,6 +611,14 @@ public class CarServiceImpl implements CarService {
                             && h.getActionType() != null
                             && h.getActionType().stream().anyMatch(action -> action.equalsIgnoreCase(serviceEntity.getActionType())))
                     .toList();
+
+            log.info("[hist-debug] percentages CSR/v1 fallback | carId={} serviceId={} name={} csrMatches={} v1HistoryMatches={} csrStatus={}",
+                    car.getCarId(),
+                    serviceEntity.getId(),
+                    serviceEntity.getServiceName(),
+                    csrList.size(),
+                    shList.size(),
+                    record != null ? record.getServicedStatus() : null);
 
             LocalDate lastServiceDate = Stream.concat(csrList.stream()
                             .map(CustomerServiceRecord::getDoneDate), shList
@@ -669,6 +698,7 @@ public class CarServiceImpl implements CarService {
         responseList.sort(Comparator
                 .comparingInt(this::remainingServiceScore)
                 .thenComparing(CarServicePercentageResponse::getServiceName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
+        log.info("[hist-debug] percentages done | carId={} itemCount={}", car.getCarId(), responseList.size());
         return PercentageResponse.builder()
                 .carId(car.getCarId())
                 .vin(car.getVin())
@@ -1696,12 +1726,18 @@ public class CarServiceImpl implements CarService {
                 : serviceEntityRepository.findByServiceNameAndActionType(request.getServiceName(), request.getActionType());
 
         if (serviceEntity == null) {
+            log.warn("[hist-debug] addRecord service not found | carId={} serviceId={} serviceName={} actionType={}",
+                    car.getCarId(), request.getServiceId(), request.getServiceName(), request.getActionType());
             throw new ResourceNotFoundException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         CustomerServiceRecord existingRecord = customerServiceRecordRepository.findByServiceIdAndCar(serviceEntity.getId(), car);
         if (existingRecord != null) {
+            log.warn("[hist-debug] addRecord already exists | carId={} serviceId={} existingRecordId={} existingStatus={}",
+                    car.getCarId(), serviceEntity.getId(), existingRecord.getId(), existingRecord.getServicedStatus());
             throw new ResourceNotFoundException(MessagesLangValues.RECORD_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
+        log.info("[hist-debug] addRecord creating | carId={} serviceId={} doneDate={} doneKm={}",
+                car.getCarId(), serviceEntity.getId(), request.getDoneDate(), request.getDoneKm());
         CustomerServiceRecord record = CustomerServiceRecord.builder()
                 .serviceName(serviceEntity.getServiceName())
                 .serviceNameAz(serviceEntity.getNameAz())
@@ -1740,6 +1776,12 @@ public class CarServiceImpl implements CarService {
     @Override
     public RecordResponse updateRecord(RecordRequest request, String phoneNumber, String userIdHeader,
                                        String timezone, String acceptLanguage) {
+        log.info("[hist-debug] updateRecord start | carId={} recordId={} doneDate={} doneKm={} servicedStatus={}",
+                request != null ? request.getCarId() : null,
+                request != null ? request.getRecordId() : null,
+                request != null ? request.getDoneDate() : null,
+                request != null ? request.getDoneKm() : null,
+                request != null ? request.getServicedStatus() : null);
         log.info("basladi  WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");
         log.info("Request :  {}", request);
         if (request == null || request.getCarId() == null || request.getRecordId() == null || phoneNumber == null
@@ -1754,9 +1796,12 @@ public class CarServiceImpl implements CarService {
         CustomerServiceRecord record = customerServiceRecordRepository.findByIdAndCar(request.getRecordId(), car);
         log.info("Bazadan gelen record budur: {}", record);
         if (record == null) {
+            log.info("[hist-debug] updateRecord not found | carId={} recordId={}", car.getCarId(), request.getRecordId());
             log.info("Record null oldu");
             throw new ResourceNotFoundException(MessagesLangValues.RECORD_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
+        log.info("[hist-debug] updateRecord found | carId={} recordId={} currentStatus={} currentDoneDate={} currentDoneKm={}",
+                car.getCarId(), record.getId(), record.getServicedStatus(), record.getDoneDate(), record.getDoneKm());
 
         if (request.getDoneDate() != null) {
             record.setDoneDate(request.getDoneDate());
@@ -1771,6 +1816,8 @@ public class CarServiceImpl implements CarService {
         record.setServicedStatus(request.getServicedStatus());
         log.info("Request.getServicedStatus budur : {}", request.getServicedStatus());
         customerServiceRecordRepository.save(record);
+        log.info("[hist-debug] updateRecord saved | carId={} recordId={} newStatus={} newDoneDate={} newDoneKm={}",
+                car.getCarId(), record.getId(), record.getServicedStatus(), record.getDoneDate(), record.getDoneKm());
         log.info("Record yekun olaraq budur: -----------------> {}", record);
         log.info("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");
 

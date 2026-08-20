@@ -97,25 +97,33 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     @Override
     @Transactional
     public VisitHistoryResponse getServiceHistoryByVin(String vin, String phoneNumber, String userIdHeader, String acceptLanguage) {
+        log.info("[hist-debug] v2 getServiceHistoryByVin start | vin={} userId={}", vin, userIdHeader);
         if (vin == null || vin.isBlank() || phoneNumber == null || userIdHeader == null) {
+            log.warn("[hist-debug] v2 missing field | vinBlank={} phoneNull={} userIdNull={}",
+                    vin == null || vin.isBlank(), phoneNumber == null, userIdHeader == null);
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
         Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
                 Long.valueOf(userIdHeader), phoneNumber, UserStatus.ACTIVE.name());
         if (customer == null) {
+            log.warn("[hist-debug] v2 customer not found | userId={}", userIdHeader);
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         Car car = carRepository.findByVinAndCustomer(vin, customer);
         if (car == null) {
+            log.warn("[hist-debug] v2 car not found for customer | vin={} userId={}", vin, userIdHeader);
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         List<Visit> cachedVisits = loadCachedVisits(car);
+        log.info("[hist-debug] v2 cache lookup | carId={} cachedVisits={}",
+                car.getCarId(), cachedVisits != null ? cachedVisits.size() : null);
         if (cachedVisits != null) {
             hyperPercentageSyncService.syncFromVisits(car, cachedVisits);
             refreshServicedPartnerIds(car);
+            log.info("[hist-debug] v2 returning cache | carId={} source={}", car.getCarId(), CACHE_SOURCE);
             return buildResponse(car, vin, CACHE_SOURCE, cachedVisits, acceptLanguage);
         }
 
@@ -124,17 +132,23 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
             if (cachedVisits != null) {
                 hyperPercentageSyncService.syncFromVisits(car, cachedVisits);
                 refreshServicedPartnerIds(car);
+                log.info("[hist-debug] v2 returning cache after lock | carId={} visits={}", car.getCarId(), cachedVisits.size());
                 return buildResponse(car, vin, CACHE_SOURCE, cachedVisits, acceptLanguage);
             }
 
             HyperVehicleByVinResponse hyperResponse = fetchHyperHistory(vin);
+            int hyperCount = hyperResponse != null && hyperResponse.getServiceHistory() != null
+                    ? hyperResponse.getServiceHistory().size() : 0;
+            log.info("[hist-debug] v2 hyper fetch | carId={} vin={} hyperItems={}", car.getCarId(), vin, hyperCount);
             if (hyperResponse == null || hyperResponse.getServiceHistory() == null || hyperResponse.getServiceHistory().isEmpty()) {
+                log.info("[hist-debug] v2 hyper empty | carId={} vin={}", car.getCarId(), vin);
                 return buildResponse(car, vin, LIVE_SOURCE, Collections.emptyList(), acceptLanguage);
             }
 
             List<Visit> persisted = persistHyperVisits(car, hyperResponse.getServiceHistory());
             hyperPercentageSyncService.syncFromVisits(car, persisted);
             refreshServicedPartnerIds(car);
+            log.info("[hist-debug] v2 persisted visits | carId={} persisted={}", car.getCarId(), persisted.size());
             return buildResponse(car, vin, LIVE_SOURCE, persisted, acceptLanguage);
         }
     }

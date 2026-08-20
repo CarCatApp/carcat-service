@@ -13,10 +13,12 @@ import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.MaintenanceTemplateRepository;
 import com.carland.carland_service.service.impl.HyperTokenService;
 import com.carland.carland_service.service.CarService;
+import com.carland.carland_service.service.CarVinHistoryService;
 import com.carland.carland_service.dto.response.VisitHistoryResponse;
 import com.carland.carland_service.service.VisitHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,14 +32,14 @@ import java.util.List;
  * tr: Araç REST controller'ı; araç ekleme/düzenleme/silme, VIN kontrolü ve VIN'e göre sorgu, kilometre güncelleme, bakım yüzdesi hesaplama/düzenleme, servis kayıtları ve VIN bazlı servis geçmişi uçlarını sunar.
  * en: REST controller for cars; exposes endpoints for adding/editing/removing cars, VIN check and lookup, mileage updates, maintenance percentage calculation/editing, service records, and VIN-based service history.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/car")
 @RequiredArgsConstructor
 public class CarController {
 
     private final CarService carService;
-    // v1 HTTP kapalı; Flutter / partner visit modeli v2 (VisitHistoryService).
-    // private final CarVinHistoryService carVinHistoryService;
+    private final CarVinHistoryService carVinHistoryService;
     private final VisitHistoryService visitHistoryService;
     private final MaintenanceTemplateRepository maintenanceTemplateRepository;
     private final CarRepository carRepository;
@@ -219,6 +221,7 @@ public class CarController {
                                                            @RequestHeader("X-Client-Timezone") String timezone,
                                                            @RequestHeader("Accept-Language") String acceptLanguage) {
         System.err.println("/service/percentages cagrildi");
+        log.info("[hist-debug] GET /service/percentages | carId={} userId={}", carId, userIdHeader);
         return carService.getServicePercentageList(carId, phoneNumber, userIdHeader, timezone, acceptLanguage);
 
     }
@@ -254,6 +257,16 @@ public class CarController {
                                     @RequestHeader("X-Client-Timezone") String timezone,
                                     @RequestHeader("Accept-Language") String acceptLanguage) {
         System.err.println("/add/record cagrildi");
+        log.info("[hist-debug] POST /add/record | carId={} recordId={} serviceId={} serviceName={} actionType={} doneDate={} doneKm={} servicedStatus={} userId={}",
+                request != null ? request.getCarId() : null,
+                request != null ? request.getRecordId() : null,
+                request != null ? request.getServiceId() : null,
+                request != null ? request.getServiceName() : null,
+                request != null ? request.getActionType() : null,
+                request != null ? request.getDoneDate() : null,
+                request != null ? request.getDoneKm() : null,
+                request != null ? request.getServicedStatus() : null,
+                userIdHeader);
         return carService.addRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage);
     }
 
@@ -269,6 +282,16 @@ public class CarController {
                                        @RequestHeader("X-Client-Timezone") String timezone,
                                        @RequestHeader("Accept-Language") String acceptLanguage) {
         System.err.println("/update/record cagrildi");
+        log.info("[hist-debug] PUT /update/record | carId={} recordId={} serviceId={} serviceName={} actionType={} doneDate={} doneKm={} servicedStatus={} userId={}",
+                request != null ? request.getCarId() : null,
+                request != null ? request.getRecordId() : null,
+                request != null ? request.getServiceId() : null,
+                request != null ? request.getServiceName() : null,
+                request != null ? request.getActionType() : null,
+                request != null ? request.getDoneDate() : null,
+                request != null ? request.getDoneKm() : null,
+                request != null ? request.getServicedStatus() : null,
+                userIdHeader);
         return carService.updateRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage);
 
     }
@@ -285,6 +308,12 @@ public class CarController {
                                     @RequestHeader("X-Client-Timezone") String timezone,
                                     @RequestHeader("Accept-Language") String acceptLanguage) {
         System.err.println("/get/record cagrildi");
+        log.info("[hist-debug] PUT /get/record | carId={} recordId={} serviceId={} serviceName={} userId={}",
+                request != null ? request.getCarId() : null,
+                request != null ? request.getRecordId() : null,
+                request != null ? request.getServiceId() : null,
+                request != null ? request.getServiceName() : null,
+                userIdHeader);
         return carService.getRecord(request, phoneNumber, userIdHeader, timezone, acceptLanguage);
 
     }
@@ -310,31 +339,30 @@ public class CarController {
                                                   @RequestHeader("X-Client-Timezone") String timezone,
                                                   @RequestHeader("Accept-Language") String acceptLanguage) {
         System.err.println("/get/service/records cagrildi");
+        log.info("[hist-debug] GET /get/service/records | carId={} userId={}", carId, userIdHeader);
         return carService.getServiceRecords(carId, phoneNumber, userIdHeader, timezone, acceptLanguage);
 
     }
 
     /**
-     * v1 GET /{vin}/service-history kapatıldı. Canlı yol: GET /{vin}/service-history/v2 (visits).
-     *
-     * tr: Path'teki VIN koduna göre aracın servis geçmişini (v1 format) döner.
-     * en: Returns the car's service history (v1 format) for the VIN code in the path.
+     * tr: Path'teki VIN koduna göre aracın servis geçmişini (v1 format, service_histories) döner.
+     * en: Returns the car's service history (v1 format, service_histories) for the VIN code in the path.
      */
-//    @Operation(
-//            summary = "Service history v1 (legacy flat rows)",
-//            description = """
-//                    Legacy Hyper flatten into `service_histories`. Still callable; percentages still read this table.
-//                    **Current mobile/partner visit model is v2** (`GET .../service-history/v2`, `visits` table).
-//                    After add-car Hyper sync uses v2, not this endpoint.
-//                    """
-//    )
-//    @GetMapping("/{vin}/service-history")
-//    public CarVinServiceHistoryResponse getServiceHistoryByVin(@PathVariable String vin,
-//                                                                @RequestHeader("phoneNumber") String phoneNumber,
-//                                                                @RequestHeader("X-User-Id") String userIdHeader,
-//                                                                @RequestHeader("Accept-Language") String acceptLanguage) {
-//        return carVinHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
-//    }
+    @Operation(
+            summary = "Service history v1 (legacy flat rows)",
+            description = """
+                    Legacy Hyper flatten into `service_histories`. Percentages still read this table.
+                    Visit-based model is v2 (`GET .../service-history/v2`, `visits` table).
+                    """
+    )
+    @GetMapping("/{vin}/service-history")
+    public CarVinServiceHistoryResponse getServiceHistoryByVin(@PathVariable String vin,
+                                                                @RequestHeader("phoneNumber") String phoneNumber,
+                                                                @RequestHeader("X-User-Id") String userIdHeader,
+                                                                @RequestHeader("Accept-Language") String acceptLanguage) {
+        log.info("[hist-debug] GET /{}/service-history (v1) | userId={} lang={}", vin, userIdHeader, acceptLanguage);
+        return carVinHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
+    }
 
     /**
      * tr: Path'teki VIN koduna göre aracın ziyaret bazlı servis geçmişini (v2 format) döner.
@@ -352,6 +380,7 @@ public class CarController {
                                                                    @RequestHeader("phoneNumber") String phoneNumber,
                                                                    @RequestHeader("X-User-Id") String userIdHeader,
                                                                    @RequestHeader("Accept-Language") String acceptLanguage) {
+        log.info("[hist-debug] GET /{}/service-history/v2 | userId={} lang={}", vin, userIdHeader, acceptLanguage);
         return visitHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
     }
 

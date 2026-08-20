@@ -4,9 +4,9 @@ import com.carland.carland_service.dto.response.CarVinServiceHistoryResponse;
 
 /**
  * tr: Bir aracın VIN numarasına göre servis geçmişini getiren servis sözleşmesidir.
- *     HTTP v1 (GET /api/v1/car/{vin}/service-history) CarController'da comment'lendi; Flutter v2 kullanır.
+ *     HTTP v1: GET /api/v1/car/{vin}/service-history (service_histories).
  * en: Service contract that returns a car's service history by VIN.
- *     HTTP v1 is commented out in CarController; Flutter uses v2.
+ *     HTTP v1: GET /api/v1/car/{vin}/service-history (service_histories).
  */
 public interface CarVinHistoryService {
     /**

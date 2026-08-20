@@ -9,4 +9,6 @@ public class FeatureFlagWriteRequest {
     String name;
     String description;
     FeatureFlagState defaultState;
+    /** Optional semver to seed. Blank → current version only (not all versions). */
+    String version;
 }
