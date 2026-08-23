@@ -25,17 +25,17 @@ public interface FeatureFlagService {
 
     Map<String, Object> flagDetail(Long id, String semver);
 
-    List<Map<String, Object>> availableEndpoints();
+    Map<String, Object> availableEndpoints(int page, int size);
 
-    List<Map<String, Object>> listEndpoints();
-
-    Map<String, Object> createEndpoint(FeatureFlagEndpointWriteRequest request, String actor);
+    Map<String, Object> listEndpoints(int page, int size);
 
     Map<String, Object> updateEndpoint(Long id, FeatureFlagEndpointWriteRequest request, String actor);
 
     void deleteEndpoint(Long id, String actor);
 
-    List<Map<String, Object>> auditForFlag(Long id);
+    Map<String, Object> auditForFlag(Long id, int page, int size);
+
+    Map<String, Object> listAudit(int page, int size, String flagName);
 
     List<Map<String, Object>> listVersions();
 

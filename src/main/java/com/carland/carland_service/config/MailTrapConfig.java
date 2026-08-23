@@ -28,7 +28,6 @@ public class MailTrapConfig {
         MailtrapConfig config = new MailtrapConfig.Builder()
                 .token(apiToken)
                 .build();
-        System.err.println("mailtrap token ================= "+apiToken);
         return MailtrapClientFactory.createMailtrapClient(config);
     }
 

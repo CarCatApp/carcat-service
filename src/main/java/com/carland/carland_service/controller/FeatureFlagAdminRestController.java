@@ -168,28 +168,9 @@ public class FeatureFlagAdminRestController {
 
     @Operation(summary = "List unclaimed catalog APIs")
     @GetMapping(value = "/admin/available-endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> available(HttpServletRequest request) {
-        ResponseEntity<?> denied = guard(request);
-        if (denied != null) {
-            return denied;
-        }
-        return ResponseEntity.ok(featureFlagService.availableEndpoints());
-    }
-
-    @Operation(summary = "List all catalog APIs")
-    @GetMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> listEndpoints(HttpServletRequest request) {
-        ResponseEntity<?> denied = guard(request);
-        if (denied != null) {
-            return denied;
-        }
-        return ResponseEntity.ok(featureFlagService.listEndpoints());
-    }
-
-    @Operation(summary = "Create catalog API")
-    @PostMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> createEndpoint(
-            @RequestBody FeatureFlagEndpointWriteRequest body,
+    public ResponseEntity<?> available(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
         ResponseEntity<?> denied = guard(request);
@@ -197,10 +178,25 @@ public class FeatureFlagAdminRestController {
             return denied;
         }
         try {
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(featureFlagService.createEndpoint(body, adminAccessService.actor(request)));
-        } catch (IllegalStateException ex) {
-            return conflict(ex);
+            return ResponseEntity.ok(featureFlagService.availableEndpoints(page, size));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @Operation(summary = "List all catalog APIs (paginated)")
+    @GetMapping(value = "/admin/endpoints", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listEndpoints(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            HttpServletRequest request
+    ) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        try {
+            return ResponseEntity.ok(featureFlagService.listEndpoints(page, size));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
@@ -270,6 +266,8 @@ public class FeatureFlagAdminRestController {
     @GetMapping(value = "/admin/feature-flags/{id:\\d+}/audit", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> audit(
             @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
         ResponseEntity<?> denied = guard(request);
@@ -277,7 +275,26 @@ public class FeatureFlagAdminRestController {
             return denied;
         }
         try {
-            return ResponseEntity.ok(featureFlagService.auditForFlag(id));
+            return ResponseEntity.ok(featureFlagService.auditForFlag(id, page, size));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Global change history (all flags)")
+    @GetMapping(value = "/admin/audit", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listAudit(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String flagName,
+            HttpServletRequest request
+    ) {
+        ResponseEntity<?> denied = guard(request);
+        if (denied != null) {
+            return denied;
+        }
+        try {
+            return ResponseEntity.ok(featureFlagService.listAudit(page, size, flagName));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }

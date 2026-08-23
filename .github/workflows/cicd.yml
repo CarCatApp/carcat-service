@@ -82,7 +82,9 @@ jobs:
           git push origin ${{ env.NEW_VERSION }}
 
 
-      # Deploy
+      # Deploy. App secrets are NOT GitHub Secrets — they live on the server:
+      # /root/carland.env (env_file + compose interpolation). GitHub only needs
+      # DOCKER_USERNAME, DOCKER_PASSWORD, HOST, SSH_KEY.
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -90,6 +92,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_KEY }}
           script: |
-            docker-compose pull carland-service
-            docker-compose up -d --no-deps carland-service
+            cd /root
+            docker-compose --env-file /root/carland.env pull carland-service
+            docker-compose --env-file /root/carland.env up -d --no-deps carland-service
             

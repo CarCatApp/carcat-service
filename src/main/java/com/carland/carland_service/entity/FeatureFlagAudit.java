@@ -28,6 +28,16 @@ public class FeatureFlagAudit {
     @Column(name = "created_at", nullable = false)
     LocalDateTime createdAt;
 
+    /**
+     * tr: Flag silinse de history kalsın diye FK yok; okumada flagName esastır.
+     * en: Not FK'd so history survives flag deletion; flagName is authoritative on read.
+     */
+    @Column(name = "flag_id")
+    Long flagId;
+
+    @Column(name = "flag_name", length = 128)
+    String flagName;
+
     @Column(nullable = false, length = 64)
     String actor;
 

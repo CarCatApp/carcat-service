@@ -20,6 +20,7 @@ import com.carland.carland_service.repository.FeatureFlagAuditRepository;
 import com.carland.carland_service.repository.FeatureFlagEndpointRepository;
 import com.carland.carland_service.repository.FeatureFlagRepository;
 import com.carland.carland_service.repository.FeatureFlagRoleStateRepository;
+import com.carland.carland_service.service.FeatureFlagAdminSupport;
 import com.carland.carland_service.service.FeatureFlagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -145,15 +146,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         List<Map<String, Object>> catalog = new ArrayList<>();
         for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
-            Map<String, Object> e = new LinkedHashMap<>();
-            e.put("id", ep.getId());
-            e.put("method", ep.getHttpMethod());
-            e.put("path", ep.getPathPattern());
-            e.put("neverGuard", ep.isNeverGuard());
-            boolean claimed = ep.getFlag() != null;
-            e.put("claimed", claimed);
-            e.put("inFlag", claimed);
-            catalog.add(e);
+            catalog.add(FeatureFlagAdminSupport.endpointDto(ep));
         }
         List<Map<String, Object>> versions = new ArrayList<>();
         for (AppVersion v : appVersionRepository.findAllByOrderByCreatedAtDesc()) {
@@ -170,7 +163,8 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         body.put("flags", flagDtos);
         body.put("catalog", catalog);
         body.put("availableEndpoints", catalog.stream().filter(e -> Boolean.FALSE.equals(e.get("claimed")) && Boolean.FALSE.equals(e.get("neverGuard"))).toList());
-        body.put("audit", toAuditDtos(auditRepository.findTop50ByAppVersionOrderByCreatedAtDesc(version.getSemver())));
+        body.put("audit", auditRepository.findTop50ByAppVersionOrderByCreatedAtDesc(version.getSemver())
+                .stream().map(FeatureFlagAdminSupport::auditDto).toList());
         return body;
     }
 
@@ -220,50 +214,22 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> availableEndpoints() {
-        List<Map<String, Object>> catalog = new ArrayList<>();
-        for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
-            if (ep.isNeverGuard() || ep.getFlag() != null) {
-                continue;
-            }
-            Map<String, Object> e = new LinkedHashMap<>();
-            e.put("id", ep.getId());
-            e.put("method", ep.getHttpMethod());
-            e.put("path", ep.getPathPattern());
-            e.put("claimed", false);
-            e.put("inFlag", false);
-            catalog.add(e);
-        }
-        return catalog;
+    public Map<String, Object> availableEndpoints(int page, int size) {
+        var pageable = FeatureFlagAdminSupport.pageRequest(page, size);
+        var result = endpointRepository.findByNeverGuardFalseAndFlagIsNullOrderByPathPatternAscHttpMethodAsc(pageable);
+        return FeatureFlagAdminSupport.envelope(result, result.getContent().stream()
+                .map(FeatureFlagAdminSupport::endpointDto)
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listEndpoints() {
-        List<Map<String, Object>> catalog = new ArrayList<>();
-        for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
-            catalog.add(endpointDto(ep));
-        }
-        return catalog;
-    }
-
-    @Override
-    @Transactional
-    public Map<String, Object> createEndpoint(FeatureFlagEndpointWriteRequest request, String actor) {
-        String method = normalizeMethod(request.getMethod());
-        String path = normalizePath(request.getPath());
-        if (endpointRepository.findByHttpMethodAndPathPattern(method, path).isPresent()) {
-            throw new IllegalStateException("ENDPOINT_EXISTS");
-        }
-        boolean neverGuard = Boolean.TRUE.equals(request.getNeverGuard()) || isNeverGuard(path);
-        FeatureFlagEndpoint saved = endpointRepository.save(FeatureFlagEndpoint.builder()
-                .httpMethod(method)
-                .pathPattern(path)
-                .neverGuard(neverGuard)
-                .build());
-        audit(actor, "CREATE", method, path, null, null, currentSemverCache.get());
-        reloadCache();
-        return endpointDto(saved);
+    public Map<String, Object> listEndpoints(int page, int size) {
+        var pageable = FeatureFlagAdminSupport.pageRequest(page, size);
+        var result = endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc(pageable);
+        return FeatureFlagAdminSupport.envelope(result, result.getContent().stream()
+                .map(FeatureFlagAdminSupport::endpointDto)
+                .toList());
     }
 
     @Override
@@ -287,9 +253,9 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             ep.setNeverGuard(request.getNeverGuard());
         }
         endpointRepository.save(ep);
-        audit(actor, "UPDATE", method, path, null, null, currentSemverCache.get());
+        audit(actor, "UPDATE", method, path, null, null, currentSemverCache.get(), ep.getFlag(), UserRoles.ADMIN);
         reloadCache();
-        return endpointDto(ep);
+        return FeatureFlagAdminSupport.endpointDto(ep);
     }
 
     @Override
@@ -297,24 +263,17 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     public void deleteEndpoint(Long id, String actor) {
         FeatureFlagEndpoint ep = endpointRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown endpoint id"));
-        if (ep.getFlag() != null) {
-            throw new IllegalStateException("ENDPOINT_CLAIMED");
+        FeatureFlag attached = ep.getFlag();
+        if (attached != null) {
+            ep.setFlag(null);
+            endpointRepository.save(ep);
+            audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null,
+                    currentSemverCache.get(), attached, UserRoles.ADMIN);
         }
-        audit(actor, "DELETE", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get());
+        audit(actor, "DELETE", ep.getHttpMethod(), ep.getPathPattern(), null, null,
+                currentSemverCache.get(), attached, UserRoles.ADMIN);
         endpointRepository.delete(ep);
         reloadCache();
-    }
-
-    private Map<String, Object> endpointDto(FeatureFlagEndpoint ep) {
-        Map<String, Object> e = new LinkedHashMap<>();
-        e.put("id", ep.getId());
-        e.put("method", ep.getHttpMethod());
-        e.put("path", ep.getPathPattern());
-        e.put("neverGuard", ep.isNeverGuard());
-        boolean claimed = ep.getFlag() != null;
-        e.put("claimed", claimed);
-        e.put("inFlag", claimed);
-        return e;
     }
 
     private String normalizeMethod(String method) {
@@ -337,18 +296,26 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> auditForFlag(Long id) {
+    public Map<String, Object> auditForFlag(Long id, int page, int size) {
         FeatureFlag flag = flagRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Flag not found"));
-        String name = flag.getName();
-        List<FeatureFlagAudit> matched = new ArrayList<>();
-        for (FeatureFlagAudit row : auditRepository.findTop100ByOrderByCreatedAtDesc()) {
-            String path = row.getPathPattern() != null ? row.getPathPattern() : "";
-            if (path.contains(name)) {
-                matched.add(row);
-            }
-        }
-        return toAuditDtos(matched);
+        var pageable = FeatureFlagAdminSupport.pageRequest(page, size);
+        var result = auditRepository.findForFlag(flag.getId(), flag.getName(), pageable);
+        return FeatureFlagAdminSupport.envelope(result, result.getContent().stream()
+                .map(FeatureFlagAdminSupport::auditDto)
+                .toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> listAudit(int page, int size, String flagName) {
+        var pageable = FeatureFlagAdminSupport.pageRequest(page, size);
+        var result = (flagName != null && !flagName.isBlank())
+                ? auditRepository.findByFlagNameIgnoreCaseOrderByCreatedAtDesc(flagName.trim(), pageable)
+                : auditRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return FeatureFlagAdminSupport.envelope(result, result.getContent().stream()
+                .map(FeatureFlagAdminSupport::auditDto)
+                .toList());
     }
 
     @Override
@@ -395,7 +362,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .updatedAt(LocalDateTime.now())
                 .build());
         seedRoleStates(flag, defaultState, request.getVersion());
-        audit(actor, "CREATE", "FLAG", name, null, defaultState, currentSemverCache.get());
+        audit(actor, "CREATE", "FLAG", name, null, defaultState, currentSemverCache.get(), flag, UserRoles.ADMIN);
         reloadCache();
         return flag;
     }
@@ -413,7 +380,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         flag.setUpdatedAt(LocalDateTime.now());
         flagRepository.save(flag);
-        audit(actor, "UPDATE", "FLAG", flag.getName(), oldDefault, flag.getDefaultState(), currentSemverCache.get());
+        audit(actor, "UPDATE", "FLAG", flag.getName(), oldDefault, flag.getDefaultState(), currentSemverCache.get(), flag, UserRoles.ADMIN);
         reloadCache();
         return flag;
     }
@@ -427,7 +394,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         flag.setDeletedAt(LocalDateTime.now());
         flagRepository.save(flag);
-        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, currentSemverCache.get());
+        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, currentSemverCache.get(), flag, UserRoles.ADMIN);
         reloadCache();
     }
 
@@ -453,7 +420,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         for (FeatureFlagEndpoint ep : batch) {
             ep.setFlag(flag);
             endpointRepository.save(ep);
-            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get());
+            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get(), flag, UserRoles.ADMIN);
         }
         reloadCache();
     }
@@ -469,7 +436,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         ep.setFlag(null);
         endpointRepository.save(ep);
-        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get());
+        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get(), flag, UserRoles.ADMIN);
         reloadCache();
     }
 
@@ -488,7 +455,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         row.setState(request.getState());
         roleStateRepository.save(row);
         FeatureFlagAudit saved = audit(actor, "STATE", flag.getName(), request.getRole().name(),
-                oldState, request.getState(), version.getSemver());
+                oldState, request.getState(), version.getSemver(), flag, request.getRole());
         reloadCache();
         return saved;
     }
@@ -692,13 +659,16 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     }
 
     private FeatureFlagAudit audit(String actor, String action, String methodOrName, String pathOrRole,
-                                   FeatureFlagState oldState, FeatureFlagState newState, String version) {
+                                   FeatureFlagState oldState, FeatureFlagState newState, String version,
+                                   FeatureFlag flag, UserRoles role) {
         FeatureFlagAudit row = FeatureFlagAudit.builder()
                 .createdAt(LocalDateTime.now())
+                .flagId(flag != null ? flag.getId() : null)
+                .flagName(flag != null ? flag.getName() : null)
                 .actor(actor != null ? actor : "unknown")
                 .httpMethod(action.length() > 8 ? action.substring(0, 8) : action)
                 .pathPattern((methodOrName != null ? methodOrName : "") + (pathOrRole != null ? " " + pathOrRole : ""))
-                .role(UserRoles.ADMIN)
+                .role(role != null ? role : UserRoles.ADMIN)
                 .oldState(oldState)
                 .newState(newState != null ? newState : FeatureFlagState.HIDDEN)
                 .appVersion(version != null ? version : currentSemverCache.get())
@@ -752,20 +722,4 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         return version + "|" + flagId + "|" + role.name();
     }
 
-    private List<Map<String, Object>> toAuditDtos(List<FeatureFlagAudit> rows) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (FeatureFlagAudit row : rows) {
-            Map<String, Object> dto = new LinkedHashMap<>();
-            dto.put("at", row.getCreatedAt() != null ? row.getCreatedAt().toString() : null);
-            dto.put("actor", row.getActor());
-            dto.put("method", row.getHttpMethod());
-            dto.put("path", row.getPathPattern());
-            dto.put("role", row.getRole() != null ? row.getRole().name() : null);
-            dto.put("oldState", row.getOldState() != null ? row.getOldState().name() : null);
-            dto.put("newState", row.getNewState() != null ? row.getNewState().name() : null);
-            dto.put("appVersion", row.getAppVersion());
-            out.add(dto);
-        }
-        return out;
-    }
 }

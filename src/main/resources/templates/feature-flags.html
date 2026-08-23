@@ -135,6 +135,9 @@
     .locked { background: #f1f5f9; color: var(--muted); }
     .audit { padding: 14px; margin-top: 18px; }
     .audit h2 { font-size: 16px; margin-bottom: 10px; }
+    .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .catalog-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .flag-tag { font-size: 12px; font-weight: 700; color: var(--primary); white-space: nowrap; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 12px; text-align: left; }
   </style>
@@ -189,25 +192,9 @@
 
   <section class="create-card">
     <h2>API catalog</h2>
-    <p class="muted">Add extra APIs here instead of SQL. Attached APIs cannot be edited or deleted until detached.</p>
-    <form id="createEpForm" class="form-row">
-      <div class="field">
-        <label>Method</label>
-        <select name="method">
-          <option>GET</option>
-          <option>POST</option>
-          <option>PUT</option>
-          <option>PATCH</option>
-          <option>DELETE</option>
-        </select>
-      </div>
-      <div class="field grow">
-        <label>Path</label>
-        <input name="path" placeholder="/api/v1/example" required />
-      </div>
-      <button class="btn-primary" type="submit">Create API</button>
-    </form>
+    <p class="muted">Filled automatically from controllers on deploy. Delete an API here and remove it from the controller so the scanner does not add it again.</p>
     <div id="catalogList" style="margin-top:12px"></div>
+    <div class="pager" id="catalogPager"></div>
   </section>
 
   <div class="flags" id="flagList"></div>
@@ -220,12 +207,17 @@
       </thead>
       <tbody id="auditBody"></tbody>
     </table>
+    <div class="pager" id="auditPager"></div>
   </div>
 </div>
 
 <script>
   let currentVersion = null;
   let snapshot = { flags: [], availableEndpoints: [], roles: [], versions: [], audit: [] };
+  let catalogPage = 0;
+  let catalogSize = 10;
+  let auditPage = 0;
+  let auditSize = 10;
   const LABELS = { HIDDEN: "Hidden", ENABLED: "Enable", DISABLED: "Disable" };
   const ERRORS = {
     FLAG_EXISTS: "This flag name already exists",
@@ -266,8 +258,52 @@
     currentVersion = data.version;
     renderVersions(data.versions || [], data.version);
     renderFlags(data.flags || [], data.availableEndpoints || [], data.roles || []);
-    renderCatalog(data.catalog || []);
-    renderAudit(data.audit || []);
+    loadCatalog();
+    loadAudit();
+  }
+
+  async function loadCatalog() {
+    const data = await api("/admin/endpoints?page=" + catalogPage + "&size=" + catalogSize);
+    if (!data) return;
+    renderCatalog(data.content || []);
+    renderPager("catalogPager", data, (nextPage, nextSize) => {
+      catalogPage = nextPage;
+      catalogSize = nextSize;
+      loadCatalog();
+    });
+  }
+
+  async function loadAudit() {
+    const data = await api("/admin/audit?page=" + auditPage + "&size=" + auditSize);
+    if (!data) return;
+    renderAudit(data.content || []);
+    renderPager("auditPager", data, (nextPage, nextSize) => {
+      auditPage = nextPage;
+      auditSize = nextSize;
+      loadAudit();
+    });
+  }
+
+  function renderPager(elId, page, onChange) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const current = page.page || 0;
+    const size = page.size || 10;
+    const totalPages = page.totalPages || 0;
+    const total = page.totalElements || 0;
+    el.innerHTML = `
+      <label class="muted">Per page
+        <select data-size>
+          <option value="10" ${size === 10 ? "selected" : ""}>10</option>
+          <option value="25" ${size === 25 ? "selected" : ""}>25</option>
+        </select>
+      </label>
+      <button type="button" class="btn-ghost" data-prev ${current <= 0 ? "disabled" : ""}>Prev</button>
+      <span class="muted">Page ${totalPages === 0 ? 0 : current + 1} / ${totalPages} · ${total}</span>
+      <button type="button" class="btn-ghost" data-next ${current + 1 >= totalPages ? "disabled" : ""}>Next</button>`;
+    el.querySelector("[data-size]").onchange = (e) => onChange(0, Number(e.target.value));
+    el.querySelector("[data-prev]").onclick = () => onChange(Math.max(current - 1, 0), size);
+    el.querySelector("[data-next]").onclick = () => onChange(current + 1, size);
   }
 
   function renderVersions(versions, selected) {
@@ -480,34 +516,20 @@
       return;
     }
     box.innerHTML = rows.map(ep => {
-      const claimed = ep.claimed || ep.inFlag;
-      const locked = claimed || ep.neverGuard;
-      const actions = locked
-        ? `<span class="muted">${claimed ? "in a flag" : "never-guard"}</span>`
-        : `<button type="button" class="btn-ghost edit-ep" data-id="${ep.id}" data-method="${ep.method}" data-path="${ep.path}">Edit</button>
-           <button type="button" class="btn-danger del-ep" data-id="${ep.id}">Delete</button>`;
+      const flagLabel = ep.flagName
+        ? `<span class="flag-tag">${ep.flagName}</span>`
+        : `<span class="muted">${ep.neverGuard ? "never-guard" : ""}</span>`;
       return `<div class="ep">
         <div><span class="method ${ep.method}">${ep.method}</span><span class="path">${ep.path}</span></div>
-        <div>${actions}</div>
+        <div class="catalog-actions">
+          <button type="button" class="btn-danger del-ep" data-id="${ep.id}">Delete API</button>
+          ${flagLabel}
+        </div>
       </div>`;
     }).join("");
-    box.querySelectorAll(".edit-ep").forEach(btn => {
-      btn.onclick = async () => {
-        const path = prompt("Path", btn.dataset.path);
-        if (path == null || !path.trim()) return;
-        const method = prompt("Method", btn.dataset.method);
-        if (method == null || !method.trim()) return;
-        const ok = await api("/admin/endpoints/" + btn.dataset.id, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ method: method.trim(), path: path.trim() })
-        });
-        if (ok) loadSnapshot(currentVersion);
-      };
-    });
     box.querySelectorAll(".del-ep").forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm("Delete this API from the catalog?")) return;
+        if (!confirm("Detach (if needed) and delete this API from the catalog?")) return;
         const ok = await api("/admin/endpoints/" + btn.dataset.id, { method: "DELETE" });
         if (ok) loadSnapshot(currentVersion);
       };
@@ -534,20 +556,6 @@
     }
   };
 
-  document.getElementById("createEpForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const ok = await api("/admin/endpoints", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: form.method.value, path: form.path.value })
-    });
-    if (ok) {
-      form.reset();
-      loadSnapshot(currentVersion);
-    }
-  };
-
   function renderAudit(rows) {
     const body = document.getElementById("auditBody");
     if (!rows.length) {
@@ -557,8 +565,8 @@
     body.innerHTML = rows.map(r => `<tr>
       <td>${r.at || ""}</td>
       <td>${r.actor || ""}</td>
-      <td>${r.method || ""} ${r.path || ""}</td>
-      <td>${r.oldState || "—"} → ${r.newState || ""}</td>
+      <td>${r.action || r.method || ""} ${r.target || r.path || ""}</td>
+      <td>${r.change || ((r.flagName || "—") + " → " + (r.newState || ""))}</td>
     </tr>`).join("");
   }
 
