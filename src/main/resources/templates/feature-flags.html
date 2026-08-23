@@ -62,15 +62,28 @@
       background: var(--card); border: 1px solid var(--border); border-radius: 12px;
     }
     .version-bar {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
       padding: 12px 14px; margin-bottom: 14px;
     }
-    .ver-btn {
-      border: 1px solid var(--border); background: #fff; border-radius: 999px;
-      padding: 6px 14px; font-weight: 700; cursor: pointer; font-size: 13px;
+    .ver-combo { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
+    .ver-combo label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+    .ver-combo input { width: 100%; }
+    .ver-menu {
+      display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+      max-height: 220px; overflow-y: auto; background: #fff;
+      border: 1px solid var(--border); border-radius: 8px; z-index: 30;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .12);
     }
-    .ver-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
-    .ver-btn.current { box-shadow: 0 0 0 2px #bfdbfe; }
+    .ver-combo.open .ver-menu { display: block; }
+    .ver-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      width: 100%; padding: 8px 12px; border: 0; background: #fff;
+      cursor: pointer; font-size: 13px; font-weight: 600; text-align: left; color: var(--text);
+    }
+    .ver-item:hover { background: #eff6ff; }
+    .ver-item.selected { background: #dbeafe; }
+    .ver-hint { padding: 8px 12px; font-size: 12px; color: var(--muted); }
+    .ver-hint.exists { color: var(--primary); font-weight: 700; }
     .new-ver { display: flex; gap: 8px; margin-left: auto; align-items: center; flex-wrap: wrap; }
     .new-ver label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; align-items: center; }
     .set-current {
@@ -306,25 +319,82 @@
     el.querySelector("[data-next]").onclick = () => onChange(current + 1, size);
   }
 
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function findVersion(versions, semver) {
+    const key = (semver || "").trim().toLowerCase();
+    return versions.find(v => v.semver.toLowerCase() === key) || null;
+  }
+
+  function fillVersionMenu(versions, selected, query) {
+    const menu = document.getElementById("verMenu");
+    const btn = document.getElementById("verSubmitBtn");
+    if (!menu) return;
+    const q = (query || "").trim().toLowerCase();
+    const matches = versions.filter(v => !q || v.semver.toLowerCase().includes(q));
+    const exact = q ? findVersion(versions, query) : null;
+    const rows = matches.map(v => {
+      const cls = ["ver-item", v.semver === selected ? "selected" : ""].join(" ");
+      const tag = v.current ? `<span class="muted">current</span>` : "";
+      return `<button type="button" class="${cls}" data-v="${esc(v.semver)}"><span>${esc(v.semver)}</span>${tag}</button>`;
+    }).join("");
+    let hint = "";
+    if (q && exact) {
+      hint = `<div class="ver-hint exists">${esc(exact.semver)} already exists — click to select</div>`;
+    } else if (q && !matches.length) {
+      hint = `<div class="ver-hint">No existing version. Add “${esc(query.trim())}”.</div>`;
+    } else if (!matches.length) {
+      hint = `<div class="ver-hint">No versions yet</div>`;
+    }
+    menu.innerHTML = hint + rows;
+    menu.querySelectorAll(".ver-item").forEach(item => {
+      item.onclick = () => {
+        document.getElementById("verCombo")?.classList.remove("open");
+        loadSnapshot(item.dataset.v);
+      };
+    });
+    if (btn) {
+      btn.textContent = exact ? "Select existing" : "Add version";
+    }
+  }
+
   function renderVersions(versions, selected) {
     const bar = document.getElementById("versionBar");
-    const last5 = versions.slice(0, 5);
-    const selectedMeta = last5.find(v => v.semver === selected);
+    const selectedMeta = versions.find(v => v.semver === selected);
     const setCurrentBtn = (selectedMeta && !selectedMeta.current)
       ? `<button type="button" class="set-current" id="setCurrentBtn">Set current</button>`
       : "";
-    bar.innerHTML = last5.map(v => {
-      const cls = ["ver-btn", v.semver === selected ? "active" : "", v.current ? "current" : ""].join(" ");
-      return `<button type="button" class="${cls}" data-v="${v.semver}">${v.semver}${v.current ? " · current" : ""}</button>`;
-    }).join("") + setCurrentBtn + `
+    bar.innerHTML = `
+      <div class="ver-combo" id="verCombo">
+        <label for="verSearch">Version</label>
+        <input id="verSearch" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Search or type a new version" value="${esc(selected || "")}" />
+        <div class="ver-menu" id="verMenu" role="listbox"></div>
+      </div>
+      ${setCurrentBtn}
       <form class="new-ver" id="newVerForm">
-        <input name="semver" placeholder="2.2.0" required />
         <label><input type="checkbox" name="makeCurrent" /> Make current</label>
-        <button class="btn-primary" type="submit">Add version</button>
+        <button class="btn-primary" type="submit" id="verSubmitBtn">Add version</button>
       </form>`;
-    bar.querySelectorAll(".ver-btn").forEach(btn => {
-      btn.onclick = () => loadSnapshot(btn.dataset.v);
-    });
+    const combo = document.getElementById("verCombo");
+    const input = document.getElementById("verSearch");
+    fillVersionMenu(versions, selected, "");
+    const openMenu = (query) => {
+      combo.classList.add("open");
+      fillVersionMenu(versions, selected, query);
+    };
+    input.onfocus = () => {
+      input.select();
+      openMenu("");
+    };
+    input.oninput = () => openMenu(input.value);
+    input.onkeydown = (e) => {
+      if (e.key === "Escape") combo.classList.remove("open");
+    };
     const setBtn = document.getElementById("setCurrentBtn");
     if (setBtn) {
       setBtn.onclick = async () => {
@@ -338,7 +408,14 @@
     }
     document.getElementById("newVerForm").onsubmit = async (e) => {
       e.preventDefault();
-      const semver = e.target.semver.value.trim();
+      const semver = input.value.trim();
+      if (!semver) { showError("semver required"); return; }
+      const existing = findVersion(versions, semver);
+      if (existing) {
+        combo.classList.remove("open");
+        loadSnapshot(existing.semver);
+        return;
+      }
       const makeCurrent = e.target.makeCurrent.checked;
       const ok = await api("/admin/feature-flags/versions", {
         method: "POST",
@@ -569,6 +646,11 @@
       <td>${r.change || ((r.flagName || "—") + " → " + (r.newState || ""))}</td>
     </tr>`).join("");
   }
+
+  document.addEventListener("click", (e) => {
+    const combo = document.getElementById("verCombo");
+    if (combo && !combo.contains(e.target)) combo.classList.remove("open");
+  });
 
   loadSnapshot();
 </script>
