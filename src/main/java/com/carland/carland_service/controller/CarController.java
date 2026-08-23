@@ -47,6 +47,15 @@ public class CarController {
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
     /**
+     * tr: Feature-flag scanner duman testi; catalog'a GET /api/v1/car/test/scanner eklenmeli.
+     * en: Feature-flag scanner smoke test; catalog should gain GET /api/v1/car/test/scanner.
+     */
+    @GetMapping("/test/scanner")
+    public Void testScannerCatalog() {
+        return null;
+    }
+
+    /**
      * tr: Hyper API bağlantısını test eder; token alıp sabit bir VIN için araç sorgusu yapar ve ham cevabı string olarak döner, hata olursa hata mesajını döner.
      * en: Tests the Hyper API connection; obtains a token, queries a hardcoded VIN, and returns the raw response as a string, or the error message on failure.
      */
