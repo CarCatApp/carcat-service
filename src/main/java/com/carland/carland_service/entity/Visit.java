@@ -8,8 +8,10 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * tr: Bir aracın partner serviste geçirdiği tek bir servis ziyaretini (visits tablosu) temsil eden JPA entity'sidir;
@@ -71,6 +73,21 @@ public class Visit {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "service_groups", columnDefinition = "jsonb")
     private List<String> serviceGroups;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    /**
+     * tr: Webhook CREATE/PUT olayları (append-only JSON dizi). Müşteri API'sinde dönülmez.
+     * en: Webhook CREATE/PUT events (append-only JSON array). Not returned on the customer API.
+     */
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "edit_history", columnDefinition = "jsonb")
+    private List<Map<String, Object>> editHistory = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "visit", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

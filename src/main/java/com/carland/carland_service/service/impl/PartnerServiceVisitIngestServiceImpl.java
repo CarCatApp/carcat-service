@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -79,7 +80,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         }
 
         hyperWebhookCarMetadataApplier.apply(car, request);
-        return ingestVisits(car, HyperWebhookIngestMapper.toIngestRequest(request, partner), partner.getId());
+        return ingestVisits(car, HyperWebhookIngestMapper.toIngestRequest(request, partner), partner);
     }
 
     /**
@@ -89,7 +90,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
      * en: Processes the visit list one by one: asserts each visit is new via the guard (throws on
      *     duplicates), maps and persists them; then triggers total-cost, partner-list and percentage sync.
      */
-    private PartnerNewServiceVisitResult ingestVisits(Car car, VisitHistoryResponse request, Long partnerId) {
+    private PartnerNewServiceVisitResult ingestVisits(Car car, VisitHistoryResponse request, Partner partner) {
         String vin = request.getVin().trim();
 
         PartnerNewServiceVisitResult result = PartnerNewServiceVisitResult.builder()
@@ -103,6 +104,9 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
             partnerVisitIngestGuard.assertNewVisit(car.getCarId(), item);
 
             Visit created = mapItemToVisit(car, item);
+            created.setCreatedAt(LocalDateTime.now());
+            visitWebhookSupport.fillPartnerIfMissing(created, partner);
+            visitWebhookSupport.appendEditEvent(created, "CREATE", null, partner);
             visitRepository.saveAndFlush(created);
             touchedVisits.add(created);
             result.getVisits().add(buildCreatedVisitDetail(created, item.getPartnerRecordId()));

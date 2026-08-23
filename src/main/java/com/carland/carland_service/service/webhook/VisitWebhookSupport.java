@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.response.MoneyResponse;
 import com.carland.carland_service.dto.response.VisitPartResponse;
 import com.carland.carland_service.dto.response.VisitServiceLineResponse;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.entity.VisitPart;
 import com.carland.carland_service.entity.VisitServiceLine;
@@ -13,7 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * tr: Webhook ingest ve update servislerinin ortak yardımcılarıdır; daha önce
@@ -101,6 +106,45 @@ public class VisitWebhookSupport {
             return visit.getCostAmount();
         }
         return BigDecimal.ZERO;
+    }
+
+    /**
+     * tr: Webhook olayını edit_history'ye ekler. PUT için changed true/false; CREATE için changed yok.
+     * en: Appends a webhook event to edit_history. PUT includes changed true/false; CREATE omits changed.
+     */
+    public void appendEditEvent(Visit visit, String action, Boolean changed, Partner partner) {
+        if (visit.getEditHistory() == null) {
+            visit.setEditHistory(new ArrayList<>());
+        }
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("at", LocalDateTime.now().toString());
+        event.put("action", action);
+        if (changed != null) {
+            event.put("changed", changed);
+        }
+        if (partner != null) {
+            event.put("partnerId", partner.getId());
+            event.put("partnerName", partner.getName());
+        }
+        List<Map<String, Object>> history = new ArrayList<>(visit.getEditHistory());
+        history.add(event);
+        visit.setEditHistory(history);
+    }
+
+    /**
+     * tr: Partner id/ad boşsa gelen partner ile doldurur; Hyper iş alanı değişikliği sayılmaz.
+     * en: Fills blank partner id/name from the caller; not counted as a Hyper business-field change.
+     */
+    public void fillPartnerIfMissing(Visit visit, Partner partner) {
+        if (partner == null) {
+            return;
+        }
+        if (visit.getServiceCenterId() == null) {
+            visit.setServiceCenterId(partner.getId());
+        }
+        if (visit.getServiceCenterName() == null || visit.getServiceCenterName().isBlank()) {
+            visit.setServiceCenterName(partner.getName());
+        }
     }
 
     /**

@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -94,6 +95,8 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
                 .parts(new ArrayList<>())
                 .build();
 
+        visitWebhookSupport.fillPartnerIfMissing(visit, partner);
+
         int visitFieldsUpdated = applyVisitSnapshot(visit, item);
         int linesUpdated = mergeLines(visit, item, result);
         int partsUpdated = mergeParts(visit, item, result);
@@ -103,8 +106,11 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         result.setPartsUpdated(partsUpdated);
 
         boolean changed = visitFieldsUpdated > 0 || linesUpdated > 0 || partsUpdated > 0;
+        visit.setUpdatedAt(LocalDateTime.now());
+        visitWebhookSupport.appendEditEvent(visit, "PUT", changed, partner);
+        visitRepository.saveAndFlush(visit);
+
         if (changed) {
-            visitRepository.saveAndFlush(visit);
             visitWebhookSupport.recalculateAllTimeCost(car);
             visitRepository.findWithDetailsByCarIdAndHyperRecordId(car.getCarId(), recordId)
                     .ifPresent(freshVisit -> hyperPercentageSyncService.syncFromVisit(car, freshVisit));
