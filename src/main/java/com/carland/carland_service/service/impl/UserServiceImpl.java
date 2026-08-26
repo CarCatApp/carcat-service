@@ -10,6 +10,7 @@ import com.carland.carland_service.entity.Notification;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
+import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
@@ -143,9 +144,17 @@ public class UserServiceImpl implements UserService {
             throw new NotMatchException(MessagesLangValues.INVALID_PIN.getMessageByLang(acceptLanguage));
         }
 
-        Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
-        if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
-            throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+        if (Boolean.TRUE.equals(customer.getSimaVerified())) {
+            if (!name.equals(customer.getName())
+                    || !surname.equals(customer.getSurname())
+                    || !pin.equalsIgnoreCase(customer.getPin() == null ? "" : customer.getPin())) {
+                throw new ConflictException(MessagesLangValues.SIMA_PROFILE_LOCKED.getMessageByLang(acceptLanguage));
+            }
+        } else {
+            Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
+            if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
+                throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+            }
         }
 
         Customer mailOwner = customerRepository.findByMailIgnoreCase(mail);
@@ -153,10 +162,12 @@ public class UserServiceImpl implements UserService {
             throw new AlreadyExistsException(MessagesLangValues.MAIL_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
 
-        customer.setName(name);
-        customer.setSurname(surname);
+        if (!Boolean.TRUE.equals(customer.getSimaVerified())) {
+            customer.setName(name);
+            customer.setSurname(surname);
+            customer.setPin(pin);
+        }
         customer.setMail(mail);
-        customer.setPin(pin);
         customerRepository.save(customer);
 
         return toInformationResponse(customer);
@@ -185,6 +196,7 @@ public class UserServiceImpl implements UserService {
                 .mail(customer.getMail())
                 .pin(customer.getPin())
                 .phoneNumber(customer.getPhoneNumber())
+                .verified(Boolean.TRUE.equals(customer.getSimaVerified()))
                 .build();
     }
 

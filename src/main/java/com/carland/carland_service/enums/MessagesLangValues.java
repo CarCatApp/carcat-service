@@ -543,6 +543,18 @@ public enum MessagesLangValues {
             "Avtomobil şəkli tapılmadı",
             "Car photo not found",
             "Автомобиль фото не найден"
+    ),
+
+    SIMA_ALREADY_VERIFIED(
+            "İstifadəçi artıq SIMA ilə təsdiqlənib",
+            "User is already SIMA verified",
+            "Пользователь уже подтверждён через SIMA"
+    ),
+
+    SIMA_PROFILE_LOCKED(
+            "Təsdiqlənmiş ad, soyad və FIN dəyişdirilə bilməz",
+            "Verified name, surname and FIN cannot be changed",
+            "Подтверждённые имя, фамилия и FIN нельзя изменить"
     );
 
     private final String azMessage;

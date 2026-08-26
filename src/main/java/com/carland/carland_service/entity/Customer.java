@@ -33,6 +33,13 @@ public class Customer {
      */
     @Column(name = "pin", unique = true, length = 7)
     String pin;
+    /**
+     * True after a SIMA citizen/foreign attempt passed isSuccess + both scores &gt;= 0.90.
+     * Locks name, surname and FIN on PUT /user/information.
+     */
+    @Column(name = "sima_verified", nullable = false)
+    @Builder.Default
+    Boolean simaVerified = false;
     String notificationLanguage;
     String status;
     LocalDate createdAt;

@@ -23,5 +23,10 @@ public class SimaVerifyResponse {
     private String transactionId;
     private String code;
     private String message;
+    /** Same as SIMA error.errorCode when present. */
+    private Integer simaResponseCode;
+    /** Same as SIMA error.errorMessage when present. */
+    private String simaMessage;
+    /** Alias of simaResponseCode for older clients. */
     private Integer simaErrorCode;
 }

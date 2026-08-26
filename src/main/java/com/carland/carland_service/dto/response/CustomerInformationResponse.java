@@ -22,4 +22,6 @@ public class CustomerInformationResponse {
     String pin;
     @Schema(description = "Read-only. Phone cannot be changed from this screen.")
     String phoneNumber;
+    @Schema(description = "True after SIMA KYC passed. Flutter hides the verify button.")
+    boolean verified;
 }
