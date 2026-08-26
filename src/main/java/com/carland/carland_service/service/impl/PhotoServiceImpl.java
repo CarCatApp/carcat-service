@@ -8,6 +8,7 @@ import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.PhotoService;
+import com.carland.carland_service.service.RedisCacheService;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class PhotoServiceImpl implements PhotoService {
     private final PartnerRepository partnerRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
+    private final RedisCacheService redisCacheService;
     /**
      * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
      * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
@@ -53,6 +55,11 @@ public class PhotoServiceImpl implements PhotoService {
         if (role == null || phoneNumber == null || userIdHeader == null) {
             throw new MissingFieldException(
                     MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+
+        ResponseEntity<byte[]> cached = redisCacheService.getCarPhoto(carId);
+        if (cached != null) {
+            return cached;
         }
 
         CarPhoto carPhoto = carPhotoRepository.findByCarId(carId);
@@ -74,6 +81,7 @@ public class PhotoServiceImpl implements PhotoService {
 
         MediaType mediaType = MediaType.parseMediaType(fileType);
         log.info("media type file type ================= {}", mediaType.getType());
+        redisCacheService.putCarPhoto(carId, mediaType, carPhoto.getImageData());
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .body(carPhoto.getImageData());
@@ -88,6 +96,11 @@ public class PhotoServiceImpl implements PhotoService {
         if (role == null || phoneNumber == null || userIdHeader == null) {
             throw new MissingFieldException(
                     MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+
+        ResponseEntity<byte[]> cached = redisCacheService.getUserPhoto(userIdHeader);
+        if (cached != null) {
+            return cached;
         }
 
         UserPhoto userPhoto = userPhotoRepository.findByUserIdAndUserPhoneNumber(Long.valueOf(userIdHeader), phoneNumber);
@@ -110,6 +123,7 @@ public class PhotoServiceImpl implements PhotoService {
         MediaType mediaType = MediaType.parseMediaType(fileType);
         log.info("media type file type ================= {}", mediaType.getType());
 
+        redisCacheService.putUserPhoto(userIdHeader, mediaType, userPhoto.getImageData());
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .body(userPhoto.getImageData());
@@ -310,6 +324,8 @@ public class PhotoServiceImpl implements PhotoService {
         }
 
         carPhotoRepository.delete(carPhoto);
+        redisCacheService.evictCarPhoto(carId);
+        redisCacheService.evictCarListAfterCommit(redisCacheService.ownerUserId(car));
 
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
@@ -376,6 +392,8 @@ public class PhotoServiceImpl implements PhotoService {
                     .build();
 
             carPhotoRepository.save(carPhoto);
+            redisCacheService.evictCarPhoto(carId);
+            redisCacheService.evictCarListAfterCommit(userIdHeader);
 
             return PhotoResponse.builder()
                     .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
@@ -418,6 +436,8 @@ public class PhotoServiceImpl implements PhotoService {
         }
 
         carPhotoRepository.delete(carPhoto);
+        redisCacheService.evictCarPhoto(carId);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
 
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
@@ -462,6 +482,7 @@ public class PhotoServiceImpl implements PhotoService {
                     .build();
 
             userPhotoRepository.save(newPhoto);
+            redisCacheService.evictUserPhoto(userIdHeader);
 
             return PhotoResponse.builder()
                     .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
@@ -490,6 +511,7 @@ public class PhotoServiceImpl implements PhotoService {
         }
 
         userPhotoRepository.delete(userPhoto);
+        redisCacheService.evictUserPhoto(userIdHeader);
 
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))

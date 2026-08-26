@@ -24,6 +24,7 @@ import com.carland.carland_service.repository.ServiceHistoryPartRepository;
 import com.carland.carland_service.repository.ServiceHistoryRepository;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.CarVinHistoryService;
+import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,6 +67,7 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
     private final PartnerLookupService partnerLookupService;
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
+    private final RedisCacheService redisCacheService;
 
     @Value("${hyper.auth.base-url}")
     private String hyperBaseUrl;
@@ -101,6 +103,10 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
+        return redisCacheService.getOrLoadHistoryV1(vin, acceptLanguage, () -> loadHistoryUncached(car, vin, acceptLanguage));
+    }
+
+    private CarVinServiceHistoryResponse loadHistoryUncached(Car car, String vin, String acceptLanguage) {
         List<ServiceHistory> cachedRows = serviceHistoryRepository.findAllByCarOrderByDoneDateDescIdDesc(car);
         log.info("[hist-debug] v1 cache lookup | carId={} cachedRows={}", car.getCarId(), cachedRows.size());
         if (!cachedRows.isEmpty()) {

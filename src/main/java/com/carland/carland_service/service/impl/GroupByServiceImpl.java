@@ -7,6 +7,7 @@ import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.GroupByService;
+import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +34,8 @@ public class GroupByServiceImpl implements GroupByService {
     private final BodyTypeRepository bodyTypeRepository;
     private final TransmissionTypeRepository transmissionTypeRepository;
     private final EngineTypeRepository engineTypeRepository;
-private final ModelYearRepository modelYearRepository;
+    private final ModelYearRepository modelYearRepository;
+    private final RedisCacheService redisCacheService;
 
     private boolean isNewBrandModelSetActive() {
         return brandRepository.existsByIsnew(NEW_SET_MARKER);
@@ -63,14 +65,13 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<Model> getModelsByBrand(Long brandId, String timezone, String acceptLanguage) {
-
-        List<Model> modelList = loadModelsForBrand(brandId);
-
-        if (modelList.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.MODEL_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        return modelList;
+        return redisCacheService.getOrLoadModels(brandId, () -> {
+            List<Model> modelList = loadModelsForBrand(brandId);
+            if (modelList.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.MODEL_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
+            return modelList;
+        });
     }
 
     /**
@@ -79,12 +80,13 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<Brand> getAllBrands(String timezone, String acceptLanguage) {
-        List<Brand> brandList = loadActiveBrands();
-        if (brandList.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.BRAND_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        return brandList;
+        return redisCacheService.getOrLoadBrands(() -> {
+            List<Brand> brandList = loadActiveBrands();
+            if (brandList.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.BRAND_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
+            return brandList;
+        });
     }
 
     /**
@@ -93,24 +95,25 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<BodyType> getBodyTypes(String timezone, String acceptLanguage) {
+        return redisCacheService.getOrLoadBodyTypes(acceptLanguage, () -> {
+            List<BodyType> bodyTypes =
+                    bodyTypeRepository.findAllByStatusOrderByBodyTypeIdAsc("ACTIVE");
 
-        List<BodyType> bodyTypes =
-                bodyTypeRepository.findAllByStatusOrderByBodyTypeIdAsc("ACTIVE");
+            if (bodyTypes.isEmpty()) {
+                throw new ResourceNotFoundException(
+                        MessagesLangValues.BODY_TYPE_NOT_FOUND
+                                .getMessageByLang(acceptLanguage)
+                );
+            }
 
-        if (bodyTypes.isEmpty()) {
-            throw new ResourceNotFoundException(
-                    MessagesLangValues.BODY_TYPE_NOT_FOUND
-                            .getMessageByLang(acceptLanguage)
+            bodyTypes.forEach(bodyType ->
+                    bodyType.setBodyType(
+                            BodyTypeTranslation.translate(bodyType.getBodyType(), acceptLanguage)
+                    )
             );
-        }
 
-        bodyTypes.forEach(bodyType ->
-                bodyType.setBodyType(
-                        BodyTypeTranslation.translate(bodyType.getBodyType(), acceptLanguage)
-                )
-        );
-
-        return bodyTypes;
+            return bodyTypes;
+        });
     }
 
 
@@ -120,12 +123,13 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<TransmissionType> getTransmissionTypes(String timezone, String acceptLanguage) {
-        List<TransmissionType> transmissionTypes = transmissionTypeRepository.findAllByStatus("ACTIVE");
-        if (transmissionTypes.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.TRANSMISSION_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-
-        return transmissionTypes;
+        return redisCacheService.getOrLoadTransmissions(() -> {
+            List<TransmissionType> transmissionTypes = transmissionTypeRepository.findAllByStatus("ACTIVE");
+            if (transmissionTypes.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.TRANSMISSION_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
+            return transmissionTypes;
+        });
     }
 
     /**
@@ -134,20 +138,21 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<EngineType> getEngineTypes(String timezone, String acceptLanguage) {
+        return redisCacheService.getOrLoadEngineTypes(acceptLanguage, () -> {
+            List<EngineType> engineTypes = engineTypeRepository.findAllByStatusOrderByEngineTypeIdAsc("ACTIVE");
 
-        List<EngineType> engineTypes = engineTypeRepository.findAllByStatusOrderByEngineTypeIdAsc("ACTIVE");
+            if (engineTypes.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
 
-        if (engineTypes.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+            engineTypes.forEach(engineType ->
+                    engineType.setEngineType(
+                            EngineTypeTranslation.translate(engineType.getEngineType(), acceptLanguage)
+                    )
+            );
 
-        engineTypes.forEach(engineType ->
-                engineType.setEngineType(
-                        EngineTypeTranslation.translate(engineType.getEngineType(), acceptLanguage)
-                )
-        );
-
-        return engineTypes;
+            return engineTypes;
+        });
     }
 
 
@@ -157,13 +162,13 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<ModelYear> getYearList(String timezone, String acceptLanguage) {
-
-        List<ModelYear> modelYears = modelYearRepository.findAllByStatusOrderByModelYearDesc("ACTIVE");
-
-        if (modelYears.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.MODEL_YEAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
-        return modelYears;
+        return redisCacheService.getOrLoadYears(() -> {
+            List<ModelYear> modelYears = modelYearRepository.findAllByStatusOrderByModelYearDesc("ACTIVE");
+            if (modelYears.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.MODEL_YEAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
+            return modelYears;
+        });
     }
 
     /**
@@ -172,15 +177,17 @@ private final ModelYearRepository modelYearRepository;
      */
     @Override
     public List<Brand> getAllBrandsWithModels() {
-        List<Brand> brands = loadActiveBrands();
-        Map<Long, List<Model>> modelsByBrandId = loadAllActiveModels().stream()
-                .collect(Collectors.groupingBy(Model::getBrandId));
+        return redisCacheService.getOrLoadBrandsWithModels(() -> {
+            List<Brand> brands = loadActiveBrands();
+            Map<Long, List<Model>> modelsByBrandId = loadAllActiveModels().stream()
+                    .collect(Collectors.groupingBy(Model::getBrandId));
 
-        brands.forEach(brand ->
-                brand.setModels(modelsByBrandId.getOrDefault(brand.getBrandId(), Collections.emptyList()))
-        );
+            brands.forEach(brand ->
+                    brand.setModels(modelsByBrandId.getOrDefault(brand.getBrandId(), Collections.emptyList()))
+            );
 
-        return brands;
+            return brands;
+        });
     }
 
 }

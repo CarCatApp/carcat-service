@@ -28,6 +28,7 @@ import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
+import com.carland.carland_service.service.RedisCacheService;
 import com.carland.carland_service.service.VisitHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,6 +82,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     private final PartnerLookupService partnerLookupService;
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
+    private final RedisCacheService redisCacheService;
 
     @Value("${hyper.auth.base-url}")
     private String hyperBaseUrl;
@@ -117,6 +119,10 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
+        return redisCacheService.getOrLoadHistoryV2(vin, acceptLanguage, () -> loadHistoryUncached(car, vin, acceptLanguage));
+    }
+
+    private VisitHistoryResponse loadHistoryUncached(Car car, String vin, String acceptLanguage) {
         List<Visit> cachedVisits = loadCachedVisits(car);
         log.info("[hist-debug] v2 cache lookup | carId={} cachedVisits={}",
                 car.getCarId(), cachedVisits != null ? cachedVisits.size() : null);
@@ -181,6 +187,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
 
         car.setServicedPartnerIds(updated);
         carRepository.save(car);
+        redisCacheService.evictCarListAfterCommit(redisCacheService.ownerUserId(car));
         log.info("Updated servicedPartnerIds | carId={}, partnerIds={}", car.getCarId(), updated);
     }
 

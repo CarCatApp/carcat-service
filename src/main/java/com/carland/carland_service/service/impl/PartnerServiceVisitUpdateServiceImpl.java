@@ -19,6 +19,7 @@ import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitUpdateService;
+import com.carland.carland_service.service.RedisCacheService;
 import com.carland.carland_service.service.webhook.HyperWebhookIngestMapper;
 import com.carland.carland_service.service.webhook.HyperServiceVisitValidator;
 import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
@@ -51,6 +52,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
     private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
     private final HyperPercentageSyncService hyperPercentageSyncService;
     private final VisitWebhookSupport visitWebhookSupport;
+    private final RedisCacheService redisCacheService;
 
     /**
      * tr: Güncelleme isteğini işler: payload'ı doğrular, aktif partner'ı ve VIN ile aracı bulur,
@@ -119,6 +121,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
             result.setMessage("Visit and service lines already up to date");
         }
 
+        redisCacheService.evictCarAndHistoryAfterCommit(car);
         return result;
     }
 

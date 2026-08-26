@@ -17,6 +17,7 @@ import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.PushNotificationService;
+import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,6 +64,7 @@ public class CarServiceImpl implements CarService {
     private final EngineTypeRepository engineTypeRepository;
     private final AfterAddCarSyncService afterAddCarSyncService;
     private final HyperPercentageSyncService hyperPercentageSyncService;
+    private final RedisCacheService redisCacheService;
 //    private static final List<String> simulatedVins = List.of(
 //            "JTJGB7CX2R4121777",
 //            "LFMAAA0C6S0640604",
@@ -200,6 +202,10 @@ public class CarServiceImpl implements CarService {
      */
     @Override
     public List<Color> getColors(String acceptLanguage) {
+        return redisCacheService.getOrLoadColors(acceptLanguage, () -> loadColors(acceptLanguage));
+    }
+
+    private List<Color> loadColors(String acceptLanguage) {
 
         List<Color> colors = colorRepository.findAll();
 
@@ -374,6 +380,7 @@ public class CarServiceImpl implements CarService {
             car.setModelYear(carRequest.getModelYear());
         }
         carRepository.save(car);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
         return convertCarEntityToResponse(car, acceptLanguage, "null");
     }
 
@@ -764,6 +771,7 @@ public class CarServiceImpl implements CarService {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM, yyyy", Locale.forLanguageTag(acceptLanguage));
 
         percentageRepository.save(percentage);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
         log.info("[pct-status-debug] editPercentage SAVED | carId={}, percentageId={}, serviceName={}, statusAfter={}, thread={}",
                 car.getCarId(), percentage.getId(), percentage.getServiceName(),
                 percentage.getStatus(), Thread.currentThread().getName());
@@ -1133,6 +1141,7 @@ public class CarServiceImpl implements CarService {
         log.info("[pct-status-debug] executeServicePercentages END | carId={}, recomputeSaved={}, manualPreserved={}, thread={}",
                 car.getCarId(), recomputeSavedCount, manualPreservedCount, Thread.currentThread().getName());
 
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
         return PercentageResponse.builder()
                 .carId(car.getCarId())
                 .vin(car.getVin())
@@ -1294,6 +1303,7 @@ public class CarServiceImpl implements CarService {
                 carRepository.save(existingCar);
                 customerRepository.save(customer);
                 CarResponse response = convertCarEntityToResponse(existingCar, acceptLanguage, "fromDb");
+                redisCacheService.evictCarListAfterCommit(userIdHeader);
                 log.info("[addCar] END success (existing car linked) | carId={}, vin={}", response.getCarId(), response.getVin());
                 return response;
             }
@@ -1324,6 +1334,7 @@ public class CarServiceImpl implements CarService {
                 carRepository.save(conflictingCar);
                 customerRepository.save(customer);
                 CarResponse response = convertCarEntityToResponse(conflictingCar, acceptLanguage, "fromDb");
+                redisCacheService.evictCarListAfterCommit(userIdHeader);
                 log.info("[addCar] END success (existing plate car linked) | carId={}, vin={}, plateNumber={}",
                         response.getCarId(), response.getVin(), response.getPlateNumber());
                 return response;
@@ -1437,6 +1448,7 @@ public class CarServiceImpl implements CarService {
             customerRepository.save(customer);
 
             CarResponse response = convertCarEntityToResponse(newCar, acceptLanguage, "fromDecoderTool");
+            redisCacheService.evictCarListAfterCommit(userIdHeader);
             triggerAfterAddCarSync(newCar.getCarId(), newCar.getVin(), phoneNumber, userIdHeader, timezone, acceptLanguage);
 
             log.info("[addCar] END success (new car) | carId={}, vin={}, plateNumber={}",
@@ -1557,6 +1569,7 @@ public class CarServiceImpl implements CarService {
         car.setCustomer(null);
         carRepository.save(car);
         customerRepository.save(customer);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
 
         return CarResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
@@ -1623,19 +1636,21 @@ public class CarServiceImpl implements CarService {
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        List<Car> carList = carRepository.findAllByCustomerOrderByCreatedAtDesc(customer);
+        return redisCacheService.getOrLoadCarList(userIdHeader, acceptLanguage, () -> {
+            List<Car> carList = carRepository.findAllByCustomerOrderByCreatedAtDesc(customer);
 
-        if (carList == null || carList.isEmpty()) {
-            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
-        }
+            if (carList == null || carList.isEmpty()) {
+                throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+            }
 
-        List<CarResponse> responses = carList.stream().map(car -> convertCarEntityToResponse(car, acceptLanguage, "null")).collect(Collectors.toList());
-        Log log1 = new Log();
-        List<Long> carIds = responses.stream().map(CarResponse::getCarId).toList();
-        log1.setUserId(userIdHeader);
-        log1.setLog(LocalDateTime.now() + " **** " + phoneNumber + " **** " + userIdHeader + " **** " + carIds);
-        logRepository.save(log1);
-        return responses;
+            List<CarResponse> responses = carList.stream().map(car -> convertCarEntityToResponse(car, acceptLanguage, "null")).collect(Collectors.toList());
+            Log log1 = new Log();
+            List<Long> carIds = responses.stream().map(CarResponse::getCarId).toList();
+            log1.setUserId(userIdHeader);
+            log1.setLog(LocalDateTime.now() + " **** " + phoneNumber + " **** " + userIdHeader + " **** " + carIds);
+            logRepository.save(log1);
+            return responses;
+        });
     }
 
 
@@ -1692,6 +1707,8 @@ public class CarServiceImpl implements CarService {
         car.setUpdatedAt(LocalDateTime.now(ZoneId.of(timezone)));
 
         carRepository.save(car);
+        String ownerId = customer != null ? String.valueOf(customer.getUserId()) : redisCacheService.ownerUserId(car);
+        redisCacheService.evictCarListAfterCommit(ownerId);
 
         return convertCarEntityToResponse(car, acceptLanguage, "null");
     }
@@ -1750,6 +1767,7 @@ public class CarServiceImpl implements CarService {
                 .car(car)
                 .build();
         customerServiceRecordRepository.save(record);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
         return RecordResponse.builder()
                 .id(record.getId())
                 .serviceId(record.getServiceId())
@@ -1821,6 +1839,7 @@ public class CarServiceImpl implements CarService {
         log.info("Record yekun olaraq budur: -----------------> {}", record);
         log.info("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW");
 
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
         return RecordResponse.builder()
                 .id(record.getId())
                 .serviceId(record.getServiceId())
