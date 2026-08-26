@@ -26,7 +26,7 @@ public class SimaKycRecord {
     Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", referencedColumnName = "user_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     @ToString.Exclude
     Customer customer;
 
