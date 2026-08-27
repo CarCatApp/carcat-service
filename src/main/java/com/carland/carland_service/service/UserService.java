@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
+import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 
 import java.util.List;
@@ -36,5 +37,12 @@ public interface UserService {
      */
     CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
                                                         String phoneNumber, String userIdHeader, String acceptLanguage);
+
+    /**
+     * tr: FIN başka bir müşteride kayıtlıysa true, yoksa veya çağıranın kendisine aitse false döner.
+     * en: Returns true when the FIN belongs to another customer; false when unused or owned by the caller.
+     */
+    PinOccupiedResponse isPinOccupied(String pin, String role, String phoneNumber, String userIdHeader,
+                                      String acceptLanguage);
 
 }

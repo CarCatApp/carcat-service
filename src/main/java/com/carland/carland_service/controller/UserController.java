@@ -163,6 +163,19 @@ public class UserController {
         return userService.saveCustomerInformation(request, role, phoneNumber, userIdHeader, acceptLanguage);
     }
 
+    /**
+     * tr: FIN (pin) başka bir müşteride kayıtlı mı. Kendi FIN'i veya hiç yoksa occupied=false.
+     * en: Whether the FIN (pin) is already registered on another customer. Own FIN or unused → occupied=false.
+     */
+    @GetMapping("/pin/is-occupied")
+    public PinOccupiedResponse isOccupied(@RequestParam("pin") String pin,
+                                          @RequestHeader("role") String role,
+                                          @RequestHeader("phoneNumber") String phoneNumber,
+                                          @RequestHeader("X-User-Id") String userIdHeader,
+                                          @RequestHeader("Accept-Language") String acceptLanguage) {
+        return userService.isPinOccupied(pin, role, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
 
     /**
      * tr: Tüm müşterileri araçlarıyla birlikte (aracı olmayan müşteriler tek satır olarak) XLSX dosyasına yazar ve indirilebilir olarak döner.

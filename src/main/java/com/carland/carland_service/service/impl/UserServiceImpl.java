@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NameSurname;
 import com.carland.carland_service.dto.response.NotificationResponse;
+import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Notification;
@@ -197,6 +198,24 @@ public class UserServiceImpl implements UserService {
                 .pin(customer.getPin())
                 .phoneNumber(customer.getPhoneNumber())
                 .verified(Boolean.TRUE.equals(customer.getSimaVerified()))
+                .build();
+    }
+
+    /**
+     * tr: FIN başka müşterideyse occupied=true. Boşsa veya çağıranın kendi FIN'iyse false.
+     * en: occupied=true when FIN belongs to another customer; false when unused or owned by the caller.
+     */
+    @Override
+    public PinOccupiedResponse isPinOccupied(String pin, String role, String phoneNumber, String userIdHeader,
+                                             String acceptLanguage) {
+        if (pin == null || pin.isBlank() || userIdHeader == null || userIdHeader.isBlank()) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        Customer owner = customerRepository.findByPinIgnoreCase(pin.trim());
+        boolean occupied = owner != null && owner.getUserId() != null
+                && !String.valueOf(owner.getUserId()).equals(userIdHeader.trim());
+        return PinOccupiedResponse.builder()
+                .occupied(occupied)
                 .build();
     }
 
