@@ -32,8 +32,8 @@ public interface UserService {
     CustomerInformationResponse getCustomerInformation(String role, String phoneNumber, String userIdHeader, String acceptLanguage);
 
     /**
-     * tr: Müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder/günceller; telefon değişmez.
-     * en: Saves/updates the customer's name, surname, e-mail and FIN; phone is never changed.
+     * tr: Profil kaydı. SIMA verified ise yalnızca e-posta; değilse ad, soyad, e-posta ve FIN. Telefon değişmez.
+     * en: Saves profile. When SIMA-verified only e-mail; otherwise name, surname, e-mail and FIN. Phone unchanged.
      */
     CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
                                                         String phoneNumber, String userIdHeader, String acceptLanguage);

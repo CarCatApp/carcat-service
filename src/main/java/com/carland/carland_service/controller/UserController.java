@@ -151,8 +151,10 @@ public class UserController {
     }
 
     /**
-     * tr: Müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder/günceller. Telefon gövdeden alınmaz ve değişmez.
-     * en: Saves/updates the customer's name, surname, e-mail and FIN. Phone is not taken from the body and is never changed.
+     * tr: Müşteri profilini kaydeder. SIMA verified ise yalnızca e-posta güncellenir (ad/soyad/FIN kilitli).
+     *     Verified değilse ad, soyad, e-posta ve FIN güncellenir. Telefon gövdeden alınmaz.
+     * en: Saves the customer profile. When SIMA-verified only e-mail is updated (name/surname/FIN locked).
+     *     Otherwise name, surname, e-mail and FIN are updated. Phone is not taken from the body.
      */
     @PutMapping("/information")
     public CustomerInformationResponse saveCustomerInformation(@RequestBody CustomerInformationRequest request,

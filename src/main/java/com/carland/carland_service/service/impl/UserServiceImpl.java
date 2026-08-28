@@ -11,7 +11,6 @@ import com.carland.carland_service.entity.Notification;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
-import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
@@ -113,8 +112,10 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * tr: Aktif müşterinin ad, soyad, e-posta ve FIN kodunu kaydeder. Telefon güncellenmez. FIN ve e-posta başka müşteride varsa AlreadyExistsException.
-     * en: Saves the active customer's name, surname, e-mail and FIN. Phone is never updated. Throws AlreadyExistsException when FIN or e-mail belongs to another customer.
+     * tr: Aktif müşterinin profilini kaydeder. SIMA verified ise yalnızca e-posta değişir (ad/soyad/FIN yok sayılır).
+     *     Verified değilse ad, soyad, e-posta ve FIN güncellenir. Telefon değişmez.
+     * en: Saves the active customer's profile. When SIMA-verified only e-mail is updated (name/surname/FIN ignored).
+     *     Otherwise name, surname, e-mail and FIN are updated. Phone is never updated.
      */
     @Override
     public CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
@@ -126,9 +127,25 @@ public class UserServiceImpl implements UserService {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
+        boolean verified = Boolean.TRUE.equals(customer.getSimaVerified());
+        String mail = trimToNull(request.getMail());
+
+        if (verified) {
+            if (mail == null) {
+                throw new MissingFieldException(MessagesLangValues.CUSTOMER_INFORMATION_MISSING.getMessageByLang(acceptLanguage));
+            }
+            mail = mail.toLowerCase();
+            if (!MAIL_PATTERN.matcher(mail).matches()) {
+                throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
+            }
+            ensureMailAvailable(mail, customer, acceptLanguage);
+            customer.setMail(mail);
+            customerRepository.save(customer);
+            return toInformationResponse(customer);
+        }
+
         String name = trimToNull(request.getName());
         String surname = trimToNull(request.getSurname());
-        String mail = trimToNull(request.getMail());
         String pin = trimToNull(request.getPin());
 
         if (name == null || surname == null || mail == null || pin == null) {
@@ -145,33 +162,27 @@ public class UserServiceImpl implements UserService {
             throw new NotMatchException(MessagesLangValues.INVALID_PIN.getMessageByLang(acceptLanguage));
         }
 
-        if (Boolean.TRUE.equals(customer.getSimaVerified())) {
-            if (!name.equals(customer.getName())
-                    || !surname.equals(customer.getSurname())
-                    || !pin.equalsIgnoreCase(customer.getPin() == null ? "" : customer.getPin())) {
-                throw new ConflictException(MessagesLangValues.SIMA_PROFILE_LOCKED.getMessageByLang(acceptLanguage));
-            }
-        } else {
-            Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
-            if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
-                throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
-            }
+        Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
+        if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
+            throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
 
-        Customer mailOwner = customerRepository.findByMailIgnoreCase(mail);
-        if (mailOwner != null && !mailOwner.getUserId().equals(customer.getUserId())) {
-            throw new AlreadyExistsException(MessagesLangValues.MAIL_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
-        }
+        ensureMailAvailable(mail, customer, acceptLanguage);
 
-        if (!Boolean.TRUE.equals(customer.getSimaVerified())) {
-            customer.setName(name);
-            customer.setSurname(surname);
-            customer.setPin(pin);
-        }
+        customer.setName(name);
+        customer.setSurname(surname);
+        customer.setPin(pin);
         customer.setMail(mail);
         customerRepository.save(customer);
 
         return toInformationResponse(customer);
+    }
+
+    private void ensureMailAvailable(String mail, Customer customer, String acceptLanguage) {
+        Customer mailOwner = customerRepository.findByMailIgnoreCase(mail);
+        if (mailOwner != null && !mailOwner.getUserId().equals(customer.getUserId())) {
+            throw new AlreadyExistsException(MessagesLangValues.MAIL_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
+        }
     }
 
     private Customer requireActiveCustomer(String role, String phoneNumber, String userIdHeader, String acceptLanguage) {
