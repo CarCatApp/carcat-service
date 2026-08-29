@@ -613,10 +613,15 @@ textarea { width: 100%; min-height: 64px; resize: vertical; }
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   z-index: 80;
-  display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+}
+.admin-modal-backdrop:not([hidden]) {
+  display: flex;
+}
+.admin-modal-backdrop[hidden] {
+  display: none;
 }
 .admin-modal {
   width: 100%;

@@ -21,6 +21,7 @@
     wrap.id = "adminConfirmModal";
     wrap.className = "admin-modal-backdrop";
     wrap.hidden = true;
+    wrap.setAttribute("aria-hidden", "true");
     wrap.innerHTML =
       '<div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">' +
       '<h3 id="adminConfirmTitle"></h3>' +
@@ -36,16 +37,26 @@
   function confirmModal(title, message) {
     return new Promise(function (resolve) {
       var el = ensureModal();
+      var previous = document.activeElement;
+      var okBtn = el.querySelector("[data-ok]");
+      var cancelBtn = el.querySelector("[data-cancel]");
       el.querySelector("#adminConfirmTitle").textContent = title || "Confirm";
       el.querySelector("#adminConfirmBody").textContent = message || "This action cannot be undone.";
       el.hidden = false;
+      el.removeAttribute("aria-hidden");
       var done = false;
       function finish(ok) {
         if (done) return;
         done = true;
         el.hidden = true;
+        el.setAttribute("aria-hidden", "true");
         el.removeEventListener("click", onBackdrop);
         document.removeEventListener("keydown", onKey);
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        if (previous && typeof previous.focus === "function") {
+          try { previous.focus(); } catch (e) { /* ignore */ }
+        }
         resolve(ok);
       }
       function onBackdrop(e) {
@@ -54,11 +65,15 @@
       function onKey(e) {
         if (e.key === "Escape") finish(false);
       }
-      el.querySelector("[data-cancel]").onclick = function () { finish(false); };
-      el.querySelector("[data-ok]").onclick = function () { finish(true); };
+      cancelBtn.onclick = function () { finish(false); };
+      okBtn.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(true);
+      };
       el.addEventListener("click", onBackdrop);
       document.addEventListener("keydown", onKey);
-      el.querySelector("[data-ok]").focus();
+      okBtn.focus();
     });
   }
 
