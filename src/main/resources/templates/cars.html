@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cars — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium1">
   <style>
     col.c-vin           { width: 165px; }
     col.c-plate         { width: 105px; }
@@ -23,9 +23,12 @@
   </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <div class="brand">
-    <span class="logo">&#128663;</span>
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
+    </span>
     <span>Carland Admin</span>
     <nav class="nav-links">
       <a class="nav-link active" href="/admin/cars">Cars</a>
@@ -35,12 +38,15 @@
     </nav>
   </div>
   <div class="topbar-actions">
-    <a class="btn btn-excel" href="/admin/cars/export">&#11015; Excel</a>
+    <a class="btn btn-excel" href="/admin/cars/export">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+      Excel
+    </a>
     <a class="btn btn-logout" href="/admin/logout">Logout</a>
   </div>
 </header>
 
-<main class="container wide">
+<main class="container wide" id="main">
   <div class="page-head">
     <h1>Cars</h1>
     <span class="total">Toplam <strong th:text="${cars.totalElements}">0</strong> araç</span>
@@ -143,7 +149,7 @@
     </div>
   </div>
 </main>
-<script src="/admin/admin.js"></script>
+<script src="/admin/admin.js?v=premium1"></script>
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("carsTable"),
