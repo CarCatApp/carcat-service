@@ -6,14 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: FIN (pin) başka bir müşteride kayıtlı mı sorusunun yanıtı.
- * en: Whether the FIN (pin) is already registered on another customer.
+ * tr: FIN başka SIMA-verified müşteride kayıtlı mı.
+ * en: Whether another SIMA-verified customer already has this FIN.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class PinOccupiedResponse {
-    /** true = this FIN belongs to a different user. */
+    /** true = another SIMA-verified customer already has this FIN. */
     private boolean occupied;
 }

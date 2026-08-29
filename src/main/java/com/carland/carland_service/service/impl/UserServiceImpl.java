@@ -112,10 +112,12 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * tr: Aktif müşterinin profilini kaydeder. SIMA verified ise yalnızca e-posta değişir (ad/soyad/FIN yok sayılır).
-     *     Verified değilse ad, soyad, e-posta ve FIN güncellenir. Telefon değişmez.
-     * en: Saves the active customer's profile. When SIMA-verified only e-mail is updated (name/surname/FIN ignored).
-     *     Otherwise name, surname, e-mail and FIN are updated. Phone is never updated.
+     * tr: Aktif müşterinin profilini kaydeder. SIMA verified ise e-posta doluysa güncellenir (ad/soyad/FIN kilitli).
+     *     Verified değilse ad (min 3) ve FIN zorunlu; soyad ve e-posta opsiyonel. FIN yalnızca başka SIMA-verified
+     *     müşterideyse reddedilir. Telefon değişmez.
+     * en: Saves the active customer's profile. When SIMA-verified, e-mail is updated only if provided.
+     *     Otherwise name (min 3) and FIN are required; surname and e-mail are optional. FIN is rejected only
+     *     when another SIMA-verified customer already has it. Phone is never updated.
      */
     @Override
     public CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
@@ -131,16 +133,15 @@ public class UserServiceImpl implements UserService {
         String mail = trimToNull(request.getMail());
 
         if (verified) {
-            if (mail == null) {
-                throw new MissingFieldException(MessagesLangValues.CUSTOMER_INFORMATION_MISSING.getMessageByLang(acceptLanguage));
+            if (mail != null) {
+                mail = mail.toLowerCase();
+                if (!MAIL_PATTERN.matcher(mail).matches()) {
+                    throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
+                }
+                ensureMailAvailable(mail, customer, acceptLanguage);
+                customer.setMail(mail);
+                customerRepository.save(customer);
             }
-            mail = mail.toLowerCase();
-            if (!MAIL_PATTERN.matcher(mail).matches()) {
-                throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
-            }
-            ensureMailAvailable(mail, customer, acceptLanguage);
-            customer.setMail(mail);
-            customerRepository.save(customer);
             return toInformationResponse(customer);
         }
 
@@ -148,26 +149,28 @@ public class UserServiceImpl implements UserService {
         String surname = trimToNull(request.getSurname());
         String pin = trimToNull(request.getPin());
 
-        if (name == null || surname == null || mail == null || pin == null) {
+        if (name == null || pin == null) {
             throw new MissingFieldException(MessagesLangValues.CUSTOMER_INFORMATION_MISSING.getMessageByLang(acceptLanguage));
         }
-
-        mail = mail.toLowerCase();
-        pin = pin.toUpperCase();
-
-        if (!MAIL_PATTERN.matcher(mail).matches()) {
-            throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
+        if (name.length() < 3) {
+            throw new NotMatchException(MessagesLangValues.NAME_TOO_SHORT.getMessageByLang(acceptLanguage));
         }
+
+        pin = pin.toUpperCase();
         if (!PIN_PATTERN.matcher(pin).matches()) {
             throw new NotMatchException(MessagesLangValues.INVALID_PIN.getMessageByLang(acceptLanguage));
         }
-
-        Customer pinOwner = customerRepository.findByPinIgnoreCase(pin);
-        if (pinOwner != null && !pinOwner.getUserId().equals(customer.getUserId())) {
+        if (pinTakenByVerifiedOther(pin, customer.getUserId())) {
             throw new AlreadyExistsException(MessagesLangValues.PIN_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
 
-        ensureMailAvailable(mail, customer, acceptLanguage);
+        if (mail != null) {
+            mail = mail.toLowerCase();
+            if (!MAIL_PATTERN.matcher(mail).matches()) {
+                throw new NotMatchException(MessagesLangValues.INVALID_MAIL.getMessageByLang(acceptLanguage));
+            }
+            ensureMailAvailable(mail, customer, acceptLanguage);
+        }
 
         customer.setName(name);
         customer.setSurname(surname);
@@ -213,8 +216,8 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * tr: FIN başka müşterideyse occupied=true. Boşsa veya çağıranın kendi FIN'iyse false.
-     * en: occupied=true when FIN belongs to another customer; false when unused or owned by the caller.
+     * tr: FIN başka SIMA-verified müşterideyse occupied=true. Unverified duplicate veya kendi FIN → false.
+     * en: occupied=true when another SIMA-verified customer has this FIN; unverified duplicate or own FIN → false.
      */
     @Override
     public PinOccupiedResponse isPinOccupied(String pin, String role, String phoneNumber, String userIdHeader,
@@ -222,12 +225,26 @@ public class UserServiceImpl implements UserService {
         if (pin == null || pin.isBlank() || userIdHeader == null || userIdHeader.isBlank()) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
-        Customer owner = customerRepository.findByPinIgnoreCase(pin.trim());
-        boolean occupied = owner != null && owner.getUserId() != null
-                && !String.valueOf(owner.getUserId()).equals(userIdHeader.trim());
+        Long userId;
+        try {
+            userId = Long.valueOf(userIdHeader.trim());
+        } catch (NumberFormatException ex) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        boolean occupied = pinTakenByVerifiedOther(pin.trim(), userId);
         return PinOccupiedResponse.builder()
                 .occupied(occupied)
                 .build();
+    }
+
+    private boolean pinTakenByVerifiedOther(String pin, Long userId) {
+        if (pin == null || pin.isBlank() || userId == null) {
+            return false;
+        }
+        return customerRepository.findAllByPinIgnoreCase(pin.trim()).stream()
+                .anyMatch(owner -> owner.getUserId() != null
+                        && !owner.getUserId().equals(userId)
+                        && Boolean.TRUE.equals(owner.getSimaVerified()));
     }
 
     private static String trimToNull(String value) {

@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -81,8 +82,8 @@ class SimaKycServiceTest {
     @Test
     void pinTaken_conflictWithoutSima() {
         when(customerRepository.findByUserId(678L)).thenReturn(customer);
-        when(customerRepository.findByPinIgnoreCase("62HJ5KQ"))
-                .thenReturn(Customer.builder().userId(1L).pin("62HJ5KQ").build());
+        when(customerRepository.findAllByPinIgnoreCase("62HJ5KQ"))
+                .thenReturn(List.of(Customer.builder().userId(1L).pin("62HJ5KQ").simaVerified(true).build()));
         when(simaKycRecordRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         SimaVerifyOutcome out = service.verifyCitizen("678", "62HJ5KQ", "AB0668397", null, photo, "az");
@@ -91,6 +92,23 @@ class SimaKycServiceTest {
         assertFalse(out.getBody().isVerified());
         assertEquals("PIN_ALREADY_EXISTS", out.getBody().getCode());
         verify(simaFeign, never()).verifyCitizen(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void pinHeldByUnverifiedOther_doesNotBlockSima() {
+        stubCitizenCall();
+        when(customerRepository.findAllByPinIgnoreCase(anyString()))
+                .thenReturn(List.of(Customer.builder().userId(1L).pin("62HJ5KQ").simaVerified(false).build()));
+        when(simaFeign.verifyCitizen(any(), any(), any(), any(), any())).thenReturn(envelope(true, 0.996, 0.999));
+        when(simaKycRecordRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
+        when(simaKycRecordRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SimaVerifyOutcome out = service.verifyCitizen("678", "62HJ5KQ", "AB0668397", null, photo, "az");
+
+        assertEquals(200, out.getHttpStatus());
+        assertTrue(out.getBody().isVerified());
+        verify(simaFeign).verifyCitizen(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -157,7 +175,7 @@ class SimaKycServiceTest {
 
     private void stubCitizenCall() {
         when(customerRepository.findByUserId(678L)).thenReturn(customer);
-        when(customerRepository.findByPinIgnoreCase(anyString())).thenReturn(null);
+        when(customerRepository.findAllByPinIgnoreCase(anyString())).thenReturn(List.of());
         when(simaHmacSigner.signBase64(anyString())).thenReturn("sig");
         when(simaIddaProperties.getSimaIdentifier()).thenReturn("id");
         when(simaIddaProperties.getSimaAuthScheme()).thenReturn("HMACSHA256");

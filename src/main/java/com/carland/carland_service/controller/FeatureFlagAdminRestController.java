@@ -323,7 +323,7 @@ public class FeatureFlagAdminRestController {
         return ResponseEntity.ok(featureFlagService.listVersions());
     }
 
-    @Operation(summary = "Create app version")
+    @Operation(summary = "Create app version", description = "Always copies the flag grid of the version marked current.")
     @PostMapping(value = "/admin/feature-flags/versions", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> createVersion(
             @RequestBody FeatureFlagVersionCreateRequest body,

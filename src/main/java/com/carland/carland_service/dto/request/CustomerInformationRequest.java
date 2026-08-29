@@ -8,8 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: "Məlumatlarım" ekranından müşteri ad, soyad, e-posta ve FIN kodunu kaydetmek için istek DTO'su. Telefon gönderilmez / yok sayılır.
- * en: Request DTO to save customer name, surname, e-mail and FIN from the "My information" screen. Phone is not accepted / ignored.
+ * tr: "Məlumatlarım" ekranından müşteri ad, isteğe bağlı soyad, isteğe bağlı e-posta ve FIN kaydı. Telefon gönderilmez.
+ * en: Request DTO to save customer name, optional surname, optional e-mail and FIN. Phone is not accepted / ignored.
  */
 @Data
 @NoArgsConstructor

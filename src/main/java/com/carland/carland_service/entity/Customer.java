@@ -29,9 +29,9 @@ public class Customer {
     String mail;
     /**
      * FIN (Azerbaijan personal ID). JSON/API name is {@code pin} to match SIMA.
-     * This is not the login PIN stored as pin_hash on auth users.
+     * Not DB-unique; uniqueness is enforced in code only against another SIMA-verified customer.
      */
-    @Column(name = "pin", unique = true, length = 7)
+    @Column(name = "pin", length = 7)
     String pin;
     /**
      * True after a SIMA citizen/foreign attempt passed isSuccess + both scores &gt;= 0.90.

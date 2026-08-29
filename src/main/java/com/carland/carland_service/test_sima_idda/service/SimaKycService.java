@@ -287,11 +287,13 @@ public class SimaKycService {
     }
 
     private boolean pinTakenByOther(String pin, Long userId) {
-        if (pin == null || pin.isBlank()) {
+        if (pin == null || pin.isBlank() || userId == null) {
             return false;
         }
-        Customer owner = customerRepository.findByPinIgnoreCase(pin.trim());
-        return owner != null && !owner.getUserId().equals(userId);
+        return customerRepository.findAllByPinIgnoreCase(pin.trim()).stream()
+                .anyMatch(owner -> owner.getUserId() != null
+                        && !owner.getUserId().equals(userId)
+                        && Boolean.TRUE.equals(owner.getSimaVerified()));
     }
 
     private SimaCall callCitizen(String pin, String documentNumber, String birthDate, MultipartFile photo) {

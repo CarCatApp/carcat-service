@@ -151,10 +151,12 @@ public class UserController {
     }
 
     /**
-     * tr: Müşteri profilini kaydeder. SIMA verified ise yalnızca e-posta güncellenir (ad/soyad/FIN kilitli).
-     *     Verified değilse ad, soyad, e-posta ve FIN güncellenir. Telefon gövdeden alınmaz.
-     * en: Saves the customer profile. When SIMA-verified only e-mail is updated (name/surname/FIN locked).
-     *     Otherwise name, surname, e-mail and FIN are updated. Phone is not taken from the body.
+     * tr: Müşteri profilini kaydeder. SIMA verified ise e-posta doluysa güncellenir (ad/soyad/FIN kilitli).
+     *     Verified değilse ad (min 3) ve FIN zorunlu; soyad ve e-posta opsiyonel.
+     *     FIN yalnızca başka SIMA-verified müşterideyse reddedilir. Telefon gövdeden alınmaz.
+     * en: Saves the customer profile. When SIMA-verified, e-mail is updated only if provided.
+     *     Otherwise name (min 3) and FIN are required; surname and e-mail are optional.
+     *     FIN is rejected only when another SIMA-verified customer already has it.
      */
     @PutMapping("/information")
     public CustomerInformationResponse saveCustomerInformation(@RequestBody CustomerInformationRequest request,
@@ -166,8 +168,8 @@ public class UserController {
     }
 
     /**
-     * tr: FIN (pin) başka bir müşteride kayıtlı mı. Kendi FIN'i veya hiç yoksa occupied=false.
-     * en: Whether the FIN (pin) is already registered on another customer. Own FIN or unused → occupied=false.
+     * tr: FIN başka SIMA-verified müşterideyse occupied=true. Unverified duplicate veya kendi FIN → false.
+     * en: occupied=true when another SIMA-verified customer has this FIN; unverified duplicate or own FIN → false.
      */
     @GetMapping("/pin/is-occupied")
     public PinOccupiedResponse isOccupied(@RequestParam("pin") String pin,

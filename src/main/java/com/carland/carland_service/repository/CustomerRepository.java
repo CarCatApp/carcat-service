@@ -4,6 +4,8 @@ import com.carland.carland_service.entity.Customer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 /**
  * tr: Customer entity'si için JPA repository; müşterileri id, telefon ve duruma göre sorgular.
  * en: JPA repository for the Customer entity; queries customers by id, phone and status.
@@ -22,8 +24,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     /** tr: Kullanıcı id ve telefona göre müşteriyi bulur. / en: Finds a customer by user id and phone number. */
     Customer findByUserIdAndPhoneNumber(Long aLong, String phoneNumber);
 
-    /** tr: FIN koduna göre müşteriyi bulur. / en: Finds a customer by FIN (pin). */
-    Customer findByPinIgnoreCase(String pin);
+    /**
+     * tr: Aynı FIN'e sahip tüm müşteriler (verified olmayanlarda duplicate olabilir).
+     * en: All customers with this FIN (duplicates allowed when not SIMA-verified).
+     */
+    List<Customer> findAllByPinIgnoreCase(String pin);
 
     /** tr: E-posta adresine göre müşteriyi bulur. / en: Finds a customer by e-mail. */
     Customer findByMailIgnoreCase(String mail);

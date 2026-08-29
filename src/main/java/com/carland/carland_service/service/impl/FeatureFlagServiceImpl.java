@@ -460,6 +460,10 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         return saved;
     }
 
+    /**
+     * tr: Yeni version her zaman is_current grid'ini kopyalar; copyFrom yok sayılır.
+     * en: New version always copies the is_current grid; copyFrom is ignored.
+     */
     @Override
     @Transactional
     public AppVersion createVersion(FeatureFlagVersionCreateRequest request) {
@@ -470,10 +474,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         if (appVersionRepository.findBySemver(semver).isPresent()) {
             throw new IllegalArgumentException("Version already exists");
         }
-        AppVersion source = request.getCopyFrom() != null && !request.getCopyFrom().isBlank()
-                ? appVersionRepository.findBySemver(request.getCopyFrom())
-                .orElseThrow(() -> new IllegalArgumentException("copyFrom not found"))
-                : appVersionRepository.findByCurrentTrue()
+        AppVersion source = appVersionRepository.findByCurrentTrue()
                 .orElseThrow(() -> new IllegalArgumentException("No current version"));
         boolean makeCurrent = request.isMakeCurrent();
         if (makeCurrent) {

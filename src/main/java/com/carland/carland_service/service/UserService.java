@@ -32,15 +32,15 @@ public interface UserService {
     CustomerInformationResponse getCustomerInformation(String role, String phoneNumber, String userIdHeader, String acceptLanguage);
 
     /**
-     * tr: Profil kaydı. SIMA verified ise yalnızca e-posta; değilse ad, soyad, e-posta ve FIN. Telefon değişmez.
-     * en: Saves profile. When SIMA-verified only e-mail; otherwise name, surname, e-mail and FIN. Phone unchanged.
+     * tr: Profil kaydı. SIMA verified ise e-posta doluysa; değilse ad (min 3) + FIN zorunlu, soyad/e-posta opsiyonel.
+     * en: Saves profile. When SIMA-verified, e-mail if provided; otherwise name (min 3) and FIN required, surname/e-mail optional.
      */
     CustomerInformationResponse saveCustomerInformation(CustomerInformationRequest request, String role,
                                                         String phoneNumber, String userIdHeader, String acceptLanguage);
 
     /**
-     * tr: FIN başka bir müşteride kayıtlıysa true, yoksa veya çağıranın kendisine aitse false döner.
-     * en: Returns true when the FIN belongs to another customer; false when unused or owned by the caller.
+     * tr: FIN başka SIMA-verified müşterideyse true; unverified duplicate veya kendi FIN ise false.
+     * en: True when another SIMA-verified customer has this FIN; unverified duplicate or own FIN → false.
      */
     PinOccupiedResponse isPinOccupied(String pin, String role, String phoneNumber, String userIdHeader,
                                       String acceptLanguage);

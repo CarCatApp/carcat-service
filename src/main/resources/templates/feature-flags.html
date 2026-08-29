@@ -379,7 +379,8 @@
       <form class="new-ver" id="newVerForm">
         <label><input type="checkbox" name="makeCurrent" /> Make current</label>
         <button class="btn-primary" type="submit" id="verSubmitBtn">Add version</button>
-      </form>`;
+      </form>
+      <span class="muted">New version copies the grid marked current, not the version open on screen.</span>`;
     const combo = document.getElementById("verCombo");
     const input = document.getElementById("verSearch");
     fillVersionMenu(versions, selected, "");
@@ -420,7 +421,7 @@
       const ok = await api("/admin/feature-flags/versions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ semver, copyFrom: currentVersion, makeCurrent })
+        body: JSON.stringify({ semver, makeCurrent })
       });
       if (ok) loadSnapshot(semver);
     };

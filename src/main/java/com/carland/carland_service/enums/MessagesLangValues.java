@@ -291,9 +291,15 @@ public enum MessagesLangValues {
     ),
 
     CUSTOMER_INFORMATION_MISSING(
-            "Ad, soyad, e-poçt və FIN kodu boş ola bilməz",
-            "Name, surname, e-mail and FIN code cannot be empty",
-            "Имя, фамилия, электронная почта и код FIN не могут быть пустыми"
+            "Ad və FIN kodu boş ola bilməz",
+            "Name and FIN code cannot be empty",
+            "Имя и код FIN не могут быть пустыми"
+    ),
+
+    NAME_TOO_SHORT(
+            "Ad ən azı 3 simvol olmalıdır",
+            "Name must be at least 3 characters",
+            "Имя должно содержать не менее 3 символов"
     ),
 
     INVALID_MAIL(
