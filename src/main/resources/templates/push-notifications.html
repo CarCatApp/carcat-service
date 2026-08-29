@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push notifications — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">&#128663;</span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link active" href="/admin/push-notifications">Push</a>
+    </nav>
+  </div>
+  <a class="btn btn-logout" href="/admin/logout">Logout</a>
+</header>
+
+<main class="container">
+  <div class="page-head">
+    <div>
+      <h1>Push notifications</h1>
+      <p class="muted">Filters combine with AND. Leave every filter on All to reach every user who has a device token. Title max 100, message max 300. Send queues in the background so this page does not freeze.</p>
+    </div>
+  </div>
+
+  <div class="err" id="errorBox" hidden></div>
+
+  <section class="create-card">
+    <h2>Audience</h2>
+    <form id="audienceForm" class="filter-bar bare">
+      <div class="filter-field">
+        <label for="filterGender">Gender</label>
+        <select id="filterGender" name="gender">
+          <option value="">All</option>
+          <option value="MALE">Male</option>
+          <option value="FEMALE">Female</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterBrand">Car brand</label>
+        <select id="filterBrand" name="brand">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterEngine">Fuel / engine type</label>
+        <select id="filterEngine" name="engineTypeId">
+          <option value="">All</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost" type="submit">Preview count</button>
+    </form>
+    <p class="ok-box" id="previewResult" hidden role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="create-card">
+    <h2>Message</h2>
+    <form id="messageForm">
+      <div class="field grow stack-field">
+        <label for="pushTitle">Title</label>
+        <input id="pushTitle" name="title" maxlength="100" required autocomplete="off" />
+        <span class="char-count" id="titleCount">0 / 100</span>
+      </div>
+      <div class="field grow stack-field">
+        <label for="pushBody">Message</label>
+        <textarea id="pushBody" name="body" maxlength="300" required rows="4"></textarea>
+        <span class="char-count" id="bodyCount">0 / 300</span>
+      </div>
+      <div class="push-actions">
+        <button class="btn btn-primary" type="submit" id="sendBtn">Send</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="create-card" id="progressCard" hidden>
+    <h2>Sending</h2>
+    <p class="muted" id="progressLabel" role="status" aria-live="polite">Queued</p>
+    <div class="progress-track" aria-hidden="true">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <p class="muted" id="progressCounts"></p>
+  </section>
+
+  <section class="create-card">
+    <h2>Recent campaigns</h2>
+    <div class="table-wrap compact">
+      <table class="data-table" id="campaignTable">
+        <thead>
+        <tr>
+          <th>When</th>
+          <th>Title</th>
+          <th>Audience</th>
+          <th>Status</th>
+          <th>Result</th>
+        </tr>
+        </thead>
+        <tbody id="campaignBody">
+        <tr class="empty-row"><td colspan="5">No campaigns yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="/admin/admin.js"></script>
+<script>
+(function () {
+  const TITLE_MAX = 100;
+  const BODY_MAX = 300;
+  let lastPreview = null;
+  let pollTimer = null;
+
+  function showError(msg) {
+    const box = document.getElementById("errorBox");
+    if (!msg) { box.hidden = true; box.textContent = ""; return; }
+    box.hidden = false;
+    box.textContent = msg;
+  }
+
+  function audiencePayload() {
+    const gender = document.getElementById("filterGender").value;
+    const brand = document.getElementById("filterBrand").value;
+    const engine = document.getElementById("filterEngine").value;
+    const body = {};
+    if (gender) body.gender = gender;
+    if (brand) body.brand = brand;
+    if (engine) body.engineTypeId = Number(engine);
+    return body;
+  }
+
+  async function api(url, options) {
+    const headers = { Accept: "application/json", ...(options && options.headers || {}) };
+    if (options && options.body && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+    const res = await fetch(url, { credentials: "same-origin", ...(options || {}), headers });
+    if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return null; }
+    const raw = await res.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw.slice(0, 180) }; }
+    if (!res.ok) {
+      showError(body.error || body.message || ("Request failed HTTP " + res.status));
+      return null;
+    }
+    return body;
+  }
+
+  function bindCounter(input, out, max) {
+    function tick() {
+      const n = (input.value || "").length;
+      out.textContent = n + " / " + max;
+      out.classList.toggle("over", n > max);
+    }
+    input.addEventListener("input", tick);
+    tick();
+  }
+
+  bindCounter(document.getElementById("pushTitle"), document.getElementById("titleCount"), TITLE_MAX);
+  bindCounter(document.getElementById("pushBody"), document.getElementById("bodyCount"), BODY_MAX);
+
+  async function loadFilters() {
+    const data = await api("/admin/push-notifications/filters");
+    if (!data) return;
+    const brandSel = document.getElementById("filterBrand");
+    (data.brands || []).forEach(function (name) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      brandSel.appendChild(opt);
+    });
+    const engineSel = document.getElementById("filterEngine");
+    (data.engineTypes || []).forEach(function (et) {
+      const opt = document.createElement("option");
+      opt.value = et.id;
+      opt.textContent = et.name;
+      engineSel.appendChild(opt);
+    });
+  }
+
+  function statusBadge(status) {
+    if (status === "COMPLETED") return "badge badge-success";
+    if (status === "FAILED") return "badge badge-danger";
+    if (status === "SENDING") return "badge badge-info";
+    return "badge badge-warning";
+  }
+
+  function renderCampaigns(list) {
+    const tbody = document.getElementById("campaignBody");
+    if (!list || !list.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No campaigns yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(function (c) {
+      const when = window.CarlandAdmin.formatAdminDate(c.createdAt) || "";
+      const result = (c.successCount || 0) + " ok / " + (c.failedCount || 0) + " failed";
+      return "<tr>" +
+        "<td>" + when + "</td>" +
+        "<td>" + escapeHtml(c.title || "") + "</td>" +
+        "<td>" + (c.audienceCount || 0) + "</td>" +
+        "<td><span class=\"" + statusBadge(c.status) + "\">" + escapeHtml(c.status || "") + "</span></td>" +
+        "<td>" + result + "</td>" +
+        "</tr>";
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (ch) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[ch];
+    });
+  }
+
+  function updateProgress(c) {
+    const card = document.getElementById("progressCard");
+    if (!c) { card.hidden = true; return; }
+    card.hidden = false;
+    const done = (c.successCount || 0) + (c.failedCount || 0);
+    const total = c.audienceCount || 0;
+    const pct = total === 0 ? 100 : Math.min(100, Math.round(done * 100 / total));
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressLabel").textContent =
+      c.status === "COMPLETED" ? "Completed" :
+      c.status === "FAILED" ? ("Failed" + (c.errorMessage ? ": " + c.errorMessage : "")) :
+      c.status === "SENDING" ? "Sending in the background" : "Queued";
+    document.getElementById("progressCounts").textContent =
+      done + " of " + total + " · " + (c.successCount || 0) + " delivered, " + (c.failedCount || 0) + " failed";
+  }
+
+  async function loadCampaigns() {
+    const list = await api("/admin/push-notifications/campaigns");
+    if (!list) return;
+    renderCampaigns(list);
+    const active = (list || []).find(function (c) { return c.status === "QUEUED" || c.status === "SENDING"; });
+    if (active) {
+      updateProgress(active);
+      startPoll(active.id);
+    }
+  }
+
+  function startPoll(id) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async function () {
+      const c = await api("/admin/push-notifications/campaigns/" + id);
+      if (!c) return;
+      updateProgress(c);
+      if (c.status === "COMPLETED" || c.status === "FAILED") {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        loadCampaigns();
+      }
+    }, 1500);
+  }
+
+  document.getElementById("audienceForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    showError("");
+    const data = await api("/admin/push-notifications/preview", {
+      method: "POST",
+      body: JSON.stringify(audiencePayload())
+    });
+    if (!data) return;
+    lastPreview = data;
+    const el = document.getElementById("previewResult");
+    el.hidden = false;
+    el.textContent = data.audienceCount === 0
+      ? "No users with a device token match these filters."
+      : data.audienceCount + " users with a device token match these filters.";
+  });
+
+  document.getElementById("messageForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    showError("");
+    const title = document.getElementById("pushTitle").value.trim();
+    const body = document.getElementById("pushBody").value.trim();
+    if (!title || !body) { showError("Title and message are required."); return; }
+    if (title.length > TITLE_MAX) { showError("Title must be 100 characters or fewer."); return; }
+    if (body.length > BODY_MAX) { showError("Message must be 300 characters or fewer."); return; }
+
+    const preview = await api("/admin/push-notifications/preview", {
+      method: "POST",
+      body: JSON.stringify(audiencePayload())
+    });
+    if (!preview) return;
+    lastPreview = preview;
+    if (preview.audienceCount === 0) {
+      showError("No users with a device token match these filters.");
+      return;
+    }
+    const ok = await window.CarlandAdmin.confirmModal(
+      "Send push?",
+      "This will queue a notification to " + preview.audienceCount + " users. Delivery runs in the background."
+    );
+    if (!ok) return;
+
+    const sendBtn = document.getElementById("sendBtn");
+    sendBtn.disabled = true;
+    const payload = Object.assign({ title: title, body: body }, audiencePayload());
+    const campaign = await api("/admin/push-notifications/campaigns", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    sendBtn.disabled = false;
+    if (!campaign) return;
+    updateProgress(campaign);
+    startPoll(campaign.id);
+    loadCampaigns();
+  });
+
+  ["filterGender", "filterBrand", "filterEngine"].forEach(function (id) {
+    document.getElementById(id).addEventListener("change", function () {
+      lastPreview = null;
+    });
+  });
+
+  loadFilters();
+  loadCampaigns();
+})();
+</script>
+</body>
+</html>

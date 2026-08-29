@@ -1,8 +1,10 @@
 package com.carland.carland_service.service;
 
+import java.util.List;
+
 /**
- * tr: Tekil cihazlara push bildirimi gönderimi için servis sözleşmesidir.
- * en: Service contract for sending push notifications to individual devices.
+ * tr: Tekil cihazlara ve FCM multicast (en fazla 500) ile push gönderimi için servis sözleşmesidir.
+ * en: Service contract for sending push notifications to individual devices and FCM multicast (max 500).
  */
 public interface PushNotificationService {
     /**
@@ -11,4 +13,9 @@ public interface PushNotificationService {
      */
     void send(String title, String body, String deviceToken);
 
+    /**
+     * tr: FCM sendEachForMulticast; en fazla 500 token. Dönen liste token sırasıyla başarı/başarısız.
+     * en: FCM sendEachForMulticast; max 500 tokens. Returned list is success/fail aligned to token order.
+     */
+    List<Boolean> sendEachForMulticast(String title, String body, List<String> deviceTokens);
 }

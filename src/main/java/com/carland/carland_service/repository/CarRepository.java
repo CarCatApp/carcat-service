@@ -50,4 +50,7 @@ public interface CarRepository extends JpaRepository<Car, Long> {
     /** tr: Müşteri kullanıcı id'sine göre araçları sayfalı listeler. / en: Lists cars by customer user id with pagination. */
     Page<Car> findByCustomer_UserId(Long userId, Pageable pageable);
 
+    /** tr: Kayıtlı araçlarda geçen benzersiz marka adları. / en: Distinct brand names present on stored cars. */
+    @Query("SELECT DISTINCT c.brand FROM Car c WHERE c.brand IS NOT NULL AND c.brand <> '' ORDER BY c.brand")
+    List<String> findDistinctBrands();
 }

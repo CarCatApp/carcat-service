@@ -19,6 +19,7 @@ import com.carland.carland_service.test_sima_idda.dto.sima.SimaForeignFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaIdentityResult;
 import com.carland.carland_service.test_sima_idda.feign.SimaFeign;
 import com.carland.carland_service.test_sima_idda.hmac.SimaHmacSigner;
+import com.carland.carland_service.util.GenderNormalizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -199,6 +200,9 @@ public class SimaKycService {
         }
         if (result.getPin() != null && !result.getPin().isBlank()) {
             customer.setPin(result.getPin().trim().toUpperCase());
+        }
+        if (result.getGender() != null && !result.getGender().isBlank()) {
+            customer.setGender(GenderNormalizer.normalize(result.getGender()));
         }
         customer.setSimaVerified(true);
         customerRepository.save(customer);

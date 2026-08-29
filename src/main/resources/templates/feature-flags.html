@@ -1,159 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Feature Flags — Carland Admin</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      --bg: #f1f5f9;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --muted: #64748b;
-      --primary: #2563eb;
-      --green: #16a34a;
-      --red: #dc2626;
-      --amber: #d97706;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-    .topbar {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      position: sticky;
-      top: 0;
-      z-index: 20;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
-    .brand .logo {
-      width: 34px; height: 34px; border-radius: 8px;
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-    }
-    .nav-links { display: flex; align-items: center; gap: 4px; margin-left: 10px; }
-    .nav-link {
-      padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
-      text-decoration: none; color: var(--muted);
-    }
-    .nav-link:hover { background: #f1f5f9; color: var(--text); }
-    .nav-link.active { background: #eff6ff; color: var(--primary); }
-    .btn-logout {
-      display: inline-flex; padding: 9px 16px; border-radius: 8px;
-      border: 1px solid var(--border); text-decoration: none; color: var(--muted); font-weight: 600;
-    }
-    .btn-logout:hover { border-color: var(--red); color: var(--red); }
-    .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px 48px; }
-    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-    .page-head h1 { font-size: 22px; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .version-bar, .create-card, .flag, .audit {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-    }
-    .version-bar {
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
-      padding: 12px 14px; margin-bottom: 14px;
-    }
-    .ver-combo { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
-    .ver-combo label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
-    .ver-combo input { width: 100%; }
-    .ver-menu {
-      display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px);
-      max-height: 220px; overflow-y: auto; background: #fff;
-      border: 1px solid var(--border); border-radius: 8px; z-index: 30;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, .12);
-    }
-    .ver-combo.open .ver-menu { display: block; }
-    .ver-item {
-      display: flex; justify-content: space-between; align-items: center; gap: 8px;
-      width: 100%; padding: 8px 12px; border: 0; background: #fff;
-      cursor: pointer; font-size: 13px; font-weight: 600; text-align: left; color: var(--text);
-    }
-    .ver-item:hover { background: #eff6ff; }
-    .ver-item.selected { background: #dbeafe; }
-    .ver-hint { padding: 8px 12px; font-size: 12px; color: var(--muted); }
-    .ver-hint.exists { color: var(--primary); font-weight: 700; }
-    .new-ver { display: flex; gap: 8px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-    .new-ver label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; align-items: center; }
-    .set-current {
-      border: 1px solid var(--primary); background: #eff6ff; color: var(--primary);
-      border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; font-size: 12px;
-    }
-    input, select, textarea {
-      border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
-      font-size: 13px; background: #fff; color: var(--text);
-    }
-    textarea { width: 100%; min-height: 64px; resize: vertical; }
-    button, .btn {
-      border: 0; border-radius: 8px; padding: 8px 12px; font-weight: 700; cursor: pointer; font-size: 13px;
-    }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-ghost { background: #f8fafc; border: 1px solid var(--border); color: var(--text); }
-    .btn-danger { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; }
-    .err { color: var(--red); font-weight: 600; margin: 8px 0; }
-    .create-card { padding: 16px; margin-bottom: 16px; }
-    .create-card h2 { font-size: 15px; margin-bottom: 12px; }
-    .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-    .field { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
-    .field label { font-size: 12px; font-weight: 700; color: var(--muted); }
-    .field.grow { flex: 1; min-width: 240px; }
-    .flags { display: flex; flex-direction: column; gap: 10px; }
-    .flag-head {
-      width: 100%; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-      padding: 14px 16px; background: transparent; text-align: left; border: 0; cursor: pointer;
-    }
-    .flag-head:hover { background: #f8fafc; border-radius: 12px; }
-    .chev { width: 18px; color: var(--muted); transition: transform .15s ease; }
-    .flag.open .chev { transform: rotate(90deg); }
-    .flag-name { font-weight: 800; letter-spacing: .02em; }
-    .badge {
-      font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; color: #fff;
-    }
-    .ENABLED { background: var(--green); }
-    .DISABLED { background: var(--red); }
-    .HIDDEN { background: var(--amber); }
-    .count { font-size: 12px; color: var(--muted); font-weight: 700; }
-    .flag-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
-    .flag.open .flag-body { display: block; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
-    @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
-    .box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #f8fafc; }
-    .box h3 { font-size: 13px; margin-bottom: 10px; }
-    .state-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-    .ep {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
-    }
-    .method {
-      display: inline-block; min-width: 52px; text-align: center; font-size: 11px; font-weight: 800;
-      border-radius: 4px; padding: 2px 6px; margin-right: 8px; color: #fff;
-    }
-    .GET { background: #2563eb; } .POST { background: #16a34a; } .PUT { background: #d97706; }
-    .PATCH { background: #7c3aed; } .DELETE { background: #dc2626; }
-    .path { font-family: Consolas, monospace; font-size: 12px; }
-    .picker { max-height: 220px; overflow: auto; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
-    .picker label { display: flex; gap: 8px; align-items: center; padding: 6px; font-size: 12px; cursor: pointer; }
-    .picker label:hover { background: #eff6ff; }
-    .locked { background: #f1f5f9; color: var(--muted); }
-    .audit { padding: 14px; margin-top: 18px; }
-    .audit h2 { font-size: 16px; margin-bottom: 10px; }
-    .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .catalog-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .flag-tag { font-size: 12px; font-weight: 700; color: var(--primary); white-space: nowrap; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 12px; text-align: left; }
-  </style>
+  <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
 <header class="topbar">
@@ -164,16 +15,17 @@
       <a class="nav-link" href="/admin/cars">Cars</a>
       <a class="nav-link" href="/admin/users">Users</a>
       <a class="nav-link active" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
     </nav>
   </div>
-  <a class="btn-logout" href="/admin/logout">Logout</a>
+  <a class="btn btn-logout" href="/admin/logout">Logout</a>
 </header>
 
 <div class="container">
   <div class="page-head">
     <div>
       <h1>Feature Flags</h1>
-      <p class="muted">Named flags hold APIs. Each role has ENABLED / DISABLED / HIDDEN for the selected app version.</p>
+      <p class="muted">Define a flag, attach APIs, then set role visibility for the selected app version.</p>
     </div>
   </div>
 
@@ -194,12 +46,12 @@
       <div class="field">
         <label>Default state</label>
         <select name="defaultState">
-          <option value="HIDDEN" selected>HIDDEN</option>
-          <option value="DISABLED">DISABLED</option>
-          <option value="ENABLED">ENABLED</option>
+          <option value="HIDDEN" selected>Hidden</option>
+          <option value="DISABLED">Disable</option>
+          <option value="ENABLED">Enable</option>
         </select>
       </div>
-      <button class="btn-primary" type="submit">Create</button>
+      <button class="btn btn-primary" type="submit">Create</button>
     </form>
   </section>
 
@@ -214,16 +66,12 @@
 
   <div class="audit">
     <h2>Change history</h2>
-    <table>
-      <thead>
-        <tr><th>When</th><th>Who</th><th>Action</th><th>Change</th></tr>
-      </thead>
-      <tbody id="auditBody"></tbody>
-    </table>
+    <ul class="audit-list" id="auditBody"></ul>
     <div class="pager" id="auditPager"></div>
   </div>
 </div>
 
+<script src="/admin/admin.js"></script>
 <script>
   let currentVersion = null;
   let snapshot = { flags: [], availableEndpoints: [], roles: [], versions: [], audit: [] };
@@ -231,6 +79,8 @@
   let catalogSize = 10;
   let auditPage = 0;
   let auditSize = 10;
+  let openFlagId = null;
+  const GRID_ROLES = ["USER", "ADMIN", "SUPER_ADMIN", "BOSS"];
   const LABELS = { HIDDEN: "Hidden", ENABLED: "Enable", DISABLED: "Disable" };
   const ERRORS = {
     FLAG_EXISTS: "This flag name already exists",
@@ -238,6 +88,14 @@
     ENDPOINT_CLAIMED: "This API is already attached to a flag — detach first",
     ENDPOINT_EXISTS: "This method + path already exists",
     NOT_ATTACHED: "This API is not attached to the flag"
+  };
+  const ACTION_LABELS = {
+    STATE: "Changed visibility",
+    ATTACH: "Attached API",
+    DETACH: "Detached API",
+    CREATE: "Created",
+    UPDATE: "Updated",
+    DELETE: "Deleted"
   };
 
   function showError(msg) {
@@ -311,9 +169,9 @@
           <option value="25" ${size === 25 ? "selected" : ""}>25</option>
         </select>
       </label>
-      <button type="button" class="btn-ghost" data-prev ${current <= 0 ? "disabled" : ""}>Prev</button>
+      <button type="button" class="btn btn-ghost" data-prev ${current <= 0 ? "disabled" : ""}>Prev</button>
       <span class="muted">Page ${totalPages === 0 ? 0 : current + 1} / ${totalPages} · ${total}</span>
-      <button type="button" class="btn-ghost" data-next ${current + 1 >= totalPages ? "disabled" : ""}>Next</button>`;
+      <button type="button" class="btn btn-ghost" data-next ${current + 1 >= totalPages ? "disabled" : ""}>Next</button>`;
     el.querySelector("[data-size]").onchange = (e) => onChange(0, Number(e.target.value));
     el.querySelector("[data-prev]").onclick = () => onChange(Math.max(current - 1, 0), size);
     el.querySelector("[data-next]").onclick = () => onChange(current + 1, size);
@@ -378,7 +236,7 @@
       ${setCurrentBtn}
       <form class="new-ver" id="newVerForm">
         <label><input type="checkbox" name="makeCurrent" /> Make current</label>
-        <button class="btn-primary" type="submit" id="verSubmitBtn">Add version</button>
+        <button class="btn btn-primary" type="submit" id="verSubmitBtn">Add version</button>
       </form>
       <span class="muted">New version copies the grid marked current, not the version open on screen.</span>`;
     const combo = document.getElementById("verCombo");
@@ -431,102 +289,120 @@
     return values.map(v => `<option value="${v}" ${v === selected ? "selected" : ""}>${LABELS[v] || v}</option>`).join("");
   }
 
+  function rolePairs(states) {
+    const roles = Object.keys(states).length ? Object.keys(states) : GRID_ROLES;
+    return roles.map(role => {
+      const st = states[role] || "HIDDEN";
+      return `<span class="role-pair"><span class="role-chip">${esc(role)}</span><span class="badge badge-state ${st}">${LABELS[st] || st}</span></span>`;
+    }).join("");
+  }
+
+  function segmentFor(flagId, role, state) {
+    return GRID_ROLES.includes(role) ? `
+      <div class="role-row">
+        <span class="role-chip">${esc(role)}</span>
+        <div class="seg" data-flag="${flagId}" data-role="${esc(role)}">
+          ${["HIDDEN","DISABLED","ENABLED"].map(st =>
+            `<button type="button" class="seg-btn ${st}${state === st ? " on" : ""}" data-state="${st}">${LABELS[st]}</button>`
+          ).join("")}
+        </div>
+      </div>` : "";
+  }
+
   function renderFlags(flags, available, roles) {
     const list = document.getElementById("flagList");
     if (!flags.length) {
-      list.innerHTML = `<div class="create-card muted">No flags yet. Create SIMA_KYC_FLOW or PERSONAL_DETAILS to start grouping APIs.</div>`;
+      list.innerHTML = `<div class="create-card muted">No flags yet. Create a named flag to start grouping APIs.</div>`;
       return;
     }
+    const roleKeys = roles.length ? roles : GRID_ROLES;
     list.innerHTML = flags.map(flag => {
       const states = flag.states || {};
       const eps = flag.endpoints || [];
-      const roleOptions = (roles.length ? roles : Object.keys(states)).map(r => `<option value="${r}">${r}</option>`).join("");
-      const stateChips = Object.keys(states).map(role =>
-        `<span class="badge ${states[role]}">${role}: ${LABELS[states[role]] || states[role]}</span>`
-      ).join("");
       const attached = eps.length ? eps.map(ep => `
         <div class="ep">
-          <div><span class="method ${ep.method}">${ep.method}</span><span class="path">${ep.path}</span></div>
-          <button type="button" class="btn-danger detach" data-flag="${flag.id}" data-ep="${ep.id}">Detach</button>
+          <div><span class="method">${ep.method}</span><span class="path">${esc(ep.path)}</span></div>
+          <button type="button" class="btn btn-danger detach" data-flag="${flag.id}" data-ep="${ep.id}">Detach</button>
         </div>`).join("") : `<p class="muted">No APIs attached yet.</p>`;
       const free = (available || []).map(ep => `
         <label>
           <input type="checkbox" name="endpointIds" value="${ep.id}" />
-          <span class="method ${ep.method}">${ep.method}</span>
-          <span class="path">${ep.path}</span>
+          <span class="method">${ep.method}</span>
+          <span class="path">${esc(ep.path)}</span>
         </label>`).join("");
+      const visRows = roleKeys.map(role => segmentFor(flag.id, role, states[role] || flag.defaultState)).join("");
       return `
         <article class="flag" data-id="${flag.id}">
           <button type="button" class="flag-head toggle">
             <span class="chev">&#9656;</span>
-            <span class="flag-name">${flag.name}</span>
-            <span class="badge ${flag.defaultState}">default ${flag.defaultState}</span>
+            <span class="flag-name">${esc(flag.name)}</span>
+            <span class="badge badge-state ${flag.defaultState}">default ${LABELS[flag.defaultState] || flag.defaultState}</span>
             <span class="count">${eps.length} API</span>
-            ${stateChips}
+            ${rolePairs(states)}
           </button>
           <div class="flag-body">
-            <div class="grid-2">
-              <div class="box">
-                <h3>Flag details</h3>
+            <ol class="ff-steps">
+              <li class="ff-step">
+                <div class="ff-step-head"><span class="ff-step-n">1</span><h3>Flag details</h3></div>
                 <form class="edit-form" data-id="${flag.id}">
                   <div class="field">
                     <label>Name (locked)</label>
-                    <input class="locked" value="${flag.name}" disabled />
+                    <input class="locked" value="${esc(flag.name)}" disabled />
                   </div>
                   <div class="field">
                     <label>Description</label>
-                    <textarea name="description">${flag.description || ""}</textarea>
+                    <textarea name="description">${esc(flag.description || "")}</textarea>
                   </div>
                   <div class="field">
                     <label>Default state</label>
                     <select name="defaultState">${optionHtml(["HIDDEN","DISABLED","ENABLED"], flag.defaultState)}</select>
                   </div>
-                  <div class="form-row" style="margin-top:10px">
-                    <button class="btn-primary" type="submit">Save</button>
-                    <button class="btn-danger delete-flag" type="button" data-id="${flag.id}">Delete flag</button>
+                  <div class="ff-step-actions">
+                    <button class="btn btn-primary" type="submit">Save</button>
                   </div>
                 </form>
-              </div>
-              <div class="box">
-                <h3>Role visibility</h3>
-                <p class="muted" style="margin-bottom:10px">Pick a role, then pick ENABLED / DISABLED / HIDDEN for version ${currentVersion}.</p>
-                <form class="state-form" data-id="${flag.id}">
-                  <div class="form-row">
-                    <div class="field">
-                      <label>Role</label>
-                      <select name="role">${roleOptions}</select>
-                    </div>
-                    <div class="field">
-                      <label>State</label>
-                      <select name="state">${optionHtml(["HIDDEN","DISABLED","ENABLED"], states.USER || flag.defaultState)}</select>
-                    </div>
-                    <button class="btn-primary" type="submit">Apply</button>
-                  </div>
-                </form>
-                <div class="state-row" style="margin-top:12px">${stateChips}</div>
-              </div>
-            </div>
-            <div class="grid-2">
-              <div class="box">
-                <h3>Attached APIs</h3>
+                <div class="ff-step-danger">
+                  <button class="btn btn-danger delete-flag" type="button" data-id="${flag.id}">Delete flag</button>
+                </div>
+              </li>
+              <li class="ff-step">
+                <div class="ff-step-head"><span class="ff-step-n">2</span><h3>Attach / detach APIs</h3></div>
+                <h3 style="font-size:13px;margin-bottom:8px">Attached</h3>
                 ${attached}
-              </div>
-              <div class="box">
-                <h3>Add unclaimed APIs</h3>
+                <h3 style="font-size:13px;margin:14px 0 8px">Add unclaimed APIs</h3>
                 <p class="muted" style="margin-bottom:8px">Only APIs that are not inside another flag are listed. Path cannot be edited.</p>
                 <form class="attach-form" data-id="${flag.id}">
                   <div class="picker">${free || '<p class="muted">No free APIs left.</p>'}</div>
-                  <button class="btn-primary" type="submit" style="margin-top:10px" ${free ? "" : "disabled"}>Attach selected</button>
+                  <button class="btn btn-primary" type="submit" style="margin-top:10px" ${free ? "" : "disabled"}>Attach selected</button>
                 </form>
-              </div>
-            </div>
+              </li>
+              <li class="ff-step">
+                <div class="ff-step-head"><span class="ff-step-n">3</span><h3>Role visibility</h3></div>
+                <p class="muted" style="margin-bottom:10px">Version ${esc(currentVersion)}. Hidden / Disable / Enable for each role.</p>
+                ${visRows}
+              </li>
+            </ol>
           </div>
         </article>`;
     }).join("");
 
     list.querySelectorAll(".toggle").forEach(btn => {
-      btn.onclick = () => btn.parentElement.classList.toggle("open");
+      btn.onclick = () => {
+        const article = btn.parentElement;
+        const opening = !article.classList.contains("open");
+        list.querySelectorAll(".flag").forEach(f => f.classList.remove("open"));
+        if (opening) {
+          article.classList.add("open");
+          openFlagId = article.dataset.id;
+        } else {
+          openFlagId = null;
+        }
+      };
     });
+    if (openFlagId) {
+      const keep = list.querySelector('.flag[data-id="' + openFlagId + '"]');
+      if (keep) keep.classList.add("open");
+    }
     list.querySelectorAll(".edit-form").forEach(form => {
       form.onsubmit = async (e) => {
         e.preventDefault();
@@ -543,20 +419,24 @@
     });
     list.querySelectorAll(".delete-flag").forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm("Delete this flag? Detach APIs first.")) return;
+        const okAsk = await CarlandAdmin.confirmModal(
+          "Delete this flag?",
+          "Detach all APIs first. This can affect the live app if the flag still guards endpoints."
+        );
+        if (!okAsk) return;
         const ok = await api("/admin/feature-flags/" + btn.dataset.id, { method: "DELETE" });
         if (ok) loadSnapshot(currentVersion);
       };
     });
-    list.querySelectorAll(".state-form").forEach(form => {
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const ok = await api("/admin/feature-flags/" + form.dataset.id + "/state", {
+    list.querySelectorAll(".seg-btn").forEach(btn => {
+      btn.onclick = async () => {
+        const seg = btn.closest(".seg");
+        const ok = await api("/admin/feature-flags/" + seg.dataset.flag + "/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            role: form.role.value,
-            state: form.state.value,
+            role: seg.dataset.role,
+            state: btn.dataset.state,
             version: currentVersion
           })
         });
@@ -578,6 +458,11 @@
     });
     list.querySelectorAll(".detach").forEach(btn => {
       btn.onclick = async () => {
+        const okAsk = await CarlandAdmin.confirmModal(
+          "Detach this API?",
+          "The endpoint will no longer belong to this flag. The live app will stop using this flag to guard it."
+        );
+        if (!okAsk) return;
         const ok = await api("/admin/feature-flags/" + btn.dataset.flag + "/endpoints/" + btn.dataset.ep, {
           method: "DELETE"
         });
@@ -595,19 +480,23 @@
     }
     box.innerHTML = rows.map(ep => {
       const flagLabel = ep.flagName
-        ? `<span class="flag-tag">${ep.flagName}</span>`
+        ? `<span class="flag-tag">${esc(ep.flagName)}</span>`
         : `<span class="muted">${ep.neverGuard ? "never-guard" : ""}</span>`;
       return `<div class="ep">
-        <div><span class="method ${ep.method}">${ep.method}</span><span class="path">${ep.path}</span></div>
+        <div><span class="method">${esc(ep.method)}</span><span class="path">${esc(ep.path)}</span></div>
         <div class="catalog-actions">
-          <button type="button" class="btn-danger del-ep" data-id="${ep.id}">Delete API</button>
+          <button type="button" class="btn btn-danger del-ep" data-id="${ep.id}">Delete API</button>
           ${flagLabel}
         </div>
       </div>`;
     }).join("");
     box.querySelectorAll(".del-ep").forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm("Detach (if needed) and delete this API from the catalog?")) return;
+        const okAsk = await CarlandAdmin.confirmModal(
+          "Delete this API from the catalog?",
+          "It will be detached if needed. The scanner can add it again on the next deploy unless you remove it from the controller."
+        );
+        if (!okAsk) return;
         const ok = await api("/admin/endpoints/" + btn.dataset.id, { method: "DELETE" });
         if (ok) loadSnapshot(currentVersion);
       };
@@ -637,15 +526,19 @@
   function renderAudit(rows) {
     const body = document.getElementById("auditBody");
     if (!rows.length) {
-      body.innerHTML = `<tr><td class="muted" colspan="4">No changes yet</td></tr>`;
+      body.innerHTML = `<li class="muted">No changes yet</li>`;
       return;
     }
-    body.innerHTML = rows.map(r => `<tr>
-      <td>${r.at || ""}</td>
-      <td>${r.actor || ""}</td>
-      <td>${r.action || r.method || ""} ${r.target || r.path || ""}</td>
-      <td>${r.change || ((r.flagName || "—") + " → " + (r.newState || ""))}</td>
-    </tr>`).join("");
+    body.innerHTML = rows.map(r => {
+      const action = ACTION_LABELS[r.action || r.method] || (r.action || r.method || "Change");
+      const detail = r.change || ((r.flagName || "—") + (r.newState ? " → " + r.newState : ""));
+      const ver = r.appVersion ? ` · v${esc(r.appVersion)}` : "";
+      return `<li class="audit-item">
+        <div class="audit-who">${esc(r.actor || "—")}</div>
+        <div class="audit-what"><span class="audit-action">${esc(action)}</span>${esc(detail)}</div>
+        <div class="audit-when">${esc(CarlandAdmin.formatAdminDate(r.at))}${ver}</div>
+      </li>`;
+    }).join("");
   }
 
   document.addEventListener("click", (e) => {

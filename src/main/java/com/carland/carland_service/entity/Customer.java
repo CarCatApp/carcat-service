@@ -40,6 +40,11 @@ public class Customer {
     @Column(name = "sima_verified", nullable = false)
     @Builder.Default
     Boolean simaVerified = false;
+    /**
+     * SIMA gender (MALE / FEMALE). Set on successful verify; null until then.
+     */
+    @Column(name = "gender", length = 16)
+    String gender;
     String notificationLanguage;
     String status;
     LocalDate createdAt;

@@ -1,0 +1,131 @@
+(function (global) {
+  "use strict";
+
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function pad(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function formatAdminDate(value) {
+    if (!value) return "";
+    var d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return pad(d.getDate()) + " " + MONTHS[d.getMonth()] + " " + d.getFullYear() + ", " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function ensureModal() {
+    var existing = document.getElementById("adminConfirmModal");
+    if (existing) return existing;
+    var wrap = document.createElement("div");
+    wrap.id = "adminConfirmModal";
+    wrap.className = "admin-modal-backdrop";
+    wrap.hidden = true;
+    wrap.innerHTML =
+      '<div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">' +
+      '<h3 id="adminConfirmTitle"></h3>' +
+      '<p id="adminConfirmBody"></p>' +
+      '<div class="admin-modal-actions">' +
+      '<button type="button" class="btn btn-ghost" data-cancel>Cancel</button>' +
+      '<button type="button" class="btn btn-danger" data-ok>Confirm</button>' +
+      "</div></div>";
+    document.body.appendChild(wrap);
+    return wrap;
+  }
+
+  function confirmModal(title, message) {
+    return new Promise(function (resolve) {
+      var el = ensureModal();
+      el.querySelector("#adminConfirmTitle").textContent = title || "Confirm";
+      el.querySelector("#adminConfirmBody").textContent = message || "This action cannot be undone.";
+      el.hidden = false;
+      var done = false;
+      function finish(ok) {
+        if (done) return;
+        done = true;
+        el.hidden = true;
+        el.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKey);
+        resolve(ok);
+      }
+      function onBackdrop(e) {
+        if (e.target === el) finish(false);
+      }
+      function onKey(e) {
+        if (e.key === "Escape") finish(false);
+      }
+      el.querySelector("[data-cancel]").onclick = function () { finish(false); };
+      el.querySelector("[data-ok]").onclick = function () { finish(true); };
+      el.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKey);
+      el.querySelector("[data-ok]").focus();
+    });
+  }
+
+  function applyColumnVisibility(table, visible) {
+    var headers = table.querySelectorAll("thead th");
+    headers.forEach(function (th, i) {
+      var show = visible[i] !== false;
+      th.classList.toggle("col-hidden", !show);
+      table.querySelectorAll("tbody tr").forEach(function (tr) {
+        if (tr.classList.contains("empty-row")) {
+          var cell = tr.querySelector("td");
+          if (cell) cell.colSpan = visible.filter(function (v) { return v !== false; }).length || headers.length;
+          return;
+        }
+        var td = tr.children[i];
+        if (td) td.classList.toggle("col-hidden", !show);
+      });
+    });
+  }
+
+  function initColumnToggle(table, storageKey, labels, defaultHidden) {
+    if (!table) return;
+    var headers = table.querySelectorAll("thead th");
+    var count = headers.length;
+    var visible = [];
+    try {
+      var saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      if (Array.isArray(saved) && saved.length === count) visible = saved;
+    } catch (e) { /* ignore */ }
+    if (visible.length !== count) {
+      visible = [];
+      for (var i = 0; i < count; i++) visible.push(!(defaultHidden && defaultHidden.indexOf(i) >= 0));
+    }
+    applyColumnVisibility(table, visible);
+
+    var host = table.closest(".card");
+    if (!host) return;
+    var wrap = host.querySelector(".table-wrap");
+    var bar = document.createElement("div");
+    bar.className = "table-toolbar";
+    var details = document.createElement("details");
+    details.className = "col-picker";
+    details.innerHTML = "<summary>Columns</summary>";
+    var menu = document.createElement("div");
+    menu.className = "col-picker-menu";
+    labels.forEach(function (label, idx) {
+      var row = document.createElement("label");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = visible[idx] !== false;
+      cb.onchange = function () {
+        visible[idx] = cb.checked;
+        localStorage.setItem(storageKey, JSON.stringify(visible));
+        applyColumnVisibility(table, visible);
+      };
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(" " + label));
+      menu.appendChild(row);
+    });
+    details.appendChild(menu);
+    bar.appendChild(details);
+    host.insertBefore(bar, wrap);
+  }
+
+  global.CarlandAdmin = {
+    formatAdminDate: formatAdminDate,
+    confirmModal: confirmModal,
+    initColumnToggle: initColumnToggle
+  };
+})(window);

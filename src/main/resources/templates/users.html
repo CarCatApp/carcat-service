@@ -1,448 +1,23 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Users — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --bg: #f1f5f9;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --primary: #2563eb;
-      --primary-dark: #1d4ed8;
-      --green: #16a34a;
-      --green-dark: #15803d;
-      --red: #dc2626;
-      --row-height: 44px;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    .topbar {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 18px;
-      font-weight: 700;
-    }
-
-    .brand .logo {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-left: 10px;
-    }
-
-    .nav-link {
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: none;
-      color: var(--text-muted);
-    }
-
-    .nav-link:hover {
-      background: #f1f5f9;
-      color: var(--text);
-    }
-
-    .nav-link.active {
-      background: #eff6ff;
-      color: var(--primary);
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 9px 16px;
-      border-radius: 8px;
-      border: 1px solid transparent;
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: none;
-      cursor: pointer;
-      transition: background 0.15s ease, border-color 0.15s ease;
-      white-space: nowrap;
-    }
-
-    .btn-excel {
-      background: var(--green);
-      color: #fff;
-    }
-
-    .btn-excel:hover {
-      background: var(--green-dark);
-    }
-
-    .btn-excel-outline {
-      background: transparent;
-      color: var(--green);
-      border-color: var(--green);
-    }
-
-    .btn-excel-outline:hover {
-      background: #f0fdf4;
-    }
-
-    .btn-logout {
-      background: transparent;
-      color: var(--text-muted);
-      border-color: var(--border);
-    }
-
-    .btn-logout:hover {
-      border-color: var(--red);
-      color: var(--red);
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px 28px 40px;
-    }
-
-    .page-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .page-head h1 {
-      font-size: 22px;
-      font-weight: 700;
-    }
-
-    .page-head .total {
-      font-size: 14px;
-      color: var(--text-muted);
-    }
-
-    /* ---------- Filter bar ---------- */
-    .filter-bar {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-      flex-wrap: wrap;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 18px;
-      margin-bottom: 16px;
-    }
-
-    .filter-field {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .filter-field label {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .filter-field input[type="date"] {
-      padding: 8px 12px;
-      font-size: 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #f8fafc;
-      color: var(--text);
-      outline: none;
-    }
-
-    .filter-field input[type="date"]:focus {
-      border-color: var(--primary);
-      background: #fff;
-    }
-
-    .btn-filter {
-      background: var(--primary);
-      color: #fff;
-    }
-
-    .btn-filter:hover {
-      background: var(--primary-dark);
-    }
-
-    .btn-clear {
-      background: transparent;
-      color: var(--text-muted);
-      border-color: var(--border);
-    }
-
-    .btn-clear:hover {
-      color: var(--text);
-      border-color: var(--text-muted);
-    }
-
-    .filter-info {
-      font-size: 13px;
-      color: var(--primary-dark);
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      padding: 8px 12px;
-    }
-
-    .error-box {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #b91c1c;
-      font-size: 14px;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 16px;
-    }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-      overflow: hidden;
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-      /* Sayfa değişince tablo zıplamasın: header + 10 satırlık sabit yükseklik */
-      min-height: calc(var(--row-height) * 10 + 46px);
-    }
-
-    table {
-      width: 100%;
-      min-width: 900px;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: 13.5px;
-    }
-
     col.c-id      { width: 70px; }
     col.c-name    { width: 150px; }
     col.c-surname { width: 170px; }
     col.c-phone   { width: 150px; }
-    col.c-status  { width: 120px; }
-    col.c-created { width: 150px; }
-    col.c-cars    { width: 100px; }
-
-    thead th {
-      background: #f8fafc;
-      color: var(--text-muted);
-      font-size: 11.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      text-align: left;
-      padding: 14px 12px;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      position: sticky;
-      top: 0;
-    }
-
-    tbody td {
-      height: var(--row-height);
-      padding: 0 12px;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    tbody tr:hover {
-      background: #f8fafc;
-    }
-
-    .muted {
-      color: var(--text-muted);
-      font-size: 12.5px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .badge-active {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    .badge-other {
-      background: #f1f5f9;
-      color: #64748b;
-    }
-
-    .btn-cars {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 13px;
-      border-radius: 7px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--primary);
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .btn-cars:hover {
-      border-color: var(--primary);
-      background: #eff6ff;
-    }
-
-    .empty-row td {
-      text-align: center;
-      color: var(--text-muted);
-      padding: 40px 12px;
-      height: auto;
-    }
-
-    /* ---------- Pagination ---------- */
-    .pagination-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      padding: 14px 18px;
-      border-top: 1px solid var(--border);
-      background: #fbfcfe;
-    }
-
-    .page-info {
-      font-size: 13.5px;
-      color: var(--text-muted);
-    }
-
-    .pages {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      flex-wrap: wrap;
-    }
-
-    .page-link,
-    .page-arrow {
-      min-width: 36px;
-      height: 36px;
-      padding: 0 10px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--card);
-      color: var(--text);
-      font-size: 13.5px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-
-    .page-link:hover,
-    .page-arrow:hover {
-      border-color: var(--primary);
-      color: var(--primary);
-    }
-
-    .page-link.active {
-      background: var(--primary);
-      border-color: var(--primary);
-      color: #fff;
-      cursor: default;
-    }
-
-    .page-arrow.disabled {
-      opacity: 0.4;
-      pointer-events: none;
-    }
-
-    .ellipsis {
-      color: var(--text-muted);
-      padding: 0 4px;
-      user-select: none;
-    }
-
-    @media (max-width: 700px) {
-      .container { padding: 16px 12px 28px; }
-      .topbar { padding: 12px 14px; }
-      .pagination-bar { justify-content: center; }
-    }
+    col.c-status  { width: 140px; }
+    col.c-created { width: 170px; }
+    col.c-cars    { width: 110px; }
+    .data-table { min-width: 900px; }
   </style>
 </head>
-
 <body>
-
 <header class="topbar">
-
   <div class="brand">
     <span class="logo">&#128663;</span>
     <span>Carland Admin</span>
@@ -450,79 +25,55 @@
       <a class="nav-link" href="/admin/cars">Cars</a>
       <a class="nav-link active" href="/admin/users">Users</a>
       <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
     </nav>
   </div>
-
   <div class="topbar-actions">
-
-    <!-- Filtre aktifken: seçili aralığın Excel'i -->
     <a class="btn btn-excel" th:if="${from != null || to != null}"
        th:href="@{/admin/users/export(from=${from}, to=${to})}">
-      &#11015; Excel indir (filtreli)
+      &#11015; Excel (filtered)
     </a>
-
-    <!-- Her zaman: tam listenin Excel'i -->
     <a class="btn"
        th:classappend="${from != null || to != null} ? 'btn-excel-outline' : 'btn-excel'"
        href="/admin/users/export">
-      &#11015; Excel indir (tam liste)
+      &#11015; Excel (full list)
     </a>
-
-    <a class="btn btn-logout" href="/admin/logout">
-      Logout
-    </a>
-
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
   </div>
-
 </header>
 
-
 <main class="container">
-
   <div class="page-head">
-    <h1>User List Panel</h1>
-    <span class="total">
-      Toplam <strong th:text="${totalUsers}">0</strong> kullanıcı
-    </span>
+    <h1>Users</h1>
+    <span class="total">Toplam <strong th:text="${totalUsers}">0</strong> kullanıcı</span>
   </div>
-
 
   <div class="error-box" th:if="${loadError}">
     Kullanıcı listesi carland_auth servisinden alınamadı. Servisin çalıştığını kontrol edip sayfayı yenileyin.
   </div>
 
-
   <form class="filter-bar" method="get" action="/admin/users">
-
     <div class="filter-field">
       <label for="from">Başlangıç tarihi</label>
       <input type="date" id="from" name="from" th:value="${from}">
     </div>
-
     <div class="filter-field">
       <label for="to">Bitiş tarihi</label>
       <input type="date" id="to" name="to" th:value="${to}">
     </div>
-
     <button class="btn btn-filter" type="submit">Filtrele</button>
-
     <a class="btn btn-clear" th:if="${from != null || to != null}" href="/admin/users">Temizle</a>
-
     <span class="filter-info" th:if="${from != null || to != null}">
       <span th:text="${from != null ? #temporals.format(from, 'dd.MM.yyyy') : '...'}"></span>
       &#8211;
       <span th:text="${to != null ? #temporals.format(to, 'dd.MM.yyyy') : '...'}"></span>
       aralığı gösteriliyor
     </span>
-
   </form>
 
-
   <div class="card">
-
     <div class="table-wrap">
-      <table>
-
+      <table class="data-table" id="usersTable">
         <colgroup>
           <col class="c-id">
           <col class="c-name">
@@ -532,7 +83,6 @@
           <col class="c-created">
           <col class="c-cars">
         </colgroup>
-
         <thead>
         <tr>
           <th>ID</th>
@@ -544,9 +94,7 @@
           <th>Cars</th>
         </tr>
         </thead>
-
         <tbody>
-
         <tr th:each="u : ${users}">
           <td th:text="${u.id}"></td>
           <td th:text="${u.name}"></td>
@@ -554,74 +102,62 @@
           <td th:text="${u.phoneNumber}"></td>
           <td>
             <span class="badge"
-                  th:classappend="${u.status == 'ACTIVE'} ? 'badge-active' : 'badge-other'"
-                  th:text="${u.status}"></span>
+                  th:classappend="${u.status == 'ACTIVE'} ? 'badge-success' : (${u.status == 'BLOCKED'} ? 'badge-danger' : (${u.status == 'OTP_PENDING' or u.status == 'INVITED'} ? 'badge-warning' : 'badge-info'))"
+                  th:title="${u.status}"
+                  th:text="${u.status == 'OTP_PENDING'} ? 'OTP pending' : (${u.status == 'OTP_VERIFIED'} ? 'OTP verified' : (${u.status == 'ACTIVE'} ? 'Active' : (${u.status == 'BLOCKED'} ? 'Blocked' : (${u.status == 'INVITED'} ? 'Invited' : (${u.status == 'JOINED'} ? 'Joined' : u.status)))))"></span>
           </td>
           <td class="muted"
-              th:text="${u.createdAt != null ? #temporals.format(u.createdAt.plusHours(4), 'yyyy-MM-dd HH:mm') : ''}"></td>
+              th:text="${u.createdAt != null ? #temporals.format(u.createdAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
           <td>
-            <a class="btn-cars" th:href="@{/admin/cars(userId=${u.id})}">
-              &#128663; Cars
-            </a>
+            <a class="btn-cars" th:href="@{/admin/cars(userId=${u.id})}">Cars</a>
           </td>
         </tr>
-
         <tr class="empty-row" th:if="${users.isEmpty()}">
           <td colspan="7">Kayıt bulunamadı</td>
         </tr>
-
         </tbody>
-
       </table>
     </div>
 
-
     <div class="pagination-bar">
-
       <span class="page-info">
         Sayfa <strong th:text="${currentPage}">1</strong> / <span th:text="${totalPages}">1</span>
       </span>
-
       <nav class="pages">
-
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
            th:href="@{/admin/users(page=${currentPage - 1}, from=${from}, to=${to})}">
           &#8592; Previous
         </a>
-
-        <!-- İlk sayfa + üç nokta -->
         <a class="page-link" th:if="${windowStart > 1}"
            th:href="@{/admin/users(page=1, from=${from}, to=${to})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
-
-        <!-- Aktif sayfa etrafındaki numaralar -->
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
            th:href="@{/admin/users(page=${p}, from=${from}, to=${to})}"
            th:text="${p}">1</a>
-
-        <!-- Üç nokta + son sayfa -->
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
            th:href="@{/admin/users(page=${totalPages}, from=${from}, to=${to})}"
            th:text="${totalPages}"></a>
-
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
            th:href="@{/admin/users(page=${currentPage + 1}, from=${from}, to=${to})}">
           Next &#8594;
         </a>
-
       </nav>
-
     </div>
-
   </div>
-
 </main>
-
+<script src="/admin/admin.js"></script>
+<script>
+  CarlandAdmin.initColumnToggle(
+    document.getElementById("usersTable"),
+    "carland-admin-cols-users",
+    ["ID", "Name", "Surname", "Phone Number", "Status", "Created At", "Cars"],
+    []
+  );
+</script>
 </body>
-
 </html>
