@@ -4,9 +4,11 @@ import com.carland.carland_service.dto.response.AdminAuthLoginResponse;
 import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Feedback;
+import com.carland.carland_service.entity.FeedbackPhoto;
 import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +23,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -30,9 +35,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * tr: Admin panelinin MVC controller'ı; login/logout, araç ve kullanıcı listelerini sayfalayarak gösterir ve Excel (XLSX) export sağlar.
@@ -46,6 +54,8 @@ public class AdminController {
     private final CarRepository carRepository;
 
     private final FeedbackRepository feedbackRepository;
+
+    private final FeedbackPhotoRepository feedbackPhotoRepository;
 
     private final AuthUsersFeign authUsersFeign;
 
@@ -320,6 +330,7 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String withPhoto,
             HttpServletRequest request,
             Model model
     ) {
@@ -327,14 +338,17 @@ public class AdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
 
+        boolean photoOnly = isPhotoOnly(withPhoto);
         int pageIndex = Math.max(page, 1) - 1;
         Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE);
-        Page<Feedback> feedbackPage = fetchFeedbacks(type, phone, pageable);
+        Page<Feedback> feedbackPage = fetchFeedbacks(type, phone, photoOnly, pageable);
 
         addPaginationAttributes(model, feedbackPage.getTotalPages(), pageIndex);
         model.addAttribute("feedbacks", feedbackPage);
         model.addAttribute("filterType", blankToNull(type));
         model.addAttribute("filterPhone", blankToNull(phone));
+        model.addAttribute("filterWithPhoto", photoOnly);
+        model.addAttribute("photoIds", photoIdsOf(feedbackPage.getContent()));
         return "feedbacks";
     }
 
@@ -346,6 +360,7 @@ public class AdminController {
     public void exportFeedbacks(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String withPhoto,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -354,12 +369,14 @@ public class AdminController {
             return;
         }
 
-        List<Feedback> rows = fetchFeedbacks(type, phone, Pageable.unpaged()).getContent();
+        boolean photoOnly = isPhotoOnly(withPhoto);
+        List<Feedback> rows = fetchFeedbacks(type, phone, photoOnly, Pageable.unpaged()).getContent();
+        Set<Long> photoIds = photoIdsOf(rows);
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Feedbacks");
             String[] headers = {
-                    "ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone"
+                    "ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Has photo"
             };
             createHeaderRow(workbook, sheet, headers);
             int rowIndex = 1;
@@ -372,29 +389,63 @@ public class AdminController {
                 setNumericCell(row, 4, fb.getRating());
                 setNumericCell(row, 5, fb.getCustomerId());
                 setCell(row, 6, fb.getCustomerPhone());
+                setCell(row, 7, photoIds.contains(fb.getFeedbackId()) ? "Yes" : "No");
             }
-            String baseName = (blankToNull(type) != null || blankToNull(phone) != null)
+            String baseName = (blankToNull(type) != null || blankToNull(phone) != null || photoOnly)
                     ? "feedbacks-filtered" : "feedbacks";
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
     }
 
-    private Page<Feedback> fetchFeedbacks(String type, String phone, Pageable pageable) {
-        String typeFilter = blankToNull(type);
-        String phoneFilter = blankToNull(phone);
-        if (typeFilter != null && phoneFilter != null) {
-            return feedbackRepository
-                    .findByTypeIgnoreCaseAndCustomerPhoneContainingIgnoreCaseOrderByFeedbackIdDesc(
-                            typeFilter, phoneFilter, pageable);
+    /**
+     * tr: Panel admin için feedback resmini byte olarak döner (lightbox preview).
+     * en: Returns the feedback image bytes for the panel admin (lightbox preview).
+     */
+    @GetMapping("/admin/feedbacks/{id}/photo")
+    public ResponseEntity<byte[]> feedbackPhoto(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        if (typeFilter != null) {
-            return feedbackRepository.findByTypeIgnoreCaseOrderByFeedbackIdDesc(typeFilter, pageable);
+        FeedbackPhoto photo = feedbackPhotoRepository.findByFeedbackId(id).orElse(null);
+        if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {
+            return ResponseEntity.notFound().build();
         }
-        if (phoneFilter != null) {
-            return feedbackRepository.findByCustomerPhoneContainingIgnoreCaseOrderByFeedbackIdDesc(
-                    phoneFilter, pageable);
+        String fileType = photo.getFileType();
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        if (fileType != null && !fileType.isBlank()) {
+            String raw = fileType.contains("/") ? fileType : "image/" + fileType.toLowerCase();
+            try {
+                mediaType = MediaType.parseMediaType(raw);
+            } catch (Exception ignored) {
+                mediaType = MediaType.IMAGE_JPEG;
+            }
         }
-        return feedbackRepository.findAllByOrderByFeedbackIdDesc(pageable);
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .body(photo.getImageData());
+    }
+
+    private Page<Feedback> fetchFeedbacks(String type, String phone, boolean withPhoto, Pageable pageable) {
+        return feedbackRepository.search(blankToNull(type), blankToNull(phone), withPhoto, pageable);
+    }
+
+    private Set<Long> photoIdsOf(List<Feedback> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> ids = rows.stream().map(Feedback::getFeedbackId).collect(Collectors.toList());
+        return new HashSet<>(feedbackPhotoRepository.findFeedbackIdsWithPhoto(ids));
+    }
+
+    private static boolean isPhotoOnly(String withPhoto) {
+        if (withPhoto == null || withPhoto.isBlank()) {
+            return false;
+        }
+        String v = withPhoto.trim();
+        return "1".equals(v) || "true".equalsIgnoreCase(v) || "on".equalsIgnoreCase(v);
     }
 
     private static String blankToNull(String raw) {

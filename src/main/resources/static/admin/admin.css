@@ -52,7 +52,7 @@ body {
 
 button, .btn, input, select, textarea { font-family: inherit; }
 
-button, .btn, .nav-link, .page-link, .page-arrow, .btn-cars, summary, .flag-head, .seg-btn, .ver-item, .set-current {
+button, .btn, .nav-link, .page-link, .page-arrow, .btn-cars, .btn-photo, summary, .flag-head, .seg-btn, .ver-item, .set-current {
   cursor: pointer;
 }
 
@@ -444,6 +444,101 @@ button.btn-primary, button.btn-ghost, button.btn-danger { border-width: 1px; }
   text-decoration: none;
 }
 .btn-cars:hover { background: var(--primary-soft); }
+
+.btn-photo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+.btn-photo:hover { background: var(--primary-dark); }
+
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 4px 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+.filter-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(11, 11, 14, 0.78);
+  backdrop-filter: blur(6px);
+}
+.photo-lightbox[hidden] { display: none; }
+.photo-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 600;
+  box-shadow: var(--shadow-float);
+  font-family: inherit;
+}
+.photo-lightbox-close:hover { background: #f3f3f5; }
+.photo-lightbox-frame {
+  max-width: min(1100px, 92vw);
+  max-height: 86vh;
+  background: #111;
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+.photo-lightbox-frame img {
+  display: block;
+  max-width: min(1080px, 90vw);
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #000;
+}
+.photo-lightbox-caption {
+  margin: 10px 8px 4px;
+  color: #d4d4d8;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+.photo-lightbox-error {
+  min-width: 240px;
+  padding: 28px 32px;
+  color: #fff;
+  text-align: center;
+  font-weight: 600;
+}
 
 /* ---------- Badges: STATE only, pill ---------- */
 .badge, .chip {

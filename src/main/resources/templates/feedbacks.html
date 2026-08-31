@@ -4,19 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Feedbacks — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium1">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium2">
   <style>
     col.c-id      { width: 70px; }
     col.c-type    { width: 120px; }
     col.c-subject { width: 180px; }
-    col.c-desc    { width: 320px; }
+    col.c-desc    { width: 280px; }
     col.c-rating  { width: 80px; }
     col.c-user    { width: 110px; }
     col.c-phone   { width: 150px; }
+    col.c-photo   { width: 130px; }
     col.c-cars    { width: 90px; }
-    .data-table { min-width: 1120px; }
+    .data-table { min-width: 1240px; }
     .cell-desc {
-      max-width: 320px;
+      max-width: 280px;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 13px;
@@ -43,7 +44,7 @@
   </div>
   <div class="topbar-actions">
     <a class="btn btn-excel"
-       th:href="@{/admin/feedbacks/export(type=${filterType}, phone=${filterPhone})}">
+       th:href="@{/admin/feedbacks/export(type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel
     </a>
@@ -71,8 +72,12 @@
       <label for="phone">Phone</label>
       <input type="text" id="phone" name="phone" placeholder="+994..." th:value="${filterPhone}">
     </div>
+    <label class="filter-check">
+      <input type="checkbox" name="withPhoto" value="1" th:checked="${filterWithPhoto}">
+      Photos only
+    </label>
     <button class="btn btn-filter" type="submit">Filtrele</button>
-    <a class="btn btn-clear" th:if="${filterType != null || filterPhone != null}" href="/admin/feedbacks">Temizle</a>
+    <a class="btn btn-clear" th:if="${filterType != null || filterPhone != null || filterWithPhoto}" href="/admin/feedbacks">Temizle</a>
   </form>
 
   <div class="card">
@@ -86,6 +91,7 @@
           <col class="c-rating">
           <col class="c-user">
           <col class="c-phone">
+          <col class="c-photo">
           <col class="c-cars">
         </colgroup>
         <thead>
@@ -97,6 +103,7 @@
           <th>Rating</th>
           <th>Customer ID</th>
           <th>Phone</th>
+          <th>Photo</th>
           <th></th>
         </tr>
         </thead>
@@ -114,12 +121,20 @@
           <td th:text="${f.customerId}"></td>
           <td th:text="${f.customerPhone}"></td>
           <td>
+            <button type="button" class="btn-photo"
+                    th:if="${photoIds.contains(f.feedbackId)}"
+                    th:attr="data-photo-url=@{/admin/feedbacks/{id}/photo(id=${f.feedbackId})}, data-photo-id=${f.feedbackId}">
+              Open photo
+            </button>
+            <span class="muted" th:unless="${photoIds.contains(f.feedbackId)}">—</span>
+          </td>
+          <td>
             <a class="btn-cars" th:if="${f.customerId != null}"
                th:href="@{/admin/cars(userId=${f.customerId})}">Cars</a>
           </td>
         </tr>
         <tr class="empty-row" th:if="${feedbacks.isEmpty()}">
-          <td colspan="8">Kayıt bulunamadı</td>
+          <td colspan="9">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -132,38 +147,98 @@
       <nav class="pages">
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/feedbacks(page=${currentPage - 1}, type=${filterType}, phone=${filterPhone})}">
+           th:href="@{/admin/feedbacks(page=${currentPage - 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
           &#8592; Previous
         </a>
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/feedbacks(page=1, type=${filterType}, phone=${filterPhone})}">1</a>
+           th:href="@{/admin/feedbacks(page=1, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/feedbacks(page=${p}, type=${filterType}, phone=${filterPhone})}"
+           th:href="@{/admin/feedbacks(page=${p}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}"
            th:text="${p}">1</a>
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/feedbacks(page=${totalPages}, type=${filterType}, phone=${filterPhone})}"
+           th:href="@{/admin/feedbacks(page=${totalPages}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}"
            th:text="${totalPages}"></a>
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/feedbacks(page=${currentPage + 1}, type=${filterType}, phone=${filterPhone})}">
+           th:href="@{/admin/feedbacks(page=${currentPage + 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
           Next &#8594;
         </a>
       </nav>
     </div>
   </div>
 </main>
-<script src="/admin/admin.js?v=premium1"></script>
+
+<div id="photoLightbox" class="photo-lightbox" hidden role="dialog" aria-modal="true" aria-labelledby="photoLightboxCaption">
+  <button type="button" class="photo-lightbox-close" id="photoLightboxClose" aria-label="Close">&#215;</button>
+  <div class="photo-lightbox-frame">
+    <img id="photoLightboxImg" alt="Feedback photo">
+    <p class="photo-lightbox-caption" id="photoLightboxCaption"></p>
+    <p class="photo-lightbox-error" id="photoLightboxError" hidden>Photo could not be loaded.</p>
+  </div>
+</div>
+
+<script src="/admin/admin.js?v=premium2"></script>
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("feedbacksTable"),
     "carland-admin-cols-feedbacks",
-    ["ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Cars"],
+    ["ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Photo", "Cars"],
     []
   );
+
+  (function () {
+    var box = document.getElementById("photoLightbox");
+    var img = document.getElementById("photoLightboxImg");
+    var caption = document.getElementById("photoLightboxCaption");
+    var err = document.getElementById("photoLightboxError");
+    var closeBtn = document.getElementById("photoLightboxClose");
+    var lastFocus = null;
+
+    function closeLightbox() {
+      box.hidden = true;
+      img.removeAttribute("src");
+      if (lastFocus && typeof lastFocus.focus === "function") {
+        try { lastFocus.focus(); } catch (e) { /* ignore */ }
+      }
+    }
+
+    function openLightbox(url, id) {
+      lastFocus = document.activeElement;
+      err.hidden = true;
+      img.hidden = false;
+      img.src = url;
+      caption.textContent = "Ticket #" + id;
+      box.hidden = false;
+      closeBtn.focus();
+    }
+
+    img.addEventListener("error", function () {
+      img.hidden = true;
+      err.hidden = false;
+    });
+    img.addEventListener("load", function () {
+      err.hidden = true;
+      img.hidden = false;
+    });
+
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest(".btn-photo");
+      if (!btn) return;
+      e.preventDefault();
+      openLightbox(btn.getAttribute("data-photo-url"), btn.getAttribute("data-photo-id"));
+    });
+    closeBtn.addEventListener("click", closeLightbox);
+    box.addEventListener("click", function (e) {
+      if (e.target === box) closeLightbox();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !box.hidden) closeLightbox();
+    });
+  })();
 </script>
 </body>
 </html>
