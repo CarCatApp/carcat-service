@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Service History — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium3">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium5">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -46,13 +46,11 @@
         <div class="val" th:text="${visits.size()}">0</div>
         <div class="lbl">Partner visits</div>
       </div>
-      <div class="history-stat">
-        <div class="val" th:text="${hyperCount}">0</div>
-        <div class="lbl">Hyper</div>
-      </div>
-      <div class="history-stat">
-        <div class="val" th:text="${avtoCount}">0</div>
-        <div class="lbl">AvtoVaz</div>
+      <div class="history-stat partners">
+        <div class="lbl">Partners</div>
+        <div class="partner-scroll" id="partnerScroll" role="list">
+          <div class="muted" id="partnerScrollFallback">Yükleniyor…</div>
+        </div>
       </div>
       <div class="history-stat">
         <div class="val"
@@ -88,9 +86,11 @@
 
     <div class="history-toolbar">
       <div class="history-seg" role="group" aria-label="Partner">
-        <button type="button" data-src="all" aria-pressed="true">All</button>
-        <button type="button" data-src="hyper" aria-pressed="false">Hyper</button>
-        <button type="button" data-src="avtovaz" aria-pressed="false">AvtoVaz</button>
+        <button type="button" data-partner-id="all" aria-pressed="true">All</button>
+        <button type="button" th:each="p : ${partnerChips}"
+                th:attr="data-partner-id=${p.id}"
+                aria-pressed="false"
+                th:text="'#' + ${p.id} + ' ' + ${p.name}">#1</button>
       </div>
       <div class="filter-field">
         <label for="histSort">Order</label>
@@ -103,7 +103,7 @@
 
     <div class="empty-box" id="emptyVisits" th:if="${visits.isEmpty()}">
       <strong>Partner visit yok</strong>
-      Bu araç için Hyper / AvtoVaz kaydı <code>visits</code> tablosunda yok. Admin Hyper’ı canlı çekmez.
+      Bu araç için <code>visits</code> tablosunda partner kaydı yok. Admin partner API’sini canlı çekmez.
     </div>
     <div class="empty-box" id="emptyFilter" hidden>
       <strong>Bu filtrede visit yok</strong>
@@ -113,7 +113,7 @@
     <div class="history-visits" id="visitList" th:if="${!visits.isEmpty()}">
       <details class="history-visit"
                th:each="visit : ${visits}"
-               th:attr="data-source=${visit.serviceCenterId == 1 ? 'hyper' : (visit.serviceCenterId == 2 ? 'avtovaz' : 'other')},
+               th:attr="data-partner-id=${visit.serviceCenterId},
                         data-date=${visit.lastServiceDate},
                         data-id=${visit.id}">
         <summary class="history-visit-toggle">
@@ -123,14 +123,17 @@
             <div class="history-visit-sub"
                  th:text="${visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—'}">—</div>
           </div>
-          <div>
-            <span class="badge"
-                  th:classappend="${visit.serviceCenterId == 1} ? 'badge-info' : (${visit.serviceCenterId == 2} ? 'badge-warning' : 'badge-neutral')"
-                  th:text="${visit.serviceCenterId == 1} ? 'Hyper' : (${visit.serviceCenterId == 2} ? 'AvtoVaz' : 'Partner')">Hyper</span>
-            <span style="font-weight:700;margin-left:8px"
-                  th:text="${visit.serviceCenterName != null ? visit.serviceCenterName : '—'}">HyperService</span>
-            <div class="history-visit-sub"
-                 th:text="${(visit.dealer != null ? visit.dealer : '—') + (visit.serviceType != null ? ' · ' + visit.serviceType : '')}">—</div>
+          <div class="visit-partner" th:with="p=${visit.serviceCenterId != null ? partnerById.get(visit.serviceCenterId) : null}">
+            <img class="partner-logo" alt=""
+                 th:if="${visit.serviceCenterId != null}"
+                 th:src="@{/admin/partners/{id}/photo(id=${visit.serviceCenterId})}"
+                 onerror="this.style.display='none'">
+            <div>
+              <div class="name"
+                   th:text="${p != null ? ('#' + p.id + ' ' + p.name) : (visit.serviceCenterId != null ? ('#' + visit.serviceCenterId) : '—')}">#1</div>
+              <div class="history-visit-sub"
+                   th:text="${(visit.dealer != null ? visit.dealer : (p != null && p.dealer != null ? p.dealer : '—')) + (visit.serviceType != null ? ' · ' + visit.serviceType : '')}">—</div>
+            </div>
           </div>
           <div class="muted"
                th:text="${(visit.services != null ? visit.services.size() : 0) + ' servis · ' + (visit.parts != null ? visit.parts.size() : 0) + ' parça'}">0 servis</div>
@@ -145,8 +148,8 @@
         <div class="history-visit-body">
           <div class="history-chips">
             <span>visit.id <b th:text="${visit.id}">0</b></span>
-            <span>hyper_record_id <b th:text="${visit.hyperRecordId}">0</b></span>
-            <span>service_center_id <b th:text="${visit.serviceCenterId}">—</b></span>
+            <span>partner_record_id <b th:text="${visit.hyperRecordId}">0</b></span>
+            <span>partner_id <b th:text="${visit.serviceCenterId}">—</b></span>
             <span>invoice <b th:text="${visit.invoiceNumber != null ? visit.invoiceNumber : '—'}">—</b></span>
           </div>
           <h3>visit_service_lines</h3>
@@ -204,13 +207,65 @@
   </th:block>
 </main>
 <script src="/admin/admin.js?v=premium3"></script>
+<script th:inline="javascript">
+  var VISIT_COUNTS = /*[[${visitCountByPartnerId}]]*/ {};
+</script>
 <script>
   (function () {
+    function visitCount(id) {
+      if (!VISIT_COUNTS) return 0;
+      var v = VISIT_COUNTS[id];
+      if (v == null) v = VISIT_COUNTS[String(id)];
+      return v || 0;
+    }
+    function renderPartners(partners) {
+      var box = document.getElementById("partnerScroll");
+      if (!box) return;
+      box.innerHTML = "";
+      if (!partners || !partners.length) {
+        box.innerHTML = '<div class="muted">partners tablosu boş</div>';
+        return;
+      }
+      partners.forEach(function (p) {
+        var row = document.createElement("div");
+        row.className = "partner-scroll-item";
+        row.setAttribute("role", "listitem");
+        var img = document.createElement("img");
+        img.className = "partner-logo";
+        img.alt = "";
+        img.src = "/admin/partners/" + p.id + "/photo";
+        img.onerror = function () { this.style.display = "none"; };
+        var meta = document.createElement("div");
+        meta.className = "meta";
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = "#" + p.id + " " + (p.name || "");
+        meta.appendChild(name);
+        var count = document.createElement("div");
+        count.className = "count";
+        count.textContent = visitCount(p.id) + " visit";
+        row.appendChild(img);
+        row.appendChild(meta);
+        row.appendChild(count);
+        box.appendChild(row);
+      });
+    }
+    fetch("/admin/partners", { credentials: "same-origin", headers: { "Accept": "application/json" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("partners " + r.status);
+        return r.json();
+      })
+      .then(renderPartners)
+      .catch(function () {
+        var box = document.getElementById("partnerScroll");
+        if (box) box.innerHTML = '<div class="muted">Partners listesi alınamadı</div>';
+      });
+
     var list = document.getElementById("visitList");
     if (!list) return;
     var emptyFilter = document.getElementById("emptyFilter");
     var sortSel = document.getElementById("histSort");
-    var src = "all";
+    var partnerId = "all";
 
     function cards() {
       return Array.prototype.slice.call(list.querySelectorAll(".history-visit"));
@@ -230,7 +285,7 @@
       items.forEach(function (el) { list.appendChild(el); });
       var shown = 0;
       items.forEach(function (el) {
-        var match = src === "all" || el.getAttribute("data-source") === src;
+        var match = partnerId === "all" || String(el.getAttribute("data-partner-id")) === String(partnerId);
         el.hidden = !match;
         if (match) shown++;
       });
@@ -238,7 +293,7 @@
     }
     document.querySelectorAll(".history-seg button").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        src = btn.getAttribute("data-src");
+        partnerId = btn.getAttribute("data-partner-id");
         document.querySelectorAll(".history-seg button").forEach(function (b) {
           b.setAttribute("aria-pressed", b === btn ? "true" : "false");
         });

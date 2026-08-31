@@ -2,11 +2,14 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.AdminAuthLoginResponse;
 import com.carland.carland_service.dto.response.AuthUser;
+import com.carland.carland_service.dto.response.PartnerDataResponse;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Feedback;
 import com.carland.carland_service.entity.FeedbackPhoto;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
-import com.carland.carland_service.enums.PartnerId;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
@@ -14,8 +17,10 @@ import com.carland.carland_service.repository.CarSpec;
 import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
+import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
+import com.carland.carland_service.service.PhotoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -64,6 +69,8 @@ public class AdminController {
 
     private final VisitRepository visitRepository;
 
+    private final PartnerRepository partnerRepository;
+
     private final FeedbackRepository feedbackRepository;
 
     private final FeedbackPhotoRepository feedbackPhotoRepository;
@@ -73,6 +80,8 @@ public class AdminController {
     private final AuthNewUsersFeign authNewUsersFeign;
 
     private final AdminAccessService adminAccessService;
+
+    private final PhotoService photoService;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -254,6 +263,7 @@ public class AdminController {
         Car car = carRepository.findByCarId(carId);
         if (car == null) {
             model.addAttribute("carMissing", true);
+            model.addAttribute("visitCountByPartnerId", Map.of());
             return "car-history";
         }
 
@@ -264,22 +274,92 @@ public class AdminController {
             }
         }
 
-        long hyperCount = visits.stream()
-                .filter(v -> PartnerId.HYPER.getId().equals(v.getServiceCenterId()))
-                .count();
-        long avtoCount = visits.stream()
-                .filter(v -> PartnerId.AVTOVAZ.getId().equals(v.getServiceCenterId()))
-                .count();
+        Map<Long, PartnerDataResponse> partnerById = loadAdminPartners(visits);
+        Map<Long, Long> visitCountByPartnerId = visits.stream()
+                .map(Visit::getServiceCenterId)
+                .filter(id -> id != null)
+                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+        List<PartnerDataResponse> partnerChips = new ArrayList<>(partnerById.values());
+        partnerChips.sort(Comparator.comparing(PartnerDataResponse::getId, Comparator.nullsLast(Comparator.naturalOrder())));
 
         String phone = car.getCustomer() != null ? car.getCustomer().getPhoneNumber() : null;
 
         model.addAttribute("carMissing", false);
         model.addAttribute("car", car);
         model.addAttribute("visits", visits);
-        model.addAttribute("hyperCount", hyperCount);
-        model.addAttribute("avtoCount", avtoCount);
+        model.addAttribute("partnerById", partnerById);
+        model.addAttribute("partnerChips", partnerChips);
+        model.addAttribute("visitCountByPartnerId", visitCountByPartnerId);
         model.addAttribute("customerPhone", phone);
         return "car-history";
+    }
+
+    /**
+     * tr: Admin history için partners satırlarını (secret'sız) yükler; visit'te görülen ama tabloda olmayan id'ler de eklenir.
+     * en: Loads partners for admin history without secrets; also adds ids seen on visits but missing from the table.
+     */
+    private Map<Long, PartnerDataResponse> loadAdminPartners(List<Visit> visits) {
+        List<Partner> rows = partnerRepository.findAll(Sort.by(Sort.Direction.ASC, "id"));
+        Map<Long, PartnerDataResponse> byId = new LinkedHashMap<>();
+        for (Partner partner : rows) {
+            byId.put(partner.getId(), PartnerDataResponse.builder()
+                    .id(partner.getId())
+                    .name(partner.getName())
+                    .dealer(partner.getDealer())
+                    .logoUrl(partner.getLogoUrl())
+                    .active(partner.getActive())
+                    .source(partner.getSource())
+                    .build());
+        }
+        for (Visit visit : visits) {
+            Long id = visit.getServiceCenterId();
+            if (id == null || byId.containsKey(id)) {
+                continue;
+            }
+            String fallbackName = visit.getServiceCenterName();
+            byId.put(id, PartnerDataResponse.builder()
+                    .id(id)
+                    .name(fallbackName != null && !fallbackName.isBlank() ? fallbackName : ("id " + id))
+                    .dealer(visit.getDealer())
+                    .active(false)
+                    .build());
+        }
+        return byId;
+    }
+
+
+    /**
+     * tr: Admin history partner listesi (secret yok). GET /api/v1/partner list yok; panel cookie ile buradan okur.
+     * en: Admin history partner list (no secrets). There is no public GET /api/v1/partner list; panel reads here with cookie.
+     */
+    @GetMapping(value = "/admin/partners", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<List<PartnerDataResponse>> adminPartners(HttpServletRequest request) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<PartnerDataResponse> rows = new ArrayList<>(loadAdminPartners(List.of()).values());
+        rows.sort(Comparator.comparing(PartnerDataResponse::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+        return ResponseEntity.ok(rows);
+    }
+
+    /**
+     * tr: Partner logosunu döner — aynı veri {@code GET /api/v1/photo/for/partner/get/{partnerId}}, panel cookie auth.
+     * en: Returns the partner logo — same data as {@code GET /api/v1/photo/for/partner/get/{partnerId}}, cookie auth for the panel.
+     */
+    @GetMapping("/admin/partners/{id:\\d+}/photo")
+    public ResponseEntity<byte[]> adminPartnerPhoto(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            return photoService.getPartnerPhotoById(id);
+        } catch (ResourceNotFoundException | MissingFieldException ex) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
 
