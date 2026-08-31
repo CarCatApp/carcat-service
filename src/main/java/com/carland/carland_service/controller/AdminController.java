@@ -429,7 +429,15 @@ public class AdminController {
     }
 
     private Page<Feedback> fetchFeedbacks(String type, String phone, boolean withPhoto, Pageable pageable) {
-        return feedbackRepository.search(blankToNull(type), blankToNull(phone), withPhoto, pageable);
+        String typeFilter = blankToNull(type);
+        if (typeFilter != null) {
+            typeFilter = typeFilter.toLowerCase();
+        }
+        String phoneFilter = blankToNull(phone);
+        if (phoneFilter != null) {
+            phoneFilter = "%" + phoneFilter.toLowerCase() + "%";
+        }
+        return feedbackRepository.search(typeFilter, phoneFilter, withPhoto, pageable);
     }
 
     private Set<Long> photoIdsOf(List<Feedback> rows) {

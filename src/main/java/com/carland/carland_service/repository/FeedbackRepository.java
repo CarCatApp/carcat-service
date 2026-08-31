@@ -17,9 +17,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
     @Query("""
             SELECT f FROM Feedback f
-            WHERE (:type IS NULL OR LOWER(f.type) = LOWER(:type))
-              AND (:phone IS NULL OR (f.customerPhone IS NOT NULL
-                   AND LOWER(f.customerPhone) LIKE LOWER(CONCAT('%', :phone, '%'))))
+            WHERE (:type IS NULL OR LOWER(f.type) = :type)
+              AND (:phone IS NULL OR LOWER(f.customerPhone) LIKE :phone)
               AND (:withPhoto = false OR EXISTS (
                    SELECT 1 FROM FeedbackPhoto p WHERE p.feedbackId = f.feedbackId))
             ORDER BY f.feedbackId DESC
