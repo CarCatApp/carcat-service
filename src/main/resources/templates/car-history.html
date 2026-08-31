@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service History — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=premium3">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
+    </span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link active" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-clear" href="/admin/cars">&#8592; Cars</a>
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Service History</h1>
+      <p class="muted">Kaynak: DB <code>visits</code>. Hyper API bu ekranda çağrılmaz.</p>
+    </div>
+  </div>
+
+  <div class="error-box" th:if="${carMissing}">
+    Araç bulunamadı. <a href="/admin/cars">Cars listesine dön</a>
+  </div>
+
+  <th:block th:if="${!carMissing}">
+    <div class="history-stats">
+      <div class="history-stat">
+        <div class="val" th:text="${visits.size()}">0</div>
+        <div class="lbl">Partner visits</div>
+      </div>
+      <div class="history-stat">
+        <div class="val" th:text="${hyperCount}">0</div>
+        <div class="lbl">Hyper</div>
+      </div>
+      <div class="history-stat">
+        <div class="val" th:text="${avtoCount}">0</div>
+        <div class="lbl">AvtoVaz</div>
+      </div>
+      <div class="history-stat">
+        <div class="val"
+             th:text="${car.allTimeCost != null ? #numbers.formatDecimal(car.allTimeCost, 1, 2) + ' AZN' : '—'}">—</div>
+        <div class="lbl">all_time_cost</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px; padding: 8px 8px 16px;">
+      <table class="history-kv">
+        <tr><th>VIN</th><td class="vin" th:text="${car.vin}">—</td></tr>
+        <tr><th>Plate</th><td th:text="${car.plateNumber}">—</td></tr>
+        <tr>
+          <th>Vehicle</th>
+          <td th:text="|${car.brand} ${car.model} · ${car.modelYear} · ${car.engineType} · ${car.bodyType}|">—</td>
+        </tr>
+        <tr><th>Mileage</th><td th:text="${car.mileage != null ? car.mileage + ' km' : '—'}">—</td></tr>
+        <tr>
+          <th>Customer</th>
+          <td th:text="${'#' + (car.customer != null ? car.customer.userId : '—') + ' · ' + (customerPhone != null ? customerPhone : '—')}">—</td>
+        </tr>
+        <tr>
+          <th>Created</th>
+          <td class="muted"
+              th:text="${car.createdAt != null ? #temporals.format(car.createdAt.plusHours(4), 'dd MMM yyyy, HH:mm') : '—'}">—</td>
+        </tr>
+        <tr>
+          <th>serviced_partner_ids</th>
+          <td th:text="${car.servicedPartnerIds != null && !car.servicedPartnerIds.isEmpty()} ? ${car.servicedPartnerIds} : '[]'">[]</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="history-toolbar">
+      <div class="history-seg" role="group" aria-label="Partner">
+        <button type="button" data-src="all" aria-pressed="true">All</button>
+        <button type="button" data-src="hyper" aria-pressed="false">Hyper</button>
+        <button type="button" data-src="avtovaz" aria-pressed="false">AvtoVaz</button>
+      </div>
+      <div class="filter-field">
+        <label for="histSort">Order</label>
+        <select id="histSort">
+          <option value="desc" selected>Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="empty-box" id="emptyVisits" th:if="${visits.isEmpty()}">
+      <strong>Partner visit yok</strong>
+      Bu araç için Hyper / AvtoVaz kaydı <code>visits</code> tablosunda yok. Admin Hyper’ı canlı çekmez.
+    </div>
+    <div class="empty-box" id="emptyFilter" hidden>
+      <strong>Bu filtrede visit yok</strong>
+      Partner filtresini All yapın.
+    </div>
+
+    <div class="history-visits" id="visitList" th:if="${!visits.isEmpty()}">
+      <details class="history-visit"
+               th:each="visit : ${visits}"
+               th:attr="data-source=${visit.serviceCenterId == 1 ? 'hyper' : (visit.serviceCenterId == 2 ? 'avtovaz' : 'other')},
+                        data-date=${visit.lastServiceDate},
+                        data-id=${visit.id}">
+        <summary class="history-visit-toggle">
+          <div>
+            <div class="history-visit-date"
+                 th:text="${visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—'}">—</div>
+            <div class="history-visit-sub"
+                 th:text="${visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—'}">—</div>
+          </div>
+          <div>
+            <span class="badge"
+                  th:classappend="${visit.serviceCenterId == 1} ? 'badge-info' : (${visit.serviceCenterId == 2} ? 'badge-warning' : 'badge-neutral')"
+                  th:text="${visit.serviceCenterId == 1} ? 'Hyper' : (${visit.serviceCenterId == 2} ? 'AvtoVaz' : 'Partner')">Hyper</span>
+            <span style="font-weight:700;margin-left:8px"
+                  th:text="${visit.serviceCenterName != null ? visit.serviceCenterName : '—'}">HyperService</span>
+            <div class="history-visit-sub"
+                 th:text="${(visit.dealer != null ? visit.dealer : '—') + (visit.serviceType != null ? ' · ' + visit.serviceType : '')}">—</div>
+          </div>
+          <div class="muted"
+               th:text="${(visit.services != null ? visit.services.size() : 0) + ' servis · ' + (visit.parts != null ? visit.parts.size() : 0) + ' parça'}">0 servis</div>
+          <div class="history-visit-cost">
+            <span th:if="${visit.finalCostAmount != null}"
+                  th:text="${#numbers.formatDecimal(visit.finalCostAmount, 1, 2) + ' ' + (visit.finalCostCurrency != null ? visit.finalCostCurrency : 'AZN')}">—</span>
+            <span th:if="${visit.finalCostAmount == null}">—</span>
+            <small th:if="${visit.costAmount != null && visit.finalCostAmount != null && visit.costAmount.compareTo(visit.finalCostAmount) != 0}"
+                   th:text="${'list ' + #numbers.formatDecimal(visit.costAmount, 1, 2)}"></small>
+          </div>
+        </summary>
+        <div class="history-visit-body">
+          <div class="history-chips">
+            <span>visit.id <b th:text="${visit.id}">0</b></span>
+            <span>hyper_record_id <b th:text="${visit.hyperRecordId}">0</b></span>
+            <span>service_center_id <b th:text="${visit.serviceCenterId}">—</b></span>
+            <span>invoice <b th:text="${visit.invoiceNumber != null ? visit.invoiceNumber : '—'}">—</b></span>
+          </div>
+          <h3>visit_service_lines</h3>
+          <table class="mini-table">
+            <thead>
+            <tr>
+              <th>code</th>
+              <th>service</th>
+              <th class="num">cost</th>
+              <th>next date</th>
+              <th class="num">next km</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${visit.services == null || visit.services.isEmpty()}">
+              <td colspan="5" class="muted">Servis satırı yok</td>
+            </tr>
+            <tr th:each="line : ${visit.services}">
+              <td th:text="${line.serviceCode != null ? line.serviceCode : '—'}">—</td>
+              <td>
+                <span th:text="${line.serviceName}">—</span>
+                <div class="history-visit-sub"
+                     th:text="${(line.universalServiceId != null ? line.universalServiceId : '') + (line.serviceGroups != null && !line.serviceGroups.isEmpty() ? ' · ' + #strings.listJoin(line.serviceGroups, ', ') : '')}"></div>
+              </td>
+              <td class="num"
+                  th:text="${line.costAmount != null ? #numbers.formatDecimal(line.costAmount, 1, 2) + ' ' + (line.costCurrency != null ? line.costCurrency : 'AZN') : '—'}">—</td>
+              <td th:text="${line.nextServiceDate != null ? #temporals.format(line.nextServiceDate, 'dd.MM.yyyy') : '—'}">—</td>
+              <td class="num" th:text="${line.nextServiceMileage != null ? line.nextServiceMileage : '—'}">—</td>
+            </tr>
+            </tbody>
+          </table>
+          <h3>visit_parts</h3>
+          <table class="mini-table">
+            <thead>
+            <tr>
+              <th>name</th>
+              <th class="num">qty</th>
+              <th>unit</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${visit.parts == null || visit.parts.isEmpty()}">
+              <td colspan="3" class="muted">Parça yok</td>
+            </tr>
+            <tr th:each="part : ${visit.parts}">
+              <td th:text="${part.name}">—</td>
+              <td class="num" th:text="${part.qty}">—</td>
+              <td th:text="${part.unit}">—</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </th:block>
+</main>
+<script src="/admin/admin.js?v=premium3"></script>
+<script>
+  (function () {
+    var list = document.getElementById("visitList");
+    if (!list) return;
+    var emptyFilter = document.getElementById("emptyFilter");
+    var sortSel = document.getElementById("histSort");
+    var src = "all";
+
+    function cards() {
+      return Array.prototype.slice.call(list.querySelectorAll(".history-visit"));
+    }
+    function apply() {
+      var items = cards();
+      items.sort(function (a, b) {
+        var da = a.getAttribute("data-date") || "";
+        var db = b.getAttribute("data-date") || "";
+        var ia = Number(a.getAttribute("data-id") || 0);
+        var ib = Number(b.getAttribute("data-id") || 0);
+        var asc = sortSel.value === "asc";
+        if (da === db) return asc ? ia - ib : ib - ia;
+        if (asc) return da < db ? -1 : 1;
+        return da > db ? -1 : 1;
+      });
+      items.forEach(function (el) { list.appendChild(el); });
+      var shown = 0;
+      items.forEach(function (el) {
+        var match = src === "all" || el.getAttribute("data-source") === src;
+        el.hidden = !match;
+        if (match) shown++;
+      });
+      if (emptyFilter) emptyFilter.hidden = shown !== 0;
+    }
+    document.querySelectorAll(".history-seg button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        src = btn.getAttribute("data-src");
+        document.querySelectorAll(".history-seg button").forEach(function (b) {
+          b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+        });
+        apply();
+      });
+    });
+    if (sortSel) sortSel.addEventListener("change", apply);
+  })();
+</script>
+</body>
+</html>

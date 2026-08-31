@@ -5,6 +5,7 @@ import com.carland.carland_service.entity.Customer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Optional;
  * tr: Car entity'si için JPA repository; araçları VIN, plaka, müşteri ve id'ye göre sorgular.
  * en: JPA repository for the Car entity; queries cars by VIN, plate number, customer and id.
  */
-public interface CarRepository extends JpaRepository<Car, Long> {
+public interface CarRepository extends JpaRepository<Car, Long>, JpaSpecificationExecutor<Car> {
 
     /** tr: VIN'e göre aracı bulur. / en: Finds a car by VIN. */
     Car findByVin(String vin);

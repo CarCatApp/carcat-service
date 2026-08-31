@@ -138,9 +138,46 @@
     host.insertBefore(bar, wrap);
   }
 
+  function initExpandCells(selector) {
+    var sel = selector || ".cell-clip";
+    function collapse(el) {
+      if (!el) return;
+      el.classList.remove("is-open");
+      el.setAttribute("aria-expanded", "false");
+      var td = el.closest("td");
+      if (td) td.classList.remove("is-open");
+    }
+    function collapseAll(except) {
+      document.querySelectorAll(sel + ".is-open").forEach(function (el) {
+        if (el !== except) collapse(el);
+      });
+    }
+    document.addEventListener("click", function (e) {
+      var cell = e.target.closest(sel);
+      if (cell) {
+        var opening = !cell.classList.contains("is-open");
+        collapseAll(cell);
+        if (opening) {
+          cell.classList.add("is-open");
+          cell.setAttribute("aria-expanded", "true");
+          var td = cell.closest("td");
+          if (td) td.classList.add("is-open");
+        } else {
+          collapse(cell);
+        }
+        return;
+      }
+      collapseAll(null);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") collapseAll(null);
+    });
+  }
+
   global.CarlandAdmin = {
     formatAdminDate: formatAdminDate,
     confirmModal: confirmModal,
-    initColumnToggle: initColumnToggle
+    initColumnToggle: initColumnToggle,
+    initExpandCells: initExpandCells
   };
 })(window);

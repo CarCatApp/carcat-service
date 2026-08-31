@@ -4,22 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cars — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium1">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium3">
   <style>
-    col.c-vin           { width: 165px; }
-    col.c-plate         { width: 105px; }
-    col.c-brand         { width: 110px; }
-    col.c-model         { width: 120px; }
-    col.c-year          { width: 70px; }
-    col.c-engine        { width: 105px; }
-    col.c-engine-id     { width: 80px; }
-    col.c-volume        { width: 85px; }
-    col.c-transmission  { width: 115px; }
-    col.c-body          { width: 100px; }
-    col.c-mileage       { width: 90px; }
-    col.c-created       { width: 160px; }
-    col.c-updated       { width: 160px; }
-    .data-table { min-width: 1350px; }
+    col.c-hist     { width: 100px; }
+    col.c-vin      { width: 165px; }
+    col.c-plate    { width: 105px; }
+    col.c-brand    { width: 110px; }
+    col.c-model    { width: 120px; }
+    col.c-year     { width: 70px; }
+    col.c-engine   { width: 105px; }
+    col.c-volume   { width: 85px; }
+    col.c-body     { width: 72px; }
+    col.c-mileage  { width: 90px; }
+    col.c-created  { width: 160px; }
+    col.c-updated  { width: 160px; }
+    .data-table { min-width: 1180px; }
+    .vin-input { font-family: ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; }
   </style>
 </head>
 <body>
@@ -39,7 +39,8 @@
     </nav>
   </div>
   <div class="topbar-actions">
-    <a class="btn btn-excel" href="/admin/cars/export">
+    <a class="btn btn-excel"
+       th:href="@{/admin/cars/export(userId=${filterUserId}, vin=${filterVin})}">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel
     </a>
@@ -55,23 +56,34 @@
 
   <div class="filter-banner" th:if="${filterUserId != null}">
     <span>Sadece <strong th:text="'User #' + ${filterUserId}"></strong> kullanıcısının araçları gösteriliyor</span>
-    <a href="/admin/cars">Tüm araçları göster &#215;</a>
+    <a th:href="@{/admin/cars(vin=${filterVin})}">Tüm araçları göster &#215;</a>
     <a href="/admin/users">&#8592; Users listesine dön</a>
   </div>
+
+  <form class="filter-bar" method="get" action="/admin/cars">
+    <input type="hidden" name="userId" th:if="${filterUserId != null}" th:value="${filterUserId}">
+    <div class="filter-field">
+      <label for="vin">VIN</label>
+      <input class="vin-input" type="text" id="vin" name="vin" maxlength="17" spellcheck="false" autocomplete="off"
+             placeholder="WBAJA9C5…" th:value="${filterVin}">
+    </div>
+    <button class="btn btn-filter" type="submit">Ara</button>
+    <a class="btn btn-clear" th:if="${filterVin != null}"
+       th:href="${filterUserId != null} ? @{/admin/cars(userId=${filterUserId})} : @{/admin/cars}">Temizle</a>
+  </form>
 
   <div class="card">
     <div class="table-wrap">
       <table class="data-table" id="carsTable">
         <colgroup>
+          <col class="c-hist">
           <col class="c-vin">
           <col class="c-plate">
           <col class="c-brand">
           <col class="c-model">
           <col class="c-year">
           <col class="c-engine">
-          <col class="c-engine-id">
           <col class="c-volume">
-          <col class="c-transmission">
           <col class="c-body">
           <col class="c-mileage">
           <col class="c-created">
@@ -79,15 +91,14 @@
         </colgroup>
         <thead>
         <tr>
+          <th></th>
           <th>VIN</th>
           <th>Plate Number</th>
           <th>Brand</th>
           <th>Model</th>
           <th>Year</th>
           <th>Engine Type</th>
-          <th>Engine ID</th>
           <th>Volume</th>
-          <th>Transmission</th>
           <th>Body</th>
           <th>Mileage</th>
           <th>Created At</th>
@@ -96,16 +107,25 @@
         </thead>
         <tbody>
         <tr th:each="car : ${cars.content}">
+          <td>
+            <a class="btn-cars" th:href="@{/admin/cars/{id}/history(id=${car.carId})}">History</a>
+          </td>
           <td class="vin" th:text="${car.vin}" th:title="${car.vin}"></td>
           <td th:text="${car.plateNumber}"></td>
           <td th:text="${car.brand}"></td>
           <td th:text="${car.model}"></td>
           <td th:text="${car.modelYear}"></td>
           <td th:text="${car.engineType}"></td>
-          <td th:text="${car.engineTypeId}"></td>
           <td th:text="${car.engineVolume}"></td>
-          <td th:text="${car.transmissionType}"></td>
-          <td th:text="${car.bodyType}"></td>
+          <td class="cell-clip-td">
+            <button type="button" class="cell-clip"
+                    th:if="${!#strings.isEmpty(car.bodyType)}"
+                    th:text="${car.bodyType}"
+                    th:title="${car.bodyType}"
+                    aria-label="Show full body type"
+                    aria-expanded="false"></button>
+            <span class="muted" th:if="${#strings.isEmpty(car.bodyType)}">—</span>
+          </td>
           <td th:text="${car.mileage}"></td>
           <td class="muted"
               th:text="${car.createdAt != null ? #temporals.format(car.createdAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
@@ -113,7 +133,7 @@
               th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
         </tr>
         <tr class="empty-row" th:if="${cars.content.isEmpty()}">
-          <td colspan="13">Kayıt bulunamadı</td>
+          <td colspan="12">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -126,38 +146,39 @@
       <nav class="pages">
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage - 1}, userId=${filterUserId})}">
+           th:href="@{/admin/cars(page=${currentPage - 1}, userId=${filterUserId}, vin=${filterVin})}">
           &#8592; Previous
         </a>
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/cars(page=1, userId=${filterUserId})}">1</a>
+           th:href="@{/admin/cars(page=1, userId=${filterUserId}, vin=${filterVin})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/cars(page=${p}, userId=${filterUserId})}"
+           th:href="@{/admin/cars(page=${p}, userId=${filterUserId}, vin=${filterVin})}"
            th:text="${p}">1</a>
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/cars(page=${totalPages}, userId=${filterUserId})}"
+           th:href="@{/admin/cars(page=${totalPages}, userId=${filterUserId}, vin=${filterVin})}"
            th:text="${totalPages}"></a>
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage + 1}, userId=${filterUserId})}">
+           th:href="@{/admin/cars(page=${currentPage + 1}, userId=${filterUserId}, vin=${filterVin})}">
           Next &#8594;
         </a>
       </nav>
     </div>
   </div>
 </main>
-<script src="/admin/admin.js?v=premium1"></script>
+<script src="/admin/admin.js?v=premium3"></script>
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("carsTable"),
-    "carland-admin-cols-cars",
-    ["VIN", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Engine ID", "Volume", "Transmission", "Body", "Mileage", "Created At", "Updated At"],
-    [6, 7]
+    "carland-admin-cols-cars-v3",
+    ["History", "VIN", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
+    []
   );
+  CarlandAdmin.initExpandCells(".cell-clip");
 </script>
 </body>
 </html>

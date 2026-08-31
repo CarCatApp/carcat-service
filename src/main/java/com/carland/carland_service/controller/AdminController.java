@@ -5,12 +5,16 @@ import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Feedback;
 import com.carland.carland_service.entity.FeedbackPhoto;
+import com.carland.carland_service.entity.Visit;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CarSpec;
 import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
+import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,7 +41,9 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +61,8 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final CarRepository carRepository;
+
+    private final VisitRepository visitRepository;
 
     private final FeedbackRepository feedbackRepository;
 
@@ -129,13 +138,14 @@ public class AdminController {
     // ==================== CARS ====================
 
     /**
-     * tr: Araç listesini sayfa sayfa gösterir; opsiyonel userId filtresi uygular, login yoksa admin giriş sayfasına yönlendirir.
-     * en: Shows the car list page by page; applies an optional userId filter and redirects to the admin login page if the session is not authenticated.
+     * tr: Araç listesini sayfa sayfa gösterir; VIN / userId filtresi, carId DESC (yeni kayıt üstte).
+     * en: Paginated car list; VIN / userId filters, carId DESC (newest first).
      */
     @GetMapping("/admin/cars")
     public String cars(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String vin,
             HttpServletRequest request,
             Model model
     ) {
@@ -144,19 +154,19 @@ public class AdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
 
-        // URL 1'den başlar, Spring Data 0'dan — burada çeviriyoruz
         int pageIndex = Math.max(page, 1) - 1;
-
-        Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE);
-
-        Page<Car> carPage = (userId != null)
-                ? carRepository.findByCustomer_UserId(userId, pageable)
-                : carRepository.findAll(pageable);
+        String vinFilter = blankToNull(vin);
+        if (vinFilter != null) {
+            vinFilter = vinFilter.replace(" ", "");
+        }
+        Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE, Sort.by(Sort.Direction.DESC, "carId"));
+        Page<Car> carPage = carRepository.findAll(CarSpec.filters(userId, vinFilter), pageable);
 
         addPaginationAttributes(model, carPage.getTotalPages(), pageIndex);
 
         model.addAttribute("cars", carPage);
         model.addAttribute("filterUserId", userId);
+        model.addAttribute("filterVin", vinFilter);
 
         return "cars";
     }
@@ -168,6 +178,8 @@ public class AdminController {
      */
     @GetMapping("/admin/cars/export")
     public void exportCars(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String vin,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -177,7 +189,13 @@ public class AdminController {
             return;
         }
 
-        List<Car> cars = carRepository.findAll(Sort.by("carId"));
+        String vinFilter = blankToNull(vin);
+        if (vinFilter != null) {
+            vinFilter = vinFilter.replace(" ", "");
+        }
+        List<Car> cars = carRepository.findAll(
+                CarSpec.filters(userId, vinFilter),
+                Sort.by(Sort.Direction.DESC, "carId"));
 
         try (Workbook workbook = new XSSFWorkbook()) {
 
@@ -212,8 +230,56 @@ public class AdminController {
                 setCell(row, 12, formatDate(car.getUpdatedAt()));
             }
 
-            writeWorkbook(workbook, sheet, headers.length, "cars", response);
+            String baseName = (userId != null || vinFilter != null) ? "cars-filtered" : "cars";
+            writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
+    }
+
+
+    /**
+     * tr: Araç partner servis geçmişini (visits) DB'den gösterir; Hyper API çağırmaz.
+     * en: Shows the car's partner service history from DB visits; does not call Hyper.
+     */
+    @Transactional(readOnly = true)
+    @GetMapping("/admin/cars/{carId:\\d+}/history")
+    public String carHistory(
+            @PathVariable Long carId,
+            HttpServletRequest request,
+            Model model
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+
+        Car car = carRepository.findByCarId(carId);
+        if (car == null) {
+            model.addAttribute("carMissing", true);
+            return "car-history";
+        }
+
+        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        for (Visit visit : visits) {
+            if (visit.getParts() != null) {
+                visit.getParts().size();
+            }
+        }
+
+        long hyperCount = visits.stream()
+                .filter(v -> PartnerId.HYPER.getId().equals(v.getServiceCenterId()))
+                .count();
+        long avtoCount = visits.stream()
+                .filter(v -> PartnerId.AVTOVAZ.getId().equals(v.getServiceCenterId()))
+                .count();
+
+        String phone = car.getCustomer() != null ? car.getCustomer().getPhoneNumber() : null;
+
+        model.addAttribute("carMissing", false);
+        model.addAttribute("car", car);
+        model.addAttribute("visits", visits);
+        model.addAttribute("hyperCount", hyperCount);
+        model.addAttribute("avtoCount", avtoCount);
+        model.addAttribute("customerPhone", phone);
+        return "car-history";
     }
 
 
@@ -228,6 +294,7 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String phone,
             HttpServletRequest request,
             Model model
     ) {
@@ -236,11 +303,12 @@ public class AdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
 
+        String phoneFilter = blankToNull(phone);
         List<AuthUser> allUsers;
         boolean loadError = false;
 
         try {
-            allUsers = fetchUsers(from, to);
+            allUsers = fetchUsers(from, to, phoneFilter);
         } catch (Exception e) {
             log.error("carland_auth user listesi alınamadı", e);
             allUsers = Collections.emptyList();
@@ -268,6 +336,7 @@ public class AdminController {
         model.addAttribute("totalUsers", allUsers.size());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        model.addAttribute("filterPhone", phoneFilter);
         model.addAttribute("loadError", loadError);
 
         return "users";
@@ -282,6 +351,7 @@ public class AdminController {
     public void exportUsers(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String phone,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -291,7 +361,8 @@ public class AdminController {
             return;
         }
 
-        List<AuthUser> users = fetchUsers(from, to);
+        String phoneFilter = blankToNull(phone);
+        List<AuthUser> users = fetchUsers(from, to, phoneFilter);
 
         try (Workbook workbook = new XSSFWorkbook()) {
 
@@ -314,7 +385,7 @@ public class AdminController {
                 setCell(row, 5, formatDate(user.getCreatedAt()));
             }
 
-            String baseName = (from != null || to != null) ? "users-filtered" : "users";
+            String baseName = (from != null || to != null || phoneFilter != null) ? "users-filtered" : "users";
 
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
@@ -493,11 +564,27 @@ public class AdminController {
 
     // ==================== helpers ====================
 
-    private List<AuthUser> fetchUsers(LocalDate from, LocalDate to) {
-        return authUsersFeign.getUserList(
+    private List<AuthUser> fetchUsers(LocalDate from, LocalDate to, String phone) {
+        List<AuthUser> users = authUsersFeign.getUserList(
                 from != null ? from.toString() : null,
                 to != null ? to.toString() : null
         );
+        if (users == null) {
+            users = Collections.emptyList();
+        }
+        List<AuthUser> copy = new ArrayList<>(users);
+        copy.sort(Comparator.comparing(AuthUser::getId, Comparator.nullsLast(Comparator.reverseOrder())));
+        if (phone != null && !phone.isBlank()) {
+            String needle = phone.replaceAll("\\s+", "").toLowerCase();
+            copy.removeIf(user -> {
+                String p = user.getPhoneNumber();
+                if (p == null) {
+                    return true;
+                }
+                return !p.replaceAll("\\s+", "").toLowerCase().contains(needle);
+            });
+        }
+        return copy;
     }
 
     /** currentPage / totalPages / windowStart / windowEnd model attribute'larını doldurur (1 tabanlı). */
