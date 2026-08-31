@@ -3,7 +3,6 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
 import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
-import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
 import com.carland.carland_service.entity.AppVersion;
@@ -19,11 +18,11 @@ public interface FeatureFlagService {
 
     FeatureFlagMeItem me(String roleHeader, String appVersionHeader);
 
-    Map<String, Object> adminSnapshot(String semver);
+    Map<String, Object> adminSnapshot();
 
     List<Map<String, Object>> listFlags();
 
-    Map<String, Object> flagDetail(Long id, String semver);
+    Map<String, Object> flagDetail(Long id);
 
     Map<String, Object> availableEndpoints(int page, int size);
 
@@ -37,8 +36,6 @@ public interface FeatureFlagService {
 
     Map<String, Object> listAudit(int page, int size, String flagName);
 
-    List<Map<String, Object>> listVersions();
-
     FeatureFlag createFlag(FeatureFlagWriteRequest request, String actor);
 
     FeatureFlag updateFlag(Long id, FeatureFlagWriteRequest request, String actor);
@@ -50,10 +47,6 @@ public interface FeatureFlagService {
     void detachEndpoint(Long flagId, Long endpointId, String actor);
 
     FeatureFlagAudit updateState(FeatureFlagStateUpdateRequest request, String actor);
-
-    AppVersion createVersion(FeatureFlagVersionCreateRequest request);
-
-    AppVersion setCurrentVersion(String semver);
 
     FeatureFlagState resolve(String httpMethod, String requestPath, String role, String appVersionHeader);
 

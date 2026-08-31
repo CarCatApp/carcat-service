@@ -245,7 +245,7 @@ public class OpenApiConfig {
                 }
 
                 if ("X-App-Version".equalsIgnoreCase(name)) {
-                    param.setDescription("App semver for `/me` and role-state snapshot. Unknown falls back to current.");
+                    param.setDescription("Client SemVer (e.g. 2.1.10). Flags apply only when this is ≥ each flag's minAvailableVersion. Missing/invalid → flags omitted from /me and guards do not apply.");
                     param.setSchema(new StringSchema().example("2.1.0"));
                 }
             }

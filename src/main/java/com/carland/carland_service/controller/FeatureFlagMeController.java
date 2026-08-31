@@ -27,6 +27,7 @@ public class FeatureFlagMeController {
 
     @Operation(summary = "GET /me (caller role)",
             description = "Returns named flags for the Kong/JWT `role` header and `X-App-Version`. "
+                    + "A flag is omitted when the client version is below minAvailableVersion. "
                     + "Any authenticated app role. Panel phone is not required.")
     @GetMapping("/me")
     public ResponseEntity<?> me(

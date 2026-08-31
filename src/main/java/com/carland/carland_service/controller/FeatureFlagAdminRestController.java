@@ -3,10 +3,7 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
 import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
-import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
-import com.carland.carland_service.dto.request.FeatureFlagVersionCurrentRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
-import com.carland.carland_service.entity.AppVersion;
 import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.security.AdminAccessService;
@@ -51,7 +48,6 @@ public class FeatureFlagAdminRestController {
     @GetMapping(value = "/admin/feature-flags/{id:\\d+}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getOne(
             @PathVariable Long id,
-            @RequestParam(required = false) String version,
             HttpServletRequest request
     ) {
         ResponseEntity<?> denied = guard(request);
@@ -59,7 +55,7 @@ public class FeatureFlagAdminRestController {
             return denied;
         }
         try {
-            return ResponseEntity.ok(featureFlagService.flagDetail(id, version));
+            return ResponseEntity.ok(featureFlagService.flagDetail(id));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
@@ -77,7 +73,7 @@ public class FeatureFlagAdminRestController {
         }
         try {
             FeatureFlag flag = featureFlagService.createFlag(body, adminAccessService.actor(request));
-            return ResponseEntity.status(HttpStatus.CREATED).body(featureFlagService.flagDetail(flag.getId(), null));
+            return ResponseEntity.status(HttpStatus.CREATED).body(featureFlagService.flagDetail(flag.getId()));
         } catch (IllegalStateException ex) {
             return conflict(ex);
         } catch (IllegalArgumentException ex) {
@@ -98,7 +94,7 @@ public class FeatureFlagAdminRestController {
         }
         try {
             featureFlagService.updateFlag(id, body, adminAccessService.actor(request));
-            return ResponseEntity.ok(featureFlagService.flagDetail(id, null));
+            return ResponseEntity.ok(featureFlagService.flagDetail(id));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
@@ -302,67 +298,12 @@ public class FeatureFlagAdminRestController {
 
     @Operation(summary = "Admin snapshot (panel one-shot)")
     @GetMapping(value = "/admin/feature-flags/snapshot", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> snapshot(
-            @RequestParam(required = false) String version,
-            HttpServletRequest request
-    ) {
+    public ResponseEntity<?> snapshot(HttpServletRequest request) {
         ResponseEntity<?> denied = guard(request);
         if (denied != null) {
             return denied;
         }
-        return ResponseEntity.ok(featureFlagService.adminSnapshot(version));
-    }
-
-    @Operation(summary = "List app versions")
-    @GetMapping(value = "/admin/feature-flags/versions", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> versions(HttpServletRequest request) {
-        ResponseEntity<?> denied = guard(request);
-        if (denied != null) {
-            return denied;
-        }
-        return ResponseEntity.ok(featureFlagService.listVersions());
-    }
-
-    @Operation(summary = "Create app version", description = "Always copies the flag grid of the version marked current.")
-    @PostMapping(value = "/admin/feature-flags/versions", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> createVersion(
-            @RequestBody FeatureFlagVersionCreateRequest body,
-            HttpServletRequest request
-    ) {
-        ResponseEntity<?> denied = guard(request);
-        if (denied != null) {
-            return denied;
-        }
-        try {
-            AppVersion created = featureFlagService.createVersion(body);
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                    "semver", created.getSemver(),
-                    "current", created.isCurrent()
-            ));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
-        }
-    }
-
-    @Operation(summary = "Set current app version")
-    @PostMapping(value = "/admin/feature-flags/versions/current", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> setCurrent(
-            @RequestBody FeatureFlagVersionCurrentRequest body,
-            HttpServletRequest request
-    ) {
-        ResponseEntity<?> denied = guard(request);
-        if (denied != null) {
-            return denied;
-        }
-        try {
-            AppVersion updated = featureFlagService.setCurrentVersion(body.getSemver());
-            return ResponseEntity.ok(Map.of(
-                    "semver", updated.getSemver(),
-                    "current", updated.isCurrent()
-            ));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
-        }
+        return ResponseEntity.ok(featureFlagService.adminSnapshot());
     }
 
     private ResponseEntity<?> writeState(

@@ -3,8 +3,8 @@ package com.carland.carland_service.service.impl;
 import com.carland.carland_service.dto.request.FeatureFlagAttachRequest;
 import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
-import com.carland.carland_service.dto.request.FeatureFlagVersionCreateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
+import com.carland.carland_service.util.SemVer;
 import com.carland.carland_service.dto.response.FeatureFlagEndpointView;
 import com.carland.carland_service.dto.response.FeatureFlagMeGroup;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
@@ -66,16 +66,19 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         if (role == null) {
             throw new IllegalArgumentException("role header required (USER|ADMIN|SUPER_ADMIN|BOSS)");
         }
-        AppVersion version = resolveVersion(appVersionHeader);
+        String clientVersion = blankToNull(appVersionHeader);
         List<FeatureFlag> flags = flagRepository.findByDeletedAtIsNullOrderByNameAsc();
         Map<String, FeatureFlagState> stateByFlag = new LinkedHashMap<>();
-        for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
+        for (FeatureFlagRoleState row : roleStateRepository.findAllFetchFlag()) {
             if (row.getRole() == role && row.getFlag() != null && row.getFlag().getDeletedAt() == null) {
                 stateByFlag.put(row.getFlag().getName(), row.getState());
             }
         }
         Map<String, FeatureFlagMeGroup> out = new LinkedHashMap<>();
         for (FeatureFlag flag : flags) {
+            if (!SemVer.isAtLeast(clientVersion, minOf(flag))) {
+                continue;
+            }
             FeatureFlagState state = stateByFlag.get(flag.getName());
             if (state == null) {
                 continue;
@@ -93,7 +96,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         return FeatureFlagMeItem.builder()
                 .role(role.name())
-                .appVersion(version.getSemver())
+                .appVersion(clientVersion)
                 .evaluatedAt(Instant.now().toString())
                 .flags(out)
                 .build();
@@ -101,27 +104,16 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<String, Object> adminSnapshot(String semver) {
-        AppVersion version = resolveVersion(semver);
+    public Map<String, Object> adminSnapshot() {
         List<FeatureFlag> flags = flagRepository.findByDeletedAtIsNullOrderByNameAsc();
         Map<String, FeatureFlagState> stateIndex = new LinkedHashMap<>();
-        for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
+        for (FeatureFlagRoleState row : roleStateRepository.findAllFetchFlag()) {
             if (row.getFlag() != null) {
                 stateIndex.put(row.getFlag().getId() + "|" + row.getRole().name(), row.getState());
             }
         }
         List<Map<String, Object>> flagDtos = new ArrayList<>();
         for (FeatureFlag flag : flags) {
-            boolean inVersion = false;
-            for (UserRoles role : GRID_ROLES) {
-                if (stateIndex.containsKey(flag.getId() + "|" + role.name())) {
-                    inVersion = true;
-                    break;
-                }
-            }
-            if (!inVersion) {
-                continue;
-            }
             Map<String, String> states = new LinkedHashMap<>();
             for (UserRoles role : GRID_ROLES) {
                 FeatureFlagState st = stateIndex.get(flag.getId() + "|" + role.name());
@@ -135,11 +127,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 e.put("path", ep.getPathPattern());
                 eps.add(e);
             }
-            Map<String, Object> dto = new LinkedHashMap<>();
-            dto.put("id", flag.getId());
-            dto.put("name", flag.getName());
-            dto.put("description", flag.getDescription());
-            dto.put("defaultState", flag.getDefaultState().name());
+            Map<String, Object> dto = flagSummary(flag);
             dto.put("states", states);
             dto.put("endpoints", eps);
             flagDtos.add(dto);
@@ -148,23 +136,14 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         for (FeatureFlagEndpoint ep : endpointRepository.findAllByOrderByPathPatternAscHttpMethodAsc()) {
             catalog.add(FeatureFlagAdminSupport.endpointDto(ep));
         }
-        List<Map<String, Object>> versions = new ArrayList<>();
-        for (AppVersion v : appVersionRepository.findAllByOrderByCreatedAtDesc()) {
-            Map<String, Object> vd = new LinkedHashMap<>();
-            vd.put("semver", v.getSemver());
-            vd.put("current", v.isCurrent());
-            versions.add(vd);
-        }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", version.getSemver());
-        body.put("current", version.isCurrent());
         body.put("roles", List.of("USER", "ADMIN", "SUPER_ADMIN", "BOSS"));
-        body.put("versions", versions);
         body.put("flags", flagDtos);
         body.put("catalog", catalog);
         body.put("availableEndpoints", catalog.stream().filter(e -> Boolean.FALSE.equals(e.get("claimed")) && Boolean.FALSE.equals(e.get("neverGuard"))).toList());
-        body.put("audit", auditRepository.findTop50ByAppVersionOrderByCreatedAtDesc(version.getSemver())
-                .stream().map(FeatureFlagAdminSupport::auditDto).toList());
+        body.put("audit", auditRepository.findAllByOrderByCreatedAtDesc(
+                        FeatureFlagAdminSupport.pageRequest(0, 10)).getContent().stream()
+                .map(FeatureFlagAdminSupport::auditDto).toList());
         return body;
     }
 
@@ -180,14 +159,10 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
 
     @Override
     @Transactional(readOnly = true)
-    public Map<String, Object> flagDetail(Long id, String semver) {
+    public Map<String, Object> flagDetail(Long id) {
         FeatureFlag flag = liveFlag(id);
-        AppVersion version = resolveVersion(semver);
-        if (!roleStateRepository.existsByFlagAndVersion(flag, version)) {
-            throw new IllegalArgumentException("FLAG_NOT_IN_VERSION");
-        }
         Map<String, FeatureFlagState> stateIndex = new LinkedHashMap<>();
-        for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
+        for (FeatureFlagRoleState row : roleStateRepository.findAllFetchFlag()) {
             if (row.getFlag() != null && row.getFlag().getId().equals(id)) {
                 stateIndex.put(row.getRole().name(), row.getState());
             }
@@ -206,7 +181,6 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             eps.add(e);
         }
         Map<String, Object> dto = flagSummary(flag);
-        dto.put("version", version.getSemver());
         dto.put("states", states);
         dto.put("endpoints", eps);
         return dto;
@@ -318,25 +292,13 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .toList());
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> listVersions() {
-        List<Map<String, Object>> versions = new ArrayList<>();
-        for (AppVersion v : appVersionRepository.findAllByOrderByCreatedAtDesc()) {
-            Map<String, Object> vd = new LinkedHashMap<>();
-            vd.put("semver", v.getSemver());
-            vd.put("current", v.isCurrent());
-            versions.add(vd);
-        }
-        return versions;
-    }
-
     private Map<String, Object> flagSummary(FeatureFlag flag) {
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", flag.getId());
         dto.put("name", flag.getName());
         dto.put("description", flag.getDescription());
         dto.put("defaultState", flag.getDefaultState() != null ? flag.getDefaultState().name() : null);
+        dto.put("minAvailableVersion", flag.getMinAvailableVersion());
         dto.put("createdAt", flag.getCreatedAt() != null ? flag.getCreatedAt().toString() : null);
         dto.put("updatedAt", flag.getUpdatedAt() != null ? flag.getUpdatedAt().toString() : null);
         return dto;
@@ -354,15 +316,17 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         FeatureFlagState defaultState = request.getDefaultState() != null
                 ? request.getDefaultState() : FeatureFlagState.HIDDEN;
+        String minVersion = requireMinVersion(request.getMinAvailableVersion());
         FeatureFlag flag = flagRepository.save(FeatureFlag.builder()
                 .name(name)
                 .description(request.getDescription())
                 .defaultState(defaultState)
+                .minAvailableVersion(minVersion)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build());
-        seedRoleStates(flag, defaultState, request.getVersion());
-        audit(actor, "CREATE", "FLAG", name, null, defaultState, currentSemverCache.get(), flag, UserRoles.ADMIN);
+        seedRoleStates(flag, defaultState);
+        audit(actor, "CREATE", "FLAG", name, null, defaultState, minVersion, flag, UserRoles.ADMIN);
         reloadCache();
         return flag;
     }
@@ -378,9 +342,13 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         if (request.getDefaultState() != null) {
             flag.setDefaultState(request.getDefaultState());
         }
+        if (request.getMinAvailableVersion() != null && !request.getMinAvailableVersion().isBlank()) {
+            flag.setMinAvailableVersion(requireMinVersion(request.getMinAvailableVersion()));
+        }
         flag.setUpdatedAt(LocalDateTime.now());
         flagRepository.save(flag);
-        audit(actor, "UPDATE", "FLAG", flag.getName(), oldDefault, flag.getDefaultState(), currentSemverCache.get(), flag, UserRoles.ADMIN);
+        audit(actor, "UPDATE", "FLAG", flag.getName(), oldDefault, flag.getDefaultState(),
+                flag.getMinAvailableVersion(), flag, UserRoles.ADMIN);
         reloadCache();
         return flag;
     }
@@ -446,78 +414,17 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         if (request.getFlagId() == null || request.getRole() == null || request.getState() == null) {
             throw new IllegalArgumentException("flagId, role, state required");
         }
-        AppVersion version = resolveVersion(request.getVersion());
         FeatureFlag flag = liveFlag(request.getFlagId());
         FeatureFlagRoleState row = roleStateRepository
-                .findByFlagAndVersionAndRole(flag, version, request.getRole())
-                .orElseThrow(() -> new IllegalArgumentException("FLAG_NOT_IN_VERSION"));
+                .findFirstByFlagAndRole(flag, request.getRole())
+                .orElseThrow(() -> new IllegalArgumentException("FLAG_STATE_NOT_FOUND"));
         FeatureFlagState oldState = row.getState();
         row.setState(request.getState());
         roleStateRepository.save(row);
         FeatureFlagAudit saved = audit(actor, "STATE", flag.getName(), request.getRole().name(),
-                oldState, request.getState(), version.getSemver(), flag, request.getRole());
+                oldState, request.getState(), flag.getMinAvailableVersion(), flag, request.getRole());
         reloadCache();
         return saved;
-    }
-
-    /**
-     * tr: Yeni version her zaman is_current grid'ini kopyalar; copyFrom yok sayılır.
-     * en: New version always copies the is_current grid; copyFrom is ignored.
-     */
-    @Override
-    @Transactional
-    public AppVersion createVersion(FeatureFlagVersionCreateRequest request) {
-        String semver = request.getSemver() == null ? "" : request.getSemver().trim();
-        if (semver.isBlank()) {
-            throw new IllegalArgumentException("semver required");
-        }
-        if (appVersionRepository.findBySemver(semver).isPresent()) {
-            throw new IllegalArgumentException("Version already exists");
-        }
-        AppVersion source = appVersionRepository.findByCurrentTrue()
-                .orElseThrow(() -> new IllegalArgumentException("No current version"));
-        boolean makeCurrent = request.isMakeCurrent();
-        if (makeCurrent) {
-            appVersionRepository.findByCurrentTrue().ifPresent(current -> {
-                current.setCurrent(false);
-                appVersionRepository.save(current);
-            });
-        }
-        AppVersion created = appVersionRepository.save(AppVersion.builder()
-                .semver(semver)
-                .current(makeCurrent)
-                .createdAt(LocalDateTime.now())
-                .build());
-        for (FeatureFlagRoleState src : roleStateRepository.findByVersionFetchFlag(source)) {
-            roleStateRepository.save(FeatureFlagRoleState.builder()
-                    .flag(src.getFlag())
-                    .version(created)
-                    .role(src.getRole())
-                    .state(src.getState())
-                    .build());
-        }
-        reloadCache();
-        return created;
-    }
-
-    @Override
-    @Transactional
-    public AppVersion setCurrentVersion(String semver) {
-        if (semver == null || semver.isBlank()) {
-            throw new IllegalArgumentException("semver required");
-        }
-        AppVersion target = appVersionRepository.findBySemver(semver.trim())
-                .orElseThrow(() -> new IllegalArgumentException("Unknown version " + semver));
-        if (!target.isCurrent()) {
-            appVersionRepository.findByCurrentTrue().ifPresent(current -> {
-                current.setCurrent(false);
-                appVersionRepository.save(current);
-            });
-            target.setCurrent(true);
-            appVersionRepository.save(target);
-            reloadCache();
-        }
-        return target;
     }
 
     @Override
@@ -527,13 +434,15 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 || matched.getFlag().getDeletedAt() != null) {
             return FeatureFlagState.ENABLED;
         }
+        FeatureFlag flag = matched.getFlag();
+        if (!SemVer.isAtLeast(blankToNull(appVersionHeader), minOf(flag))) {
+            return FeatureFlagState.ENABLED;
+        }
         UserRoles parsedRole = parseRole(role);
         if (parsedRole == null) {
             return FeatureFlagState.HIDDEN;
         }
-        String version = resolveVersionSemver(appVersionHeader);
-        FeatureFlagState cached = stateCache.get()
-                .get(cacheKey(version, matched.getFlag().getId(), parsedRole));
+        FeatureFlagState cached = stateCache.get().get(cacheKey(flag.getId(), parsedRole));
         if (cached != null) {
             return cached;
         }
@@ -614,6 +523,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 ep.getFlag().getName();
                 ep.getFlag().getDeletedAt();
                 ep.getFlag().getDefaultState();
+                ep.getFlag().getMinAvailableVersion();
             }
         }
         endpointCache.set(List.copyOf(endpoints));
@@ -622,11 +532,9 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         for (FeatureFlag flag : flagRepository.findByDeletedAtIsNullOrderByNameAsc()) {
             defaults.put(flag.getId(), flag.getDefaultState());
         }
-        for (AppVersion version : appVersionRepository.findAll()) {
-            for (FeatureFlagRoleState row : roleStateRepository.findByVersionFetchFlag(version)) {
-                if (row.getFlag() != null) {
-                    states.put(cacheKey(version.getSemver(), row.getFlag().getId(), row.getRole()), row.getState());
-                }
+        for (FeatureFlagRoleState row : roleStateRepository.findAllFetchFlag()) {
+            if (row.getFlag() != null) {
+                states.put(cacheKey(row.getFlag().getId(), row.getRole()), row.getState());
             }
         }
         stateCache.set(Map.copyOf(states));
@@ -637,13 +545,14 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     }
 
     /**
-     * Seeds role states for one version only (current if semver blank). Does not write older versions.
+     * Seeds one ENABLED/DISABLED/HIDDEN row per role. Internally still ties to current AppVersion
+     * row for the leftover FK; resolution does not use that catalog.
      */
-    private void seedRoleStates(FeatureFlag flag, FeatureFlagState defaultState, String semver) {
-        AppVersion version = resolveVersion(semver);
-        if (roleStateRepository.existsByFlagAndVersion(flag, version)) {
+    private void seedRoleStates(FeatureFlag flag, FeatureFlagState defaultState) {
+        if (roleStateRepository.existsByFlag(flag)) {
             return;
         }
+        AppVersion version = ensureCurrentVersion();
         for (UserRoles role : GRID_ROLES) {
             roleStateRepository.save(FeatureFlagRoleState.builder()
                     .flag(flag)
@@ -693,19 +602,27 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         return null;
     }
 
-    private AppVersion resolveVersion(String semver) {
-        if (semver != null && !semver.isBlank()) {
-            return appVersionRepository.findBySemver(semver.trim())
-                    .orElseGet(this::ensureCurrentVersion);
+    private String requireMinVersion(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("minAvailableVersion required");
         }
-        return ensureCurrentVersion();
+        SemVer parsed = SemVer.parse(raw.trim());
+        return parsed.toString();
     }
 
-    private String resolveVersionSemver(String header) {
-        if (header != null && !header.isBlank()) {
-            return header.trim();
+    private static String minOf(FeatureFlag flag) {
+        String min = flag.getMinAvailableVersion();
+        if (min == null || min.isBlank()) {
+            return "0.0.0";
         }
-        return currentSemverCache.get();
+        return min;
+    }
+
+    private static String blankToNull(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim();
     }
 
     private UserRoles parseRole(String role) {
@@ -719,8 +636,8 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
     }
 
-    private String cacheKey(String version, Long flagId, UserRoles role) {
-        return version + "|" + flagId + "|" + role.name();
+    private String cacheKey(Long flagId, UserRoles role) {
+        return flagId + "|" + role.name();
     }
 
 }

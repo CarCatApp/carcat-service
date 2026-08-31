@@ -12,8 +12,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * tr: Guard edilen API'lerde rol+version state'e göre DISABLED→403, HIDDEN→404 uygular.
- * en: For guarded APIs applies DISABLED→403 and HIDDEN→404 from role+version state.
+ * tr: Guard edilen API: client min version altındaysa flag yok sayılır (geçer).
+ *     Aksi halde rol state DISABLED→403, HIDDEN→404.
+ * en: For guarded APIs: if the flag's minAvailableVersion is above the client, the flag
+ *     does not apply (pass). Otherwise DISABLED→403 and HIDDEN→404 from role state.
  */
 @Component
 @RequiredArgsConstructor

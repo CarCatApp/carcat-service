@@ -9,6 +9,6 @@ public class FeatureFlagWriteRequest {
     String name;
     String description;
     FeatureFlagState defaultState;
-    /** Optional semver to seed. Blank → current version only (not all versions). */
-    String version;
+    /** SemVer: flag applies to clients ≥ this version. Required on create. */
+    String minAvailableVersion;
 }

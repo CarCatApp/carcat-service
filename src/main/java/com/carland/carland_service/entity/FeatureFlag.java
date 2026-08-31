@@ -36,6 +36,13 @@ public class FeatureFlag {
     @Column(name = "default_state", nullable = false, length = 16)
     FeatureFlagState defaultState;
 
+    /**
+     * tr: Bu flag ancak client app version ≥ bu SemVer ise uygulanır.
+     * en: Flag applies only when the client app version is ≥ this SemVer.
+     */
+    @Column(name = "min_available_version", nullable = false, length = 32, columnDefinition = "varchar(32) not null default '0.0.0'")
+    String minAvailableVersion;
+
     @Column(name = "deleted_at")
     LocalDateTime deletedAt;
 
