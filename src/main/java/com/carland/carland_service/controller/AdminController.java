@@ -333,6 +333,7 @@ public class AdminController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String withPhoto,
+            @RequestParam(required = false) String sort,
             HttpServletRequest request,
             Model model
     ) {
@@ -341,15 +342,17 @@ public class AdminController {
         }
 
         boolean photoOnly = isPhotoOnly(withPhoto);
+        boolean oldestFirst = isOldestFirst(sort);
         int pageIndex = Math.max(page, 1) - 1;
         Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE);
-        Page<Feedback> feedbackPage = fetchFeedbacks(type, phone, photoOnly, pageable);
+        Page<Feedback> feedbackPage = fetchFeedbacks(type, phone, photoOnly, oldestFirst, pageable);
 
         addPaginationAttributes(model, feedbackPage.getTotalPages(), pageIndex);
         model.addAttribute("feedbacks", feedbackPage);
         model.addAttribute("filterType", blankToNull(type));
         model.addAttribute("filterPhone", blankToNull(phone));
         model.addAttribute("filterWithPhoto", photoOnly);
+        model.addAttribute("filterOldestFirst", oldestFirst);
         model.addAttribute("photoIds", photoIdsOf(feedbackPage.getContent()));
         return "feedbacks";
     }
@@ -363,6 +366,7 @@ public class AdminController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String withPhoto,
+            @RequestParam(required = false) String sort,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -372,7 +376,8 @@ public class AdminController {
         }
 
         boolean photoOnly = isPhotoOnly(withPhoto);
-        List<Feedback> rows = fetchFeedbacks(type, phone, photoOnly, Pageable.unpaged()).getContent();
+        boolean oldestFirst = isOldestFirst(sort);
+        List<Feedback> rows = fetchFeedbacks(type, phone, photoOnly, oldestFirst, Pageable.unpaged()).getContent();
         Set<Long> photoIds = photoIdsOf(rows);
 
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -393,7 +398,7 @@ public class AdminController {
                 setCell(row, 6, fb.getCustomerPhone());
                 setCell(row, 7, photoIds.contains(fb.getFeedbackId()) ? "Yes" : "No");
             }
-            String baseName = (blankToNull(type) != null || blankToNull(phone) != null || photoOnly)
+            String baseName = (blankToNull(type) != null || blankToNull(phone) != null || photoOnly || oldestFirst)
                     ? "feedbacks-filtered" : "feedbacks";
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
@@ -430,9 +435,11 @@ public class AdminController {
                 .body(photo.getImageData());
     }
 
-    private Page<Feedback> fetchFeedbacks(String type, String phone, boolean withPhoto, Pageable pageable) {
+    private Page<Feedback> fetchFeedbacks(
+            String type, String phone, boolean withPhoto, boolean oldestFirst, Pageable pageable
+    ) {
         var spec = FeedbackSpec.filters(blankToNull(type), blankToNull(phone), withPhoto);
-        Sort sort = Sort.by(Sort.Direction.DESC, "feedbackId");
+        Sort sort = Sort.by(oldestFirst ? Sort.Direction.ASC : Sort.Direction.DESC, "feedbackId");
         if (pageable.isUnpaged()) {
             return new PageImpl<>(feedbackRepository.findAll(spec, sort));
         }
@@ -447,6 +454,10 @@ public class AdminController {
         }
         List<Long> ids = rows.stream().map(Feedback::getFeedbackId).collect(Collectors.toList());
         return new HashSet<>(feedbackPhotoRepository.findFeedbackIdsWithPhoto(ids));
+    }
+
+    private static boolean isOldestFirst(String sort) {
+        return sort != null && "asc".equalsIgnoreCase(sort.trim());
     }
 
     private static boolean isPhotoOnly(String withPhoto) {

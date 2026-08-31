@@ -67,7 +67,7 @@
   </div>
   <div class="topbar-actions">
     <a class="btn btn-excel"
-       th:href="@{/admin/feedbacks/export(type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
+       th:href="@{/admin/feedbacks/export(type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel
     </a>
@@ -95,12 +95,19 @@
       <label for="phone">Phone</label>
       <input type="text" id="phone" name="phone" placeholder="+994..." th:value="${filterPhone}">
     </div>
+    <div class="filter-field">
+      <label for="sort">Order</label>
+      <select id="sort" name="sort">
+        <option value="desc" th:selected="${!filterOldestFirst}">Newest first</option>
+        <option value="asc" th:selected="${filterOldestFirst}">Oldest first</option>
+      </select>
+    </div>
     <label class="filter-check">
       <input type="checkbox" name="withPhoto" value="1" th:checked="${filterWithPhoto}">
       Photos only
     </label>
     <button class="btn btn-filter" type="submit">Filtrele</button>
-    <a class="btn btn-clear" th:if="${filterType != null || filterPhone != null || filterWithPhoto}" href="/admin/feedbacks">Temizle</a>
+    <a class="btn btn-clear" th:if="${filterType != null || filterPhone != null || filterWithPhoto || filterOldestFirst}" href="/admin/feedbacks">Temizle</a>
   </form>
 
   <div class="card">
@@ -177,24 +184,24 @@
       <nav class="pages">
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/feedbacks(page=${currentPage - 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
+           th:href="@{/admin/feedbacks(page=${currentPage - 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}">
           &#8592; Previous
         </a>
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/feedbacks(page=1, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">1</a>
+           th:href="@{/admin/feedbacks(page=1, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/feedbacks(page=${p}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}"
+           th:href="@{/admin/feedbacks(page=${p}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}"
            th:text="${p}">1</a>
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/feedbacks(page=${totalPages}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}"
+           th:href="@{/admin/feedbacks(page=${totalPages}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}"
            th:text="${totalPages}"></a>
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/feedbacks(page=${currentPage + 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null})}">
+           th:href="@{/admin/feedbacks(page=${currentPage + 1}, type=${filterType}, phone=${filterPhone}, withPhoto=${filterWithPhoto ? 1 : null}, sort=${filterOldestFirst ? 'asc' : null})}">
           Next &#8594;
         </a>
       </nav>
