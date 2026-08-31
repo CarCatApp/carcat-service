@@ -16,13 +16,36 @@
     col.c-photo   { width: 130px; }
     col.c-cars    { width: 90px; }
     .data-table { min-width: 1240px; }
+    .cell-desc-td.is-open {
+      white-space: normal;
+      overflow: visible;
+      height: auto;
+      vertical-align: top;
+    }
     .cell-desc {
+      display: block;
       max-width: 280px;
-      white-space: pre-wrap;
-      word-break: break-word;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font: inherit;
       font-size: 13px;
       color: var(--text-muted);
       line-height: 1.45;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .cell-desc:hover { color: var(--text); }
+    .cell-desc.is-open {
+      max-width: 420px;
+      white-space: pre-wrap;
+      overflow: visible;
+      text-overflow: unset;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -116,7 +139,14 @@
                   th:text="${f.type}">feedback</span>
           </td>
           <td th:text="${f.subject}"></td>
-          <td class="cell-desc" th:text="${f.description}"></td>
+          <td class="cell-desc-td">
+            <button type="button" class="cell-desc"
+                    th:if="${!#strings.isEmpty(f.description)}"
+                    th:text="${f.description}"
+                    aria-label="Show full description"
+                    aria-expanded="false"></button>
+            <span class="muted" th:if="${#strings.isEmpty(f.description)}">—</span>
+          </td>
           <td th:text="${f.rating != null ? f.rating : '—'}"></td>
           <td th:text="${f.customerId}"></td>
           <td th:text="${f.customerPhone}"></td>
@@ -237,6 +267,41 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && !box.hidden) closeLightbox();
+    });
+  })();
+
+  (function () {
+    function collapse(el) {
+      if (!el) return;
+      el.classList.remove("is-open");
+      el.setAttribute("aria-expanded", "false");
+      var td = el.closest("td");
+      if (td) td.classList.remove("is-open");
+    }
+    function collapseAll(except) {
+      document.querySelectorAll(".cell-desc.is-open").forEach(function (el) {
+        if (el !== except) collapse(el);
+      });
+    }
+    document.addEventListener("click", function (e) {
+      var desc = e.target.closest(".cell-desc");
+      if (desc) {
+        var opening = !desc.classList.contains("is-open");
+        collapseAll(desc);
+        if (opening) {
+          desc.classList.add("is-open");
+          desc.setAttribute("aria-expanded", "true");
+          var td = desc.closest("td");
+          if (td) td.classList.add("is-open");
+        } else {
+          collapse(desc);
+        }
+        return;
+      }
+      collapseAll(null);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") collapseAll(null);
     });
   })();
 </script>
