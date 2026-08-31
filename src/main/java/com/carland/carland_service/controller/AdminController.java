@@ -10,6 +10,7 @@ import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
+import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.security.AdminAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -429,15 +431,14 @@ public class AdminController {
     }
 
     private Page<Feedback> fetchFeedbacks(String type, String phone, boolean withPhoto, Pageable pageable) {
-        String typeFilter = blankToNull(type);
-        if (typeFilter != null) {
-            typeFilter = typeFilter.toLowerCase();
+        var spec = FeedbackSpec.filters(blankToNull(type), blankToNull(phone), withPhoto);
+        Sort sort = Sort.by(Sort.Direction.DESC, "feedbackId");
+        if (pageable.isUnpaged()) {
+            return new PageImpl<>(feedbackRepository.findAll(spec, sort));
         }
-        String phoneFilter = blankToNull(phone);
-        if (phoneFilter != null) {
-            phoneFilter = "%" + phoneFilter.toLowerCase() + "%";
-        }
-        return feedbackRepository.search(typeFilter, phoneFilter, withPhoto, pageable);
+        return feedbackRepository.findAll(
+                spec,
+                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort));
     }
 
     private Set<Long> photoIdsOf(List<Feedback> rows) {
