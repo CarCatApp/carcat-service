@@ -5,7 +5,6 @@ import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
-import com.carland.carland_service.entity.AppVersion;
 import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.entity.FeatureFlagEndpoint;
@@ -55,8 +54,6 @@ public interface FeatureFlagService {
     FeatureFlagEndpoint upsertEndpoint(String httpMethod, String pathPattern, boolean neverGuard);
 
     int syncScannedEndpoints(List<FeatureFlagEndpoint> scanned);
-
-    AppVersion ensureCurrentVersion();
 
     void reloadCache();
 }

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feedbacks — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=premium1">
+  <style>
+    col.c-id      { width: 70px; }
+    col.c-type    { width: 120px; }
+    col.c-subject { width: 180px; }
+    col.c-desc    { width: 320px; }
+    col.c-rating  { width: 80px; }
+    col.c-user    { width: 110px; }
+    col.c-phone   { width: 150px; }
+    col.c-cars    { width: 90px; }
+    .data-table { min-width: 1120px; }
+    .cell-desc {
+      max-width: 320px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
+    </span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link active" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-excel"
+       th:href="@{/admin/feedbacks/export(type=${filterType}, phone=${filterPhone})}">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+      Excel
+    </a>
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <h1>Feedbacks</h1>
+    <span class="total">Toplam <strong th:text="${feedbacks.totalElements}">0</strong> kayıt</span>
+  </div>
+
+  <form class="filter-bar" method="get" action="/admin/feedbacks">
+    <div class="filter-field">
+      <label for="type">Type</label>
+      <select id="type" name="type">
+        <option value="" th:selected="${filterType == null}">All</option>
+        <option value="feedback" th:selected="${filterType == 'feedback'}">feedback</option>
+        <option value="support" th:selected="${filterType == 'support'}">support</option>
+        <option value="bug_report" th:selected="${filterType == 'bug_report'}">bug_report</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="phone">Phone</label>
+      <input type="text" id="phone" name="phone" placeholder="+994..." th:value="${filterPhone}">
+    </div>
+    <button class="btn btn-filter" type="submit">Filtrele</button>
+    <a class="btn btn-clear" th:if="${filterType != null || filterPhone != null}" href="/admin/feedbacks">Temizle</a>
+  </form>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table" id="feedbacksTable">
+        <colgroup>
+          <col class="c-id">
+          <col class="c-type">
+          <col class="c-subject">
+          <col class="c-desc">
+          <col class="c-rating">
+          <col class="c-user">
+          <col class="c-phone">
+          <col class="c-cars">
+        </colgroup>
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>Type</th>
+          <th>Subject</th>
+          <th>Description</th>
+          <th>Rating</th>
+          <th>Customer ID</th>
+          <th>Phone</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="f : ${feedbacks}">
+          <td th:text="${f.feedbackId}"></td>
+          <td>
+            <span class="badge"
+                  th:classappend="${f.type == 'bug_report'} ? 'badge-danger' : (${f.type == 'support'} ? 'badge-warning' : 'badge-info')"
+                  th:text="${f.type}">feedback</span>
+          </td>
+          <td th:text="${f.subject}"></td>
+          <td class="cell-desc" th:text="${f.description}"></td>
+          <td th:text="${f.rating != null ? f.rating : '—'}"></td>
+          <td th:text="${f.customerId}"></td>
+          <td th:text="${f.customerPhone}"></td>
+          <td>
+            <a class="btn-cars" th:if="${f.customerId != null}"
+               th:href="@{/admin/cars(userId=${f.customerId})}">Cars</a>
+          </td>
+        </tr>
+        <tr class="empty-row" th:if="${feedbacks.isEmpty()}">
+          <td colspan="8">Kayıt bulunamadı</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-bar">
+      <span class="page-info">
+        Sayfa <strong th:text="${currentPage}">1</strong> / <span th:text="${totalPages}">1</span>
+      </span>
+      <nav class="pages">
+        <a class="page-arrow"
+           th:classappend="${currentPage == 1} ? 'disabled'"
+           th:href="@{/admin/feedbacks(page=${currentPage - 1}, type=${filterType}, phone=${filterPhone})}">
+          &#8592; Previous
+        </a>
+        <a class="page-link" th:if="${windowStart > 1}"
+           th:href="@{/admin/feedbacks(page=1, type=${filterType}, phone=${filterPhone})}">1</a>
+        <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
+        <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
+           class="page-link"
+           th:classappend="${p == currentPage} ? 'active'"
+           th:href="@{/admin/feedbacks(page=${p}, type=${filterType}, phone=${filterPhone})}"
+           th:text="${p}">1</a>
+        <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
+        <a class="page-link" th:if="${windowEnd < totalPages}"
+           th:href="@{/admin/feedbacks(page=${totalPages}, type=${filterType}, phone=${filterPhone})}"
+           th:text="${totalPages}"></a>
+        <a class="page-arrow"
+           th:classappend="${currentPage >= totalPages} ? 'disabled'"
+           th:href="@{/admin/feedbacks(page=${currentPage + 1}, type=${filterType}, phone=${filterPhone})}">
+          Next &#8594;
+        </a>
+      </nav>
+    </div>
+  </div>
+</main>
+<script src="/admin/admin.js?v=premium1"></script>
+<script>
+  CarlandAdmin.initColumnToggle(
+    document.getElementById("feedbacksTable"),
+    "carland-admin-cols-feedbacks",
+    ["ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Cars"],
+    []
+  );
+</script>
+</body>
+</html>

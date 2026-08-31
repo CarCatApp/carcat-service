@@ -3,9 +3,11 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.response.AdminAuthLoginResponse;
 import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Feedback;
 import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,6 +44,8 @@ import java.util.Map;
 public class AdminController {
 
     private final CarRepository carRepository;
+
+    private final FeedbackRepository feedbackRepository;
 
     private final AuthUsersFeign authUsersFeign;
 
@@ -302,6 +306,102 @@ public class AdminController {
 
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
+    }
+
+
+    // ==================== FEEDBACKS ====================
+
+    /**
+     * tr: Uygulama geri bildirimlerini (feedback / support / bug_report) sayfalayarak gösterir.
+     * en: Lists in-app feedbacks (feedback / support / bug_report) with pagination.
+     */
+    @GetMapping("/admin/feedbacks")
+    public String feedbacks(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String phone,
+            HttpServletRequest request,
+            Model model
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+
+        int pageIndex = Math.max(page, 1) - 1;
+        Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE);
+        Page<Feedback> feedbackPage = fetchFeedbacks(type, phone, pageable);
+
+        addPaginationAttributes(model, feedbackPage.getTotalPages(), pageIndex);
+        model.addAttribute("feedbacks", feedbackPage);
+        model.addAttribute("filterType", blankToNull(type));
+        model.addAttribute("filterPhone", blankToNull(phone));
+        return "feedbacks";
+    }
+
+    /**
+     * tr: Geri bildirimleri (aynı filtrelerle) XLSX olarak indirir.
+     * en: Downloads feedbacks as XLSX using the same filters.
+     */
+    @GetMapping("/admin/feedbacks/export")
+    public void exportFeedbacks(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String phone,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            response.sendRedirect(ADMIN_URL + "/admin/");
+            return;
+        }
+
+        List<Feedback> rows = fetchFeedbacks(type, phone, Pageable.unpaged()).getContent();
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Feedbacks");
+            String[] headers = {
+                    "ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone"
+            };
+            createHeaderRow(workbook, sheet, headers);
+            int rowIndex = 1;
+            for (Feedback fb : rows) {
+                Row row = sheet.createRow(rowIndex++);
+                setNumericCell(row, 0, fb.getFeedbackId());
+                setCell(row, 1, fb.getType());
+                setCell(row, 2, fb.getSubject());
+                setCell(row, 3, fb.getDescription());
+                setNumericCell(row, 4, fb.getRating());
+                setNumericCell(row, 5, fb.getCustomerId());
+                setCell(row, 6, fb.getCustomerPhone());
+            }
+            String baseName = (blankToNull(type) != null || blankToNull(phone) != null)
+                    ? "feedbacks-filtered" : "feedbacks";
+            writeWorkbook(workbook, sheet, headers.length, baseName, response);
+        }
+    }
+
+    private Page<Feedback> fetchFeedbacks(String type, String phone, Pageable pageable) {
+        String typeFilter = blankToNull(type);
+        String phoneFilter = blankToNull(phone);
+        if (typeFilter != null && phoneFilter != null) {
+            return feedbackRepository
+                    .findByTypeIgnoreCaseAndCustomerPhoneContainingIgnoreCaseOrderByFeedbackIdDesc(
+                            typeFilter, phoneFilter, pageable);
+        }
+        if (typeFilter != null) {
+            return feedbackRepository.findByTypeIgnoreCaseOrderByFeedbackIdDesc(typeFilter, pageable);
+        }
+        if (phoneFilter != null) {
+            return feedbackRepository.findByCustomerPhoneContainingIgnoreCaseOrderByFeedbackIdDesc(
+                    phoneFilter, pageable);
+        }
+        return feedbackRepository.findAllByOrderByFeedbackIdDesc(pageable);
+    }
+
+    private static String blankToNull(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim();
     }
 
 

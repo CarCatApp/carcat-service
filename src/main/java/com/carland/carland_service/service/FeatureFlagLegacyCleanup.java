@@ -17,10 +17,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * tr: Eski path-merkezli role_state temizliği; per-flag minAvailableVersion göçü
- *     (current grid tek kaynak, min = flag'in göründüğü en düşük SemVer).
- * en: Legacy path-centric cleanup; per-flag minAvailableVersion migration
- *     (current grid is the live state; min = lowest SemVer that had the flag).
+ * tr: Eski path-merkezli role_state temizliği; per-flag minAvailableVersion göçü;
+ *     ardından global app_version kataloğu ve version_id düşülür.
+ * en: Legacy path-centric cleanup; per-flag minAvailableVersion migration;
+ *     then drop the global app_version catalog and version_id.
  */
 @Slf4j
 @Component
@@ -58,6 +58,7 @@ public class FeatureFlagLegacyCleanup implements ApplicationRunner {
             log.debug("endpoint flag_id cleanup: {}", ex.getMessage());
         }
         migratePerFlagMinVersion();
+        dropVersionCatalog();
     }
 
     private void migratePerFlagMinVersion() {
@@ -154,6 +155,45 @@ public class FeatureFlagLegacyCleanup implements ApplicationRunner {
                     "UPDATE feature_flag SET min_available_version = '0.0.0' WHERE min_available_version IS NULL OR btrim(min_available_version) = ''");
         } catch (Exception ex) {
             log.debug("fill null mins: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * tr: Per-flag min göçünden sonra global katalog ve version_id FK kalkar.
+     * en: After per-flag min migration, drop the global catalog and version_id FK.
+     */
+    private void dropVersionCatalog() {
+        boolean hadCatalog = columnExists("feature_flag_role_state", "version_id") || tableExists("app_version");
+        try {
+            jdbcTemplate.execute(
+                    "ALTER TABLE feature_flag_role_state DROP CONSTRAINT IF EXISTS uk_ffrs_flag_version_role");
+        } catch (Exception ex) {
+            log.debug("drop uk_ffrs_flag_version_role: {}", ex.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE feature_flag_role_state DROP COLUMN IF EXISTS version_id CASCADE");
+        } catch (Exception ex) {
+            log.debug("drop version_id: {}", ex.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("DROP TABLE IF EXISTS app_version CASCADE");
+        } catch (Exception ex) {
+            log.debug("drop app_version: {}", ex.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("""
+                    DO $$ BEGIN
+                      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_ffrs_flag_role') THEN
+                        ALTER TABLE feature_flag_role_state
+                          ADD CONSTRAINT uk_ffrs_flag_role UNIQUE (flag_id, role);
+                      END IF;
+                    END $$;
+                    """);
+        } catch (Exception ex) {
+            log.debug("uk_ffrs_flag_role: {}", ex.getMessage());
+        }
+        if (hadCatalog) {
+            log.info("Feature-flag app_version catalog dropped");
         }
     }
 

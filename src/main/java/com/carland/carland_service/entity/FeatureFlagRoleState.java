@@ -7,8 +7,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 /**
- * tr: Bir version + named flag + rol için görünürlük.
- * en: Visibility for one version + named flag + role.
+ * tr: Named flag + rol için görünürlük (ENABLED / DISABLED / HIDDEN).
+ * en: Visibility for one named flag + role (ENABLED / DISABLED / HIDDEN).
  */
 @Entity
 @Data
@@ -19,8 +19,8 @@ import lombok.experimental.FieldDefaults;
 @Table(
         name = "feature_flag_role_state",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_ffrs_flag_version_role",
-                columnNames = {"flag_id", "version_id", "role"}
+                name = "uk_ffrs_flag_role",
+                columnNames = {"flag_id", "role"}
         )
 )
 public class FeatureFlagRoleState {
@@ -32,10 +32,6 @@ public class FeatureFlagRoleState {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "flag_id")
     FeatureFlag flag;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "version_id", nullable = false)
-    AppVersion version;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)

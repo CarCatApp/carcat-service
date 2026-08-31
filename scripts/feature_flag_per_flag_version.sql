@@ -8,4 +8,4 @@ WHERE min_available_version IS NULL OR btrim(min_available_version) = '';
 
 -- 2) After deploy, Java sets each flag's min to the lowest SemVer among app_version
 --    rows that had that flag, then keeps only the "current" grid's ENABLED/DISABLED/HIDDEN.
---    Do not delete non-current role_state here by hand unless you know current is_current.
+--    Then FeatureFlagLegacyCleanup drops version_id and app_version (see drop_app_version.sql).

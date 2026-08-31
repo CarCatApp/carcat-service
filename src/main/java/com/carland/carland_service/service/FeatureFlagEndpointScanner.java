@@ -36,8 +36,6 @@ public class FeatureFlagEndpointScanner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        featureFlagService.ensureCurrentVersion();
-
         List<FeatureFlagEndpoint> scanned = new ArrayList<>();
         for (RequestMappingInfo info : requestMappingHandlerMapping.getHandlerMethods().keySet()) {
             Set<String> paths = pathsOf(info);

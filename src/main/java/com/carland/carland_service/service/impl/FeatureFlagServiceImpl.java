@@ -8,14 +8,12 @@ import com.carland.carland_service.util.SemVer;
 import com.carland.carland_service.dto.response.FeatureFlagEndpointView;
 import com.carland.carland_service.dto.response.FeatureFlagMeGroup;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
-import com.carland.carland_service.entity.AppVersion;
 import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.entity.FeatureFlagEndpoint;
 import com.carland.carland_service.entity.FeatureFlagRoleState;
 import com.carland.carland_service.enums.FeatureFlagState;
 import com.carland.carland_service.enums.UserRoles;
-import com.carland.carland_service.repository.AppVersionRepository;
 import com.carland.carland_service.repository.FeatureFlagAuditRepository;
 import com.carland.carland_service.repository.FeatureFlagEndpointRepository;
 import com.carland.carland_service.repository.FeatureFlagRepository;
@@ -42,13 +40,12 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class FeatureFlagServiceImpl implements FeatureFlagService {
 
-    private static final String DEFAULT_VERSION = "2.1.0";
+    private static final String AUDIT_VERSION_NA = "n/a";
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
     private static final UserRoles[] GRID_ROLES = {
             UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPER_ADMIN, UserRoles.BOSS
     };
 
-    private final AppVersionRepository appVersionRepository;
     private final FeatureFlagRepository flagRepository;
     private final FeatureFlagEndpointRepository endpointRepository;
     private final FeatureFlagRoleStateRepository roleStateRepository;
@@ -57,7 +54,6 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     private final AtomicReference<List<FeatureFlagEndpoint>> endpointCache = new AtomicReference<>(List.of());
     private final AtomicReference<Map<String, FeatureFlagState>> stateCache = new AtomicReference<>(Map.of());
     private final AtomicReference<Map<Long, FeatureFlagState>> flagDefaultCache = new AtomicReference<>(Map.of());
-    private final AtomicReference<String> currentSemverCache = new AtomicReference<>(DEFAULT_VERSION);
 
     @Override
     @Transactional(readOnly = true)
@@ -227,7 +223,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             ep.setNeverGuard(request.getNeverGuard());
         }
         endpointRepository.save(ep);
-        audit(actor, "UPDATE", method, path, null, null, currentSemverCache.get(), ep.getFlag(), UserRoles.ADMIN);
+        audit(actor, "UPDATE", method, path, null, null, AUDIT_VERSION_NA, ep.getFlag(), UserRoles.ADMIN);
         reloadCache();
         return FeatureFlagAdminSupport.endpointDto(ep);
     }
@@ -242,10 +238,10 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             ep.setFlag(null);
             endpointRepository.save(ep);
             audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null,
-                    currentSemverCache.get(), attached, UserRoles.ADMIN);
+                    AUDIT_VERSION_NA, attached, UserRoles.ADMIN);
         }
         audit(actor, "DELETE", ep.getHttpMethod(), ep.getPathPattern(), null, null,
-                currentSemverCache.get(), attached, UserRoles.ADMIN);
+                AUDIT_VERSION_NA, attached, UserRoles.ADMIN);
         endpointRepository.delete(ep);
         reloadCache();
     }
@@ -362,7 +358,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         flag.setDeletedAt(LocalDateTime.now());
         flagRepository.save(flag);
-        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, currentSemverCache.get(), flag, UserRoles.ADMIN);
+        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
         reloadCache();
     }
 
@@ -388,7 +384,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         for (FeatureFlagEndpoint ep : batch) {
             ep.setFlag(flag);
             endpointRepository.save(ep);
-            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get(), flag, UserRoles.ADMIN);
+            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
         }
         reloadCache();
     }
@@ -404,7 +400,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         ep.setFlag(null);
         endpointRepository.save(ep);
-        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, currentSemverCache.get(), flag, UserRoles.ADMIN);
+        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
         reloadCache();
     }
 
@@ -503,18 +499,6 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     }
 
     @Override
-    @Transactional
-    public AppVersion ensureCurrentVersion() {
-        return appVersionRepository.findByCurrentTrue().orElseGet(() ->
-                appVersionRepository.findBySemver(DEFAULT_VERSION).orElseGet(() ->
-                        appVersionRepository.save(AppVersion.builder()
-                                .semver(DEFAULT_VERSION)
-                                .current(true)
-                                .createdAt(LocalDateTime.now())
-                                .build())));
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public void reloadCache() {
         List<FeatureFlagEndpoint> endpoints = endpointRepository.findAllWithFlag();
@@ -539,24 +523,19 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         stateCache.set(Map.copyOf(states));
         flagDefaultCache.set(Map.copyOf(defaults));
-        appVersionRepository.findByCurrentTrue()
-                .ifPresent(v -> currentSemverCache.set(v.getSemver()));
         log.info("Feature-flag cache reloaded: {} endpoints, {} flag-states", endpoints.size(), states.size());
     }
 
     /**
-     * Seeds one ENABLED/DISABLED/HIDDEN row per role. Internally still ties to current AppVersion
-     * row for the leftover FK; resolution does not use that catalog.
+     * Seeds one ENABLED/DISABLED/HIDDEN row per role. Resolution uses this grid plus minAvailableVersion.
      */
     private void seedRoleStates(FeatureFlag flag, FeatureFlagState defaultState) {
         if (roleStateRepository.existsByFlag(flag)) {
             return;
         }
-        AppVersion version = ensureCurrentVersion();
         for (UserRoles role : GRID_ROLES) {
             roleStateRepository.save(FeatureFlagRoleState.builder()
                     .flag(flag)
-                    .version(version)
                     .role(role)
                     .state(defaultState)
                     .build());
@@ -581,7 +560,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .role(role != null ? role : UserRoles.ADMIN)
                 .oldState(oldState)
                 .newState(newState != null ? newState : FeatureFlagState.HIDDEN)
-                .appVersion(version != null ? version : currentSemverCache.get())
+                .appVersion(version != null ? version : AUDIT_VERSION_NA)
                 .build();
         return auditRepository.save(row);
     }
