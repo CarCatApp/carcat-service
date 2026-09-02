@@ -121,7 +121,10 @@
             <div class="history-visit-date"
                  th:text="${visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—'}">—</div>
             <div class="history-visit-sub"
-                 th:text="${visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—'}">—</div>
+                 th:with="nextLine=${visit.services != null ? visit.services.^[nextServiceDate != null || nextServiceMileage != null] : null}">
+              <div th:text="${'last ' + (visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—') + ' · ' + (visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—')}">last — · —</div>
+              <div th:text="${'next ' + (nextLine != null && nextLine.nextServiceDate != null ? #temporals.format(nextLine.nextServiceDate, 'dd.MM.yyyy') : '—') + ' · ' + (nextLine != null && nextLine.nextServiceMileage != null ? nextLine.nextServiceMileage + ' km' : '—')}">next — · —</div>
+            </div>
           </div>
           <div class="visit-partner" th:with="p=${visit.serviceCenterId != null ? partnerById.get(visit.serviceCenterId) : null}">
             <img class="partner-logo" alt=""

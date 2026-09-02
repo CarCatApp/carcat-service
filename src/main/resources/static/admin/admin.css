@@ -1105,7 +1105,7 @@ body.login-page {
   list-style: none;
   width: 100%;
   display: grid;
-  grid-template-columns: 140px 1fr auto auto;
+  grid-template-columns: 200px 1fr auto auto;
   gap: 16px;
   align-items: center;
   padding: 18px 22px;

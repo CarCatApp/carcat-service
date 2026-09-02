@@ -44,6 +44,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -57,12 +58,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * tr: VIN'e göre servis ziyareti geçmişini yöneten servistir; visits tablosunu cache olarak kullanır,
- *     cache boşsa Hyper API'den canlı veri çekip kaydeder, percentage senkronunu ve servicedPartnerIds
- *     güncellemesini tetikler. (Eski adı: CarVinHistoryServiceV2Impl)
- * en: Service managing service visit history by VIN; uses the visits table as a cache,
- *     fetches live data from the Hyper API and persists it when the cache is empty, and triggers
- *     percentage sync plus servicedPartnerIds refresh. (Former name: CarVinHistoryServiceV2Impl)
+ * tr: VIN'e göre servis ziyareti geçmişini yöneten servistir; Redis miss'te Hyper API'den çeker,
+ *     mevcut recordId'leri günceller (upsert), percentage senkronunu ve servicedPartnerIds güncellemesini
+ *     tetikler. (Eski adı: CarVinHistoryServiceV2Impl)
+ * en: Service managing service visit history by VIN; on Redis miss fetches Hyper, upserts existing
+ *     recordIds, and triggers percentage sync plus servicedPartnerIds refresh.
+ *     (Former name: CarVinHistoryServiceV2Impl)
  */
 @Service
 @RequiredArgsConstructor
@@ -90,11 +91,10 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     /**
      * tr: VIN'e göre servis geçmişini döner. Parametreleri doğrular (eksikse MissingFieldException),
      *     aktif müşteriyi bulur (yoksa UserNotFoundException), aracın müşteriye ait olduğunu kontrol eder
-     *     (değilse ResourceNotFoundException). Cache (visits) doluysa oradan, boşsa Hyper'dan çekip kaydederek döner.
+     *     (değilse ResourceNotFoundException). Redis hit ise cache, miss ise Hyper'dan çekip visits'e upsert eder.
      * en: Returns service history by VIN. Validates parameters (MissingFieldException when missing),
      *     resolves the active customer (UserNotFoundException when absent), verifies car ownership
-     *     (ResourceNotFoundException otherwise). Serves from the visits cache when present; otherwise
-     *     fetches from Hyper, persists and returns.
+     *     (ResourceNotFoundException otherwise). Redis hit returns cache; miss fetches Hyper and upserts visits.
      */
     @Override
     @Transactional
@@ -123,39 +123,32 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     private VisitHistoryResponse loadHistoryUncached(Car car, String vin, String acceptLanguage) {
-        List<Visit> cachedVisits = loadCachedVisits(car);
-        log.info("[hist-debug] v2 cache lookup | carId={} cachedVisits={}",
-                car.getCarId(), cachedVisits != null ? cachedVisits.size() : null);
-        if (cachedVisits != null) {
-            hyperPercentageSyncService.syncFromVisits(car, cachedVisits);
-            refreshServicedPartnerIds(car);
-            log.info("[hist-debug] v2 returning cache | carId={} source={}", car.getCarId(), CACHE_SOURCE);
-            return buildResponse(car, vin, CACHE_SOURCE, cachedVisits, acceptLanguage);
-        }
-
         synchronized (lockForCar(car.getCarId())) {
-            cachedVisits = loadCachedVisits(car);
-            if (cachedVisits != null) {
-                hyperPercentageSyncService.syncFromVisits(car, cachedVisits);
-                refreshServicedPartnerIds(car);
-                log.info("[hist-debug] v2 returning cache after lock | carId={} visits={}", car.getCarId(), cachedVisits.size());
-                return buildResponse(car, vin, CACHE_SOURCE, cachedVisits, acceptLanguage);
-            }
-
-            HyperVehicleByVinResponse hyperResponse = fetchHyperHistory(vin);
+            HyperVehicleByVinResponse hyperResponse = fetchHyperHistoryLenient(car, vin);
             int hyperCount = hyperResponse != null && hyperResponse.getServiceHistory() != null
                     ? hyperResponse.getServiceHistory().size() : 0;
             log.info("[hist-debug] v2 hyper fetch | carId={} vin={} hyperItems={}", car.getCarId(), vin, hyperCount);
+
             if (hyperResponse == null || hyperResponse.getServiceHistory() == null || hyperResponse.getServiceHistory().isEmpty()) {
+                List<Visit> cachedVisits = loadCachedVisits(car);
+                if (cachedVisits != null) {
+                    hyperPercentageSyncService.syncFromVisits(car, cachedVisits);
+                    refreshServicedPartnerIds(car);
+                    log.info("[hist-debug] v2 hyper empty, returning db cache | carId={} visits={}",
+                            car.getCarId(), cachedVisits.size());
+                    return buildResponse(car, vin, CACHE_SOURCE, cachedVisits, acceptLanguage);
+                }
                 log.info("[hist-debug] v2 hyper empty | carId={} vin={}", car.getCarId(), vin);
                 return buildResponse(car, vin, LIVE_SOURCE, Collections.emptyList(), acceptLanguage);
             }
 
-            List<Visit> persisted = persistHyperVisits(car, hyperResponse.getServiceHistory());
-            hyperPercentageSyncService.syncFromVisits(car, persisted);
+            persistHyperVisits(car, hyperResponse.getServiceHistory());
+            List<Visit> allVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+            hyperPercentageSyncService.resyncFromVisits(car, allVisits);
             refreshServicedPartnerIds(car);
-            log.info("[hist-debug] v2 persisted visits | carId={} persisted={}", car.getCarId(), persisted.size());
-            return buildResponse(car, vin, LIVE_SOURCE, persisted, acceptLanguage);
+            redisCacheService.evictCarListAfterCommit(redisCacheService.ownerUserId(car));
+            log.info("[hist-debug] v2 upserted visits | carId={} visits={}", car.getCarId(), allVisits.size());
+            return buildResponse(car, vin, LIVE_SOURCE, allVisits, acceptLanguage);
         }
     }
 
@@ -354,6 +347,20 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
+     * tr: Hyper çekişini yumuşatır; ağ/5xx/token hatasında null döner ki DB'deki ziyaretler kaybolmasın.
+     * en: Softens the Hyper fetch; returns null on network/5xx/token errors so DB visits are still served.
+     */
+    private HyperVehicleByVinResponse fetchHyperHistoryLenient(Car car, String vin) {
+        try {
+            return fetchHyperHistory(vin);
+        } catch (RuntimeException e) {
+            log.warn("[hist-debug] v2 hyper fetch failed | carId={} vin={} err={}",
+                    car.getCarId(), vin, e.toString());
+            return null;
+        }
+    }
+
+    /**
      * tr: Hyper API'den VIN'e göre araç servis geçmişini çeker; Hyper "vehicle_not_found" dönerse null,
      *     diğer 404'lerde exception fırlatır.
      * en: Fetches the vehicle service history by VIN from the Hyper API; returns null when Hyper responds
@@ -381,13 +388,15 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
-     * tr: Hyper'dan gelen ziyaret kayıtlarını Visit entity'lerine çevirip kaydeder; recordId'siz ve mükerrer
-     *     kayıtları atlar, aracın allTimeCost toplamını günceller ve ziyaretleri tarihe göre sıralı döner.
-     * en: Maps Hyper visit records to Visit entities and persists them; skips records without recordId and
-     *     duplicates, updates the car's allTimeCost total and returns visits sorted by date.
+     * tr: Hyper'dan gelen ziyaret kayıtlarını Visit'e çevirip kaydeder. Aynı recordId varsa km/tutar/dealer/
+     *     satır/parça Hyper anlık görüntüsüyle değiştirilir (GET snapshot replace; webhook PUT merge-add ayrıdır).
+     *     Aynı yanıttaki mükerrer recordId atlanır. Aracın allTimeCost toplamı Hyper JSON toplamına çekilir.
+     * en: Maps Hyper visit records to Visit entities and persists them. Existing recordIds are replaced
+     *     (km, cost, dealer, lines, parts) from the Hyper snapshot (GET snapshot replace; webhook PUT
+     *     merge-add is separate). Duplicate recordIds in the same response are skipped. allTimeCost is
+     *     set to the Hyper JSON total.
      */
     private List<Visit> persistHyperVisits(Car car, List<HyperServiceHistoryItemResponse> items) {
-        List<Visit> persisted = new ArrayList<>();
         Set<Long> seenRecordIds = new HashSet<>();
         BigDecimal allTimeCost = BigDecimal.ZERO;
 
@@ -395,11 +404,9 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         Long partnerId = HYPER_PARTNER.getId();
         String partnerName = hyperPartner != null ? hyperPartner.getName() : HYPER_PARTNER.getDefaultName();
 
-        Set<Long> existingRecordIds = visitRepository.findHyperRecordIdsByCar(car);
-        Map<Long, Visit> existingByRecordId = existingRecordIds.isEmpty()
-                ? Map.of()
-                : visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
-                        .collect(Collectors.toMap(Visit::getHyperRecordId, visit -> visit, (a, b) -> a));
+        Map<Long, Visit> existingByRecordId = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
+                .filter(visit -> visit.getHyperRecordId() != null)
+                .collect(Collectors.toMap(Visit::getHyperRecordId, visit -> visit, (a, b) -> a));
 
         List<Visit> toSave = new ArrayList<>();
 
@@ -417,26 +424,85 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
 
             Visit existing = existingByRecordId.get(item.getRecordId());
             if (existing != null) {
-                log.info("Skipping duplicate Hyper visit for carId={}, recordId={}", car.getCarId(), item.getRecordId());
-                persisted.add(existing);
-                continue;
+                applyHyperSnapshot(existing, item);
+                toSave.add(existing);
+            } else {
+                toSave.add(mapHyperItemToVisit(car, item, partnerId, partnerName));
             }
-
-            toSave.add(mapHyperItemToVisit(car, item, partnerId, partnerName));
         }
 
-        if (!toSave.isEmpty()) {
-            persisted.addAll(visitRepository.saveAll(toSave));
-        }
+        List<Visit> persisted = toSave.isEmpty() ? List.of() : visitRepository.saveAll(toSave);
 
         car.setAllTimeCost(allTimeCost);
         carRepository.save(car);
-        log.info("Updated allTimeCost for carId={} | total={}", car.getCarId(), allTimeCost);
+        log.info("Updated allTimeCost for carId={} | total={} upserted={}", car.getCarId(), allTimeCost, persisted.size());
 
         return persisted.stream()
                 .sorted(Comparator.comparing(Visit::getLastServiceDate, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Visit::getId, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * tr: Mevcut ziyaretin başlık alanlarını ve satır/parçalarını Hyper anlık görüntüsüyle değiştirir.
+     *     serviceCenterId/Name ve editHistory dokunulmaz (GET cache, webhook geçmişi korunur).
+     * en: Replaces an existing visit's header fields and lines/parts from the Hyper snapshot.
+     *     serviceCenterId/Name and editHistory are left unchanged (GET cache; webhook history preserved).
+     */
+    private void applyHyperSnapshot(Visit visit, HyperServiceHistoryItemResponse item) {
+        visit.setServiceType(item.getServiceType());
+        visit.setLastServiceDate(item.getLastServiceDate());
+        visit.setLastServiceMileage(item.getLastServiceMileage());
+        visit.setInvoiceNumber(item.getInvoiceNumber());
+        visit.setDealer(item.getDealer());
+        visit.setCostAmount(item.getCost() != null ? item.getCost().getAmount() : null);
+        visit.setCostCurrency(item.getCost() != null ? item.getCost().getCurrency() : null);
+        visit.setFinalCostAmount(item.getFinalCost() != null ? item.getFinalCost().getAmount() : null);
+        visit.setFinalCostCurrency(item.getFinalCost() != null ? item.getFinalCost().getCurrency() : null);
+        visit.setServiceGroups(item.getServiceGroups() != null ? new ArrayList<>(item.getServiceGroups()) : new ArrayList<>());
+        visit.setUpdatedAt(LocalDateTime.now());
+        replaceVisitChildren(visit, item);
+        log.info("Updated existing Hyper visit | carId={} recordId={} mileage={} finalCost={}",
+                visit.getCar() != null ? visit.getCar().getCarId() : null,
+                item.getRecordId(),
+                item.getLastServiceMileage(),
+                visit.getFinalCostAmount());
+    }
+
+    /**
+     * tr: orphanRemoval ile satır ve parçaları Hyper listesiyle birebir değiştirir (fazla satır düşer).
+     * en: Replaces lines and parts 1:1 with the Hyper lists via orphanRemoval (extra rows are dropped).
+     */
+    private void replaceVisitChildren(Visit visit, HyperServiceHistoryItemResponse item) {
+        if (visit.getServices() == null) {
+            visit.setServices(new ArrayList<>());
+        }
+        if (visit.getParts() == null) {
+            visit.setParts(new ArrayList<>());
+        }
+        visit.getServices().size();
+        visit.getParts().size();
+        visit.getServices().clear();
+        visit.getParts().clear();
+
+        if (item.getServices() != null) {
+            for (HyperServiceLineResponse line : item.getServices()) {
+                visit.addService(mapHyperLineToEntity(line));
+            }
+        }
+        if (item.getParts() != null) {
+            for (HyperServicePartResponse part : item.getParts()) {
+                visit.addPart(mapHyperPartToEntity(part));
+            }
+        }
+    }
+
+    private VisitPart mapHyperPartToEntity(HyperServicePartResponse part) {
+        return VisitPart.builder()
+                .name(part.getName())
+                .qty(part.getQty())
+                .unit(part.getUnit())
+                .build();
     }
 
     /**
@@ -482,11 +548,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         }
         if (item.getParts() != null) {
             for (HyperServicePartResponse part : item.getParts()) {
-                visit.addPart(VisitPart.builder()
-                        .name(part.getName())
-                        .qty(part.getQty())
-                        .unit(part.getUnit())
-                        .build());
+                visit.addPart(mapHyperPartToEntity(part));
             }
         }
 

@@ -1,0 +1,79 @@
+---
+description: Redis put/evict rules for carland_service. Any mutation that a list/history/photo/catalog screen can show must drop the matching keys — SQL included.
+alwaysApply: true
+---
+
+# Redis cache (carland_service)
+
+Admin HTML **Redis kullanmaz** (DB). Mobil liste ve servis geçmişi **kullanır**. Müşteri “DB/admin doğru, app eski” diyorsa önce Redis, sonra telefon belleği.
+
+İki gerçek vaka: (1) SQL ile model düzeltmek Spring’den geçmez → `carlist` eski kalır. (2) App `PUT /edit/details` success + hâlâ eski model → ya liste Redis HIT, ya Flutter listeyi yeniden çekmedi. Hyper “yaddaşda köhnə” (Infiniti/Macan) çoğu zaman **model değil**: `history:v2` TTL’siz + aynı recordId.
+
+## Keys (gerçek isimler)
+
+| Key | Kim okur | TTL | Ne taşır |
+|---|---|---|---|
+| `carlist:{userId}:{lang}` | `GET /get/list/by/user` | **yok** | Bütün arabalar: model, km, plaka, `allTimeCost`, … |
+| `history:v1:{VIN}:{lang}` | eski history | **yok** | Hyper/DB geçmiş |
+| `history:v2:{VIN}:{lang}` | `.../service-history/v2` | **yok** | Visit listesi |
+| `photo:car:{carId}` + `:bytes`/`:type` | araç foto | 1s | |
+| `photo:user:{userId}` + aynı | profil foto | 1s | |
+| `catalog:*` | marka/model/renk/… | 30g | Kullanıcı arabası **değil** |
+
+`GET /get/by/vin` **cache’lenmez**. Tekil ekran eskiyse ve liste yeniye: telefon. Liste eskiyse: `carlist`.
+
+`lang` = `Accept-Language` lower-case (`az`, `en`, `ru`, bazen `az-az`). Evict **daima** `carlist:{userId}:*` / `history:v2:{VIN}:*` — tek dile silme.
+
+`userId` = `customers.user_id` = `X-User-Id` = `cars.customer_id`. Admin mileage güncellemesinde **sahibin** listesini düşür (`ownerUserId(car)`), çağıran admin’i değil.
+
+## Zorunlu kural
+
+Yazdığın her `getOrLoad*` / `putJson` için **aynı PR’de** kim `evict*` eder yaz. Writer eksikse cache ekleme.
+
+Kullanıcı verisi (`carlist`, `history:*`, `photo:*`): commit **sonrası** sil — `evictCarListAfterCommit` / `evictCarAndHistoryAfterCommit`. Tx yoksa `runAfterCommit` hemen çalışır; tx varsa commit’ten önce silme (rollback’te boş cache + eski DB). `REDIS_EVICT_SKIP owner` = lazy `car.customer` yüklenmedi, evict no-op. Lazy riskinde `userIdHeader` veya `car.customer.userId`’yi tx içinde çöz.
+
+**Put etme, sil.** Stale’i yeni JSON ile üzerine yazma. Miss bir sonraki GET’te DB’den dolar.
+
+`carlist` **araç bazlı değil, sahip bazlı**. Add / edit / remove / mileage / foto / `allTimeCost` / partner id → **listenin tamamı** `carlist:{owner}:*`. “Sadece bu VIN’i patch’le” yok.
+
+## Mutation → ne düşer
+
+Ekranda değişen her alan hangi GET’ten geliyorsa onu sil.
+
+| Ne değişti | Evict |
+|---|---|
+| Add / `editCarDetails` / `removeCar` / mileage | `carlist:{owner}:*` |
+| SQL/admin `UPDATE cars` (Spring yok) | aynı, **elle** Redis |
+| Webhook POST/PUT visit | `evictCarAndHistoryAfterCommit` → liste + `history:v1/v2:{VIN}:*` |
+| Hyper GET persist (allTimeCost, visit) | liste (history key’ini loader bitince yeniden `put` eder; yazdığın taze JSON’u afterCommit ile silme) |
+| Araç/user foto upload-delete | `photo:car\|user:…` **ve** `carlist` (listede thumb varsa) |
+| Catalog tablo (brands/models) | `catalog:*` ilgili key; kullanıcı `cars.model` string’i catalog’dan gelmez |
+| Percentage / CSR | listede yoksa `carlist` şart değil; kartta yüzde varsa evict et |
+
+Bugün `editCarDetails` zaten `evictCarListAfterCommit(userIdHeader)` çağırır. App update + hâlâ eski model = log’da `REDIS_HIT carlist` (evict kaçtı) veya HIT yok = telefon. SQL update = Spring evict yok, sen `DEL`.
+
+Hyper geçmişi: `history:*` TTL yok. Miss olmayınca Hyper’a gidilmez. Visit değişti / ilk snapshot dondu → `evictHistory(vin)` veya webhook’un `evictCarAndHistory`. Yeni `history` key’i koyuyorsan TTL veya zorunlu evict olmadan koyma.
+
+## Elle müdahale (prod)
+
+```text
+# liste (müşteri hâlâ Deepal vs)
+KEYS carlist:{customer_id}*
+DEL carlist:{id}:az   # yoksa SCAN pattern carlist:{id}:*
+
+# Hyper geçmişi
+DEL history:v2:{VIN}:az
+# pattern: history:v1:{VIN}:*  ve  history:v2:{VIN}:*
+```
+
+VIN Redis key’inde **uppercase**. Secret’i chat’e yapıştırma; container’da `REDIS_PASSWORD`.
+
+Doğrulama: bir sonraki liste `REDIS_HIT` olmamalı (ilk yükleme put). Hâlâ eski + `EXISTS carlist:…` = 0 → uygulama kendi listesini tutuyor, sunucu değil.
+
+## Kod yazarken
+
+- Yeni user-data cache = key + TTL kararı + **bütün writer’lar** + dil/VIN normalize.
+- Admin/SQL notuna “Redis: …” cümlesi.
+- Catalog ile `cars.model` karıştırma.
+- `hyper` CacheManager (token) Redis değil; evict etme.
+- Test: mutate → ilgili key yok → GET miss → taze body.

@@ -59,6 +59,16 @@ public class HyperPercentageSyncService {
     }
 
     /**
+     * tr: Ziyaret listesini yüzdelere zorla yeniden uygular (EDITED_BY_PARTNER aynı recordId olsa bile).
+     *     GET persist Hyper kaydını güncelledikten sonra last/next km'nin donmaması için kullanılır.
+     * en: Force-reapplies the visit list onto percentages even when already EDITED_BY_PARTNER for the
+     *     same recordId. Used after GET persist refreshes a Hyper snapshot so last/next km do not stay frozen.
+     */
+    public void resyncFromVisits(Car car, List<Visit> visits) {
+        syncInternal(car, visits, true);
+    }
+
+    /**
      * tr: Tek bir ziyareti zorla yeniden uygulama modunda senkronlar; ziyaret null ise hiçbir şey yapmaz.
      *     Bu servis için daha yeni bir satır varsa uygulamayı atlar.
      * en: Syncs a single visit in forced-reapply mode; does nothing when the visit is null.
