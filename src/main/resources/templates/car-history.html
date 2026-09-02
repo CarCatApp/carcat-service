@@ -117,13 +117,37 @@
                         data-date=${visit.lastServiceDate},
                         data-id=${visit.id}">
         <summary class="history-visit-toggle">
-          <div>
-            <div class="history-visit-date"
-                 th:text="${visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—'}">—</div>
-            <div class="history-visit-sub"
-                 th:with="nextLine=${visit.services != null ? visit.services.^[nextServiceDate != null || nextServiceMileage != null] : null}">
-              <div th:text="${'last ' + (visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—') + ' · ' + (visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—')}">last — · —</div>
-              <div th:text="${'next ' + (nextLine != null && nextLine.nextServiceDate != null ? #temporals.format(nextLine.nextServiceDate, 'dd.MM.yyyy') : '—') + ' · ' + (nextLine != null && nextLine.nextServiceMileage != null ? nextLine.nextServiceMileage + ' km' : '—')}">next — · —</div>
+          <div class="visit-sn"
+               th:with="nextLine=${visit.services != null ? visit.services.^[nextServiceDate != null || nextServiceMileage != null] : null}">
+            <div class="visit-sn-row">
+              <div class="visit-sn-cell">
+                <span class="visit-sn-label">Last Service Date</span>
+                <span class="visit-sn-value"
+                      th:classappend="${visit.lastServiceDate == null} ? ' is-empty'"
+                      th:text="${visit.lastServiceDate != null ? #temporals.format(visit.lastServiceDate, 'dd.MM.yyyy') : '—'}">—</span>
+              </div>
+              <div class="visit-sn-rule" aria-hidden="true"></div>
+              <div class="visit-sn-cell visit-sn-next">
+                <span class="visit-sn-label">Next Service Date</span>
+                <span class="visit-sn-value"
+                      th:classappend="${nextLine == null || nextLine.nextServiceDate == null} ? ' is-empty'"
+                      th:text="${nextLine != null && nextLine.nextServiceDate != null ? #temporals.format(nextLine.nextServiceDate, 'dd.MM.yyyy') : '—'}">—</span>
+              </div>
+            </div>
+            <div class="visit-sn-row">
+              <div class="visit-sn-cell">
+                <span class="visit-sn-label">Last Service Mileage</span>
+                <span class="visit-sn-value"
+                      th:classappend="${visit.lastServiceMileage == null} ? ' is-empty'"
+                      th:text="${visit.lastServiceMileage != null ? visit.lastServiceMileage + ' km' : '—'}">—</span>
+              </div>
+              <div class="visit-sn-rule" aria-hidden="true"></div>
+              <div class="visit-sn-cell visit-sn-next">
+                <span class="visit-sn-label">Next Service Mileage</span>
+                <span class="visit-sn-value"
+                      th:classappend="${nextLine == null || nextLine.nextServiceMileage == null} ? ' is-empty'"
+                      th:text="${nextLine != null && nextLine.nextServiceMileage != null ? nextLine.nextServiceMileage + ' km' : '—'}">—</span>
+              </div>
             </div>
           </div>
           <div class="visit-partner" th:with="p=${visit.serviceCenterId != null ? partnerById.get(visit.serviceCenterId) : null}">
