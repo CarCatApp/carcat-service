@@ -1,12 +1,16 @@
 package com.carland.carland_service.service.impl;
 
+import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.entity.*;
+import com.carland.carland_service.enums.CarPhotoSource;
+import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
+import com.carland.carland_service.service.CarAiPhotoWorker;
 import com.carland.carland_service.service.PhotoService;
 import com.carland.carland_service.service.RedisCacheService;
 
@@ -17,6 +21,8 @@ import org.apache.tika.Tika;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -39,6 +45,9 @@ public class PhotoServiceImpl implements PhotoService {
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
     private final RedisCacheService redisCacheService;
+    private final CarAiPhotoWorker carAiPhotoWorker;
+
+    private static final int MAX_AI_GENERATES = 3;
     /**
      * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
      * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
@@ -81,10 +90,101 @@ public class PhotoServiceImpl implements PhotoService {
 
         MediaType mediaType = MediaType.parseMediaType(fileType);
         log.info("media type file type ================= {}", mediaType.getType());
-        redisCacheService.putCarPhoto(carId, mediaType, carPhoto.getImageData());
+        byte[] bytes = carPhoto.getImageData() == null ? new byte[0] : carPhoto.getImageData();
+        if (bytes.length > 0 && !CarPhotoStatus.isPending(carPhoto.getPhotoStatus())) {
+            redisCacheService.putCarPhoto(carId, mediaType, bytes);
+        }
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .body(carPhoto.getImageData());
+                .body(bytes);
+    }
+
+    @Override
+    public ResponseEntity<byte[]> getCarPhotoV2(String role, Long carId, String phoneNumber, String userIdHeader,
+                                                String timezone, String acceptLanguage) {
+        if (role == null || phoneNumber == null || userIdHeader == null) {
+            throw new MissingFieldException(
+                    MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+
+        CarPhoto carPhoto = carPhotoRepository.findByCarId(carId);
+        if (carPhoto == null) {
+            throw new ResourceNotFoundException(
+                    MessagesLangValues.CAR_PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+
+        String status = carPhoto.getPhotoStatus();
+        if (status == null || status.isBlank()) {
+            status = (carPhoto.getImageData() != null && carPhoto.getImageData().length > 0)
+                    ? CarPhotoStatus.READY
+                    : CarPhotoStatus.FAILED;
+        }
+        String source = carPhoto.getPhotoSource();
+        if (source == null || source.isBlank()) {
+            source = (carPhoto.getImageData() != null && carPhoto.getImageData().length > 0)
+                    ? CarPhotoSource.USER
+                    : CarPhotoSource.DEFAULT;
+        }
+
+        String fileType = carPhoto.getFileType();
+        if (fileType == null || fileType.isBlank()) {
+            fileType = "image/webp";
+        }
+        if (!fileType.contains("/")) {
+            fileType = "image/" + fileType.toLowerCase();
+        }
+        MediaType mediaType = MediaType.parseMediaType(fileType);
+        byte[] bytes = carPhoto.getImageData() == null ? new byte[0] : carPhoto.getImageData();
+
+        var response = ResponseEntity.ok()
+                .contentType(mediaType)
+                .header("X-Photo-Status", status)
+                .header("X-Photo-Source", source);
+        if (CarPhotoStatus.FAILED.equalsIgnoreCase(status)) {
+            response.header("X-Photo-Message",
+                    MessagesLangValues.PHOTO_AI_FAILED.getMessageByLang(acceptLanguage));
+        }
+        return response.body(CarPhotoStatus.READY.equalsIgnoreCase(status) ? bytes : new byte[0]);
+    }
+
+    @Override
+    @Transactional
+    public GeneratePhotoResponse generateCarPhoto(Long carId, String role, String phoneNumber, String userIdHeader,
+                                                  String timezone, String acceptLanguage) {
+        if (carId == null || role == null || phoneNumber == null || userIdHeader == null || acceptLanguage == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        if (!role.equals(UserRoles.USER.name())) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        }
+
+        Car car = requireOwnedCar(carId, phoneNumber, userIdHeader, acceptLanguage);
+        CarPhoto photo = carPhotoRepository.findByCarId(carId);
+
+        if (photo != null && CarPhotoStatus.isPending(photo.getPhotoStatus())) {
+            return pendingResponse(carId, acceptLanguage);
+        }
+
+        int used = car.getAiPhotoGenerateCount() == null ? 0 : car.getAiPhotoGenerateCount();
+        if (used >= MAX_AI_GENERATES) {
+            throw new InvalidStatusException(
+                    MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage));
+        }
+
+        if (photo == null) {
+            photo = CarPhoto.builder()
+                    .carId(carId)
+                    .fileName("car " + carId + " image")
+                    .fileType("webp")
+                    .imageData(null)
+                    .build();
+        }
+        photo.setPhotoStatus(CarPhotoStatus.PENDING);
+        carPhotoRepository.save(photo);
+        redisCacheService.evictCarPhoto(carId);
+        redisCacheService.evictCarListAfterCommit(userIdHeader);
+        enqueueGenerateAfterCommit(carId, userIdHeader);
+        return pendingResponse(carId, acceptLanguage);
     }
 
     /**
@@ -362,10 +462,13 @@ public class PhotoServiceImpl implements PhotoService {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
+        CarPhoto existPhoto = carPhotoRepository.findByCarId(carId);
+        if (existPhoto != null && CarPhotoStatus.isPending(existPhoto.getPhotoStatus())) {
+            throw new ConflictException(MessagesLangValues.PHOTO_AI_UPLOAD_BLOCKED.getMessageByLang(acceptLanguage));
+        }
+
         try {
             checkAttack(file, acceptLanguage);
-
-            CarPhoto existPhoto = carPhotoRepository.findByCarId(carId);
 
             if (existPhoto != null) {
                 carPhotoRepository.delete(existPhoto);
@@ -389,6 +492,8 @@ public class PhotoServiceImpl implements PhotoService {
                     .fileType(fileType)
                     .carId(carId)
                     .imageData(file.getBytes())
+                    .photoStatus(CarPhotoStatus.READY)
+                    .photoSource(CarPhotoSource.USER)
                     .build();
 
             carPhotoRepository.save(carPhoto);
@@ -433,6 +538,9 @@ public class PhotoServiceImpl implements PhotoService {
 
         if (carPhoto == null) {
             throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        if (CarPhotoStatus.isPending(carPhoto.getPhotoStatus())) {
+            throw new ConflictException(MessagesLangValues.PHOTO_AI_UPLOAD_BLOCKED.getMessageByLang(acceptLanguage));
         }
 
         carPhotoRepository.delete(carPhoto);
@@ -527,6 +635,41 @@ public class PhotoServiceImpl implements PhotoService {
         if (file.getOriginalFilename().contains("..")) {
             throw new MissingFieldException(MessagesLangValues.INVALID_PHOTO_NAME.getMessageByLang(acceptLanguage));
 
+        }
+    }
+
+    private Car requireOwnedCar(Long carId, String phoneNumber, String userIdHeader, String acceptLanguage) {
+        Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader),
+                phoneNumber, UserStatus.ACTIVE.name());
+        if (customer == null) {
+            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        Car car = carRepository.findByCarIdAndCustomer(carId, customer);
+        if (car == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        return car;
+    }
+
+    private static GeneratePhotoResponse pendingResponse(Long carId, String acceptLanguage) {
+        return GeneratePhotoResponse.builder()
+                .carId(carId)
+                .photoStatus(CarPhotoStatus.PENDING)
+                .message(MessagesLangValues.PHOTO_AI_PREPARING.getMessageByLang(acceptLanguage))
+                .build();
+    }
+
+    private void enqueueGenerateAfterCommit(Long carId, String userIdHeader) {
+        Runnable job = () -> carAiPhotoWorker.generate(carId, userIdHeader);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    job.run();
+                }
+            });
+        } else {
+            job.run();
         }
     }
 }

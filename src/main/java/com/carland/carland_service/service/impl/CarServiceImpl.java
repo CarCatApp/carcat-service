@@ -5,7 +5,6 @@ import com.carland.carland_service.dto.request.PercentageRequest;
 import com.carland.carland_service.dto.request.RecordRequest;
 import com.carland.carland_service.dto.response.*;
 import com.carland.carland_service.entity.*;
-import com.carland.carland_service.enums.ColorTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
 import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.MessagesLangValues;
@@ -216,35 +215,47 @@ public class CarServiceImpl implements CarService {
         }
 
         List<String> azOrder = List.of(
-                "Ağ", "Bej", "Bənövşəyi", "Bordo", "Boz", "Gümüş", "İncə ağ",
-                "Mat qara", "Mavi", "Metalik gümüş", "Narıncı", "Qara", "Qəhvəyi",
-                "Qırmızı", "Qızıl", "Sarı", "Tünd mavi", "Yaşıl", "Digər"
+                "Qara", "Yaş asfalt", "Boz", "Gümüşü", "Ağ", "Bej", "Tünd qırmızı", "Qırmızı",
+                "Çəhrayı", "Narıncı", "Qızılı", "Sarı", "Xaki", "Tünd yaşıl", "Yaşıl", "Açıq yaşıl",
+                "Mavi", "Göy", "Bənövşəyi", "Qəhvəyi", "Bordo", "Mat qara", "Metalik gümüş",
+                "Tünd mavi", "İncə ağ", "Digər"
         );
-
         List<String> enOrder = List.of(
-                "Beige", "Black", "Blue", "Brown", "Gold", "Gray / Grey", "Green",
-                "Maroon", "Matte Black", "Metallic silver", "Navy blue", "Orange",
-                "Pearl white", "Purple", "Red", "Silver", "White", "Yellow", "Other"
+                "Black", "Wet Asphalt", "Gray / Grey", "Gray", "Silver", "White", "Beige", "Dark Red",
+                "Red", "Pink", "Orange", "Gold", "Yellow", "Khaki", "Dark Green", "Green", "Light Green",
+                "Light Blue", "Blue", "Purple", "Brown", "Maroon", "Matte Black", "Metallic silver",
+                "Navy blue", "Pearl white", "Other"
         );
+        List<String> ruOrder = List.of(
+                "Чёрный", "Мокрый асфальт", "Серый", "Серебристый", "Белый", "Бежевый", "Тёмно-красный",
+                "Красный", "Розовый", "Оранжевый", "Золотой", "Жёлтый", "Хаки", "Тёмно-зелёный", "Зелёный",
+                "Светло-зелёный", "Голубой", "Синий", "Фиолетовый", "Коричневый", "Тёмно-бордовый",
+                "Матовый чёрный", "Серебристый металлик", "Тёмно-синий", "Жемчужно-белый", "Другой"
+        );
+        String lang = acceptLanguage == null ? "az" : acceptLanguage.toLowerCase();
+        List<String> order = lang.startsWith("en") ? enOrder : lang.startsWith("ru") ? ruOrder : azOrder;
 
         return colors.stream()
-                .peek(color -> {
-                    String translated = ColorTranslation.translate(color.getColor(), acceptLanguage);
-                    color.setColor(translated);
-                })
+                .map(src -> Color.builder()
+                        .colorId(src.getColorId())
+                        .color(src.nameForLang(acceptLanguage))
+                        .hex(src.getHex())
+                        .build())
                 .sorted((c1, c2) -> {
-                    String lang = acceptLanguage.toLowerCase();
-
-                    if ("az".equals(lang)) {
-                        return Integer.compare(
-                                azOrder.indexOf(c1.getColor()),
-                                azOrder.indexOf(c2.getColor())
-                        );
-                    } else {
-                        if ("Other".equalsIgnoreCase(c1.getColor())) return 1;
-                        if ("Other".equalsIgnoreCase(c2.getColor())) return -1;
-                        return c1.getColor().compareToIgnoreCase(c2.getColor());
+                    int i1 = order.indexOf(c1.getColor());
+                    int i2 = order.indexOf(c2.getColor());
+                    if (i1 < 0 && i2 < 0) {
+                        String n1 = c1.getColor() == null ? "" : c1.getColor();
+                        String n2 = c2.getColor() == null ? "" : c2.getColor();
+                        return n1.compareToIgnoreCase(n2);
                     }
+                    if (i1 < 0) {
+                        return 1;
+                    }
+                    if (i2 < 0) {
+                        return -1;
+                    }
+                    return Integer.compare(i1, i2);
                 })
                 .toList();
     }
@@ -1962,7 +1973,7 @@ public class CarServiceImpl implements CarService {
      */
     private CarResponse convertCarEntityToResponse(Car car, String acceptLanguage, String resource) {
         Color color = colorRepository.findByColorId(car.getColorId());
-        String colorResponse = color != null ? ColorTranslation.translate(color.getColor(), acceptLanguage) : "unknown";
+        String colorResponse = color != null ? color.nameForLang(acceptLanguage) : "unknown";
         Customer customer = car.getCustomer();
         return CarResponse.builder()
                 .carId(car.getCarId())

@@ -192,6 +192,10 @@ public class RedisCacheService {
         return getOrLoadCatalog("catalog:colors:" + langKey(lang), new TypeReference<>() {}, loader, "catalog colors");
     }
 
+    public void evictCatalogColors() {
+        deleteByPattern("catalog:colors:*");
+    }
+
     private <T> List<T> getOrLoadCatalog(String key, TypeReference<List<T>> type, Supplier<List<T>> loader, String hitLabel) {
         List<T> hit = getJson(key, type, hitLabel);
         if (hit != null) {

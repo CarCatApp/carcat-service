@@ -120,11 +120,11 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder()
                 .group("mobile-api")
                 .displayName("2. Carland — Mobile API")
-                .pathsToMatch("/api/v1/**")
+                .pathsToMatch("/api/v1/**", "/api/v2/**")
                 .addOpenApiCustomizer(openApi -> openApi.getInfo()
                         .title("Carland — Mobile API")
                         .description("""
-                                **carland-service** mobile / app APIs (`/api/v1/**`).
+                                **carland-service** mobile / app APIs (`/api/v1/**`, `/api/v2/**`).
 
                                 Requires access JWT from **1. Auth**. Use the **Carland Login** bar first.
                                 Kong injects `X-User-Id` / `phoneNumber` from the JWT (read-only fields in Swagger).

@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +38,20 @@ public interface PhotoService {
      */
     PhotoResponse deleteUserPP(String role, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage);
 
+
+    /**
+     * tr: AI ile araç fotoğrafı üretir (202 + pending); sonucu döner.
+     * en: Starts AI generation of the car photo (202 + pending) and returns the result.
+     */
+    GeneratePhotoResponse generateCarPhoto(Long carId, String role, String phoneNumber, String userIdHeader,
+                                           String timezone, String acceptLanguage);
+
+    /**
+     * tr: Aracın fotoğrafını v2 olarak döner: gövde byte, status/source header.
+     * en: Returns the car photo for v2: body = bytes, status/source on headers.
+     */
+    ResponseEntity<byte[]> getCarPhotoV2(String role, Long carId, String phoneNumber, String userIdHeader,
+                                         String timezone, String acceptLanguage);
 
     /**
      * tr: Aracın fotoğrafını byte dizisi olarak döner.

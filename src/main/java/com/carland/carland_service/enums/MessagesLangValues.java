@@ -561,6 +561,30 @@ public enum MessagesLangValues {
             "Təsdiqlənmiş ad, soyad və FIN dəyişdirilə bilməz",
             "Verified name, surname and FIN cannot be changed",
             "Подтверждённые имя, фамилия и FIN нельзя изменить"
+    ),
+
+    PHOTO_AI_PREPARING(
+            "Şəkiliniz hazırlanır",
+            "Your photo is being prepared",
+            "Ваше фото готовится"
+    ),
+
+    PHOTO_AI_UPLOAD_BLOCKED(
+            "Fotonuz AI tərəfindən hazırlanır, bir neçə saniyə gözləyin",
+            "Your photo is being prepared by AI, please wait a few seconds",
+            "Фото готовится с помощью ИИ, подождите несколько секунд"
+    ),
+
+    PHOTO_AI_FAILED(
+            "Foto hazırlanmadı. Bir az sonra yenidən cəhd edin",
+            "The photo could not be created. Please try again later",
+            "Не удалось создать фото. Попробуйте позже"
+    ),
+
+    PHOTO_AI_GENERATE_LIMIT(
+            "Bu avtomobil üçün AI foto limiti bitib (3)",
+            "AI photo limit reached for this car (3)",
+            "Лимит AI-фото для этого автомобиля исчерпан (3)"
     );
 
     private final String azMessage;
@@ -569,11 +593,9 @@ public enum MessagesLangValues {
 
     public String getMessageByLang(String lang) {
         if (lang == null) return azMessage;
-        return switch (lang.toLowerCase()) {
-            case "az" -> azMessage;
-            case "en" -> enMessage;
-            case "ru" -> ruMessage;
-            default -> azMessage;
-        };
+        String key = lang.toLowerCase();
+        if (key.startsWith("en")) return enMessage;
+        if (key.startsWith("ru")) return ruMessage;
+        return azMessage;
     }
 }

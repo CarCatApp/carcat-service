@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.service.PhotoService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,21 @@ public class PhotoController {
                                         @RequestHeader("X-Client-Timezone") String timezone,
                                         @RequestHeader("Accept-Language") String acceptLanguage) {
         return photoService.uploadCarPhoto(file, carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: OpenAI ile araç fotoğrafı üretimini başlatır; 202 + pending. Upload path'ine dokunmaz.
+     * en: Starts AI generation of the car photo; 202 + pending. Does not replace the upload path.
+     */
+    @PostMapping(value = "/for/car/generate", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<GeneratePhotoResponse> generateCarPhoto(@RequestParam("carId") Long carId,
+                                                                  @RequestHeader("role") String role,
+                                                                  @RequestHeader("phoneNumber") String phoneNumber,
+                                                                  @RequestHeader("X-User-Id") String userIdHeader,
+                                                                  @RequestHeader("X-Client-Timezone") String timezone,
+                                                                  @RequestHeader("Accept-Language") String acceptLanguage) {
+        return ResponseEntity.accepted().body(
+                photoService.generateCarPhoto(carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage));
     }
 
 

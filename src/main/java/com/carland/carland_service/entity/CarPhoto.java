@@ -25,6 +25,10 @@ public class CarPhoto {
     Long carId;
     String fileName;
     String fileType;
+    /** pending | ready | failed — belongs to the photo, not the car. */
+    String photoStatus;
+    /** ai_generated | user | default */
+    String photoSource;
 
     @Lob
     @JdbcTypeCode(Types.BINARY)

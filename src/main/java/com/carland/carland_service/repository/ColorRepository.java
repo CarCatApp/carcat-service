@@ -19,5 +19,5 @@ public interface ColorRepository extends JpaRepository<Color, Long> {
     /** tr: Renk id'sine göre rengi bulur. / en: Finds a color by color id. */
     Color findByColorId(Long colorId);
 
-
+    Color findByColorIgnoreCase(String color);
 }
