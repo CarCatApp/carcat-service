@@ -582,9 +582,9 @@ public enum MessagesLangValues {
     ),
 
     PHOTO_AI_GENERATE_LIMIT(
-            "Bu avtomobil üçün AI foto limiti bitib (3)",
-            "AI photo limit reached for this car (3)",
-            "Лимит AI-фото для этого автомобиля исчерпан (3)"
+            "Bu avtomobil üçün AI foto 5 dəqiqədə bir dəfə yaradıla bilər",
+            "AI photo can be generated once every 5 minutes for this car",
+            "AI-фото для этого автомобиля можно создать раз в 5 минут"
     );
 
     private final String azMessage;

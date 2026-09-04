@@ -51,8 +51,10 @@ public class Car {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private BigDecimal allTimeCost;
-    /** Successful AI photo generates for this car (failed attempts do not increment). Max 3. */
+    /** Successful AI photo generates (informational). Rate limit uses {@link #aiPhotoLastGenerateAt}. */
     Integer aiPhotoGenerateCount;
+    /** Last time an AI generate job was started for this car (5-minute rate limit). */
+    LocalDateTime aiPhotoLastGenerateAt;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id")
     @ToString.Exclude

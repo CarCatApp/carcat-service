@@ -269,5 +269,16 @@ public class CustomExceptionHandler {
         return new ResponseEntity<>(responseException, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ResponseException> handleTooManyRequestsException(TooManyRequestsException ex) {
+        ResponseException responseException = ResponseException.builder()
+                .error("Too many requests")
+                .message(ex.getMessage())
+                .timeStamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .build();
+        return new ResponseEntity<>(responseException, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
 
 }

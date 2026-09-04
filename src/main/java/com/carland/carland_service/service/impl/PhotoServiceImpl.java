@@ -26,6 +26,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 
 /**
@@ -47,7 +49,7 @@ public class PhotoServiceImpl implements PhotoService {
     private final RedisCacheService redisCacheService;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
-    private static final int MAX_AI_GENERATES = 3;
+    private static final Duration GENERATE_RATE_LIMIT = Duration.ofMinutes(5);
     /**
      * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
      * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
@@ -165,9 +167,9 @@ public class PhotoServiceImpl implements PhotoService {
             return pendingResponse(carId, acceptLanguage);
         }
 
-        int used = car.getAiPhotoGenerateCount() == null ? 0 : car.getAiPhotoGenerateCount();
-        if (used >= MAX_AI_GENERATES) {
-            throw new InvalidStatusException(
+        LocalDateTime last = car.getAiPhotoLastGenerateAt();
+        if (last != null && last.isAfter(LocalDateTime.now().minus(GENERATE_RATE_LIMIT))) {
+            throw new TooManyRequestsException(
                     MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage));
         }
 
@@ -181,6 +183,8 @@ public class PhotoServiceImpl implements PhotoService {
         }
         photo.setPhotoStatus(CarPhotoStatus.PENDING);
         carPhotoRepository.save(photo);
+        car.setAiPhotoLastGenerateAt(LocalDateTime.now());
+        carRepository.save(car);
         redisCacheService.evictCarPhoto(carId);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
         enqueueGenerateAfterCommit(carId, userIdHeader);
