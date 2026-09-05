@@ -108,7 +108,7 @@ public class CarAiPhotoWorker {
         String colorPart = colorForPrompt(car);
         String plate = car.getPlateNumber() == null ? "" : car.getPlateNumber().trim();
         return "Stylized 3D miniature model of a " + year + " " + brand + " " + model + " in " + colorPart + ". "
-                + "Front-right 45° three-quarter view. Preserve the real vehicle's recognizable design and proportions, "
+                + "Front-left 45° three-quarter view. Preserve the real vehicle's recognizable design and proportions, "
                 + "especially the body shape, grille, headlights, wheels, windows and trim. "
                 + "Include an Azerbaijani license plate displaying '" + plate + "' clearly on the front of the vehicle. "
                 + "Clean toy-like 3D appearance with smooth surfaces, simplified realistic details, slightly exaggerated but accurate proportions, "
