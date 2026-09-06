@@ -159,9 +159,9 @@ public enum MessagesLangValues {
     ),
 
     PLATE_NUMBER_ALREADY_EXISTS(
-            "Bu qeydiyyat nişanı artıq mövcuddur",
-            "This license plate number already exists",
-            "Этот регистрационный номер уже существует"
+            "Bu qeydiyyat nişanı mövcuddur",
+            "This registration plate already exists",
+            "Этот регистрационный знак уже существует"
     ),
 
     APPOINTMENT_STATUS_ALREADY_SET(

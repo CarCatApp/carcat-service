@@ -1406,11 +1406,15 @@ public class CarServiceImpl implements CarService {
             try {
                 carRepository.save(newCar);
             } catch (DataIntegrityViolationException e) {
+                String cause = e.getMostSpecificCause().getMessage();
+                boolean plateClash = cause != null && cause.toLowerCase().contains("plate");
                 throwAddCarFailure(logUserId,
                         "DB constraint violation on car save | vin=" + vin
                                 + ", plateNumber=" + plateNumber
-                                + ", cause=" + e.getMostSpecificCause().getMessage(),
-                        new AlreadyExistsException(MessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+                                + ", cause=" + cause,
+                        new AlreadyExistsException(plateClash
+                                ? MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)
+                                : MessagesLangValues.CAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
             }
             log.info("[addCar] car saved | carId={}, vin={}", newCar.getCarId(), newCar.getVin());
 
