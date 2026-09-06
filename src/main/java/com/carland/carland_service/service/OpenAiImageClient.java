@@ -48,8 +48,8 @@ public class OpenAiImageClient {
     }
 
     /**
-     * tr: Prompt'tan webp byte üretir. Key veya gövde loglanmaz; hata status kodu yazılır.
-     * en: Produces webp bytes from the prompt. Never logs the key or body; logs HTTP status on error.
+     * tr: Prompt'tan webp byte üretir. API key loglanmaz; PO için b64_json decode öncesi yazılır.
+     * en: Produces webp bytes from the prompt. API key is never logged; b64_json is logged before decode for PO.
      */
     public byte[] generateWebp(String prompt) {
         HttpHeaders headers = new HttpHeaders();
@@ -86,6 +86,7 @@ public class OpenAiImageClient {
             if (comma >= 0) {
                 b64 = b64.substring(comma + 1);
             }
+            log.info("OpenAI image b64_json length={} value={}", b64.length(), b64);
             return Base64.getDecoder().decode(b64);
         } catch (IllegalStateException ex) {
             throw ex;
