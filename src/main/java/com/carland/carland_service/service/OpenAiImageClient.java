@@ -62,7 +62,14 @@ public class OpenAiImageClient {
         body.put("size", size);
         body.put("quality", quality);
         body.put("output_format", "webp");
-        body.put("background", "transparent");
+        String jsonBody;
+        try {
+            jsonBody = objectMapper.writeValueAsString(body);
+        } catch (Exception ex) {
+            jsonBody = String.valueOf(body);
+        }
+        log.info("OpenAI image full request method=POST url={} contentType=application/json authorization=Bearer *** body={}",
+                GENERATIONS_URL, jsonBody);
 
         ResponseEntity<String> response = openaiRestTemplate.postForEntity(
                 GENERATIONS_URL, new HttpEntity<>(body, headers), String.class);

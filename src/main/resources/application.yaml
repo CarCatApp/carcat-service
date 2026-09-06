@@ -123,7 +123,7 @@ idda:
 # Placeholder values are "test". Put the real key only in /root/carland.env (never git).
 openai:
   api-key: ${OPENAI_API_KEY:test}
-  image-model: ${OPENAI_IMAGE_MODEL:gpt-image-2}
-  image-size: ${OPENAI_IMAGE_SIZE:1280x720}
+  image-model: ${OPENAI_IMAGE_MODEL:gpt-image-1}
+  image-size: ${OPENAI_IMAGE_SIZE:1024x1024}
   image-quality: ${OPENAI_IMAGE_QUALITY:low}
   image-timeout-ms: ${OPENAI_IMAGE_TIMEOUT_MS:35000}
