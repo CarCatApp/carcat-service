@@ -40,8 +40,8 @@ public interface PhotoService {
 
 
     /**
-     * tr: AI ile araç fotoğrafı üretir (202 + pending); sonucu döner.
-     * en: Starts AI generation of the car photo (202 + pending) and returns the result.
+     * tr: AI ile araç fotoğrafı üretir. OpenAI kuyruğa girdiyse pending; mevcut AI foto prompt ile uyumluysa ready.
+     * en: Starts AI generation. pending when OpenAI is queued; ready when the current AI photo still matches the prompt.
      */
     GeneratePhotoResponse generateCarPhoto(Long carId, String role, String phoneNumber, String userIdHeader,
                                            String timezone, String acceptLanguage);

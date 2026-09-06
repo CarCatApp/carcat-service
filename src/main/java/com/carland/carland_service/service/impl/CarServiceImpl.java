@@ -366,9 +366,9 @@ public class CarServiceImpl implements CarService {
             car.setPlateNumber(carRequest.getPlateNumber());
         }
 
-//        if (carRequest.getColorId() != null) {
-//            car.setColorId(carRequest.getColorId());
-//        }
+        if (carRequest.getColorId() != null) {
+            car.setColorId(carRequest.getColorId());
+        }
 
         if (carRequest.getEngineTypeId() != null) {
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
@@ -1305,6 +1305,7 @@ public class CarServiceImpl implements CarService {
                 log.info("[addCar] BRANCH existing car without customer | linking carId={} to customerUserId={}",
                         existingCar.getCarId(), customer.getUserId());
                 existingCar.setCustomer(customer);
+                applyAddCarRequestToExisting(existingCar, carRequest, plateNumber, logUserId, acceptLanguage);
                 if (customer.getCars() == null) {
                     customer.setCars(new ArrayList<>());
                 }
@@ -1315,7 +1316,8 @@ public class CarServiceImpl implements CarService {
                 customerRepository.save(customer);
                 CarResponse response = convertCarEntityToResponse(existingCar, acceptLanguage, "fromDb");
                 redisCacheService.evictCarListAfterCommit(userIdHeader);
-                log.info("[addCar] END success (existing car linked) | carId={}, vin={}", response.getCarId(), response.getVin());
+                log.info("[addCar] END success (existing car linked) | carId={}, vin={}, colorId={}",
+                        response.getCarId(), response.getVin(), existingCar.getColorId());
                 return response;
             }
 
@@ -1336,6 +1338,7 @@ public class CarServiceImpl implements CarService {
                 log.info("[addCar] BRANCH existing plate without customer | linking carId={} to customerUserId={}, plateNumber={}, existingVin={}, requestVin={}",
                         conflictingCar.getCarId(), customer.getUserId(), plateNumber, conflictingCar.getVin(), vin);
                 conflictingCar.setCustomer(customer);
+                applyAddCarRequestToExisting(conflictingCar, carRequest, plateNumber, logUserId, acceptLanguage);
                 if (customer.getCars() == null) {
                     customer.setCars(new ArrayList<>());
                 }
@@ -1346,8 +1349,8 @@ public class CarServiceImpl implements CarService {
                 customerRepository.save(customer);
                 CarResponse response = convertCarEntityToResponse(conflictingCar, acceptLanguage, "fromDb");
                 redisCacheService.evictCarListAfterCommit(userIdHeader);
-                log.info("[addCar] END success (existing plate car linked) | carId={}, vin={}, plateNumber={}",
-                        response.getCarId(), response.getVin(), response.getPlateNumber());
+                log.info("[addCar] END success (existing plate car linked) | carId={}, vin={}, plateNumber={}, colorId={}",
+                        response.getCarId(), response.getVin(), response.getPlateNumber(), conflictingCar.getColorId());
                 return response;
             }
             log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
@@ -1506,6 +1509,64 @@ public class CarServiceImpl implements CarService {
                 || ex instanceof UserNotFoundException
                 || ex instanceof AlreadyExistsException
                 || ex instanceof ResourceNotFoundException;
+    }
+
+    /**
+     * Orphan car reclaim: copy the add-car form onto the existing row so generate/list
+     * see the new color/plate/model, not the previous owner's snapshot.
+     */
+    private void applyAddCarRequestToExisting(Car car, CarRequest carRequest, String plateNumber,
+                                              String logUserId, String acceptLanguage) {
+        Optional<Car> plateOwner = carRepository.findByPlateNumberIgnoreCase(plateNumber);
+        if (plateOwner.isPresent() && !plateOwner.get().getCarId().equals(car.getCarId())
+                && plateOwner.get().getCustomer() != null) {
+            throwAddCarFailure(logUserId,
+                    "plateNumber already exists on reclaim | plateNumber=" + plateNumber
+                            + ", existingCarId=" + plateOwner.get().getCarId()
+                            + ", reclaimCarId=" + car.getCarId(),
+                    new AlreadyExistsException(
+                            MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
+        }
+
+        EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
+        if (engineType == null) {
+            throwAddCarFailure(logUserId,
+                    "engineType not found on reclaim | engineTypeId=" + carRequest.getEngineTypeId(),
+                    new ResourceNotFoundException(
+                            MessagesLangValues.ENGINE_TYPE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+        }
+
+        car.setPlateNumber(plateNumber);
+        if (carRequest.getBrand() != null && !carRequest.getBrand().isBlank()) {
+            car.setBrand(carRequest.getBrand());
+        }
+        if (carRequest.getModel() != null && !carRequest.getModel().isBlank()) {
+            car.setModel(carRequest.getModel());
+        }
+        if (carRequest.getModelYear() != null) {
+            car.setModelYear(carRequest.getModelYear());
+        }
+        if (carRequest.getColorId() != null) {
+            car.setColorId(carRequest.getColorId());
+        }
+        car.setMileage(carRequest.getMileage());
+        car.setEngineType(engineType.getEngineType());
+        car.setEngineTypeId(engineType.getEngineTypeId());
+        if (carRequest.getEngineVolume() != null) {
+            car.setEngineVolume(carRequest.getEngineVolume());
+        }
+        if (carRequest.getTransmissionType() != null) {
+            car.setTransmissionType(carRequest.getTransmissionType());
+        }
+        if (carRequest.getBodyType() != null) {
+            car.setBodyType(carRequest.getBodyType());
+        }
+        if (carRequest.getVinProvidedFields() != null) {
+            car.setVinProvidedFields(carRequest.getVinProvidedFields());
+        }
+        car.setUpdatedAt(LocalDateTime.now());
+        log.info("[addCar] applied request onto existing car | carId={}, colorId={}, plateNumber={}, brand={}, model={}",
+                car.getCarId(), car.getColorId(), car.getPlateNumber(), car.getBrand(), car.getModel());
     }
 
     /**

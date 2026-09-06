@@ -2,6 +2,7 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
+import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.service.PhotoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -38,8 +39,8 @@ public class PhotoController {
     }
 
     /**
-     * tr: OpenAI ile araç fotoğrafı üretimini başlatır; 202 + pending. Upload path'ine dokunmaz.
-     * en: Starts AI generation of the car photo; 202 + pending. Does not replace the upload path.
+     * tr: OpenAI ile araç fotoğrafı üretir. İş kuyruğa girdiyse pending (202); AI foto zaten uyumluysa ready (200).
+     * en: Starts AI generation. pending (202) when queued; ready (200) when the existing AI photo still matches.
      */
     @PostMapping(value = "/for/car/generate", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<GeneratePhotoResponse> generateCarPhoto(@RequestParam("carId") Long carId,
@@ -48,8 +49,12 @@ public class PhotoController {
                                                                   @RequestHeader("X-User-Id") String userIdHeader,
                                                                   @RequestHeader("X-Client-Timezone") String timezone,
                                                                   @RequestHeader("Accept-Language") String acceptLanguage) {
-        return ResponseEntity.accepted().body(
-                photoService.generateCarPhoto(carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage));
+        GeneratePhotoResponse body = photoService.generateCarPhoto(
+                carId, role, phoneNumber, userIdHeader, timezone, acceptLanguage);
+        if (CarPhotoStatus.READY.equalsIgnoreCase(body.getPhotoStatus())) {
+            return ResponseEntity.ok(body);
+        }
+        return ResponseEntity.accepted().body(body);
     }
 
 

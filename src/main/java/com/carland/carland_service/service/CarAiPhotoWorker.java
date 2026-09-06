@@ -76,6 +76,7 @@ public class CarAiPhotoWorker {
             photo.setFileName("car " + carId + " image");
             photo.setPhotoStatus(CarPhotoStatus.READY);
             photo.setPhotoSource(CarPhotoSource.AI_GENERATED);
+            photo.setPromptKey(CarAiPhotoPromptKey.of(car));
             carPhotoRepository.save(photo);
 
             int used = car.getAiPhotoGenerateCount() == null ? 0 : car.getAiPhotoGenerateCount();

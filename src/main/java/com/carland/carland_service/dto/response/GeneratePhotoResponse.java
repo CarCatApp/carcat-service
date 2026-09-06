@@ -6,8 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: AI araç fotoğrafı generate isteğinin 202 cevabı (status + dil mesajı; gövde byte değil).
- * en: 202 body for AI car-photo generate (status + localized message; not image bytes).
+ * tr: AI generate cevabı. OpenAI işe alındıysa pending (HTTP 202); skip/hazırsa ready (HTTP 200).
+ * en: AI generate body. pending + HTTP 202 when OpenAI is queued; ready + HTTP 200 on skip.
  */
 @Data
 @NoArgsConstructor
@@ -16,5 +16,7 @@ import lombok.NoArgsConstructor;
 public class GeneratePhotoResponse {
     Long carId;
     String photoStatus;
+    /** ai_generated | user | default — same as X-Photo-Source. */
+    String photoSource;
     String message;
 }
