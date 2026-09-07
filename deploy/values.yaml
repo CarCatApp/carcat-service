@@ -1,0 +1,57 @@
+# Shared defaults for carland-service (all envs). Override per-env in values-*.yaml
+nameOverride: carland-service
+replicaCount: 1
+
+image:
+  repository: azizjava91/carland-service
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 9091
+
+# Secret carland-service-env holds passwords / API keys (not in git)
+existingEnvSecret: carland-service-env
+
+# Firebase service account (secret carland-firebase)
+extraVolumes:
+  - name: firebase
+    secret:
+      secretName: carland-firebase
+extraVolumeMounts:
+  - name: firebase
+    mountPath: /app/firebase.json
+    subPath: firebase.json
+    readOnly: true
+
+# Non-secret config (Spring env binding). Secrets override via envFrom, but
+# explicit env wins over envFrom for the same key.
+env:
+  SERVER_PORT: "9091"
+  SWAGGER_AUTH_DOCS_URL: "http://auth-service:9090/v3/api-docs/legacy-users"
+  SWAGGER_AUTH_NEW_DOCS_URL: "http://auth-service:9090/v3/api-docs/new-users"
+  SWAGGER_WEBHOOK_DOCS_URL: "http://webhook-service:8080/v3/api-docs"
+
+# No spring-boot-actuator → TCP probes
+livenessProbe:
+  enabled: true
+  type: tcp
+  initialDelaySeconds: 60
+  periodSeconds: 15
+
+readinessProbe:
+  enabled: true
+  type: tcp
+  initialDelaySeconds: 30
+  periodSeconds: 5
+
+resources:
+  requests:
+    cpu: 150m
+    memory: 768Mi
+  limits:
+    cpu: "1"
+    memory: 1536Mi
+
+serviceMonitor:
+  enabled: false

@@ -1,0 +1,29 @@
+# DOKS preprod only — does not affect the production droplet
+replicaCount: 1
+
+nodeSelector:
+  carcat.io/env: preprod
+
+tolerations:
+  - key: carcat.io/env
+    operator: Equal
+    value: preprod
+    effect: NoSchedule
+
+# Non-secret pieces that differ by env (passwords stay in carland-service-env).
+# These override same keys from the secret (env wins over envFrom).
+env:
+  SERVER_PORT: "9091"
+  DB_URL: "jdbc:postgresql://private-carcat-pg-preprod-do-user-27979639-0.m.db.ondigitalocean.com:25060/carlanddatabase?sslmode=require"
+  DB_USERNAME: "carland"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  ADMIN_AUTH_BASE_URL: "http://auth-service:9090/api/v1/newUsers"
+  SWAGGER_AUTH_DOCS_URL: "http://auth-service:9090/v3/api-docs/legacy-users"
+  SWAGGER_AUTH_NEW_DOCS_URL: "http://auth-service:9090/v3/api-docs/new-users"
+  SWAGGER_WEBHOOK_DOCS_URL: "http://webhook-service:8080/v3/api-docs"
+  # Public Try-it-out still points at current nginx edge (no DNS cutover yet)
+  SWAGGER_SERVICE_SERVER_URL: "https://digital-innovation.agency/carland/server-carland"
+  SWAGGER_AUTH_SERVER_URL: "https://digital-innovation.agency/auth/server"
+  SWAGGER_ADMIN_SERVER_URL: "https://digital-innovation.agency"
+  SWAGGER_WEBHOOK_SERVER_URL: "https://digital-innovation.agency"
