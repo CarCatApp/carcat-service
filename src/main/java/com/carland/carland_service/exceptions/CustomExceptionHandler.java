@@ -276,6 +276,9 @@ public class CustomExceptionHandler {
                 .message(ex.getMessage())
                 .timeStamp(LocalDateTime.now())
                 .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .lockedUntil(ex.getLockedUntil())
+                .remainingSeconds(ex.getRemainingSeconds())
+                .retryAfter(ex.getRemainingSeconds())
                 .build();
         return new ResponseEntity<>(responseException, HttpStatus.TOO_MANY_REQUESTS);
     }

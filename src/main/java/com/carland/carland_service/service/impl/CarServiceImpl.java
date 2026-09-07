@@ -13,6 +13,7 @@ import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.AfterAddCarSyncService;
+import com.carland.carland_service.service.CarAiPhotoGenerateLock;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.PushNotificationService;
@@ -340,6 +341,14 @@ public class CarServiceImpl implements CarService {
 
         Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
         Car car = requireCustomerCar(carRequest.getCarId(), customer, acceptLanguage);
+
+        if (CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())
+                && CarAiPhotoGenerateLock.changesPromptFields(car, carRequest)) {
+            throw new TooManyRequestsException(
+                    MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage),
+                    car.getAiPhotoGenerateLockedUntil(),
+                    CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()));
+        }
 
         if (carRequest.getBrand() == null) {
             log.info("null");
@@ -2069,6 +2078,8 @@ public class CarServiceImpl implements CarService {
                         : Collections.emptyList())
                 .allTimeCost(car.getAllTimeCost())
                 .resource(resource)
+                .lockedUntil(car.getAiPhotoGenerateLockedUntil())
+                .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
                 .build();
     }
 

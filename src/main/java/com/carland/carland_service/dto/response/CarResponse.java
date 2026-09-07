@@ -41,4 +41,8 @@ public class CarResponse {
     private String resource;
     private BigDecimal allTimeCost;
     private Long engineTypeId;
+    /** OTP-style: generate / prompt-field edit locked until this instant. */
+    private LocalDateTime lockedUntil;
+    /** Seconds left until unlock; 0 = not locked. Flutter countdown. */
+    private Long remainingSeconds;
 }

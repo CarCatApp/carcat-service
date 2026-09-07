@@ -10,6 +10,7 @@ import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
+import com.carland.carland_service.service.CarAiPhotoGenerateLock;
 import com.carland.carland_service.service.CarAiPhotoPromptKey;
 import com.carland.carland_service.service.CarAiPhotoWorker;
 import com.carland.carland_service.service.PhotoService;
@@ -27,7 +28,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 
@@ -50,7 +50,6 @@ public class PhotoServiceImpl implements PhotoService {
     private final RedisCacheService redisCacheService;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
-    private static final Duration GENERATE_RATE_LIMIT = Duration.ofMinutes(1);
     /**
      * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
      * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.
@@ -165,17 +164,18 @@ public class PhotoServiceImpl implements PhotoService {
         CarPhoto photo = carPhotoRepository.findByCarId(carId);
 
         if (photo != null && CarPhotoStatus.isPending(photo.getPhotoStatus())) {
-            return pendingResponse(carId, acceptLanguage, photo.getPhotoSource());
+            return pendingResponse(car, acceptLanguage, photo.getPhotoSource());
         }
 
         if (canSkipOpenAi(photo, car)) {
-            return readyResponse(carId, acceptLanguage, photo.getPhotoSource());
+            return readyResponse(car, acceptLanguage, photo.getPhotoSource());
         }
 
-        LocalDateTime last = car.getAiPhotoLastGenerateAt();
-        if (last != null && last.isAfter(LocalDateTime.now().minus(GENERATE_RATE_LIMIT))) {
+        if (CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())) {
             throw new TooManyRequestsException(
-                    MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage));
+                    MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage),
+                    car.getAiPhotoGenerateLockedUntil(),
+                    CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()));
         }
 
         if (photo == null) {
@@ -188,12 +188,14 @@ public class PhotoServiceImpl implements PhotoService {
         }
         photo.setPhotoStatus(CarPhotoStatus.PENDING);
         carPhotoRepository.save(photo);
-        car.setAiPhotoLastGenerateAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        car.setAiPhotoLastGenerateAt(now);
+        car.setAiPhotoGenerateLockedUntil(CarAiPhotoGenerateLock.lockedUntilFrom(now));
         carRepository.save(car);
         redisCacheService.evictCarPhoto(carId);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
         enqueueGenerateAfterCommit(carId, userIdHeader);
-        return pendingResponse(carId, acceptLanguage, photo.getPhotoSource());
+        return pendingResponse(car, acceptLanguage, photo.getPhotoSource());
     }
 
     /**
@@ -661,23 +663,27 @@ public class PhotoServiceImpl implements PhotoService {
         return car;
     }
 
-    private static GeneratePhotoResponse pendingResponse(Long carId, String acceptLanguage, String photoSource) {
+    private static GeneratePhotoResponse pendingResponse(Car car, String acceptLanguage, String photoSource) {
         return GeneratePhotoResponse.builder()
-                .carId(carId)
+                .carId(car.getCarId())
                 .photoStatus(CarPhotoStatus.PENDING)
                 .photoSource(photoSource)
                 .message(MessagesLangValues.PHOTO_AI_PREPARING.getMessageByLang(acceptLanguage))
+                .lockedUntil(car.getAiPhotoGenerateLockedUntil())
+                .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
                 .build();
     }
 
-    private static GeneratePhotoResponse readyResponse(Long carId, String acceptLanguage, String photoSource) {
+    private static GeneratePhotoResponse readyResponse(Car car, String acceptLanguage, String photoSource) {
         return GeneratePhotoResponse.builder()
-                .carId(carId)
+                .carId(car.getCarId())
                 .photoStatus(CarPhotoStatus.READY)
                 .photoSource(photoSource == null || photoSource.isBlank()
                         ? CarPhotoSource.AI_GENERATED
                         : photoSource)
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .lockedUntil(car.getAiPhotoGenerateLockedUntil())
+                .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
                 .build();
     }
 

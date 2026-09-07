@@ -49,11 +49,25 @@ public class RedisCacheService {
         String key = "carlist:" + userId + ":" + langKey(lang);
         List<CarResponse> hit = getJson(key, new TypeReference<>() {}, "carlist userId=" + userId);
         if (hit != null) {
+            refreshLockCountdowns(hit);
             return hit;
         }
         List<CarResponse> loaded = loader.get();
         putJson(key, loaded, null);
         return loaded;
+    }
+
+    /** remainingSeconds must not freeze in carlist (no TTL). lockedUntil is the stored instant. */
+    private static void refreshLockCountdowns(List<CarResponse> cars) {
+        if (cars == null) {
+            return;
+        }
+        for (CarResponse car : cars) {
+            if (car == null) {
+                continue;
+            }
+            car.setRemainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getLockedUntil()));
+        }
     }
 
     public void evictCarList(String userId) {
