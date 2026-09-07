@@ -50,7 +50,7 @@ public class PhotoServiceImpl implements PhotoService {
     private final RedisCacheService redisCacheService;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
-    private static final Duration GENERATE_RATE_LIMIT = Duration.ofMinutes(5);
+    private static final Duration GENERATE_RATE_LIMIT = Duration.ofMinutes(1);
     /**
      * tr: Verilen carId'ye ait araç fotoğrafını uygun Content-Type ile byte dizisi olarak döner. Header'lar eksikse MissingFieldException, fotoğraf yoksa ResourceNotFoundException fırlatır.
      * en: Returns the car photo for the given carId as a byte array with the proper Content-Type. Throws MissingFieldException if headers are missing and ResourceNotFoundException if the photo does not exist.

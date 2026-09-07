@@ -108,14 +108,9 @@ public class CarAiPhotoWorker {
         String model = car.getModel() == null ? "" : car.getModel().trim();
         String colorPart = colorForPrompt(car);
         String plate = car.getPlateNumber() == null ? "" : car.getPlateNumber().trim();
-        return "Stylized 3D model of " + year + " " + brand + " " + model + " in " + colorPart + "."
-                + "Front-left 45° three-quarter view."
-                + "Preserve the real vehicle's recognizable design and proportions, especially the body shape, grille,"
-                + "headlights, wheels, windows and trim. "
-                + "Include an Azerbaijani license plate displaying " + plate + " clearly on the front of the vehicle. "
-                + "Clean 3D appearance with smooth surfaces, simplified realistic details, slightly exaggerated but accurate proportions, "
-                + "soft studio lighting and subtle shadow. Full vehicle visible, centered, no cropping. "
-                + "Transparent background. No people, additional text or watermark.";
+        return "Photorealistic studio product photo of a " + year + " " + colorPart + " " + brand + " " + model
+                + " , shown in a front three-quarter view angled toward the front — the front fascia mostly facing the camera with only a slight turn to reveal the right-side profile, roughly 20° from head-on, camera at roughly bumper height, entire vehicle centered and fully in frame. Transparent background, even soft studio lighting, subtle contact shadow and faint reflection directly beneath the car, no other reflections. Clean catalog/marketing style, sharp detail, no people, no text or watermarks, no background objects. License plate '"
+                + plate + "' in Azerbaijani format";
     }
 
     private String colorForPrompt(Car car) {
