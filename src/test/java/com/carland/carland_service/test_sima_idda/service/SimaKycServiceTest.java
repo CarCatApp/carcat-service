@@ -4,6 +4,7 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.SimaKycRecord;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
+import com.carland.carland_service.test_sima_idda.SimaKycErrorCatalog;
 import com.carland.carland_service.test_sima_idda.config.SimaIddaProperties;
 import com.carland.carland_service.test_sima_idda.dto.response.SimaVerifyOutcome;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaApiEnvelope;
@@ -82,6 +83,7 @@ class SimaKycServiceTest {
     @Test
     void pinTaken_conflictWithoutSima() {
         when(customerRepository.findByUserId(678L)).thenReturn(customer);
+        stubLimitsOpen();
         when(customerRepository.findAllByPinIgnoreCase("62HJ5KQ"))
                 .thenReturn(List.of(Customer.builder().userId(1L).pin("62HJ5KQ").simaVerified(true).build()));
         when(simaKycRecordRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -143,6 +145,8 @@ class SimaKycServiceTest {
         assertEquals(200, out.getHttpStatus());
         assertFalse(out.getBody().isVerified());
         assertEquals("SIMA_SCORE_GATE", out.getBody().getCode());
+        assertEquals(751, out.getBody().getSimaResponseCode());
+        assertEquals(SimaKycErrorCatalog.message(751, "en"), out.getBody().getMessage());
         assertFalse(Boolean.TRUE.equals(customer.getSimaVerified()));
         verify(customerRepository, never()).save(any());
         verify(simaKycRecordRepository).save(any());
@@ -170,16 +174,59 @@ class SimaKycServiceTest {
         assertFalse(out.getBody().isVerified());
         assertEquals(752, out.getBody().getSimaResponseCode());
         assertEquals("resim decode edilemedi", out.getBody().getSimaMessage());
+        assertEquals(SimaKycErrorCatalog.message(752, "az"), out.getBody().getMessage());
         verify(customerRepository, never()).save(any());
+    }
+
+    @Test
+    void dailyFailLimit_blocksWithoutSima() {
+        when(customerRepository.findByUserId(678L)).thenReturn(customer);
+        when(simaIddaProperties.getKycTotalAttemptLimit()).thenReturn(5);
+        when(simaIddaProperties.getKycDailyFailLimit()).thenReturn(3);
+        when(simaIddaProperties.getKycTimezone()).thenReturn("Asia/Baku");
+        when(simaKycRecordRepository.countByCustomerAndChannelIn(any(), any())).thenReturn(3L);
+        when(simaKycRecordRepository.countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
+                any(), any(), any())).thenReturn(3L);
+
+        SimaVerifyOutcome out = service.verifyCitizen("678", "62HJ5KQ", "AB0668397", null, photo, "az");
+
+        assertEquals(429, out.getHttpStatus());
+        assertEquals("SIMA_DAILY_LIMIT", out.getBody().getCode());
+        assertTrue(out.getBody().getMessage().contains("3"));
+        verify(simaFeign, never()).verifyCitizen(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void totalAttemptLimit_blocksWithoutSima() {
+        when(customerRepository.findByUserId(678L)).thenReturn(customer);
+        when(simaIddaProperties.getKycTotalAttemptLimit()).thenReturn(5);
+        when(simaKycRecordRepository.countByCustomerAndChannelIn(any(), any())).thenReturn(5L);
+
+        SimaVerifyOutcome out = service.verifyCitizen("678", "62HJ5KQ", "AB0668397", null, photo, "en");
+
+        assertEquals(429, out.getHttpStatus());
+        assertEquals("SIMA_TOTAL_LIMIT", out.getBody().getCode());
+        assertTrue(out.getBody().getMessage().contains("5"));
+        verify(simaFeign, never()).verifyCitizen(any(), any(), any(), any(), any());
     }
 
     private void stubCitizenCall() {
         when(customerRepository.findByUserId(678L)).thenReturn(customer);
         when(customerRepository.findAllByPinIgnoreCase(anyString())).thenReturn(List.of());
+        stubLimitsOpen();
         when(simaHmacSigner.signBase64(anyString())).thenReturn("sig");
         when(simaIddaProperties.getSimaIdentifier()).thenReturn("id");
         when(simaIddaProperties.getSimaAuthScheme()).thenReturn("HMACSHA256");
         when(simaIddaProperties.getSimaDeviceInfo()).thenReturn("test");
+    }
+
+    private void stubLimitsOpen() {
+        when(simaIddaProperties.getKycTotalAttemptLimit()).thenReturn(5);
+        when(simaIddaProperties.getKycDailyFailLimit()).thenReturn(3);
+        when(simaIddaProperties.getKycTimezone()).thenReturn("Asia/Baku");
+        when(simaKycRecordRepository.countByCustomerAndChannelIn(any(), any())).thenReturn(0L);
+        when(simaKycRecordRepository.countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
+                any(), any(), any())).thenReturn(0L);
     }
 
     private static SimaApiEnvelope envelope(boolean success, double live, double sim) {

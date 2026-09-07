@@ -7,6 +7,8 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
+import com.carland.carland_service.test_sima_idda.SimaKycErrorCatalog;
+import com.carland.carland_service.test_sima_idda.SimaPiiMask;
 import com.carland.carland_service.test_sima_idda.SimaVerificationGate;
 import com.carland.carland_service.test_sima_idda.config.SimaIddaProperties;
 import com.carland.carland_service.test_sima_idda.dto.request.SimaCitizenVerifyRequest;
@@ -29,8 +31,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -40,6 +45,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class SimaKycService {
+
+    private static final List<String> ATTEMPT_CHANNELS = List.of("CITIZEN", "FOREIGN");
 
     private final SimaFeign simaFeign;
     private final CustomerRepository customerRepository;
@@ -72,7 +79,7 @@ public class SimaKycService {
             return blocked;
         }
         SimaCall call = callCitizen(pin, documentNumber, birthDate, photo);
-        return finishAttempt(customer, call, "CITIZEN", acceptLanguage);
+        return finishAttempt(customer, call, "CITIZEN", acceptLanguage, pin, documentNumber, birthDate);
     }
 
     @Transactional
@@ -90,7 +97,7 @@ public class SimaKycService {
             return blocked;
         }
         SimaCall call = callForeign(pin, documentType, photo);
-        return finishAttempt(customer, call, "FOREIGN", acceptLanguage);
+        return finishAttempt(customer, call, "FOREIGN", acceptLanguage, pin, null, null);
     }
 
     private SimaVerifyOutcome preflight(Customer customer, String pin, String acceptLanguage) {
@@ -107,6 +114,10 @@ public class SimaKycService {
                             .build())
                     .build();
         }
+        SimaVerifyOutcome limited = checkAttemptLimits(customer, acceptLanguage);
+        if (limited != null) {
+            return limited;
+        }
         if (pinTakenByOther(pin, customer.getUserId())) {
             persistPinTaken(customer, pin, "PRECHECK");
             return pinTakenOutcome(pin, acceptLanguage);
@@ -114,11 +125,47 @@ public class SimaKycService {
         return null;
     }
 
+    private SimaVerifyOutcome checkAttemptLimits(Customer customer, String acceptLanguage) {
+        int totalLimit = simaIddaProperties.getKycTotalAttemptLimit();
+        long total = simaKycRecordRepository.countByCustomerAndChannelIn(customer, ATTEMPT_CHANNELS);
+        if (total >= totalLimit) {
+            log.warn("SIMA KYC total limit exceeded userId={} attempts={} limit={}",
+                    customer.getUserId(), total, totalLimit);
+            return limitBlocked("SIMA_TOTAL_LIMIT",
+                    SimaKycErrorCatalog.totalLimit(totalLimit, acceptLanguage));
+        }
+        int dailyLimit = simaIddaProperties.getKycDailyFailLimit();
+        long failsToday = simaKycRecordRepository
+                .countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
+                        customer, ATTEMPT_CHANNELS, startOfTodayLocal());
+        if (failsToday >= dailyLimit) {
+            log.warn("SIMA KYC daily limit exceeded userId={} failCountToday={} limit={}",
+                    customer.getUserId(), failsToday, dailyLimit);
+            return limitBlocked("SIMA_DAILY_LIMIT",
+                    SimaKycErrorCatalog.dailyLimit(dailyLimit, acceptLanguage));
+        }
+        return null;
+    }
+
+    private static SimaVerifyOutcome limitBlocked(String code, String message) {
+        return SimaVerifyOutcome.builder()
+                .httpStatus(HttpStatus.TOO_MANY_REQUESTS.value())
+                .body(SimaVerifyResponse.builder()
+                        .verified(false)
+                        .code(code)
+                        .message(message)
+                        .build())
+                .build();
+    }
+
     private SimaVerifyOutcome finishAttempt(
             Customer customer,
             SimaCall call,
             String channel,
-            String acceptLanguage
+            String acceptLanguage,
+            String requestPin,
+            String requestDocumentNumber,
+            String requestBirthDate
     ) {
         SimaApiEnvelope envelope = call.envelope;
         SimaIdentityResult result = envelope != null ? envelope.getResult() : null;
@@ -130,28 +177,32 @@ public class SimaKycService {
                 error != null ? error.getTransactionId() : null
         );
         boolean verified = SimaVerificationGate.attemptVerified(envelope);
+        long attemptNo = simaKycRecordRepository.countByCustomerAndChannelIn(customer, ATTEMPT_CHANNELS) + 1;
 
         String outcome;
         int httpStatus;
         boolean applyProfile = false;
         String appCode;
         String appMessage;
+        Integer userSimaCode = simaCode;
 
         if (envelope == null) {
             outcome = "SIMA_EMPTY";
             httpStatus = call.httpStatus > 0 ? call.httpStatus : 502;
             appCode = "SIMA_EMPTY";
-            appMessage = "Empty SIMA response";
+            userSimaCode = 70000;
+            appMessage = SimaKycErrorCatalog.message(70000, acceptLanguage);
         } else if (!Boolean.TRUE.equals(envelope.getIsSuccess()) || result == null) {
             outcome = "SIMA_ERROR";
             httpStatus = resolveSimaHttp(error, call.httpStatus);
             appCode = simaCode != null ? "SIMA_" + simaCode : "SIMA_FAIL";
-            appMessage = simaMessage != null ? simaMessage : "SIMA failed";
+            appMessage = SimaKycErrorCatalog.message(simaCode, acceptLanguage);
         } else if (!verified) {
             outcome = "SCORE_GATE";
             httpStatus = HttpStatus.OK.value();
             appCode = "SIMA_SCORE_GATE";
-            appMessage = "livenessScore and similarityScore must both be >= 0.90";
+            userSimaCode = SimaKycErrorCatalog.scoreGateCode(result.getLivenessScore(), result.getSimilarityScore());
+            appMessage = SimaKycErrorCatalog.message(userSimaCode, acceptLanguage);
         } else if (pinTakenByOther(result.getPin(), customer.getUserId())) {
             outcome = "PIN_TAKEN";
             httpStatus = HttpStatus.CONFLICT.value();
@@ -172,6 +223,20 @@ public class SimaKycService {
             applyVerifiedProfile(customer, result);
         }
 
+        if (applyProfile) {
+            log.info("SIMA KYC ok userId={} attempt={} pin={} transactionId={}",
+                    customer.getUserId(), attemptNo, SimaPiiMask.fin(result.getPin()), transactionId);
+        } else {
+            log.warn("SIMA KYC fail userId={} attempt={} code={} outcome={} pin={} documentNumber={} birthDate={}",
+                    customer.getUserId(),
+                    attemptNo,
+                    appCode,
+                    outcome,
+                    SimaPiiMask.fin(requestPin),
+                    SimaPiiMask.documentNumber(requestDocumentNumber),
+                    SimaPiiMask.birthDate(requestBirthDate));
+        }
+
         return SimaVerifyOutcome.builder()
                 .httpStatus(httpStatus)
                 .body(SimaVerifyResponse.builder()
@@ -184,9 +249,9 @@ public class SimaKycService {
                         .transactionId(transactionId)
                         .code(appCode)
                         .message(appMessage)
-                        .simaResponseCode(simaCode)
+                        .simaResponseCode(userSimaCode)
                         .simaMessage(simaMessage)
-                        .simaErrorCode(simaCode)
+                        .simaErrorCode(userSimaCode)
                         .build())
                 .build();
     }
@@ -207,7 +272,7 @@ public class SimaKycService {
         customer.setSimaVerified(true);
         customerRepository.save(customer);
         log.info("SIMA verified userId={} pin={} transactionId={}",
-                customer.getUserId(), result.getPin(), result.getTransactionId());
+                customer.getUserId(), SimaPiiMask.fin(result.getPin()), result.getTransactionId());
     }
 
     private void persistRecord(
@@ -236,7 +301,7 @@ public class SimaKycService {
                 .simaResponseCode(error != null ? error.getErrorCode() : null)
                 .simaMessage(error != null ? error.getErrorMessage() : null)
                 .outcome(outcome)
-                .createdAt(LocalDateTime.now());
+                .createdAt(nowLocal());
         if (result != null) {
             row.transactionId(result.getTransactionId())
                     .processTime(result.getProcessTime())
@@ -274,7 +339,7 @@ public class SimaKycService {
                 .idempotencyKey(UUID.randomUUID().toString())
                 .pin(pin)
                 .outcome("PIN_TAKEN")
-                .createdAt(LocalDateTime.now())
+                .createdAt(nowLocal())
                 .build());
     }
 
@@ -346,8 +411,8 @@ public class SimaKycService {
                 .build();
         String minified = SimaHmacSigner.minify(body);
         String signature = simaHmacSigner.signBase64(minified);
-        log.info("SIMA foreign verify user pin={} documentType={} idempotencyKey={}",
-                pin, body.getDocumentType(), idempotencyKey);
+        log.info("SIMA foreign verify pin={} documentType={} idempotencyKey={}",
+                SimaPiiMask.fin(pin), body.getDocumentType(), idempotencyKey);
         try {
             SimaApiEnvelope envelope = simaFeign.verifyForeign(
                     simaIddaProperties.getSimaIdentifier(),
@@ -365,16 +430,18 @@ public class SimaKycService {
     private SimaCall parseFeignError(FeignException e, String idempotencyKey) {
         int status = e.status() > 0 ? e.status() : 502;
         String content = e.contentUTF8();
-        log.warn("SIMA Feign status={} bodySnippet={}", status,
-                content != null && content.length() > 400 ? content.substring(0, 400) : content);
         SimaApiEnvelope envelope = null;
         if (content != null && !content.isBlank()) {
             try {
                 envelope = objectMapper.readValue(content, SimaApiEnvelope.class);
             } catch (Exception parseEx) {
-                log.warn("SIMA error body parse failed: {}", parseEx.getMessage());
+                log.warn("SIMA error body parse failed status={}", status);
             }
         }
+        Integer errCode = envelope != null && envelope.getError() != null
+                ? envelope.getError().getErrorCode()
+                : null;
+        log.warn("SIMA Feign status={} errorCode={}", status, errCode);
         if (envelope == null) {
             envelope = SimaApiEnvelope.builder()
                     .isSuccess(false)
@@ -396,6 +463,19 @@ public class SimaKycService {
             return feignStatus;
         }
         return 400;
+    }
+
+    private LocalDateTime nowLocal() {
+        return LocalDateTime.now(kycZone());
+    }
+
+    private LocalDateTime startOfTodayLocal() {
+        return LocalDate.now(kycZone()).atStartOfDay();
+    }
+
+    private ZoneId kycZone() {
+        String zone = simaIddaProperties.getKycTimezone();
+        return ZoneId.of(zone == null || zone.isBlank() ? "Asia/Baku" : zone);
     }
 
     private static String firstNonBlank(String a, String b) {

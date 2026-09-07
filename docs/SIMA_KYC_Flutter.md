@@ -2,7 +2,7 @@
 
 Bu dosya **tek kaynak**. Backend (carland_service) canlı sözleşmesi. Aziz’e sormadan buradan yaz.
 
-Tarih: 24 Aug 2026 · Jira: CRCT-248, CRCT-249 (parent CRCT-232)
+Tarih: 7 Sep 2026 · Jira: CRCT-273 / CRCT-259, CRCT-248, CRCT-249 (parent CRCT-232)
 
 ---
 
@@ -167,9 +167,9 @@ Body **her zaman** bu şekil (alanlar null olabilir). SIMA 4xx olsa bile bu şab
 | `livenessScore` / `similarityScore` | 0–1 ondalık. Eşik **0.90** (dahil). Backend karar verir; sen skor göstermek zorunda değilsin |
 | `transactionId` | Destek / log |
 | `code` | Bizim kod (`OK`, `SIMA_SCORE_GATE`, `PIN_ALREADY_EXISTS`, …) |
-| `message` | Kullanıcıya gösterilebilecek yazı (dil header’ına göre bazıları) |
-| `simaResponseCode` | SIMA’nın sayısal kodu (7xx). Yoksa `null` |
-| `simaMessage` | SIMA’nın kendi metni. Varsa **bunu öncelikli göster** |
+| `message` | Kullanıcıya gösterilecek yazı (`Accept-Language`: az/en/ru). **Bunu toast’la.** |
+| `simaResponseCode` | SIMA’nın sayısal kodu (7xx) veya skor kapısı 751/752. Yoksa `null` |
+| `simaMessage` | SIMA’nın ham teknik metni. **UI’da gösterme** (log). |
 | `simaErrorCode` | `simaResponseCode` ile aynı (eski isim) |
 
 Parse kuralı: `if (json['verified'] == true)` başarı. HTTP’ye bakarak “oldu” deme.
@@ -181,20 +181,20 @@ Parse kuralı: `if (json['verified'] == true)` başarı. HTTP’ye bakarak “ol
 | HTTP | `verified` | Ne oldu | UI |
 |---|---|---|---|
 | **200** | `true` | KYC geçti, DB yazıldı | Butonu gizle; ad/soyad/FIN doldur ve kilitle |
-| **200** | `false` | SIMA cevap verdi ama skor &lt; 0.90 veya iş kuralı | Buton kalsın; `simaMessage` yoksa `message` göster |
+| **200** | `false` | SIMA cevap verdi ama skor &lt; 0.90 (`isSuccess` + her iki skor **≥ 0.90** değil) | Buton kalsın; **`message` göster** |
 | **200** | `true` + `code: SIMA_ALREADY_VERIFIED` | Zaten doğrulanmış, SIMA’ya gidilmedi | Butonu gizle; hata toast’ı **yok** |
-| **400** | `false` | SIMA validation / foto / XOR / `documentType` | Mesaj göster, tekrar dene |
-| **409** | `false` + `code: PIN_ALREADY_EXISTS` | Bu FIN başka hesapta | “Bu FIN kodu artıq istifadə olunur” |
+| **400** | `false` | SIMA kodu (751, 752, 722…) | **`message` göster** (AZ/EN/RU). Tekrar dene |
+| **409** | `false` + `code: PIN_ALREADY_EXISTS` | Bu FIN başka hesapta | `message` |
+| **429** | `false` + `SIMA_DAILY_LIMIT` | Bugün (Bakü 00:00) 3 fail doldu | `message`; yarın tekrar |
+| **429** | `false` + `SIMA_TOTAL_LIMIT` | Hesapta 5 yoxlama doldu | `message`; support |
 | 401 / 403 | (başka body) | JWT / Kong | Login |
-| 5xx | SIMA veya biz | Tekrar dene | |
+| 5xx | SIMA veya biz | `message` | |
 
 **Kritik:** HTTP 200 + `verified: false` = **başarısız KYC**. Loading’i kapat, yeşil tick basma.
 
-Kullanıcı metni öncelik:
+Kullanıcı metni: **sadece `message`**. `simaMessage` ham SIMA, kullanıcıya basma.
 
-1. `simaMessage` (null değilse)
-2. `message`
-3. Sabit çeviri (`code`’a göre)
+Fail sayılır: `isSuccess != true` **veya** liveness/similarity **&lt; 0.90**. Success yalnız ikisi de **≥ 0.90**.
 
 ---
 
@@ -204,10 +204,12 @@ Kullanıcı metni öncelik:
 |---|---|---|
 | `OK` | 200 | Doğrulandı |
 | `SIMA_ALREADY_VERIFIED` | 200 | Zaten doğrulanmış |
-| `SIMA_SCORE_GATE` | 200 | Skorlar 0.90 altında |
+| `SIMA_SCORE_GATE` | 200 | Skorlar 0.90 altında (`message` = 751 veya 752 metni) |
 | `PIN_ALREADY_EXISTS` | 409 | FIN başka müşteride |
-| `SIMA_EMPTY` | 502 civarı | Boş SIMA cevabı |
-| `SIMA_<sayı>` | SIMA’nın HTTP’si | Ör. `SIMA_752` |
+| `SIMA_DAILY_LIMIT` | 429 | Günlük 3 fail (Bakü günü) |
+| `SIMA_TOTAL_LIMIT` | 429 | Toplam 5 yoxlama |
+| `SIMA_EMPTY` | 502 civarı | Boş SIMA cevabı (`message` = 70000) |
+| `SIMA_<sayı>` | SIMA’nın HTTP’si | Ör. `SIMA_752` — `message` tablodaki cümle |
 | `SIMA_FAIL` | SIMA HTTP | Kod yok, genel fail |
 
 ---

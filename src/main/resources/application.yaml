@@ -114,6 +114,9 @@ sima:
   hmac-secret: ${SIMA_HMAC_SECRET}
   auth-scheme: ${SIMA_AUTH_SCHEME:HMACSHA256}
   device-info: ${SIMA_DEVICE_INFO:carland-sima-test}
+  kyc-daily-fail-limit: ${SIMA_KYC_DAILY_FAIL_LIMIT:3}
+  kyc-total-attempt-limit: ${SIMA_KYC_TOTAL_ATTEMPT_LIMIT:5}
+  kyc-timezone: ${SIMA_KYC_TIMEZONE:Asia/Baku}
 
 idda:
   base-url: ${IDDA_BASE_URL:https://example-idda-staging.local}

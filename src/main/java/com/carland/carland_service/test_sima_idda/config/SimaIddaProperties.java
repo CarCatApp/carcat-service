@@ -34,4 +34,13 @@ public class SimaIddaProperties {
 
     @Value("${idda.api-key:}")
     private String iddaApiKey;
+
+    @Value("${sima.kyc-daily-fail-limit:3}")
+    private int kycDailyFailLimit;
+
+    @Value("${sima.kyc-total-attempt-limit:5}")
+    private int kycTotalAttemptLimit;
+
+    @Value("${sima.kyc-timezone:Asia/Baku}")
+    private String kycTimezone;
 }
