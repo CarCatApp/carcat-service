@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -18,4 +19,13 @@ public interface SimaKycRecordRepository extends JpaRepository<SimaKycRecord, Lo
 
     long countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
             Customer customer, Collection<String> channels, LocalDateTime from);
+
+    long countByCustomerAndChannelInAndCreatedAtAfter(
+            Customer customer, Collection<String> channels, LocalDateTime after);
+
+    long countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtAfter(
+            Customer customer, Collection<String> channels, LocalDateTime after);
+
+    List<SimaKycRecord> findByCustomerAndChannelInOrderByCreatedAtAsc(
+            Customer customer, Collection<String> channels);
 }

@@ -10,10 +10,23 @@
     col.c-name    { width: 150px; }
     col.c-surname { width: 170px; }
     col.c-phone   { width: 150px; }
-    col.c-status  { width: 140px; }
-    col.c-created { width: 170px; }
-    col.c-cars    { width: 110px; }
-    .data-table { min-width: 900px; }
+    col.c-status  { width: 120px; }
+    col.c-sima    { width: 80px; }
+    col.c-created { width: 160px; }
+    col.c-cars    { width: 90px; }
+    col.c-attempts { width: 110px; }
+    .data-table { min-width: 1100px; }
+    .row-open { background: #fafafa; }
+    .sima-panel { border-top: 1px solid var(--border); background: #fafafa; padding: 18px 20px 22px; }
+    .sima-panel h2 { font-size: 16px; margin-bottom: 4px; }
+    .sima-limits { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+    .sima-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 240px; }
+    .sima-box b { display: block; font-size: 18px; margin: 4px 0 8px; }
+    .sima-recs { width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .sima-recs th, .sima-recs td { font-size: 13px; padding: 10px 12px; }
+    .sima-ok { color: #16a34a; font-weight: 700; }
+    .sima-bad { color: #dc2626; font-weight: 700; }
+    .sima-note { background: #ecf8ef; color: #166534; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -33,13 +46,13 @@
     </nav>
   </div>
   <div class="topbar-actions">
-    <a class="btn btn-excel" th:if="${from != null || to != null || filterPhone != null}"
-       th:href="@{/admin/users/export(from=${from}, to=${to}, phone=${filterPhone})}">
+    <a class="btn btn-excel" th:if="${from != null || to != null || filterPhone != null || filterSima != 'all'}"
+       th:href="@{/admin/users/export(from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel (filtered)
     </a>
     <a class="btn"
-       th:classappend="${from != null || to != null || filterPhone != null} ? 'btn-excel-outline' : 'btn-excel'"
+       th:classappend="${from != null || to != null || filterPhone != null || filterSima != 'all'} ? 'btn-excel-outline' : 'btn-excel'"
        href="/admin/users/export">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel (full list)
@@ -48,7 +61,7 @@
   </div>
 </header>
 
-<main class="container" id="main">
+<main class="container wide" id="main">
   <div class="page-head">
     <h1>Users</h1>
     <span class="total">Toplam <strong th:text="${totalUsers}">0</strong> kullanıcı</span>
@@ -71,8 +84,16 @@
       <label for="phone">Phone</label>
       <input type="text" id="phone" name="phone" placeholder="+994..." th:value="${filterPhone}">
     </div>
+    <div class="filter-field">
+      <label for="sima">SIMA</label>
+      <select id="sima" name="sima">
+        <option value="all" th:selected="${filterSima == 'all'}">All</option>
+        <option value="yes" th:selected="${filterSima == 'yes'}">Verified</option>
+        <option value="no" th:selected="${filterSima == 'no'}">Not verified</option>
+      </select>
+    </div>
     <button class="btn btn-filter" type="submit">Filtrele</button>
-    <a class="btn btn-clear" th:if="${from != null || to != null || filterPhone != null}" href="/admin/users">Temizle</a>
+    <a class="btn btn-clear" th:if="${from != null || to != null || filterPhone != null || filterSima != 'all'}" href="/admin/users">Temizle</a>
     <span class="filter-info" th:if="${from != null || to != null}">
       <span th:text="${from != null ? #temporals.format(from, 'dd.MM.yyyy') : '...'}"></span>
       &#8211;
@@ -90,8 +111,10 @@
           <col class="c-surname">
           <col class="c-phone">
           <col class="c-status">
+          <col class="c-sima">
           <col class="c-created">
           <col class="c-cars">
+          <col class="c-attempts">
         </colgroup>
         <thead>
         <tr>
@@ -100,12 +123,14 @@
           <th>Surname</th>
           <th>Phone Number</th>
           <th>Status</th>
+          <th>SIMA</th>
           <th>Created At</th>
           <th>Cars</th>
+          <th>Attempts</th>
         </tr>
         </thead>
         <tbody>
-        <tr th:each="u : ${users}">
+        <tr th:each="u : ${users}" th:classappend="${attemptsUserId != null and attemptsUserId == u.id} ? 'row-open'">
           <td th:text="${u.id}"></td>
           <td th:text="${u.name}"></td>
           <td th:text="${u.surname}"></td>
@@ -116,14 +141,93 @@
                   th:title="${u.status}"
                   th:text="${u.status == 'OTP_PENDING'} ? 'OTP pending' : (${u.status == 'OTP_VERIFIED'} ? 'OTP verified' : (${u.status == 'ACTIVE'} ? 'Active' : (${u.status == 'BLOCKED'} ? 'Blocked' : (${u.status == 'INVITED'} ? 'Invited' : (${u.status == 'JOINED'} ? 'Joined' : u.status)))))"></span>
           </td>
+          <td>
+            <span class="badge"
+                  th:classappend="${simaByUserId[u.id]} ? 'badge-success' : 'badge-info'"
+                  th:text="${simaByUserId[u.id]} ? 'Yes' : 'No'">No</span>
+          </td>
           <td class="muted"
               th:text="${u.createdAt != null ? #temporals.format(u.createdAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
           <td>
             <a class="btn-cars" th:href="@{/admin/cars(userId=${u.id})}">Cars</a>
           </td>
+          <td>
+            <a class="btn-cars" th:if="${attemptsUserId == null or attemptsUserId != u.id}"
+               th:href="@{/admin/users(page=${currentPage}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima}, attempts=${u.id})}">cəhdlər</a>
+            <a class="btn-cars" th:if="${attemptsUserId != null and attemptsUserId == u.id}"
+               th:href="@{/admin/users(page=${currentPage}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">bağla</a>
+          </td>
         </tr>
         <tr class="empty-row" th:if="${users.isEmpty()}">
-          <td colspan="7">Kayıt bulunamadı</td>
+          <td colspan="9">Kayıt bulunamadı</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sima-panel" th:if="${simaPanel != null}">
+      <div class="sima-note" th:if="${simaMessage}" th:text="${simaMessage}"></div>
+      <h2>
+        <span th:text="${simaPanel.phone}">phone</span>
+        <span class="muted"> · cəhdlər</span>
+      </h2>
+      <p class="muted">Köhnə cəhdlər silinmir. Günlük sayğac bu günün fail-lərini, ümumi sayğac bütün cəhdləri sayır — sıfırlamadan sonrakıları.</p>
+      <div class="sima-limits" th:if="${simaPanel.customerFound}">
+        <div class="sima-box">
+          <span class="muted">Günlük fail</span>
+          <b th:text="${simaPanel.dailyUsed + ' / ' + simaPanel.dailyLimit}">0 / 3</b>
+          <form method="post" th:action="@{/admin/users/sima/reset}"
+                onsubmit="return confirm('Günlük limit sıfırlansın? Köhnə cəhdlər silinməyəcək.');">
+            <input type="hidden" name="customerUserId" th:value="${simaPanel.customerUserId}">
+            <input type="hidden" name="kind" value="daily">
+            <input type="hidden" name="page" th:value="${currentPage}">
+            <input type="hidden" name="from" th:value="${from}">
+            <input type="hidden" name="to" th:value="${to}">
+            <input type="hidden" name="phone" th:value="${filterPhone}">
+            <input type="hidden" name="sima" th:value="${filterSima}">
+            <input type="hidden" name="attempts" th:value="${attemptsUserId}">
+            <button class="btn btn-filter" type="submit">Günlük limiti sıfırla</button>
+          </form>
+        </div>
+        <div class="sima-box">
+          <span class="muted">Ümumi cəhd</span>
+          <b th:text="${simaPanel.totalUsed + ' / ' + simaPanel.totalLimit}">0 / 5</b>
+          <form method="post" th:action="@{/admin/users/sima/reset}"
+                onsubmit="return confirm('Ümumi limit sıfırlansın? Köhnə cəhdlər silinməyəcək.');">
+            <input type="hidden" name="customerUserId" th:value="${simaPanel.customerUserId}">
+            <input type="hidden" name="kind" value="ever">
+            <input type="hidden" name="page" th:value="${currentPage}">
+            <input type="hidden" name="from" th:value="${from}">
+            <input type="hidden" name="to" th:value="${to}">
+            <input type="hidden" name="phone" th:value="${filterPhone}">
+            <input type="hidden" name="sima" th:value="${filterSima}">
+            <input type="hidden" name="attempts" th:value="${attemptsUserId}">
+            <button class="btn btn-filter" type="submit">Ümumi limiti sıfırla</button>
+          </form>
+        </div>
+      </div>
+      <div class="empty-row" th:if="${simaPanel.attempts.isEmpty()}" style="padding:16px 0;font-weight:600;">Sima cəhdi yoxdur</div>
+      <table class="sima-recs" th:if="${!simaPanel.attempts.isEmpty()}">
+        <thead>
+        <tr>
+          <th>Vaxt</th>
+          <th>Nəticə</th>
+          <th>Outcome</th>
+          <th>Liveness</th>
+          <th>Similarity</th>
+          <th>SIMA kod</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="a : ${simaPanel.attempts}">
+          <td th:text="${a.time}"></td>
+          <td th:class="${a.success} ? 'sima-ok' : 'sima-bad'" th:text="${a.success} ? 'success' : 'fail'"></td>
+          <td th:text="${a.outcome}"></td>
+          <td th:text="${a.liveness}"></td>
+          <td th:text="${a.similarity}"></td>
+          <td th:text="${a.code}"></td>
+          <td class="muted" th:text="${a.beforeLabel}"></td>
         </tr>
         </tbody>
       </table>
@@ -136,24 +240,24 @@
       <nav class="pages">
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/users(page=${currentPage - 1}, from=${from}, to=${to}, phone=${filterPhone})}">
+           th:href="@{/admin/users(page=${currentPage - 1}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">
           &#8592; Previous
         </a>
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/users(page=1, from=${from}, to=${to}, phone=${filterPhone})}">1</a>
+           th:href="@{/admin/users(page=1, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/users(page=${p}, from=${from}, to=${to}, phone=${filterPhone})}"
+           th:href="@{/admin/users(page=${p}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}"
            th:text="${p}">1</a>
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/users(page=${totalPages}, from=${from}, to=${to}, phone=${filterPhone})}"
+           th:href="@{/admin/users(page=${totalPages}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}"
            th:text="${totalPages}"></a>
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/users(page=${currentPage + 1}, from=${from}, to=${to}, phone=${filterPhone})}">
+           th:href="@{/admin/users(page=${currentPage + 1}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">
           Next &#8594;
         </a>
       </nav>
@@ -164,8 +268,8 @@
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("usersTable"),
-    "carland-admin-cols-users",
-    ["ID", "Name", "Surname", "Phone Number", "Status", "Created At", "Cars"],
+    "carland-admin-cols-users-sima",
+    ["ID", "Name", "Surname", "Phone Number", "Status", "SIMA", "Created At", "Cars", "Attempts"],
     []
   );
 </script>

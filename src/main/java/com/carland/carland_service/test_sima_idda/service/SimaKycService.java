@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
@@ -46,7 +45,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SimaKycService {
 
-    private static final List<String> ATTEMPT_CHANNELS = List.of("CITIZEN", "FOREIGN");
+    private static final List<String> ATTEMPT_CHANNELS = SimaAttemptLimitService.ATTEMPT_CHANNELS;
 
     private final SimaFeign simaFeign;
     private final CustomerRepository customerRepository;
@@ -54,6 +53,7 @@ public class SimaKycService {
     private final ObjectMapper objectMapper;
     private final SimaHmacSigner simaHmacSigner;
     private final SimaIddaProperties simaIddaProperties;
+    private final SimaAttemptLimitService simaAttemptLimitService;
 
     public SimaApiEnvelope testIdentityVerify(
             String pin,
@@ -126,18 +126,16 @@ public class SimaKycService {
     }
 
     private SimaVerifyOutcome checkAttemptLimits(Customer customer, String acceptLanguage) {
-        int totalLimit = simaIddaProperties.getKycTotalAttemptLimit();
-        long total = simaKycRecordRepository.countByCustomerAndChannelIn(customer, ATTEMPT_CHANNELS);
+        int totalLimit = simaAttemptLimitService.totalLimit();
+        long total = simaAttemptLimitService.countTotal(customer);
         if (total >= totalLimit) {
             log.warn("SIMA KYC total limit exceeded userId={} attempts={} limit={}",
                     customer.getUserId(), total, totalLimit);
             return limitBlocked("SIMA_TOTAL_LIMIT",
                     SimaKycErrorCatalog.totalLimit(totalLimit, acceptLanguage));
         }
-        int dailyLimit = simaIddaProperties.getKycDailyFailLimit();
-        long failsToday = simaKycRecordRepository
-                .countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
-                        customer, ATTEMPT_CHANNELS, startOfTodayLocal());
+        int dailyLimit = simaAttemptLimitService.dailyLimit();
+        long failsToday = simaAttemptLimitService.countDailyFails(customer);
         if (failsToday >= dailyLimit) {
             log.warn("SIMA KYC daily limit exceeded userId={} failCountToday={} limit={}",
                     customer.getUserId(), failsToday, dailyLimit);
@@ -467,10 +465,6 @@ public class SimaKycService {
 
     private LocalDateTime nowLocal() {
         return LocalDateTime.now(kycZone());
-    }
-
-    private LocalDateTime startOfTodayLocal() {
-        return LocalDate.now(kycZone()).atStartOfDay();
     }
 
     private ZoneId kycZone() {

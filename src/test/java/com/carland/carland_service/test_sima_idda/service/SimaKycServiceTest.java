@@ -54,7 +54,8 @@ class SimaKycServiceTest {
                 simaKycRecordRepository,
                 new ObjectMapper(),
                 simaHmacSigner,
-                simaIddaProperties
+                simaIddaProperties,
+                new SimaAttemptLimitService(simaKycRecordRepository, simaIddaProperties)
         );
         customer = Customer.builder()
                 .userId(678L)

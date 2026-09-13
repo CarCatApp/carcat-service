@@ -1,10 +1,14 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.AdminAuthLoginResponse;
+import com.carland.carland_service.dto.response.AdminSimaAttemptRow;
+import com.carland.carland_service.dto.response.AdminSimaPanel;
 import com.carland.carland_service.dto.response.AuthUser;
 import com.carland.carland_service.dto.response.PartnerDataResponse;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Feedback;
+import com.carland.carland_service.entity.SimaKycRecord;
 import com.carland.carland_service.entity.FeedbackPhoto;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
@@ -14,12 +18,14 @@ import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CarSpec;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
+import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
 import com.carland.carland_service.service.PhotoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -46,6 +52,9 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -67,6 +76,8 @@ public class AdminController {
 
     private final CarRepository carRepository;
 
+    private final CustomerRepository customerRepository;
+
     private final VisitRepository visitRepository;
 
     private final PartnerRepository partnerRepository;
@@ -82,6 +93,8 @@ public class AdminController {
     private final AdminAccessService adminAccessService;
 
     private final PhotoService photoService;
+
+    private final SimaAttemptLimitService simaAttemptLimitService;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -375,6 +388,8 @@ public class AdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String phone,
+            @RequestParam(defaultValue = "all") String sima,
+            @RequestParam(required = false) Long attempts,
             HttpServletRequest request,
             Model model
     ) {
@@ -384,6 +399,7 @@ public class AdminController {
         }
 
         String phoneFilter = blankToNull(phone);
+        String simaFilter = normalizeSimaFilter(sima);
         List<AuthUser> allUsers;
         boolean loadError = false;
 
@@ -395,7 +411,17 @@ public class AdminController {
             loadError = true;
         }
 
-        // Liste uzak servisten geldiği için sayfalama burada, bellek üzerinde yapılır
+        Map<Long, Customer> customersById = new LinkedHashMap<>();
+        Map<String, Customer> customersByPhone = new LinkedHashMap<>();
+        indexCustomers(customersById, customersByPhone);
+
+        if (!"all".equals(simaFilter)) {
+            boolean wantVerified = "yes".equals(simaFilter);
+            allUsers = allUsers.stream()
+                    .filter(user -> isSimaVerified(resolveCustomer(user, customersById, customersByPhone)) == wantVerified)
+                    .collect(Collectors.toList());
+        }
+
         int pageIndex = Math.max(page, 1) - 1;
         int totalPages = Math.max((int) Math.ceil((double) allUsers.size() / PAGE_SIZE), 1);
 
@@ -410,16 +436,61 @@ public class AdminController {
                 ? allUsers.subList(fromIndex, toIndex)
                 : Collections.emptyList();
 
+        Map<Long, Boolean> simaByUserId = new LinkedHashMap<>();
+        for (AuthUser user : pageContent) {
+            if (user.getId() == null) {
+                continue;
+            }
+            simaByUserId.put(user.getId(), isSimaVerified(resolveCustomer(user, customersById, customersByPhone)));
+        }
+
         addPaginationAttributes(model, totalPages, pageIndex);
 
         model.addAttribute("users", pageContent);
+        model.addAttribute("simaByUserId", simaByUserId);
         model.addAttribute("totalUsers", allUsers.size());
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("filterPhone", phoneFilter);
+        model.addAttribute("filterSima", simaFilter);
+        model.addAttribute("attemptsUserId", attempts);
         model.addAttribute("loadError", loadError);
+        model.addAttribute("simaPanel", attempts == null ? null : buildSimaPanel(attempts, allUsers, customersById, customersByPhone));
 
         return "users";
+    }
+
+    @PostMapping("/admin/users/sima/reset")
+    public String resetSimaLimit(
+            @RequestParam Long customerUserId,
+            @RequestParam String kind,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String phone,
+            @RequestParam(defaultValue = "all") String sima,
+            @RequestParam(required = false) Long attempts,
+            HttpServletRequest request,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        Customer customer = customerRepository.findByUserId(customerUserId);
+        if (customer == null) {
+            redirectAttributes.addFlashAttribute("simaMessage", "Müştəri tapılmadı.");
+        } else if ("daily".equalsIgnoreCase(kind)) {
+            simaAttemptLimitService.resetDaily(customer);
+            customerRepository.save(customer);
+            redirectAttributes.addFlashAttribute("simaMessage", "Günlük limit sıfırlandı. Köhnə cəhdlər silinmedi.");
+        } else if ("ever".equalsIgnoreCase(kind)) {
+            simaAttemptLimitService.resetEver(customer);
+            customerRepository.save(customer);
+            redirectAttributes.addFlashAttribute("simaMessage", "Ümumi limit sıfırlandı. Köhnə cəhdlər silinmedi.");
+        } else {
+            redirectAttributes.addFlashAttribute("simaMessage", "Naməlum limit növü.");
+        }
+        return usersRedirect(page, from, to, phone, sima, attempts);
     }
 
 
@@ -432,6 +503,7 @@ public class AdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String phone,
+            @RequestParam(defaultValue = "all") String sima,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -442,13 +514,23 @@ public class AdminController {
         }
 
         String phoneFilter = blankToNull(phone);
+        String simaFilter = normalizeSimaFilter(sima);
         List<AuthUser> users = fetchUsers(from, to, phoneFilter);
+        Map<Long, Customer> customersById = new LinkedHashMap<>();
+        Map<String, Customer> customersByPhone = new LinkedHashMap<>();
+        indexCustomers(customersById, customersByPhone);
+        if (!"all".equals(simaFilter)) {
+            boolean wantVerified = "yes".equals(simaFilter);
+            users = users.stream()
+                    .filter(user -> isSimaVerified(resolveCustomer(user, customersById, customersByPhone)) == wantVerified)
+                    .collect(Collectors.toList());
+        }
 
         try (Workbook workbook = new XSSFWorkbook()) {
 
             Sheet sheet = workbook.createSheet("Users");
 
-            String[] headers = {"ID", "Name", "Surname", "Phone Number", "Status", "Created At"};
+            String[] headers = {"ID", "Name", "Surname", "Phone Number", "Status", "SIMA", "Created At"};
 
             createHeaderRow(workbook, sheet, headers);
 
@@ -462,10 +544,12 @@ public class AdminController {
                 setCell(row, 2, user.getSurname());
                 setCell(row, 3, user.getPhoneNumber());
                 setCell(row, 4, user.getStatus());
-                setCell(row, 5, formatDate(user.getCreatedAt()));
+                setCell(row, 5, isSimaVerified(resolveCustomer(user, customersById, customersByPhone)) ? "Yes" : "No");
+                setCell(row, 6, formatDate(user.getCreatedAt()));
             }
 
-            String baseName = (from != null || to != null || phoneFilter != null) ? "users-filtered" : "users";
+            String baseName = (from != null || to != null || phoneFilter != null || !"all".equals(simaFilter))
+                    ? "users-filtered" : "users";
 
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
@@ -625,6 +709,143 @@ public class AdminController {
         }
         return raw.trim();
     }
+
+    private static String normalizeSimaFilter(String raw) {
+        if (raw == null) {
+            return "all";
+        }
+        String value = raw.trim().toLowerCase(Locale.ROOT);
+        return "yes".equals(value) || "no".equals(value) ? value : "all";
+    }
+
+    private void indexCustomers(Map<Long, Customer> byId, Map<String, Customer> byPhone) {
+        for (Customer customer : customerRepository.findAll()) {
+            if (customer.getUserId() != null) {
+                byId.put(customer.getUserId(), customer);
+            }
+            String phone = digits(customer.getPhoneNumber());
+            if (phone != null) {
+                byPhone.putIfAbsent(phone, customer);
+            }
+        }
+    }
+
+    private Customer resolveCustomer(AuthUser user, Map<Long, Customer> byId, Map<String, Customer> byPhone) {
+        if (user.getId() != null && byId.containsKey(user.getId())) {
+            return byId.get(user.getId());
+        }
+        String phone = digits(user.getPhoneNumber());
+        return phone == null ? null : byPhone.get(phone);
+    }
+
+    private static boolean isSimaVerified(Customer customer) {
+        return customer != null && Boolean.TRUE.equals(customer.getSimaVerified());
+    }
+
+    private static String digits(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        String digits = phone.replaceAll("\\D", "");
+        return digits.isBlank() ? null : digits;
+    }
+
+    private AdminSimaPanel buildSimaPanel(
+            Long authUserId,
+            List<AuthUser> users,
+            Map<Long, Customer> byId,
+            Map<String, Customer> byPhone
+    ) {
+        AuthUser user = users.stream()
+                .filter(row -> authUserId.equals(row.getId()))
+                .findFirst()
+                .orElse(null);
+        if (user == null) {
+            return null;
+        }
+        Customer customer = resolveCustomer(user, byId, byPhone);
+        if (customer == null) {
+            return AdminSimaPanel.builder()
+                    .authUserId(authUserId)
+                    .phone(user.getPhoneNumber())
+                    .customerFound(false)
+                    .simaVerified(false)
+                    .dailyUsed(0)
+                    .dailyLimit(simaAttemptLimitService.dailyLimit())
+                    .totalUsed(0)
+                    .totalLimit(simaAttemptLimitService.totalLimit())
+                    .attempts(List.of())
+                    .build();
+        }
+        List<AdminSimaAttemptRow> rows = simaAttemptLimitService.listAttempts(customer).stream()
+                .map(record -> toAttemptRow(customer, record))
+                .collect(Collectors.toList());
+        return AdminSimaPanel.builder()
+                .authUserId(authUserId)
+                .customerUserId(customer.getUserId())
+                .phone(user.getPhoneNumber())
+                .customerFound(true)
+                .simaVerified(isSimaVerified(customer))
+                .dailyUsed((int) simaAttemptLimitService.countDailyFails(customer))
+                .dailyLimit(simaAttemptLimitService.dailyLimit())
+                .totalUsed((int) simaAttemptLimitService.countTotal(customer))
+                .totalLimit(simaAttemptLimitService.totalLimit())
+                .attempts(rows)
+                .build();
+    }
+
+    private AdminSimaAttemptRow toAttemptRow(Customer customer, SimaKycRecord record) {
+        boolean beforeDaily = isBeforeReset(record.getCreatedAt(), customer.getSimaDailyLimitResetAt());
+        boolean beforeEver = isBeforeReset(record.getCreatedAt(), customer.getSimaEverLimitResetAt());
+        String beforeLabel = "";
+        if (beforeDaily && beforeEver) {
+            beforeLabel = "günlük + ümumi limitdən əvvəl";
+        } else if (beforeDaily) {
+            beforeLabel = "günlük limitdən əvvəl";
+        } else if (beforeEver) {
+            beforeLabel = "ümumi limitdən əvvəl";
+        }
+        return AdminSimaAttemptRow.builder()
+                .time(record.getCreatedAt() == null ? "—" : record.getCreatedAt().format(SIMA_TIME))
+                .success(record.isVerified())
+                .outcome(record.getOutcome() == null ? "—" : record.getOutcome())
+                .liveness(formatScore(record.getLivenessScore()))
+                .similarity(formatScore(record.getSimilarityScore()))
+                .code(record.getSimaResponseCode() == null ? "—" : String.valueOf(record.getSimaResponseCode()))
+                .beforeLabel(beforeLabel)
+                .build();
+    }
+
+    private static boolean isBeforeReset(LocalDateTime createdAt, LocalDateTime resetAt) {
+        return createdAt != null && resetAt != null && !createdAt.isAfter(resetAt);
+    }
+
+    private static String formatScore(Double score) {
+        if (score == null) {
+            return "—";
+        }
+        return String.format(Locale.US, "%.4f", score);
+    }
+
+    private String usersRedirect(int page, LocalDate from, LocalDate to, String phone, String sima, Long attempts) {
+        StringBuilder url = new StringBuilder("redirect:/admin/users?page=").append(Math.max(page, 1));
+        if (from != null) {
+            url.append("&from=").append(from);
+        }
+        if (to != null) {
+            url.append("&to=").append(to);
+        }
+        if (phone != null && !phone.isBlank()) {
+            url.append("&phone=").append(URLEncoder.encode(phone.trim(), StandardCharsets.UTF_8));
+        }
+        url.append("&sima=").append(normalizeSimaFilter(sima));
+        if (attempts != null) {
+            url.append("&attempts=").append(attempts);
+        }
+        return url.toString();
+    }
+
+    private static final DateTimeFormatter SIMA_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
 
     /**

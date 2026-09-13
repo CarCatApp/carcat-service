@@ -5,6 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -45,6 +46,18 @@ public class Customer {
      */
     @Column(name = "gender", length = 16)
     String gender;
+    /**
+     * Attempts with createdAt after this instant do not count toward the daily fail limit.
+     * Null = count all of today's fails. Records themselves are never deleted on reset.
+     */
+    @Column(name = "sima_daily_limit_reset_at")
+    LocalDateTime simaDailyLimitResetAt;
+    /**
+     * Attempts with createdAt after this instant do not count toward the lifetime attempt limit.
+     * Null = count every CITIZEN/FOREIGN row.
+     */
+    @Column(name = "sima_ever_limit_reset_at")
+    LocalDateTime simaEverLimitResetAt;
     String notificationLanguage;
     String status;
     LocalDate createdAt;
