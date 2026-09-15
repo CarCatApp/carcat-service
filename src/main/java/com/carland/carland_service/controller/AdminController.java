@@ -435,6 +435,7 @@ public class AdminController {
         List<AuthUser> pageContent = fromIndex < allUsers.size()
                 ? allUsers.subList(fromIndex, toIndex)
                 : Collections.emptyList();
+        applyAdminDisplayNames(pageContent, customersById, customersByPhone);
 
         Map<Long, Boolean> simaByUserId = new LinkedHashMap<>();
         for (AuthUser user : pageContent) {
@@ -563,6 +564,7 @@ public class AdminController {
             createHeaderRow(workbook, sheet, headers);
 
             int rowIndex = 1;
+            applyAdminDisplayNames(users, customersById, customersByPhone);
             for (AuthUser user : users) {
 
                 Row row = sheet.createRow(rowIndex++);
@@ -768,6 +770,38 @@ public class AdminController {
 
     private static boolean isSimaVerified(Customer customer) {
         return customer != null && Boolean.TRUE.equals(customer.getSimaVerified());
+    }
+
+    private void applyAdminDisplayNames(
+            List<AuthUser> users,
+            Map<Long, Customer> byId,
+            Map<String, Customer> byPhone
+    ) {
+        for (AuthUser user : users) {
+            applyAdminDisplayName(user, resolveCustomer(user, byId, byPhone));
+        }
+    }
+
+    /**
+     * tr: SIMA verified ise adı/soyadı kayıtsız customers'tan alır. Değilse dolu olan kaynağı kullanır (önce customer, boşsa auth).
+     * en: If SIMA-verified, name/surname come from customers with no extra checks. Otherwise the non-blank source wins (customer first, else auth).
+     */
+    private static void applyAdminDisplayName(AuthUser user, Customer customer) {
+        if (user == null) {
+            return;
+        }
+        if (isSimaVerified(customer)) {
+            user.setName(blankToNull(customer.getName()));
+            user.setSurname(blankToNull(customer.getSurname()));
+            return;
+        }
+        user.setName(firstNonBlank(customer == null ? null : customer.getName(), user.getName()));
+        user.setSurname(firstNonBlank(customer == null ? null : customer.getSurname(), user.getSurname()));
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        String value = blankToNull(primary);
+        return value != null ? value : blankToNull(fallback);
     }
 
     private static String digits(String phone) {
