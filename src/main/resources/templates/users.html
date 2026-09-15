@@ -27,6 +27,7 @@
     .sima-ok { color: #16a34a; font-weight: 700; }
     .sima-bad { color: #dc2626; font-weight: 700; }
     .sima-note { background: #ecf8ef; color: #166534; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-weight: 600; }
+    .sima-box-danger { border-color: #f0c8c8; }
   </style>
 </head>
 <body>
@@ -203,6 +204,21 @@
             <input type="hidden" name="sima" th:value="${filterSima}">
             <input type="hidden" name="attempts" th:value="${attemptsUserId}">
             <button class="btn btn-filter" type="submit">Ümumi limiti sıfırla</button>
+          </form>
+        </div>
+        <div class="sima-box sima-box-danger" th:if="${simaPanel.simaVerified}">
+          <span class="muted">Sima təsdiq</span>
+          <b>Yes</b>
+          <form method="post" th:action="@{/admin/users/sima/clear-verified}"
+                onsubmit="return confirm('Sima təsdiq statusu silinsin? Ad, FIN və cəhdlər qalacaq.');">
+            <input type="hidden" name="customerUserId" th:value="${simaPanel.customerUserId}">
+            <input type="hidden" name="page" th:value="${currentPage}">
+            <input type="hidden" name="from" th:value="${from}">
+            <input type="hidden" name="to" th:value="${to}">
+            <input type="hidden" name="phone" th:value="${filterPhone}">
+            <input type="hidden" name="sima" th:value="${filterSima}">
+            <input type="hidden" name="attempts" th:value="${attemptsUserId}">
+            <button class="btn btn-danger" type="submit">Sima təsdiq statusu sil</button>
           </form>
         </div>
       </div>

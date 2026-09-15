@@ -493,6 +493,34 @@ public class AdminController {
         return usersRedirect(page, from, to, phone, sima, attempts);
     }
 
+    @PostMapping("/admin/users/sima/clear-verified")
+    public String clearSimaVerified(
+            @RequestParam Long customerUserId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String phone,
+            @RequestParam(defaultValue = "all") String sima,
+            @RequestParam(required = false) Long attempts,
+            HttpServletRequest request,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        Customer customer = customerRepository.findByUserId(customerUserId);
+        if (customer == null) {
+            redirectAttributes.addFlashAttribute("simaMessage", "Müştəri tapılmadı.");
+        } else if (!Boolean.TRUE.equals(customer.getSimaVerified())) {
+            redirectAttributes.addFlashAttribute("simaMessage", "Bu müştəri artıq Sima təsdiqli deyil.");
+        } else {
+            customer.setSimaVerified(false);
+            customerRepository.save(customer);
+            redirectAttributes.addFlashAttribute("simaMessage", "Sima təsdiq statusu silindi. Ad, FIN və cəhdlər saxlanıldı.");
+        }
+        return usersRedirect(page, from, to, phone, sima, attempts);
+    }
+
 
     /**
      * tr: carland_auth kullanıcılarını (opsiyonel from/to tarih filtresiyle) XLSX dosyası olarak indirir; login yoksa admin giriş sayfasına yönlendirir.
