@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Service History — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium5">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium6">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -35,6 +35,9 @@
       <p class="muted">Kaynak: DB <code>visits</code>. Hyper API bu ekranda çağrılmaz.</p>
     </div>
   </div>
+
+  <div class="ok-box" th:if="${historyMessage}" th:text="${historyMessage}"></div>
+  <div class="error-box" th:if="${historyError}" th:text="${historyError}"></div>
 
   <div class="error-box" th:if="${carMissing}">
     Araç bulunamadı. <a href="/admin/cars">Cars listesine dön</a>
@@ -82,6 +85,31 @@
           <td th:text="${car.servicedPartnerIds != null && !car.servicedPartnerIds.isEmpty()} ? ${car.servicedPartnerIds} : '[]'">[]</td>
         </tr>
       </table>
+    </div>
+
+    <div class="card car-admin-actions">
+      <div class="car-admin-col">
+        <h2>Delete from customer list</h2>
+        <p class="muted">Müşterinin app listesinden çıkarır (<code>customer_id</code> null). Visit, percentage ve foto kalır. Sahibin <code>carlist</code> cache’i silinir.</p>
+        <form method="post" th:action="@{/admin/cars/{id}/unlink-customer(id=${car.carId})}"
+              th:if="${car.customer != null}"
+              onsubmit="return confirm('Bu araç müşteri listesinden çıksın? Satır DB’de kalır.');">
+          <button class="btn btn-warn" type="submit">Delete from customer list</button>
+        </form>
+        <p class="muted" th:if="${car.customer == null}">Zaten bir müşteriye bağlı değil.</p>
+      </div>
+      <div class="car-admin-col danger">
+        <h2>Delete car</h2>
+        <p class="muted">Satır + visits + service_histories + percentages + photos + Redis (carlist, history, foto). Geri alınmaz. Onay için VIN’i yaz.</p>
+        <form method="post" class="vin-confirm-form" th:action="@{/admin/cars/{id}/delete(id=${car.carId})}"
+              th:attr="data-vin=${car.vin}"
+              onsubmit="return confirmDeleteCar(this);">
+          <label for="confirmVin">VIN</label>
+          <input class="vin-input" type="text" id="confirmVin" name="confirmVin" maxlength="32"
+                 spellcheck="false" autocomplete="off" required placeholder="VIN’i buraya yaz">
+          <button class="btn btn-danger" type="submit">Delete car</button>
+        </form>
+      </div>
     </div>
 
     <div class="history-toolbar">
@@ -329,6 +357,19 @@
     });
     if (sortSel) sortSel.addEventListener("change", apply);
   })();
+
+  function normalizeVin(v) {
+    return String(v || "").replace(/\s+/g, "").toUpperCase();
+  }
+  function confirmDeleteCar(form) {
+    var typed = normalizeVin(form.confirmVin && form.confirmVin.value);
+    var expected = normalizeVin(form.getAttribute("data-vin"));
+    if (!typed || typed !== expected) {
+      alert("VIN eşleşmedi. Delete car iptal.");
+      return false;
+    }
+    return confirm("Bu aracı ve tüm visit / percentage / foto / cache kayıtlarını silmek istediğine emin misin? Geri alınmaz.");
+  }
 </script>
 </body>
 </html>

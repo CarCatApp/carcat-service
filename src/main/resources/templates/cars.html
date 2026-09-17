@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cars — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium3">
+  <link rel="stylesheet" href="/admin/admin.css?v=premium6">
   <style>
     col.c-hist     { width: 100px; }
     col.c-vin      { width: 165px; }
@@ -53,6 +53,8 @@
     <h1>Cars</h1>
     <span class="total">Toplam <strong th:text="${cars.totalElements}">0</strong> araç</span>
   </div>
+
+  <div class="ok-box" th:if="${carsMessage}" th:text="${carsMessage}"></div>
 
   <div class="filter-banner" th:if="${filterUserId != null}">
     <span>Sadece <strong th:text="'User #' + ${filterUserId}"></strong> kullanıcısının araçları gösteriliyor</span>

@@ -1238,6 +1238,59 @@ body.login-page {
   .history-visit-toggle { grid-template-columns: 1fr auto; }
 }
 
+.car-admin-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.car-admin-col h2 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+.car-admin-col.danger {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+.vin-confirm-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+.vin-confirm-form label {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.vin-confirm-form .vin-input {
+  flex: 1;
+  min-width: 180px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.btn-warn {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid #f3d19a;
+}
+.btn-warn:hover { background: #ffefd4; }
+.container > .ok-box { margin-top: 0; margin-bottom: 20px; }
+@media (max-width: 800px) {
+  .car-admin-actions { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

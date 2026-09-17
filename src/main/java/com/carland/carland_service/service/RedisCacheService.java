@@ -145,6 +145,14 @@ public class RedisCacheService {
         runAfterCommit(() -> evictCarAndHistory(userId, vin));
     }
 
+    public void evictCarAndHistoryAfterCommit(String userId, String vin) {
+        runAfterCommit(() -> evictCarAndHistory(userId, vin));
+    }
+
+    public void evictCarPhotoAfterCommit(Long carId) {
+        runAfterCommit(() -> evictCarPhoto(carId));
+    }
+
     public String ownerUserId(Car car) {
         try {
             if (car == null || car.getCustomer() == null || car.getCustomer().getUserId() == null) {

@@ -26,6 +26,7 @@ import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
+import com.carland.carland_service.service.AdminCarPurgeService;
 import com.carland.carland_service.service.PhotoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -47,6 +48,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -95,6 +97,8 @@ public class AdminController {
     private final PhotoService photoService;
 
     private final SimaAttemptLimitService simaAttemptLimitService;
+
+    private final AdminCarPurgeService adminCarPurgeService;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -305,6 +309,58 @@ public class AdminController {
         model.addAttribute("visitCountByPartnerId", visitCountByPartnerId);
         model.addAttribute("customerPhone", phone);
         return "car-history";
+    }
+
+    /**
+     * tr: History ekranından aracı ve bağlı visit/percentage/foto/history satırlarını siler; VIN onayı şart.
+     * en: From the history screen, deletes the car and related visit/percentage/photo/history rows; VIN confirmation required.
+     */
+    @PostMapping("/admin/cars/{carId:\\d+}/delete")
+    public String deleteCar(
+            @PathVariable Long carId,
+            @RequestParam(required = false) String confirmVin,
+            HttpServletRequest request,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        AdminCarPurgeService.DeleteOutcome outcome = adminCarPurgeService.deleteCompletely(carId, confirmVin);
+        if (outcome == AdminCarPurgeService.DeleteOutcome.DELETED) {
+            redirectAttributes.addFlashAttribute("carsMessage", "Araç silindi (carId=" + carId + ").");
+            return "redirect:" + ADMIN_URL + "/admin/cars";
+        }
+        if (outcome == AdminCarPurgeService.DeleteOutcome.VIN_MISMATCH) {
+            redirectAttributes.addFlashAttribute("historyError", "VIN eşleşmedi. Delete car iptal.");
+            return "redirect:" + ADMIN_URL + "/admin/cars/" + carId + "/history";
+        }
+        redirectAttributes.addFlashAttribute("carsMessage", "Araç bulunamadı.");
+        return "redirect:" + ADMIN_URL + "/admin/cars";
+    }
+
+    /**
+     * tr: History ekranından aracı müşteri listesinden çıkarır (customer_id null) ve carlist cache'ini düşürür.
+     * en: From the history screen, unlinks the car from the customer (customer_id null) and evicts carlist cache.
+     */
+    @PostMapping("/admin/cars/{carId:\\d+}/unlink-customer")
+    public String unlinkCarFromCustomer(
+            @PathVariable Long carId,
+            HttpServletRequest request,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        AdminCarPurgeService.UnlinkOutcome outcome = adminCarPurgeService.unlinkFromCustomer(carId);
+        if (outcome == AdminCarPurgeService.UnlinkOutcome.UNLINKED) {
+            redirectAttributes.addFlashAttribute("historyMessage", "Araç müşteri listesinden çıkarıldı. Satır ve history duruyor.");
+        } else if (outcome == AdminCarPurgeService.UnlinkOutcome.ALREADY_ORPHAN) {
+            redirectAttributes.addFlashAttribute("historyMessage", "Bu araç zaten bir müşteriye bağlı değil.");
+        } else {
+            redirectAttributes.addFlashAttribute("historyError", "Araç bulunamadı.");
+            return "redirect:" + ADMIN_URL + "/admin/cars";
+        }
+        return "redirect:" + ADMIN_URL + "/admin/cars/" + carId + "/history";
     }
 
     /**
