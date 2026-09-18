@@ -644,9 +644,10 @@ public class PhotoServiceImpl implements PhotoService {
 
     /**
      * tr: Servis kalemi ikonunu yükler; services satırı yoksa 404, görsel değilse InvalidStatusException.
-     *     Mevcut satırı siler, yenisini yazar, Redis key'ini commit sonrası DEL eder.
-     * en: Uploads a maintenance-item icon; 404 when the services row is missing. Replaces existing bytes
-     *     and DELs the Redis key after commit.
+     *     Mevcut satır varsa fileName/fileType/imageData güncellenir (INSERT yok); yoksa INSERT.
+     *     Redis key commit sonrası DEL.
+     * en: Uploads a maintenance-item icon; 404 when the services row is missing. Updates
+     *     fileName/fileType/imageData in place when a row exists; otherwise INSERT. DELs Redis after commit.
      */
     @Override
     @Transactional
@@ -659,16 +660,13 @@ public class PhotoServiceImpl implements PhotoService {
         }
         try {
             DetectedImage image = detectImage(file);
-            PercentagePhoto existPhoto = percentagePhotoRepository.findByServiceId(serviceId);
-            if (existPhoto != null) {
-                percentagePhotoRepository.delete(existPhoto);
+            PercentagePhoto photo = percentagePhotoRepository.findByServiceId(serviceId);
+            if (photo == null) {
+                photo = PercentagePhoto.builder().serviceId(serviceId).build();
             }
-            PercentagePhoto photo = PercentagePhoto.builder()
-                    .serviceId(serviceId)
-                    .fileName("percentage service " + serviceId + " image")
-                    .fileType(image.fileType())
-                    .imageData(image.bytes())
-                    .build();
+            photo.setFileName("percentage service " + serviceId + " image");
+            photo.setFileType(image.fileType());
+            photo.setImageData(image.bytes());
             percentagePhotoRepository.save(photo);
             redisCacheService.evictPercentagePhotoAfterCommit(serviceId);
             return PhotoResponse.builder()
@@ -710,8 +708,10 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: Empty-state placeholder yükler; eski satırları siler, Redis empty key'ini commit sonrası DEL eder.
-     * en: Uploads the empty-state placeholder; deletes prior rows and DELs the Redis empty key after commit.
+     * tr: Empty-state placeholder yükler. Satır varsa fileName/fileType/imageData güncellenir; yoksa INSERT.
+     *     Redis empty key commit sonrası DEL.
+     * en: Uploads the empty-state placeholder. Updates fileName/fileType/imageData in place when a row
+     *     exists; otherwise INSERT. DELs the Redis empty key after commit.
      */
     @Override
     @Transactional
@@ -721,12 +721,11 @@ public class PhotoServiceImpl implements PhotoService {
         }
         try {
             DetectedImage image = detectImage(file);
-            percentageEmptyPhotoRepository.deleteAll();
-            PercentageEmptyPhoto photo = PercentageEmptyPhoto.builder()
-                    .fileName("percentage empty state image")
-                    .fileType(image.fileType())
-                    .imageData(image.bytes())
-                    .build();
+            PercentageEmptyPhoto photo = percentageEmptyPhotoRepository.findFirstByOrderByImageIdAsc()
+                    .orElseGet(PercentageEmptyPhoto::new);
+            photo.setFileName("percentage empty state image");
+            photo.setFileType(image.fileType());
+            photo.setImageData(image.bytes());
             percentageEmptyPhotoRepository.save(photo);
             redisCacheService.evictPercentageEmptyPhotoAfterCommit();
             return PhotoResponse.builder()

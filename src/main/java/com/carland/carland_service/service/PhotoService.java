@@ -98,8 +98,8 @@ public interface PhotoService {
     PhotoResponse deleteOtherCarPhoto(Long carId, String acceptLanguage);
 
     /**
-     * tr: Servis kalemi ikonunu yükler; varsa eski byte'ı siler. serviceId services.id'dir.
-     * en: Uploads the maintenance-item icon; deletes existing bytes first. serviceId is services.id.
+     * tr: Servis kalemi ikonunu yükler. Satır varsa fileName/fileType/imageData güncellenir; yoksa INSERT.
+     * en: Uploads the maintenance-item icon. Updates fileName/fileType/imageData in place when a row exists.
      */
     PhotoResponse uploadPercentagePhoto(MultipartFile file, Long serviceId);
 
@@ -110,8 +110,8 @@ public interface PhotoService {
     ResponseEntity<byte[]> getPercentagePhoto(Long serviceId);
 
     /**
-     * tr: Empty-state (placeholder) ikonunu yükler; varsa eski byte'ı siler.
-     * en: Uploads the empty-state placeholder icon; deletes existing bytes first.
+     * tr: Empty-state ikonunu yükler. Satır varsa fileName/fileType/imageData güncellenir; yoksa INSERT.
+     * en: Uploads the empty-state icon. Updates fileName/fileType/imageData in place when a row exists.
      */
     PhotoResponse uploadPercentageEmptyPhoto(MultipartFile file);
 

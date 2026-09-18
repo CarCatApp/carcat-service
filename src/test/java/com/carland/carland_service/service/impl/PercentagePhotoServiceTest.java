@@ -103,16 +103,27 @@ class PercentagePhotoServiceTest {
     }
 
     @Test
-    void uploadReplacesExistingAndEvicts() throws Exception {
+    void uploadUpdatesExistingRowInPlaceAndEvicts() throws Exception {
         when(serviceEntityRepository.existsById(10L)).thenReturn(true);
-        PercentagePhoto old = PercentagePhoto.builder().serviceId(10L).imageData(new byte[] {1}).build();
+        PercentagePhoto old = PercentagePhoto.builder()
+                .imageId(5L)
+                .serviceId(10L)
+                .fileName("old")
+                .fileType("jpeg")
+                .imageData(new byte[] {1})
+                .build();
         when(percentagePhotoRepository.findByServiceId(10L)).thenReturn(old);
         MockMultipartFile file = new MockMultipartFile("file", "oil.png", "image/png", PNG);
 
         photoService.uploadPercentagePhoto(file, 10L);
 
-        verify(percentagePhotoRepository).delete(old);
-        verify(percentagePhotoRepository).save(any(PercentagePhoto.class));
+        assertEquals(5L, old.getImageId());
+        assertEquals(10L, old.getServiceId());
+        assertEquals("percentage service 10 image", old.getFileName());
+        assertEquals("png", old.getFileType());
+        assertArrayEquals(PNG, old.getImageData());
+        verify(percentagePhotoRepository, never()).delete(any());
+        verify(percentagePhotoRepository).save(old);
         verify(redisCacheService).evictPercentagePhotoAfterCommit(10L);
     }
 }
