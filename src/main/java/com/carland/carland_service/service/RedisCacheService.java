@@ -101,6 +101,38 @@ public class RedisCacheService {
         deletePhoto("photo:user:" + userId);
     }
 
+    public ResponseEntity<byte[]> getPercentagePhoto(Long serviceId) {
+        return getPhoto("photo:percentage:" + serviceId, "percentage-photo serviceId=" + serviceId);
+    }
+
+    public void putPercentagePhoto(Long serviceId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:percentage:" + serviceId, mediaType, bytes);
+    }
+
+    public void evictPercentagePhoto(Long serviceId) {
+        deletePhoto("photo:percentage:" + serviceId);
+    }
+
+    public void evictPercentagePhotoAfterCommit(Long serviceId) {
+        runAfterCommit(() -> evictPercentagePhoto(serviceId));
+    }
+
+    public ResponseEntity<byte[]> getPercentageEmptyPhoto() {
+        return getPhoto("photo:percentage:empty", "percentage-photo empty");
+    }
+
+    public void putPercentageEmptyPhoto(MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:percentage:empty", mediaType, bytes);
+    }
+
+    public void evictPercentageEmptyPhoto() {
+        deletePhoto("photo:percentage:empty");
+    }
+
+    public void evictPercentageEmptyPhotoAfterCommit() {
+        runAfterCommit(this::evictPercentageEmptyPhoto);
+    }
+
     public VisitHistoryResponse getOrLoadHistoryV2(String vin, String lang, Supplier<VisitHistoryResponse> loader) {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);

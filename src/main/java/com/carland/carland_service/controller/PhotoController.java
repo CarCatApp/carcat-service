@@ -12,8 +12,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 
 /**
- * tr: Fotoğraf REST controller'ı; araç fotoğrafı, partner logosu/rozet logosu ve kullanıcı profil fotoğrafı için yükleme, getirme ve silme uçlarını sunar.
- * en: REST controller for photos; exposes upload, fetch, and delete endpoints for car photos, partner logos/badge logos, and user profile pictures.
+ * tr: Fotoğraf REST controller'ı; araç fotoğrafı, partner logosu/rozet logosu, kullanıcı profil fotoğrafı
+ *     ve bakım kalemi (percentage) ikonları için yükleme/getirme uçlarını sunar.
+ * en: REST controller for photos; exposes upload/fetch for car photos, partner logos/badge logos,
+ *     user profile pictures, and maintenance-item (percentage) icons.
  */
 @RestController
 @RequestMapping("/api/v1/photo")
@@ -134,6 +136,47 @@ public class PhotoController {
     @GetMapping(value = "/for/partner/badge-logo/get/{partnerId}", produces = MediaType.ALL_VALUE)
     public ResponseEntity<byte[]> getPartnerBadgeLogoById(@PathVariable("partnerId") Long partnerId) {
         return photoService.getPartnerBadgeLogoById(partnerId);
+    }
+
+    /**
+     * tr: Bakım kalemi ikonunu döner (services.id). Kendi fotosu yoksa empty-state; ikisi de yoksa 404.
+     *     Flutter: GET /service/percentages içindeki serviceId. role / X-User-Id gerekmez (Kong JWT yeter).
+     * en: Returns the maintenance-item icon (services.id). Falls back to empty-state; 404 when both missing.
+     *     Flutter uses serviceId from GET /service/percentages. No role / X-User-Id (Kong JWT is enough).
+     */
+    @GetMapping(value = "/for/percentage/get", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getPercentagePhoto(@RequestParam("serviceId") Long serviceId) {
+        return photoService.getPercentagePhoto(serviceId);
+    }
+
+    /**
+     * tr: Bakım kalemi ikonunu yükler; eski byte silinir. Postman: form-data key = file, query serviceId.
+     * en: Uploads the maintenance-item icon; replaces existing bytes. Postman: form-data key = file, query serviceId.
+     */
+    @PostMapping(value = "/for/percentage/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadPercentagePhoto(@RequestPart("file") MultipartFile file,
+                                               @RequestParam("serviceId") Long serviceId) {
+        return photoService.uploadPercentagePhoto(file, serviceId);
+    }
+
+    /**
+     * tr: Empty-state (placeholder) ikonunu döner; yoksa 404.
+     * en: Returns the empty-state placeholder icon; 404 when missing.
+     */
+    @GetMapping(value = "/for/percentage/get-empty", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getPercentageEmptyPhoto() {
+        return photoService.getPercentageEmptyPhoto();
+    }
+
+    /**
+     * tr: Empty-state ikonunu yükler; eski byte silinir.
+     * en: Uploads the empty-state placeholder; replaces existing bytes.
+     */
+    @PostMapping(value = "/for/percentage/upload-empty", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadPercentageEmptyPhoto(@RequestPart("file") MultipartFile file) {
+        return photoService.uploadPercentageEmptyPhoto(file);
     }
 
 

@@ -97,4 +97,28 @@ public interface PhotoService {
      */
     PhotoResponse deleteOtherCarPhoto(Long carId, String acceptLanguage);
 
+    /**
+     * tr: Servis kalemi ikonunu yükler; varsa eski byte'ı siler. serviceId services.id'dir.
+     * en: Uploads the maintenance-item icon; deletes existing bytes first. serviceId is services.id.
+     */
+    PhotoResponse uploadPercentagePhoto(MultipartFile file, Long serviceId);
+
+    /**
+     * tr: Servis kalemi ikonunu döner; yoksa empty-state. İkisi de yoksa 404.
+     * en: Returns the maintenance-item icon, or the empty-state placeholder. 404 when both are missing.
+     */
+    ResponseEntity<byte[]> getPercentagePhoto(Long serviceId);
+
+    /**
+     * tr: Empty-state (placeholder) ikonunu yükler; varsa eski byte'ı siler.
+     * en: Uploads the empty-state placeholder icon; deletes existing bytes first.
+     */
+    PhotoResponse uploadPercentageEmptyPhoto(MultipartFile file);
+
+    /**
+     * tr: Empty-state ikonunu döner; yoksa 404.
+     * en: Returns the empty-state placeholder icon; 404 when missing.
+     */
+    ResponseEntity<byte[]> getPercentageEmptyPhoto();
+
 }

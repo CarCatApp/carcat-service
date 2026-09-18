@@ -47,6 +47,9 @@ public class PhotoServiceImpl implements PhotoService {
     private final PartnerRepository partnerRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
+    private final PercentagePhotoRepository percentagePhotoRepository;
+    private final PercentageEmptyPhotoRepository percentageEmptyPhotoRepository;
+    private final ServiceEntityRepository serviceEntityRepository;
     private final RedisCacheService redisCacheService;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
@@ -640,11 +643,127 @@ public class PhotoServiceImpl implements PhotoService {
 
 
     /**
+     * tr: Servis kalemi ikonunu yükler; services satırı yoksa 404, görsel değilse InvalidStatusException.
+     *     Mevcut satırı siler, yenisini yazar, Redis key'ini commit sonrası DEL eder.
+     * en: Uploads a maintenance-item icon; 404 when the services row is missing. Replaces existing bytes
+     *     and DELs the Redis key after commit.
+     */
+    @Override
+    @Transactional
+    public PhotoResponse uploadPercentagePhoto(MultipartFile file, Long serviceId) {
+        if (file == null || serviceId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        if (!serviceEntityRepository.existsById(serviceId)) {
+            throw new ResourceNotFoundException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(null));
+        }
+        try {
+            DetectedImage image = detectImage(file);
+            PercentagePhoto existPhoto = percentagePhotoRepository.findByServiceId(serviceId);
+            if (existPhoto != null) {
+                percentagePhotoRepository.delete(existPhoto);
+            }
+            PercentagePhoto photo = PercentagePhoto.builder()
+                    .serviceId(serviceId)
+                    .fileName("percentage service " + serviceId + " image")
+                    .fileType(image.fileType())
+                    .imageData(image.bytes())
+                    .build();
+            percentagePhotoRepository.save(photo);
+            redisCacheService.evictPercentagePhotoAfterCommit(serviceId);
+            return PhotoResponse.builder()
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .build();
+        } catch (IOException e) {
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+        }
+    }
+
+    /**
+     * tr: Servis ikonunu döner. Kendi fotosu varsa onu (ve Redis'e koyar); yoksa empty-state'i
+     *     serviceId key'ine yazmadan döner. İkisi de yoksa 404. Olmayan serviceId de 404.
+     * en: Returns the service icon. Caches a real photo under serviceId; empty fallback is never
+     *     written to that key. 404 when the service is missing or both photos are missing.
+     */
+    @Override
+    public ResponseEntity<byte[]> getPercentagePhoto(Long serviceId) {
+        if (serviceId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        if (!serviceEntityRepository.existsById(serviceId)) {
+            throw new ResourceNotFoundException(MessagesLangValues.SERVICE_NOT_FOUND.getMessageByLang(null));
+        }
+
+        ResponseEntity<byte[]> cached = redisCacheService.getPercentagePhoto(serviceId);
+        if (cached != null) {
+            return cached;
+        }
+
+        PercentagePhoto photo = percentagePhotoRepository.findByServiceId(serviceId);
+        if (photo != null && photo.getImageData() != null && photo.getImageData().length > 0) {
+            MediaType mediaType = mediaTypeOf(photo.getFileType());
+            redisCacheService.putPercentagePhoto(serviceId, mediaType, photo.getImageData());
+            return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
+        }
+
+        return getPercentageEmptyPhoto();
+    }
+
+    /**
+     * tr: Empty-state placeholder yükler; eski satırları siler, Redis empty key'ini commit sonrası DEL eder.
+     * en: Uploads the empty-state placeholder; deletes prior rows and DELs the Redis empty key after commit.
+     */
+    @Override
+    @Transactional
+    public PhotoResponse uploadPercentageEmptyPhoto(MultipartFile file) {
+        if (file == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        try {
+            DetectedImage image = detectImage(file);
+            percentageEmptyPhotoRepository.deleteAll();
+            PercentageEmptyPhoto photo = PercentageEmptyPhoto.builder()
+                    .fileName("percentage empty state image")
+                    .fileType(image.fileType())
+                    .imageData(image.bytes())
+                    .build();
+            percentageEmptyPhotoRepository.save(photo);
+            redisCacheService.evictPercentageEmptyPhotoAfterCommit();
+            return PhotoResponse.builder()
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .build();
+        } catch (IOException e) {
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+        }
+    }
+
+    /**
+     * tr: Empty-state ikonunu Redis sonra DB'den döner; yoksa 404.
+     * en: Returns the empty-state icon from Redis then DB; 404 when missing.
+     */
+    @Override
+    public ResponseEntity<byte[]> getPercentageEmptyPhoto() {
+        ResponseEntity<byte[]> cached = redisCacheService.getPercentageEmptyPhoto();
+        if (cached != null) {
+            return cached;
+        }
+        PercentageEmptyPhoto empty = percentageEmptyPhotoRepository.findFirstByOrderByImageIdAsc()
+                .orElse(null);
+        if (empty == null || empty.getImageData() == null || empty.getImageData().length == 0) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+        }
+        MediaType mediaType = mediaTypeOf(empty.getFileType());
+        redisCacheService.putPercentageEmptyPhoto(mediaType, empty.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(empty.getImageData());
+    }
+
+    /**
      * tr: Yüklenen dosyanın adında ".." (path traversal) olup olmadığını kontrol eder; varsa MissingFieldException fırlatır.
      * en: Checks whether the uploaded file's name contains ".." (path traversal); throws MissingFieldException if it does.
      */
     public void checkAttack(MultipartFile file, String acceptLanguage) {
-        if (file.getOriginalFilename().contains("..")) {
+        String name = file.getOriginalFilename();
+        if (name != null && name.contains("..")) {
             throw new MissingFieldException(MessagesLangValues.INVALID_PHOTO_NAME.getMessageByLang(acceptLanguage));
 
         }
@@ -720,5 +839,30 @@ public class PhotoServiceImpl implements PhotoService {
         } else {
             job.run();
         }
+    }
+
+    private DetectedImage detectImage(MultipartFile file) throws IOException {
+        checkAttack(file, null);
+        byte[] bytes = file.getBytes();
+        Tika tika = new Tika();
+        String detectedType = tika.detect(bytes);
+        if (!detectedType.startsWith("image/")) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
+        }
+        return new DetectedImage(detectedType.substring("image/".length()), bytes);
+    }
+
+    private static MediaType mediaTypeOf(String fileType) {
+        String type = fileType;
+        if (type == null || type.isBlank()) {
+            type = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+        if (!type.contains("/")) {
+            type = "image/" + type.toLowerCase();
+        }
+        return MediaType.parseMediaType(type);
+    }
+
+    private record DetectedImage(String fileType, byte[] bytes) {
     }
 }
