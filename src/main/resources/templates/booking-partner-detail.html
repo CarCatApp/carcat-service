@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="'Partner ' + ${partner.name}">Partner</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=premium7">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
+    </span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link active" href="/admin/booking-partners">Booking</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <h1 th:text="${partner.name}">Partner</h1>
+    <a href="/admin/booking-partners">← Siyahı</a>
+  </div>
+
+  <div class="ok-box" th:if="${detailMessage}" th:text="${detailMessage}"></div>
+  <div class="error-box" th:if="${detailError}" th:text="${detailError}"></div>
+  <div class="ok-box" th:if="${oneTimePassword}">
+    <p>Birdəfəlik şifrə (<span th:text="${oneTimePhone}"></span>) — yalnız indi görünür:</p>
+    <p><code th:text="${oneTimePassword}"></code></p>
+  </div>
+
+  <h2>Şöbələr</h2>
+  <form class="filter-bar" method="post" th:action="@{/admin/booking-partners/{id}/branches(id=${partner.id})}">
+    <div class="filter-field">
+      <label>Ad</label>
+      <input type="text" name="name" required>
+    </div>
+    <div class="filter-field grow">
+      <label>Ünvan</label>
+      <input type="text" name="address">
+    </div>
+    <div class="filter-field">
+      <label>Lat</label>
+      <input type="text" name="lat" placeholder="40.37">
+    </div>
+    <div class="filter-field">
+      <label>Lng</label>
+      <input type="text" name="lng" placeholder="49.83">
+    </div>
+    <label class="filter-field"><input type="checkbox" name="active" value="true" checked> Aktiv</label>
+    <button class="btn btn-filter" type="submit">Şöbə əlavə et</button>
+  </form>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr><th>ID</th><th>Ad</th><th>Ünvan</th><th>Məkan</th><th>Aktiv</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="b : ${branches}">
+          <td th:text="${b.id}">1</td>
+          <td th:text="${b.name}">Ad</td>
+          <td th:text="${b.address}">—</td>
+          <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
+          <td th:text="${b.active} ? 'bəli' : 'xeyr'">bəli</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(branches)}"><td colspan="5">Şöbə yoxdur</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Staff</h2>
+  <form class="filter-bar" method="post" th:action="@{/admin/booking-partners/{id}/staff(id=${partner.id})}">
+    <div class="filter-field">
+      <label>Rol</label>
+      <select name="role" required>
+        <option value="PARTNER_ADMIN" th:disabled="${partner.hqUserId != null}">PARTNER_ADMIN (HQ)</option>
+        <option value="BRANCH_ADMIN">BRANCH_ADMIN</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>Şöbə (branch admin)</label>
+      <select name="branchId">
+        <option value="">—</option>
+        <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}">branch</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>Telefon</label>
+      <input type="text" name="phoneNumber" required placeholder="+99470xxxxxxx">
+    </div>
+    <div class="filter-field">
+      <label>Ad</label>
+      <input type="text" name="name">
+    </div>
+    <div class="filter-field">
+      <label>Soyad</label>
+      <input type="text" name="surname">
+    </div>
+    <button class="btn btn-filter" type="submit">Staff yarat</button>
+  </form>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr><th>User</th><th>Rol</th><th>Şöbə</th><th>Telefon</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="s : ${staff}">
+          <td th:text="${s.userId}">1</td>
+          <td th:text="${s.role}">ROLE</td>
+          <td th:text="${s.branch != null} ? ${s.branch.name} : 'HQ'">HQ</td>
+          <td th:text="${s.phoneNumber}">+994</td>
+          <td th:text="${s.status}">INVITED</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(staff)}"><td colspan="5">Staff yoxdur</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</body>
+</html>

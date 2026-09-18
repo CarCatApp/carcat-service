@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partner şöbələr</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=premium7">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span>Partner panel</span></div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/partner/login" id="logout">Çıxış</a>
+  </div>
+</header>
+<main class="container" id="main">
+  <div class="page-head"><h1>Şöbələr</h1></div>
+  <div class="error-box" id="error" hidden></div>
+
+  <form class="filter-bar" id="pwForm" hidden>
+    <p>İlk giriş: şifrəni dəyişin (min 8 simvol).</p>
+    <div class="filter-field grow">
+      <label>Yeni şifrə</label>
+      <input type="password" id="newPassword" minlength="8" required>
+    </div>
+    <button class="btn btn-filter" type="submit">Aktivləşdir</button>
+  </form>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr><th>ID</th><th>Partner</th><th>Şöbə</th><th>Ünvan</th><th>Aktiv</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script th:inline="javascript">
+  const AUTH = /*[[${authServerUrl}]]*/ '';
+  const API = /*[[${serviceServerUrl}]]*/ '';
+  const token = sessionStorage.getItem('staffAccess');
+  if (!token) {
+    window.location.href = '/partner/login';
+  }
+  document.getElementById('logout').addEventListener('click', () => sessionStorage.clear());
+
+  const error = document.getElementById('error');
+  const pwForm = document.getElementById('pwForm');
+  if (sessionStorage.getItem('staffMustChange') === '1') {
+    pwForm.hidden = false;
+  }
+
+  pwForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const res = await fetch(AUTH + '/api/v1/staff/password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'Accept-Language': 'az'
+      },
+      body: JSON.stringify({ newPassword: document.getElementById('newPassword').value })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      error.textContent = data.message || 'Şifrə dəyişmədi';
+      error.hidden = false;
+      return;
+    }
+    sessionStorage.setItem('staffAccess', data.accessToken);
+    sessionStorage.setItem('staffMustChange', '0');
+    pwForm.hidden = true;
+    await loadBranches();
+  });
+
+  async function loadBranches() {
+    const access = sessionStorage.getItem('staffAccess');
+    const res = await fetch(API + '/api/v1/booking/staff/branches', {
+      headers: { 'Authorization': 'Bearer ' + access }
+    });
+    if (res.status === 403) {
+      error.textContent = 'Şifrəni dəyişdirməlisiniz';
+      error.hidden = false;
+      pwForm.hidden = false;
+      return;
+    }
+    if (!res.ok) {
+      error.textContent = 'Şöbələr yüklənmədi';
+      error.hidden = false;
+      return;
+    }
+    const list = await res.json();
+    const tbody = document.getElementById('rows');
+    tbody.innerHTML = '';
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Şöbə yoxdur</td></tr>';
+      return;
+    }
+    for (const b of list) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + b.id + '</td><td>' + (b.partnerName || '') + '</td><td>' + (b.name || '') +
+        '</td><td>' + (b.address || '—') + '</td><td>' + (b.active ? 'bəli' : 'xeyr') + '</td>';
+      tbody.appendChild(tr);
+    }
+  }
+
+  if (sessionStorage.getItem('staffMustChange') !== '1') {
+    loadBranches();
+  }
+</script>
+</body>
+</html>

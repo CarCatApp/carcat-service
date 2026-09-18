@@ -51,6 +51,16 @@ public class CustomFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (path.startsWith("/api/v1/internal/booking/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (path.startsWith("/partner")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         boolean isPublic =
                 path.contains("/swagger-ui")
                         || path.contains("/v3/api-docs")

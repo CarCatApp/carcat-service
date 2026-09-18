@@ -53,6 +53,8 @@ server:
 
 carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
+  auth:
+    base-url: ${AUTH_BASE_URL:http://auth-service:9090}
   admin:
     panel-phone: ${ADMIN_PANEL_PHONE}
     auth-base-url: ${ADMIN_AUTH_BASE_URL:https://digital-innovation.agency/auth/server/api/v1/newUsers}

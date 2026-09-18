@@ -127,6 +127,17 @@ public class CustomExceptionHandler {
         return new ResponseEntity<>(responseException, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ResponseException> handleForbiddenException(ForbiddenException ex) {
+        ResponseException responseException = ResponseException.builder()
+                .error("Forbidden")
+                .message(ex.getMessage())
+                .timeStamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .build();
+        return new ResponseEntity<>(responseException, HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler(InviteException.class)
     public ResponseEntity<ResponseException> handleAlreadyExistsExceptionException(InviteException ex) {
         ResponseException responseException=ResponseException.builder()

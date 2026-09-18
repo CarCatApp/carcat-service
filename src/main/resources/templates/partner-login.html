@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partner login</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=premium7">
+</head>
+<body class="login-page">
+<div class="login-card">
+  <h2>Partner panel</h2>
+  <p class="subtitle">Birdəfəlik və ya öz şifrənizlə daxil olun</p>
+  <div class="error-box" id="error" hidden></div>
+  <form id="loginForm">
+    <div class="field">
+      <label for="phoneNumber">Telefon</label>
+      <input id="phoneNumber" name="phoneNumber" autocomplete="tel" required placeholder="+99470xxxxxxx">
+    </div>
+    <div class="field">
+      <label for="password">Şifrə</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit">Login</button>
+  </form>
+</div>
+<script th:inline="javascript">
+  const AUTH = /*[[${authServerUrl}]]*/ '';
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const error = document.getElementById('error');
+    error.hidden = true;
+    const body = {
+      phoneNumber: document.getElementById('phoneNumber').value,
+      password: document.getElementById('password').value,
+      deviceId: 'partner-web',
+      platform: 'WEB'
+    };
+    try {
+      const res = await fetch(AUTH + '/api/v1/staff/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept-Language': 'az' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        error.textContent = data.message || 'Login alınmadı';
+        error.hidden = false;
+        return;
+      }
+      sessionStorage.setItem('staffAccess', data.accessToken);
+      sessionStorage.setItem('staffMustChange', data.mustChangePassword ? '1' : '0');
+      window.location.href = '/partner/app';
+    } catch (err) {
+      error.textContent = 'Şəbəkə xətası';
+      error.hidden = false;
+    }
+  });
+</script>
+</body>
+</html>
