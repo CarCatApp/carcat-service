@@ -38,6 +38,7 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS hq_user_id int8");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS created_at timestamp");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS updated_at timestamp");
+        clearOrphanBranchIds();
 
         if (!tableExists("booking_partners") && !tableExists("booking_branches")) {
             return;
@@ -120,7 +121,23 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
         }
 
         jdbc.execute("DROP TABLE IF EXISTS booking_partners CASCADE");
+        clearOrphanBranchIds();
         log.info("BOOKING_ORG_MIGRATE done");
+    }
+
+    private void clearOrphanBranchIds() {
+        if (!tableExists("booking_staff") || !tableExists("branches")
+                || !columnExists("booking_staff", "branch_id")) {
+            return;
+        }
+        int n = jdbc.update("""
+                UPDATE booking_staff SET branch_id = NULL
+                WHERE branch_id IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.id = booking_staff.branch_id)
+                """);
+        if (n > 0) {
+            log.warn("BOOKING_ORG_ORPHAN_BRANCH_CLEARED count={}", n);
+        }
     }
 
     private void remapPartnerId(String table, long oldId, long newId) {
