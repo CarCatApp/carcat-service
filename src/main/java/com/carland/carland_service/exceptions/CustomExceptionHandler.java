@@ -138,17 +138,6 @@ public class CustomExceptionHandler {
         return new ResponseEntity<>(responseException, HttpStatus.FORBIDDEN);
     }
 
-    @ExceptionHandler(InviteException.class)
-    public ResponseEntity<ResponseException> handleAlreadyExistsExceptionException(InviteException ex) {
-        ResponseException responseException=ResponseException.builder()
-                .error("Invite code error")
-                .message(ex.getMessage())
-                .timeStamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .build();
-        return new ResponseEntity<>(responseException, HttpStatus.BAD_REQUEST);
-    }
-
     @ExceptionHandler(MsmTransactionException.class)
     public ResponseEntity<ResponseException> handleMsmTransactionException(MsmTransactionException ex) {
         ResponseException responseException=ResponseException.builder()

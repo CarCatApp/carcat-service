@@ -1,9 +1,7 @@
 package com.carland.carland_service.controller;
 
-import com.carland.carland_service.dto.request.AutoServiceRequest;
 import com.carland.carland_service.dto.request.ServiceHistoryRequest;
 import com.carland.carland_service.dto.request.ServiceRequest;
-import com.carland.carland_service.dto.response.AutoServiceResponse;
 import com.carland.carland_service.dto.response.ServiceHistoryResponse;
 import com.carland.carland_service.dto.response.ServiceResponse;
 import com.carland.carland_service.service.AutoServiceService;
@@ -21,23 +19,6 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class AutoServiceController {
     private final AutoServiceService autoServiceService;
-
-    /**
-     * tr: Gövdedeki AutoServiceRequest ile yeni bir oto servis kaydı oluşturur; phoneNumber, role, X-User-Id, timezone ve Accept-Language header'larını servise iletir ve oluşturulan kaydı döner.
-     * en: Creates a new auto service record from the AutoServiceRequest body; forwards the phoneNumber, role, X-User-Id, timezone, and Accept-Language headers to the service layer and returns the created record.
-     */
-    @PostMapping("/create")
-    public AutoServiceResponse createAutoService(@RequestBody AutoServiceRequest autoServiceRequest,
-                                                 @RequestHeader("Authorization") String token,
-                                                 @RequestHeader("phoneNumber") String phoneNumber,
-                                                 @RequestHeader("role") String role,
-                                                 @RequestHeader("X-User-Id") String userIdHeader,
-                                                 @RequestHeader("X-Client-Timezone") String timezone,
-                                                 @RequestHeader("Accept-Language") String acceptLanguage) {
-
-
-        return autoServiceService.createAutoService(autoServiceRequest, phoneNumber, role, userIdHeader, timezone, acceptLanguage);
-    }
 
     /**
      * tr: Gövdedeki ServiceHistoryRequest ile bir araca servis geçmişi kaydı ekler; kullanıcı/rol bilgileri header'lardan alınır ve eklenen geçmiş kaydı döner.

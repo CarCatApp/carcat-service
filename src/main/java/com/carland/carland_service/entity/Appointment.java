@@ -6,10 +6,9 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.OffsetDateTime;
 
-
 /**
- * tr: "appointments" tablosunu modelleyen entity; müşterinin servis merkezine aldığı randevuyu (tarih, durum, zaman aralığı) temsil eder.
- * en: Entity modeling the "appointments" table; represents a customer's appointment at an auto service center (date, status, time range).
+ * tr: Müşterinin şubeye aldığı randevu.
+ * en: Customer appointment at a branch.
  */
 @Entity
 @Data
@@ -24,7 +23,6 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-
     @Column(name = "appointment_date", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime appointmentDate;
     OffsetDateTime appointmentStart;
@@ -34,10 +32,13 @@ public class Appointment {
     String serviceName;
     String actionType;
     String serviceCategory;
-    @ManyToOne
-    @JoinColumn(name = "auto_service_id", nullable = false)
-    AutoService autoService;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    Branch branch;
 
     @ManyToOne
     @JoinColumn(name = "customer_id", nullable = false)
@@ -46,6 +47,4 @@ public class Appointment {
     @ManyToOne
     @JoinColumn(name = "range_id")
     private Range range;
-
 }
-

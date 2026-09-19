@@ -37,6 +37,7 @@ public class FeatureFlagLegacyCleanup implements ApplicationRunner {
         } catch (Exception ex) {
             log.debug("drop legacy unique: {}", ex.getMessage());
         }
+        dropRemovedAuthRoles();
         try {
             jdbcTemplate.execute("ALTER TABLE feature_flag_role_state ALTER COLUMN endpoint_id DROP NOT NULL");
         } catch (Exception ex) {
@@ -59,6 +60,19 @@ public class FeatureFlagLegacyCleanup implements ApplicationRunner {
         }
         migratePerFlagMinVersion();
         dropVersionCatalog();
+    }
+
+    private void dropRemovedAuthRoles() {
+        try {
+            jdbcTemplate.update("DELETE FROM feature_flag_role_state WHERE role IN ('ADMIN','SUPER_ADMIN')");
+        } catch (Exception ex) {
+            log.debug("drop ADMIN/SUPER_ADMIN role_state: {}", ex.getMessage());
+        }
+        try {
+            jdbcTemplate.update("UPDATE feature_flag_audit SET role = 'USER' WHERE role IN ('ADMIN','SUPER_ADMIN')");
+        } catch (Exception ex) {
+            log.debug("remap ADMIN/SUPER_ADMIN audit: {}", ex.getMessage());
+        }
     }
 
     private void migratePerFlagMinVersion() {

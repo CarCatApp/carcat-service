@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="'Partner ' + ${partner.name}">Partner</title>
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
-  <link rel="stylesheet" href="/admin/admin.css?v=booking1">
+  <link rel="stylesheet" href="/admin/admin.css?v=booking2">
 </head>
 <body class="booking-page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -150,15 +150,15 @@
     <div class="booking-form-grid booking-form-grid-staff">
       <div class="filter-field">
         <label>Rol</label>
-        <select name="role" required>
-          <option value="PARTNER_ADMIN" th:disabled="${partner.hqUserId != null}">PARTNER_ADMIN (HQ)</option>
+        <select name="role" id="staffRole" required>
+          <option value="PARTNER_ADMIN" th:disabled="${partner.hqUserId != null}">PARTNER_ADMIN</option>
           <option value="BRANCH_ADMIN">BRANCH_ADMIN</option>
         </select>
       </div>
       <div class="filter-field">
-        <label>Şöbə</label>
-        <select name="branchId">
-          <option value="">HQ</option>
+        <label>Şube</label>
+        <select name="branchId" id="staffBranch">
+          <option value="">Şube seç</option>
           <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}">branch</option>
         </select>
       </div>
@@ -182,13 +182,13 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-        <tr><th>User</th><th>Rol</th><th>Şöbə</th><th>Telefon</th><th>Status</th></tr>
+        <tr><th>User</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Status</th></tr>
         </thead>
         <tbody>
         <tr th:each="s : ${staff}">
           <td th:text="${s.userId}">1</td>
           <td th:text="${s.role}">ROLE</td>
-          <td th:text="${s.branch != null} ? ${s.branch.name} : 'HQ'">HQ</td>
+          <td th:text="${s.role == 'PARTNER_ADMIN'} ? 'Tüm partner şubeleri' : (${s.branch != null} ? ${s.branch.name} : '—')">—</td>
           <td th:text="${s.phoneNumber}">+994</td>
           <td th:text="${s.status}">INVITED</td>
         </tr>
@@ -225,6 +225,28 @@
 <script src="/admin/admin.js?v=booking1"></script>
 <script>
   CarlandAdmin.initTimeWheels();
+  const staffRole = document.getElementById('staffRole');
+  const staffBranch = document.getElementById('staffBranch');
+  function ensureEnabledRole() {
+    if (!staffRole) return;
+    const opt = staffRole.selectedOptions[0];
+    if (opt && opt.disabled) {
+      const next = Array.from(staffRole.options).find((o) => !o.disabled);
+      if (next) staffRole.value = next.value;
+    }
+  }
+  function syncStaffBranch() {
+    if (!staffRole || !staffBranch) return;
+    ensureEnabledRole();
+    const partnerAdmin = staffRole.value === 'PARTNER_ADMIN';
+    staffBranch.disabled = partnerAdmin;
+    staffBranch.required = !partnerAdmin;
+    if (partnerAdmin) staffBranch.value = '';
+  }
+  if (staffRole) {
+    staffRole.addEventListener('change', syncStaffBranch);
+    syncStaffBranch();
+  }
   const copyBtn = document.getElementById('copyOneTime');
   if (copyBtn) {
     copyBtn.addEventListener('click', async () => {

@@ -69,7 +69,7 @@ public class OpenApiConfig {
                 | **1A. Auth — Legacy** | **auth-service** | Current app: `/api/v1/users`, `/api/v1/otp` |
                 | **1B. Auth — NewUsers** | **auth-service** | Parallel PO flow: `/api/v1/newUsers` |
                 | **2. Carland — Mobile API** | **carland-service** | Mobile / app APIs (`/api/v1/**`) |
-                | **5. Carland — Admin Feature Flags** | **carland-service** | Panel REST (`/admin/feature-flags`, `/admin/endpoints`). **Panel ADMIN JWT only** |
+                | **5. Carland — Admin Feature Flags** | **carland-service** | Panel REST (`/admin/feature-flags`, `/admin/endpoints`). **Panel phone JWT only** |
                 | **3. Carland — Partner Webhook Receiver** | **carland-service** | Internal **receiver** for partner visit ingest/update (`/webhook/**`) |
                 | **4. Webhook Gateway — Partner Edge Adapter** | **webhook-service** | Public **edge adapter**: partners call here; forwards to carland; queues in RabbitMQ if carland is down |
 
@@ -108,7 +108,7 @@ public class OpenApiConfig {
                         new Tag().name("user-controller").description("User details and notifications"),
                         new Tag().name("feature-flags-me").description("Mobile `/me` — caller JWT role, not panel admin"),
                         new Tag().name("admin-feature-flags").description(
-                                "Panel feature-flag REST. **Required: panel ADMIN JWT.** Other JWTs → 403."),
+                                "Panel feature-flag REST. **Required: panel phone JWT.** Other JWTs → 403."),
                         new Tag().name("photo-controller").description("Photos for cars, users, partners"),
                         new Tag().name("group-by-controller").description("Reference lookups"),
                         new Tag().name("webhook-controller").description(
@@ -135,11 +135,11 @@ public class OpenApiConfig {
     @Bean
     public GroupedOpenApi adminFeatureFlagsGroup() {
         String adminNote = """
-                **Required role: panel ADMIN only.**
+                **Required: panel phone JWT only.**
 
-                - JWT claim `role=ADMIN` for the designated panel account
+                - JWT subject is the designated panel phone
                 - `Authorization: Bearer <accessToken>` or cookie `ADMIN_ACCESS`
-                - Any other user / role → **403 Admin not found**
+                - Any other user → **403 Admin not found**
                 - Missing/invalid token → **401 JWT token required**
 
                 Try it out uses the **admin host** (`digital-innovation.agency`), not `/carland/server-carland`.

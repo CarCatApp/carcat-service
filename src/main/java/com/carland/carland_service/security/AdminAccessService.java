@@ -13,8 +13,8 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 
 /**
- * tr: Admin panel JWT cookie (auth access token) okur/yazar; yalnız panel admin telefonunu kabul eder.
- * en: Reads/writes the admin-panel JWT cookie; accepts only the panel admin phone.
+ * tr: Admin panel JWT cookie (auth access token) okur/yazar; yalnız panel telefonunu kabul eder.
+ * en: Reads/writes the admin-panel JWT cookie; accepts only the panel phone.
  */
 @Component
 public class AdminAccessService {
@@ -63,8 +63,7 @@ public class AdminAccessService {
             return Status.INVALID;
         }
         String phone = claims.getSubject();
-        String role = stringClaim(claims, "role");
-        if (panelPhone.equals(phone) && "ADMIN".equalsIgnoreCase(role)) {
+        if (panelPhone.equals(phone)) {
             return Status.OK;
         }
         return Status.FORBIDDEN;
@@ -114,10 +113,5 @@ public class AdminAccessService {
         } catch (Exception ex) {
             return null;
         }
-    }
-
-    private String stringClaim(Claims claims, String name) {
-        Object value = claims.get(name);
-        return value != null ? value.toString() : null;
     }
 }

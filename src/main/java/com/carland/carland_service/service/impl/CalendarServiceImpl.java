@@ -3,17 +3,21 @@ package com.carland.carland_service.service.impl;
 import com.carland.carland_service.dto.request.CalendarRequest;
 import com.carland.carland_service.dto.response.CalendarResponse;
 import com.carland.carland_service.dto.response.RangeResponse;
-import com.carland.carland_service.entity.Admin;
-import com.carland.carland_service.entity.AutoService;
+import com.carland.carland_service.entity.BookingStaff;
+import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Range;
-import com.carland.carland_service.enums.*;
-import com.carland.carland_service.exceptions.*;
-import com.carland.carland_service.repository.AdminRepository;
-import com.carland.carland_service.repository.AutoServiceRepository;
+import com.carland.carland_service.enums.CalendarStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.RangeStatus;
+import com.carland.carland_service.exceptions.AlreadyExistsException;
+import com.carland.carland_service.exceptions.InvalidStatusException;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CalendarRepository;
+import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.CalendarService;
-import com.carland.carland_service.service.impl.Helper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -27,32 +31,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * tr: Takvim yönetiminin implementasyonudur: admin için gün/saat aralıklı takvim oluşturur
- *     (saatleri UTC'ye çevirerek saklar) ve oto servise ait takvimi sorgular.
- * en: Implementation of calendar management: creates a calendar with day/time ranges for an admin
- *     (storing times converted to UTC) and queries the calendar of an auto service.
- */
 @Service
 @RequiredArgsConstructor
 public class CalendarServiceImpl implements CalendarService {
-    private final AdminRepository adminRepository;
-    private final CalendarRepository calendarRepository;
-    private final Helper helper;
-    private final AutoServiceRepository autoServiceRepository;
 
-    /**
-     * tr: Admin'in oto servisi için verilen gün/saat aralığında, rangeMinutes uzunluğunda dilimlerden
-     *     oluşan yeni bir takvim oluşturur ve aralık listesini döner. Eksik alan veya geçersiz süre için
-     *     MissingFieldException; admin bulunamazsa, geçmiş tarih/saat seçilirse InvalidStatusException;
-     *     oto servis yoksa ResourceNotFoundException; aynı gün+kategori için takvim zaten varsa
-     *     AlreadyExistsException fırlatır.
-     * en: Creates a new calendar for the admin's auto service on the given day/time window, sliced into
-     *     rangeMinutes-long ranges, and returns the range list. Throws MissingFieldException on missing
-     *     fields or invalid duration; InvalidStatusException when the admin is not found or a past
-     *     date/time is chosen; ResourceNotFoundException when the auto service is missing; and
-     *     AlreadyExistsException when a calendar already exists for the same day+category.
-     */
+    private final CalendarRepository calendarRepository;
+    private final BranchRepository branchRepository;
+    private final BookingStaffAccess bookingStaffAccess;
+    private final Helper helper;
+
     @Override
     @Transactional
     public CalendarResponse createCalendar(CalendarRequest calendarRequest, String phoneNumber,
@@ -61,16 +48,13 @@ public class CalendarServiceImpl implements CalendarService {
         if (phoneNumber == null || userIdHeader == null || calendarRequest.getDay() == null ||
                 calendarRequest.getStart() == null || calendarRequest.getEnd() == null ||
                 calendarRequest.getRangeMinutes() == null || calendarRequest.getServiceCategory() == null ||
-                calendarRequest.getWorkerCount() == null) {
+                calendarRequest.getWorkerCount() == null || calendarRequest.getBranchId() == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-                UserStatus.ACTIVE.name());
-
-        if (admin == null) {
-            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
-        }
+        BookingStaff staff = bookingStaffAccess.requireActive(Long.valueOf(userIdHeader), acceptLanguage);
+        Branch branch = bookingStaffAccess.requireWritableBranch(
+                staff, calendarRequest.getBranchId(), acceptLanguage);
 
         if (calendarRequest.getRangeMinutes() <= 0) {
             throw new MissingFieldException(MessagesLangValues.INVALID_RANGE_MINUTES.getMessageByLang(acceptLanguage));
@@ -85,25 +69,18 @@ public class CalendarServiceImpl implements CalendarService {
         if (calendarRequest.getDay().isEqual(todayLocal) && calendarRequest.getStart().isBefore(nowLocal)) {
             throw new InvalidStatusException(MessagesLangValues.START_TIME_ALREADY_PASSED.getMessageByLang(acceptLanguage));
         }
-
         if (!calendarRequest.getStart().isBefore(calendarRequest.getEnd())) {
             throw new MissingFieldException(MessagesLangValues.START_AFTER_END.getMessageByLang(acceptLanguage));
-        }
-
-        AutoService autoService = admin.getAutoService();
-        if (autoService == null) {
-            throw new ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         OffsetDateTime startUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(calendarRequest.getDay(),
                 calendarRequest.getStart(), timezone);
         OffsetDateTime endUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(
                 calendarRequest.getDay(), calendarRequest.getEnd(), timezone);
-
         LocalDate utcDay = helper.getUtcDayFromUtcTime(startUtc);
 
-        Calendar existingCalendar = calendarRepository.findByDayAndServiceCategoryAndAutoService(utcDay,
-                calendarRequest.getServiceCategory(), autoService);
+        Calendar existingCalendar = calendarRepository.findByDayAndServiceCategoryAndBranch(
+                utcDay, calendarRequest.getServiceCategory(), branch);
         if (existingCalendar != null) {
             throw new AlreadyExistsException(MessagesLangValues.CALENDAR_ALREADY_EXISTS.getMessageByLang(acceptLanguage));
         }
@@ -121,75 +98,51 @@ public class CalendarServiceImpl implements CalendarService {
                 .day(utcDay)
                 .start(startUtc)
                 .end(endUtc)
-                .autoService(autoService)
+                .branch(branch)
                 .timeRanges(rangeList)
                 .rangeMinutes(calendarRequest.getRangeMinutes())
                 .status(CalendarStatus.ACTIVE.name())
                 .serviceCategory(calendarRequest.getServiceCategory())
                 .build();
-
         rangeList.forEach(range -> range.setCalendar(calendar));
-
         calendarRepository.save(calendar);
 
-        List<RangeResponse> rangeResponseList = mapToRangeResponseList(rangeList, timezone, acceptLanguage);
-
         return CalendarResponse.builder()
-                .timeRanges(rangeResponseList)
+                .timeRanges(mapToRangeResponseList(rangeList, timezone, acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
 
-    /**
-     * tr: Verilen oto servis id'si, gün ve servis kategorisine göre takvimi bulur ve zaman aralıklarını
-     *     kullanıcının saat dilimine çevirerek döner. Eksik alanlarda MissingFieldException; oto servis
-     *     veya takvim bulunamazsa ResourceNotFoundException fırlatır.
-     * en: Finds the calendar by the given auto service id, day, and service category, and returns its
-     *     time ranges converted to the caller's timezone. Throws MissingFieldException on missing fields
-     *     and ResourceNotFoundException when the auto service or calendar cannot be found.
-     */
     @Override
-    public CalendarResponse getCalendarByAutoServiceId(CalendarRequest request, String role, String phoneNumber,
-                                                       String userIdHeader, String timezone, String acceptLanguage) {
-
+    public CalendarResponse getCalendarByBranchId(CalendarRequest request, String role, String phoneNumber,
+                                                  String userIdHeader, String timezone, String acceptLanguage) {
         if (request == null || request.getDay() == null || request.getServiceCategory() == null || role == null ||
-                phoneNumber == null || userIdHeader == null || request.getAutoServiceId() == null) {
+                phoneNumber == null || userIdHeader == null || request.getBranchId() == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
 
-        AutoService autoService = autoServiceRepository.findById(request.getAutoServiceId()).orElseThrow(() -> new
-                ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
+        Branch branch = branchRepository.findById(request.getBranchId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
 
-//        Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(Long.valueOf(userIdHeader), phoneNumber,
-//                UserStatus.ACTIVE.name());
-//
-//        if (admin == null) {
-//            throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
-//        }
-//        if (role.equals(UserRoles.ADMIN.name()) && !autoService.getAdmins().contains(admin)) {
-//            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
-//        }
-
-        Calendar calendar = calendarRepository.findByDayAndServiceCategoryAndAutoService(request.getDay(),
-                request.getServiceCategory(), autoService);
-
+        Calendar calendar = calendarRepository.findByDayAndServiceCategoryAndBranch(
+                request.getDay(), request.getServiceCategory(), branch);
         if (calendar == null) {
             throw new ResourceNotFoundException(MessagesLangValues.CALENDAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
-        List<Range> ranges = calendar.getTimeRanges();
 
         return CalendarResponse.builder()
-                .timeRanges(mapToRangeResponseList(ranges, timezone, acceptLanguage))
+                .timeRanges(mapToRangeResponseList(calendar.getTimeRanges(), timezone, acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
-
 
     private List<RangeResponse> mapToRangeResponseList(List<Range> rangeList, String timezone, String acceptLanguage) {
         return mapToRangeResponseList(rangeList, timezone, acceptLanguage, null);
     }
 
-    private List<RangeResponse> mapToRangeResponseList(List<Range> rangeList, String timezone, String acceptLanguage, @Nullable OffsetDateTime cutoffUtc) {
+    private List<RangeResponse> mapToRangeResponseList(List<Range> rangeList, String timezone, String acceptLanguage,
+                                                       @Nullable OffsetDateTime cutoffUtc) {
         return rangeList.stream()
                 .sorted(Comparator.comparing(Range::getStart))
                 .filter(range -> cutoffUtc == null || range.getStart().isAfter(cutoffUtc))
@@ -204,10 +157,9 @@ public class CalendarServiceImpl implements CalendarService {
                 .toList();
     }
 
-
-    private List<Range> createRangeList(LocalDate day, LocalTime start, LocalTime end, Integer rangeMinutes, String timezone, Integer workerCount) {
+    private List<Range> createRangeList(LocalDate day, LocalTime start, LocalTime end, Integer rangeMinutes,
+                                        String timezone, Integer workerCount) {
         List<Range> ranges = new ArrayList<>();
-
         OffsetDateTime currentStartUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(day, start, timezone);
         OffsetDateTime endUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(day, end, timezone);
 
@@ -216,23 +168,17 @@ public class CalendarServiceImpl implements CalendarService {
             if (currentEndUtc.isAfter(endUtc)) {
                 currentEndUtc = endUtc;
             }
-
             ranges.add(Range.builder()
                     .start(currentStartUtc)
                     .end(currentEndUtc)
                     .workerCount(workerCount)
                     .status(RangeStatus.AVAILABLE.name())
-                    .build()
-            );
-
+                    .build());
             if (currentEndUtc.equals(endUtc)) {
                 break;
             }
-
             currentStartUtc = currentEndUtc;
         }
-
         return ranges;
     }
-
 }

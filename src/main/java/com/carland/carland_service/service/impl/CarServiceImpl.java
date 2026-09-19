@@ -12,6 +12,7 @@ import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.enums.PercentageStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
+import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.CarAiPhotoGenerateLock;
 import com.carland.carland_service.service.HyperPercentageSyncService;
@@ -52,7 +53,7 @@ public class CarServiceImpl implements CarService {
     private final CustomerRepository customerRepository;
     private final MaintenanceTemplateRepository maintenanceTemplateRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
-    private final AdminRepository adminRepository;
+    private final BookingStaffAccess bookingStaffAccess;
     private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final ServiceEntityRepository serviceEntityRepository;
     private final VinService vinService;
@@ -1772,15 +1773,12 @@ public class CarServiceImpl implements CarService {
             log.info("Mileage update edən avtomobil sahibidir: {}", customer.getUserId());
             car = carRepository.findByVinAndCustomer(carRequest.getVin(), customer);
         } else {
-            Admin admin = adminRepository.findByUserIdAndPhoneNumberAndStatus(userId, phoneNumber,
-                    UserStatus.ACTIVE.name());
-
-            if (admin == null) {
-                log.warn("Mileage update eden ne avtomobil sahibi ne de admindir. Istek redd edilir.");
+            if (!bookingStaffAccess.isActiveStaff(userId)) {
+                log.warn("Mileage update eden ne avtomobil sahibi ne de staff. Istek redd edilir.");
                 throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
             }
 
-            log.info("Mileage update eden admindir : {}", admin.getUserId());
+            log.info("Mileage update eden booking staff: {}", userId);
             car = carRepository.findByVin(carRequest.getVin());
         }
 

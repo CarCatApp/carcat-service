@@ -17,7 +17,7 @@ import java.util.Map;
  * tr: Mobil feature-flag okuma; Kong/JWT role header'ına göre yalnızca çağıran rolün map'ini döner.
  * en: Mobile feature-flag read; returns only the caller role's map from the Kong/JWT role header.
  */
-@Tag(name = "feature-flags-me", description = "Mobile feature-flag read. Caller JWT role (USER/ADMIN/SUPER_ADMIN/BOSS). Not panel-admin-only.")
+@Tag(name = "feature-flags-me", description = "Mobile feature-flag read. Caller JWT role (USER/BOSS/PARTNER_ADMIN/BRANCH_ADMIN). Not panel-only.")
 @RestController
 @RequestMapping("/api/v1/feature-flags")
 @RequiredArgsConstructor

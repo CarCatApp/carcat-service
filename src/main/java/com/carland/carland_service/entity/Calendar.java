@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * tr: "calendars" tablosunu modelleyen entity; bir servis merkezinin günlük randevu takvimini ve zaman aralıklarını (Range) temsil eder.
- * en: Entity modeling the "calendars" table; represents an auto service center's daily appointment calendar and its time ranges (Range).
+ * tr: Şubenin günlük randevu takvimi.
+ * en: Daily appointment calendar of a branch.
  */
 @Entity
 @Data
@@ -41,8 +41,10 @@ public class Calendar {
     @Builder.Default
     List<Range> timeRanges = new ArrayList<>();
 
-    @ManyToOne
-    @JoinColumn(name = "auto_service_id", nullable = false)
-    AutoService autoService;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    Branch branch;
 }
-

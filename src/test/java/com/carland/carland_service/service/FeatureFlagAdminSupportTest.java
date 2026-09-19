@@ -107,7 +107,7 @@ class FeatureFlagAdminSupportTest {
         FeatureFlagAudit row = FeatureFlagAudit.builder()
                 .httpMethod("STATE")
                 .pathPattern("TEST_FLOW USER")
-                .role(UserRoles.ADMIN)
+                .role(UserRoles.USER)
                 .newState(FeatureFlagState.HIDDEN)
                 .build();
         assertEquals("TEST_FLOW", FeatureFlagAdminSupport.resolveStoredFlagName(row));

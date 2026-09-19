@@ -129,8 +129,8 @@ public class AdminController {
 
 
     /**
-     * tr: Auth JWT login; yalnızca +994500000000 / ADMIN panele girer, diğer herkes "Admin not found".
-     * en: Auth JWT login; only +994500000000 / ADMIN may enter the panel, everyone else gets "Admin not found".
+     * tr: Auth JWT login; yalnızca panel telefonu girer.
+     * en: Auth JWT login; only the panel phone may enter.
      */
     @PostMapping("/admin/login")
     public String login(
@@ -148,8 +148,7 @@ public class AdminController {
             if (auth == null
                     || auth.getAccessToken() == null
                     || auth.getAccessToken().isBlank()
-                    || !adminAccessService.getPanelPhone().equals(auth.getPhoneNumber())
-                    || !"ADMIN".equalsIgnoreCase(auth.getRole())) {
+                    || !adminAccessService.getPanelPhone().equals(auth.getPhoneNumber())) {
                 return "redirect:" + ADMIN_URL + "/admin/?error=not_found";
             }
             adminAccessService.writeCookie(response, auth.getAccessToken());

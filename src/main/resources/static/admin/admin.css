@@ -1410,10 +1410,10 @@ body.booking-page .card { margin-bottom: 4px; }
   font-size: 13px;
   border-radius: 10px;
 }
-.booking-form-grid .btn {
-  min-height: 38px;
-  padding: 8px 16px;
-  border-radius: 10px;
+.booking-form-grid select:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
 }
 .booking-name {
   display: flex;

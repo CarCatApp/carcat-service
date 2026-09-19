@@ -116,8 +116,7 @@ public final class FeatureFlagAdminSupport {
 
     private static String resolveAuditTarget(String action, String path, FeatureFlagAudit row) {
         if ("STATE".equals(action)) {
-            if (row.getRole() != null && row.getRole().name() != null
-                    && !"ADMIN".equals(row.getRole().name())) {
+            if (row.getRole() != null && row.getRole().name() != null) {
                 return row.getRole().name();
             }
             String[] parts = path.trim().split("\\s+");

@@ -25,7 +25,7 @@ import java.util.Map;
  * tr: PO sözleşmeli feature-flag REST (id path, Bearer veya cookie). Panel HTML ayrı kalır.
  * en: PO-shaped feature-flag REST (id in path, Bearer or cookie). HTML page stays separate.
  */
-@Tag(name = "admin-feature-flags", description = "Panel ADMIN JWT only. Other JWTs → 403 Admin not found.")
+@Tag(name = "admin-feature-flags", description = "Panel phone JWT only. Other JWTs → 403 Admin not found.")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor

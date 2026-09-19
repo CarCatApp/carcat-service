@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 
 
 /**
- * tr: AppointmentController randevu sorgularında dönen yanıt DTO'su. Randevu tarihi, durumu, servis merkezi ve müşteri bilgilerini içerir.
- * en: Response DTO returned by AppointmentController appointment queries. Contains appointment date, status, auto service and customer info.
+ * tr: Randevu yanıtı: tarih, durum, şube ve müşteri.
+ * en: Appointment response: date, status, branch and customer.
  */
 @Data
 @NoArgsConstructor
@@ -19,9 +19,9 @@ public class AppointmentResponse {
     Long id;
     String appointmentDate;
     String status;
-    Long autoServiceId;
-    String autoServiceName;
-    String autoServiceNumber;
+    Long branchId;
+    String branchName;
+    String branchPhone;
     String serviceCategory;
     String customerNumber;
     String customerName;

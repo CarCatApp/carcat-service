@@ -7,8 +7,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
- * tr: CalendarController üzerinden randevu takvimi (gün, saat aralığı, çalışan sayısı) oluşturma isteklerinde kullanılan DTO.
- * en: DTO used in CalendarController requests to create an appointment calendar (day, time range, worker count).
+ * tr: Şube randevu takvimi oluşturma/okuma isteği.
+ * en: Branch calendar create/read request.
  */
 @Data
 @NoArgsConstructor
@@ -22,6 +22,5 @@ public class CalendarRequest {
     Integer rangeMinutes;
     String serviceCategory;
     Integer workerCount;
-    Long autoServiceId;
-
+    Long branchId;
 }

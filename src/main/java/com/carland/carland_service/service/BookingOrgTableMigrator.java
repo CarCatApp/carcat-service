@@ -46,6 +46,13 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
             jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS photos");
             jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS rating");
         }
+        relinkLegacyAutoService("calendars");
+        relinkLegacyAutoService("appointments");
+        dropForeignKeys("admins");
+        dropForeignKeys("super_admins");
+        jdbc.execute("DROP TABLE IF EXISTS admins CASCADE");
+        jdbc.execute("DROP TABLE IF EXISTS super_admins CASCADE");
+        jdbc.execute("DROP TABLE IF EXISTS auto_services CASCADE");
         clearOrphanBranchIds();
 
         if (!tableExists("booking_partners") && !tableExists("booking_branches")) {
@@ -131,6 +138,15 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
         jdbc.execute("DROP TABLE IF EXISTS booking_partners CASCADE");
         clearOrphanBranchIds();
         log.info("BOOKING_ORG_MIGRATE done");
+    }
+
+    private void relinkLegacyAutoService(String table) {
+        if (!tableExists(table)) {
+            return;
+        }
+        jdbc.execute("ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS branch_id int8");
+        dropForeignKeys(table);
+        jdbc.execute("ALTER TABLE " + table + " DROP COLUMN IF EXISTS auto_service_id");
     }
 
     private void clearOrphanBranchIds() {

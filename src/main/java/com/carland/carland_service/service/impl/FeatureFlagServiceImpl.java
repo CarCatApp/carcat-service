@@ -43,7 +43,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     private static final String AUDIT_VERSION_NA = "n/a";
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
     private static final UserRoles[] GRID_ROLES = {
-            UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPER_ADMIN, UserRoles.BOSS
+            UserRoles.USER, UserRoles.BOSS
     };
 
     private final FeatureFlagRepository flagRepository;
@@ -60,7 +60,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
     public FeatureFlagMeItem me(String roleHeader, String appVersionHeader) {
         UserRoles role = parseRole(roleHeader);
         if (role == null) {
-            throw new IllegalArgumentException("role header required (USER|ADMIN|SUPER_ADMIN|BOSS)");
+            throw new IllegalArgumentException("role header required (USER|BOSS|PARTNER_ADMIN|BRANCH_ADMIN)");
         }
         String clientVersion = blankToNull(appVersionHeader);
         List<FeatureFlag> flags = flagRepository.findByDeletedAtIsNullOrderByNameAsc();
@@ -133,7 +133,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             catalog.add(FeatureFlagAdminSupport.endpointDto(ep));
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("roles", List.of("USER", "ADMIN", "SUPER_ADMIN", "BOSS"));
+        body.put("roles", List.of("USER", "BOSS"));
         body.put("flags", flagDtos);
         body.put("catalog", catalog);
         body.put("availableEndpoints", catalog.stream().filter(e -> Boolean.FALSE.equals(e.get("claimed")) && Boolean.FALSE.equals(e.get("neverGuard"))).toList());
@@ -223,7 +223,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             ep.setNeverGuard(request.getNeverGuard());
         }
         endpointRepository.save(ep);
-        audit(actor, "UPDATE", method, path, null, null, AUDIT_VERSION_NA, ep.getFlag(), UserRoles.ADMIN);
+        audit(actor, "UPDATE", method, path, null, null, AUDIT_VERSION_NA, ep.getFlag(), UserRoles.USER);
         reloadCache();
         return FeatureFlagAdminSupport.endpointDto(ep);
     }
@@ -238,10 +238,10 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
             ep.setFlag(null);
             endpointRepository.save(ep);
             audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null,
-                    AUDIT_VERSION_NA, attached, UserRoles.ADMIN);
+                    AUDIT_VERSION_NA, attached, UserRoles.USER);
         }
         audit(actor, "DELETE", ep.getHttpMethod(), ep.getPathPattern(), null, null,
-                AUDIT_VERSION_NA, attached, UserRoles.ADMIN);
+                AUDIT_VERSION_NA, attached, UserRoles.USER);
         endpointRepository.delete(ep);
         reloadCache();
     }
@@ -322,7 +322,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .updatedAt(LocalDateTime.now())
                 .build());
         seedRoleStates(flag, defaultState);
-        audit(actor, "CREATE", "FLAG", name, null, defaultState, minVersion, flag, UserRoles.ADMIN);
+        audit(actor, "CREATE", "FLAG", name, null, defaultState, minVersion, flag, UserRoles.USER);
         reloadCache();
         return flag;
     }
@@ -344,7 +344,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         flag.setUpdatedAt(LocalDateTime.now());
         flagRepository.save(flag);
         audit(actor, "UPDATE", "FLAG", flag.getName(), oldDefault, flag.getDefaultState(),
-                flag.getMinAvailableVersion(), flag, UserRoles.ADMIN);
+                flag.getMinAvailableVersion(), flag, UserRoles.USER);
         reloadCache();
         return flag;
     }
@@ -358,7 +358,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         flag.setDeletedAt(LocalDateTime.now());
         flagRepository.save(flag);
-        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
+        audit(actor, "DELETE", "FLAG", flag.getName(), flag.getDefaultState(), null, AUDIT_VERSION_NA, flag, UserRoles.USER);
         reloadCache();
     }
 
@@ -384,7 +384,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         for (FeatureFlagEndpoint ep : batch) {
             ep.setFlag(flag);
             endpointRepository.save(ep);
-            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
+            audit(actor, "ATTACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.USER);
         }
         reloadCache();
     }
@@ -400,7 +400,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
         }
         ep.setFlag(null);
         endpointRepository.save(ep);
-        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.ADMIN);
+        audit(actor, "DETACH", ep.getHttpMethod(), ep.getPathPattern(), null, null, AUDIT_VERSION_NA, flag, UserRoles.USER);
         reloadCache();
     }
 
@@ -557,7 +557,7 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .actor(actor != null ? actor : "unknown")
                 .httpMethod(action.length() > 8 ? action.substring(0, 8) : action)
                 .pathPattern((methodOrName != null ? methodOrName : "") + (pathOrRole != null ? " " + pathOrRole : ""))
-                .role(role != null ? role : UserRoles.ADMIN)
+                .role(role != null ? role : UserRoles.USER)
                 .oldState(oldState)
                 .newState(newState != null ? newState : FeatureFlagState.HIDDEN)
                 .appVersion(version != null ? version : AUDIT_VERSION_NA)

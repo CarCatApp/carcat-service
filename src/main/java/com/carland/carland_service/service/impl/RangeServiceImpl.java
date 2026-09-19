@@ -3,7 +3,7 @@ package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.response.AppointmentResponse;
 import com.carland.carland_service.entity.Appointment;
-import com.carland.carland_service.entity.AutoService;
+import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.AppointmentStatus;
@@ -12,14 +12,11 @@ import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.AppointmentRepository;
-import com.carland.carland_service.repository.AutoServiceRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.carland.carland_service.service.PushNotificationService;
-import com.carland.carland_service.service.impl.Helper;
 import com.carland.carland_service.dto.response.RangeResponse;
 import com.carland.carland_service.service.RangeService;
-import jakarta.persistence.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +35,6 @@ public class RangeServiceImpl implements RangeService {
 
     private final RangeRepository rangeRepository;
     private final CustomerRepository customerRepository;
-    private final AutoServiceRepository autoServiceRepository;
     private final AppointmentRepository appointmentRepository;
     private final Helper helper;
     private final PushNotificationService pushNotificationService;
@@ -80,19 +76,21 @@ public class RangeServiceImpl implements RangeService {
             throw new ResourceNotFoundException(MessagesLangValues.BREAK_TIME.getMessageByLang(acceptLanguage));
         }
 
-        AutoService autoService = autoServiceRepository.findById(range.getCalendar().getAutoService().getId())
-                .orElseThrow(() -> new UserNotFoundException(MessagesLangValues.DOCTOR_NOT_FOUND.getMessageByLang(acceptLanguage)));
+        Branch branch = range.getCalendar().getBranch();
+        if (branch == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
 
         OffsetDateTime dayStart = range.getStart().toLocalDate().atStartOfDay().atOffset(range.getStart().getOffset());
         OffsetDateTime dayEnd = range.getStart().toLocalDate().atTime(23, 59, 59).atOffset(range.getStart().getOffset());
 
         Optional<Appointment> existing = appointmentRepository
-                .findByCustomer_UserIdAndServiceCategoryAndAppointmentDateBetweenAndRange_Calendar_AutoService_Id(
+                .findByCustomer_UserIdAndServiceCategoryAndAppointmentDateBetweenAndRange_Calendar_Branch_Id(
                         customer.getUserId(),
                         range.getCalendar().getServiceCategory(),
                         dayStart,
                         dayEnd,
-                        range.getCalendar().getAutoService().getId()
+                        branch.getId()
                 );
 
 
@@ -107,7 +105,7 @@ public class RangeServiceImpl implements RangeService {
                 .appointmentDate(appointmentDateUtc)
                 .appointmentStart(range.getStart())
                 .appointmentEnd(range.getEnd())
-                .autoService(autoService)
+                .branch(branch)
                 .range(range)
                 .serviceCategory(range.getCalendar().getServiceCategory())
                 .customer(customer)
@@ -320,6 +318,11 @@ public class RangeServiceImpl implements RangeService {
         String appointmentStartString = helper.formatAppointmentDate(appointmentStartLocal, acceptLanguage);
         String appointmentEndString = helper.formatAppointmentDate(appointmentEndLocal, acceptLanguage);
 
+        Branch branch = appointment.getBranch();
+        Long branchId = branch != null ? branch.getId() : null;
+        String branchName = branch != null ? branch.getName() : null;
+        String branchPhone = branch != null ? branch.getContactPhone() : null;
+
         return AppointmentResponse.builder()
                 .id(appointment.getId())
                 .appointmentDate(appointmentDateString)
@@ -327,10 +330,9 @@ public class RangeServiceImpl implements RangeService {
                 .appointmentEnd(appointmentEndString)
                 .status(appointment.getStatus())
                 .serviceCategory(appointment.getServiceCategory())
-                .autoServiceId(appointment.getAutoService() != null ? appointment.getAutoService().getId() : null)
-                .autoServiceName(appointment.getAutoService() != null ? appointment.getAutoService().getName() : null)
-                .autoServiceNumber(appointment.getAutoService() != null ? appointment.getAutoService().getPhoneNumber() : null)
-                .serviceCategory(appointment.getServiceCategory())
+                .branchId(branchId)
+                .branchName(branchName)
+                .branchPhone(branchPhone)
                 .customerNumber(appointment.getCustomer() != null ? appointment.getCustomer().getPhoneNumber() : null)
                 .customerName(appointment.getCustomer() != null ? appointment.getCustomer().getName() + " " + appointment.getCustomer().getSurname() : null)
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
