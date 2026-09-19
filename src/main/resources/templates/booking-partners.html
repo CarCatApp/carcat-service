@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Booking partners — Carland Admin</title>
+  <title>Partners — Carland Admin</title>
   <link rel="stylesheet" href="/admin/admin.css?v=premium7">
 </head>
 <body>
@@ -31,7 +31,7 @@
 
 <main class="container wide" id="main">
   <div class="page-head">
-    <h1>Booking partners</h1>
+    <h1>Partners</h1>
   </div>
 
   <div class="ok-box" th:if="${partnersMessage}" th:text="${partnersMessage}"></div>
@@ -39,11 +39,23 @@
 
   <form class="filter-bar" method="post" action="/admin/booking-partners">
     <div class="filter-field">
-      <label for="name">Yeni partner</label>
+      <label for="name">Yeni Partner</label>
       <input type="text" id="name" name="name" required placeholder="HyperService">
     </div>
+    <div class="filter-field">
+      <label for="contactPhone">Telefon</label>
+      <input type="text" id="contactPhone" name="contactPhone" placeholder="+99470xxxxxxx">
+    </div>
+    <div class="filter-field">
+      <label for="contactEmail">Email</label>
+      <input type="email" id="contactEmail" name="contactEmail" placeholder="ops@partner.az">
+    </div>
+    <div class="filter-field grow">
+      <label for="photo">Logo URL</label>
+      <input type="text" id="photo" name="photo" placeholder="https://…">
+    </div>
     <label class="filter-field">
-      <input type="checkbox" name="active" value="true" checked> Aktiv
+      <input type="checkbox" name="active" value="true" checked> ACTIVE
     </label>
     <button class="btn btn-filter" type="submit">Yarat</button>
   </form>
@@ -54,8 +66,10 @@
         <thead>
         <tr>
           <th>ID</th>
-          <th>Ad</th>
-          <th>Aktiv</th>
+          <th>Partner</th>
+          <th>Telefon</th>
+          <th>Email</th>
+          <th>Status</th>
           <th>HQ user</th>
           <th></th>
         </tr>
@@ -64,12 +78,14 @@
         <tr th:each="p : ${partners}">
           <td th:text="${p.id}">1</td>
           <td th:text="${p.name}">Name</td>
-          <td th:text="${p.active} ? 'bəli' : 'xeyr'">bəli</td>
+          <td th:text="${p.contactPhone != null} ? ${p.contactPhone} : '—'">—</td>
+          <td th:text="${p.contactEmail != null} ? ${p.contactEmail} : '—'">—</td>
+          <td th:text="${p.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</td>
           <td th:text="${p.hqUserId != null} ? ${p.hqUserId} : '—'">—</td>
           <td><a class="btn btn-filter" th:href="@{/admin/booking-partners/{id}(id=${p.id})}">Aç</a></td>
         </tr>
         <tr th:if="${#lists.isEmpty(partners)}">
-          <td colspan="5">Hələ partner yoxdur</td>
+          <td colspan="7">Hələ Partner yoxdur</td>
         </tr>
         </tbody>
       </table>

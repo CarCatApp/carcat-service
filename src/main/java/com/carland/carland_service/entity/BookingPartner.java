@@ -28,6 +28,16 @@ public class BookingPartner {
     @Column(nullable = false)
     String name;
 
+    /** Logo URL. Secrets stay on Hyper partners / env, not here. */
+    @Column(length = 512)
+    String photo;
+
+    @Column(name = "contact_phone", length = 32)
+    String contactPhone;
+
+    @Column(name = "contact_email", length = 128)
+    String contactEmail;
+
     @Builder.Default
     @Column(nullable = false)
     Boolean active = true;
@@ -38,9 +48,28 @@ public class BookingPartner {
 
     LocalDateTime createdAt;
 
+    LocalDateTime updatedAt;
+
     @OneToMany(mappedBy = "partner", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     List<BookingBranch> branches = new ArrayList<>();
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+        if (active == null) {
+            active = true;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

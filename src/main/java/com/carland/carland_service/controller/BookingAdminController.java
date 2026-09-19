@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.booking.StaffProvisionResponse;
 import com.carland.carland_service.entity.BookingPartner;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.BookingOrgService;
+import com.carland.carland_service.service.BookingStaffAuditService;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class BookingAdminController {
 
     private final AdminAccessService adminAccessService;
     private final BookingOrgService bookingOrgService;
+    private final BookingStaffAuditService staffAuditService;
 
     @GetMapping(value = "/admin/booking-partners", produces = MediaType.TEXT_HTML_VALUE)
     public String list(HttpServletRequest request, Model model) {
@@ -46,6 +48,7 @@ public class BookingAdminController {
         model.addAttribute("partner", partner);
         model.addAttribute("branches", bookingOrgService.listBranches(id));
         model.addAttribute("staff", bookingOrgService.listStaff(id));
+        model.addAttribute("audit", staffAuditService.listForPartner(id));
         return "booking-partner-detail";
     }
 
@@ -53,6 +56,9 @@ public class BookingAdminController {
     public String createPartner(
             @RequestParam String name,
             @RequestParam(required = false) String active,
+            @RequestParam(required = false) String photo,
+            @RequestParam(required = false) String contactPhone,
+            @RequestParam(required = false) String contactEmail,
             HttpServletRequest request,
             RedirectAttributes redirect
     ) {
@@ -60,7 +66,8 @@ public class BookingAdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         try {
-            BookingPartner created = bookingOrgService.createPartner(name, active != null);
+            BookingPartner created = bookingOrgService.createPartner(
+                    name, active != null, photo, contactPhone, contactEmail);
             return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + created.getId();
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("partnersError", ex.getMessage());
@@ -76,6 +83,12 @@ public class BookingAdminController {
             @RequestParam(required = false) String lat,
             @RequestParam(required = false) String lng,
             @RequestParam(required = false) String active,
+            @RequestParam(required = false) String contactPhone,
+            @RequestParam(required = false) String workingHours,
+            @RequestParam(required = false) String photo,
+            @RequestParam(required = false) String photos,
+            @RequestParam(required = false) String rating,
+            @RequestParam(required = false) String ratingCount,
             HttpServletRequest request,
             RedirectAttributes redirect
     ) {
@@ -83,8 +96,9 @@ public class BookingAdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         try {
-            bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), active != null);
-            redirect.addFlashAttribute("detailMessage", "Şöbə əlavə olundu");
+            bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), active != null,
+                    contactPhone, workingHours, photo, photos, parseDouble(rating), parseInteger(ratingCount));
+            redirect.addFlashAttribute("detailMessage", "Branch əlavə olundu");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
         }
@@ -106,7 +120,8 @@ public class BookingAdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         try {
-            StaffProvisionResponse created = bookingOrgService.addStaff(id, branchId, role, phoneNumber, name, surname);
+            StaffProvisionResponse created = bookingOrgService.addStaff(
+                    id, branchId, role, phoneNumber, name, surname, adminAccessService.actor(request));
             redirect.addFlashAttribute("oneTimePassword", created.getOneTimePassword());
             redirect.addFlashAttribute("oneTimePhone", created.getPhoneNumber());
             redirect.addFlashAttribute("detailMessage", "Staff yaradıldı — birdəfəlik şifrəni indi kopyalayın");
@@ -122,6 +137,17 @@ public class BookingAdminController {
         }
         try {
             return Double.valueOf(raw.trim().replace(",", "."));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static Integer parseInteger(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(raw.trim());
         } catch (NumberFormatException ex) {
             return null;
         }

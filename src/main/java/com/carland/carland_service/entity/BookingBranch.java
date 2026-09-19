@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * tr: Booking şubesi (adres + koordinat). Hastane {@code auto_services} tablosundan ayrıdır.
- * en: Booking branch (address + coordinates). Separate from hospital {@code auto_services}.
+ * tr: Booking şubesi (adres + koordinat). Hyper {@code partners} ve eski {@code auto_services} tablolarından ayrıdır.
+ * en: Booking branch (address + coordinates). Separate from Hyper {@code partners} and legacy {@code auto_services}.
  */
 @Entity
 @Data
@@ -38,9 +38,50 @@ public class BookingBranch {
 
     Double lng;
 
+    @Column(name = "contact_phone", length = 32)
+    String contactPhone;
+
+    @Column(name = "working_hours", length = 512)
+    String workingHours;
+
+    @Column(length = 512)
+    String photo;
+
+    /** Extra photo URLs, one per line. */
+    @Column(length = 2000)
+    String photos;
+
+    Double rating;
+
+    @Builder.Default
+    @Column(name = "rating_count")
+    Integer ratingCount = 0;
+
     @Builder.Default
     @Column(nullable = false)
     Boolean active = true;
 
     LocalDateTime createdAt;
+
+    LocalDateTime updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+        if (active == null) {
+            active = true;
+        }
+        if (ratingCount == null) {
+            ratingCount = 0;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

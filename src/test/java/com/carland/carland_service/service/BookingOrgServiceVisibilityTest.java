@@ -31,6 +31,7 @@ class BookingOrgServiceVisibilityTest {
     @Mock BookingBranchRepository branchRepository;
     @Mock BookingStaffRepository staffRepository;
     @Mock AuthStaffFeign authStaffFeign;
+    @Mock BookingStaffAuditService staffAuditService;
 
     @InjectMocks BookingOrgService service;
 

@@ -54,7 +54,7 @@
 
   pwForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const res = await fetch(AUTH + '/api/v1/staff/password', {
+    const res = await fetch(AUTH + '/api/v1/staff/me/own-password', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

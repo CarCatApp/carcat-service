@@ -40,6 +40,7 @@ public class BookingOrgService {
     private final BookingBranchRepository branchRepository;
     private final BookingStaffRepository staffRepository;
     private final AuthStaffFeign authStaffFeign;
+    private final BookingStaffAuditService staffAuditService;
 
     @Transactional(readOnly = true)
     public List<BookingPartner> listPartners() {
@@ -64,23 +65,27 @@ public class BookingOrgService {
     }
 
     @Transactional
-    public BookingPartner createPartner(String name, boolean active) {
+    public BookingPartner createPartner(String name, boolean active, String photo, String contactPhone, String contactEmail) {
         if (name == null || name.isBlank()) {
             throw new MissingFieldException("Partner adı boş ola bilməz");
         }
         BookingPartner partner = BookingPartner.builder()
                 .name(name.trim())
                 .active(active)
-                .createdAt(LocalDateTime.now())
+                .photo(blankToNull(photo))
+                .contactPhone(blankToNull(contactPhone))
+                .contactEmail(blankToNull(contactEmail))
                 .build();
         return partnerRepository.save(partner);
     }
 
     @Transactional
-    public BookingBranch addBranch(Long partnerId, String name, String address, Double lat, Double lng, boolean active) {
+    public BookingBranch addBranch(Long partnerId, String name, String address, Double lat, Double lng, boolean active,
+                                   String contactPhone, String workingHours, String photo, String photos,
+                                   Double rating, Integer ratingCount) {
         BookingPartner partner = getPartner(partnerId);
         if (name == null || name.isBlank()) {
-            throw new MissingFieldException("Şöbə adı boş ola bilməz");
+            throw new MissingFieldException("Branch adı boş ola bilməz");
         }
         BookingBranch branch = BookingBranch.builder()
                 .partner(partner)
@@ -89,7 +94,12 @@ public class BookingOrgService {
                 .lat(lat)
                 .lng(lng)
                 .active(active)
-                .createdAt(LocalDateTime.now())
+                .contactPhone(blankToNull(contactPhone))
+                .workingHours(blankToNull(workingHours))
+                .photo(blankToNull(photo))
+                .photos(blankToNull(photos))
+                .rating(rating)
+                .ratingCount(ratingCount == null ? 0 : ratingCount)
                 .build();
         return branchRepository.save(branch);
     }
@@ -100,7 +110,7 @@ public class BookingOrgService {
      */
     @Transactional
     public StaffProvisionResponse addStaff(Long partnerId, Long branchId, String roleRaw, String phoneRaw,
-                                           String name, String surname) {
+                                           String name, String surname, String actor) {
         BookingPartner partner = getPartner(partnerId);
         String phone = PhoneNumbers.normalize(phoneRaw);
         if (phone == null) {
@@ -166,6 +176,8 @@ public class BookingOrgService {
                 partner.setHqUserId(userId);
                 partnerRepository.save(partner);
             }
+            staffAuditService.recordCreate(actor, userId, partnerId,
+                    branch == null ? null : branch.getId(), phone, role);
         } catch (ConflictException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -250,6 +262,11 @@ public class BookingOrgService {
                 .lng(branch.getLng())
                 .active(branch.getActive())
                 .partnerActive(partner.getActive())
+                .contactPhone(branch.getContactPhone())
+                .workingHours(branch.getWorkingHours())
+                .photo(branch.getPhoto())
+                .rating(branch.getRating())
+                .ratingCount(branch.getRatingCount())
                 .build();
     }
 

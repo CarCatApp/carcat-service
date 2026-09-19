@@ -43,7 +43,7 @@
       });
       const data = await res.json();
       if (!res.ok) {
-        error.textContent = data.message || 'Login alınmadı';
+        error.textContent = data.message || (res.status === 429 ? 'Hesab müvəqqəti kilidlənib' : 'Login alınmadı');
         error.hidden = false;
         return;
       }

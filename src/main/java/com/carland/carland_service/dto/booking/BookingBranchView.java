@@ -19,4 +19,9 @@ public class BookingBranchView {
     Double lng;
     Boolean active;
     Boolean partnerActive;
+    String contactPhone;
+    String workingHours;
+    String photo;
+    Double rating;
+    Integer ratingCount;
 }
