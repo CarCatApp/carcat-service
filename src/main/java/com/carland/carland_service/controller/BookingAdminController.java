@@ -55,7 +55,6 @@ public class BookingAdminController {
     @PostMapping("/admin/booking-partners")
     public String createPartner(
             @RequestParam String name,
-            @RequestParam(required = false) String active,
             @RequestParam(required = false) String photo,
             @RequestParam(required = false) String contactPhone,
             @RequestParam(required = false) String contactEmail,
@@ -67,7 +66,7 @@ public class BookingAdminController {
         }
         try {
             Partner created = bookingOrgService.createPartner(
-                    name, active != null, photo, contactPhone, contactEmail);
+                    name, true, photo, contactPhone, contactEmail);
             return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + created.getId();
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("partnersError", ex.getMessage());
@@ -82,7 +81,6 @@ public class BookingAdminController {
             @RequestParam(required = false) String address,
             @RequestParam(required = false) String lat,
             @RequestParam(required = false) String lng,
-            @RequestParam(required = false) String active,
             @RequestParam(required = false) String contactPhone,
             @RequestParam(required = false) String hoursStart,
             @RequestParam(required = false) String hoursEnd,
@@ -94,7 +92,7 @@ public class BookingAdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         try {
-            bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), active != null,
+            bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), true,
                     contactPhone, joinWorkingHours(hoursStart, hoursEnd), photo);
             redirect.addFlashAttribute("detailMessage", "Branch əlavə olundu");
         } catch (RuntimeException ex) {

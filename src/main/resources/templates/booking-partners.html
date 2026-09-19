@@ -4,15 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Partners — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium7">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=booking1">
 </head>
-<body>
+<body class="booking-page">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <div class="brand">
-    <span class="logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
-    </span>
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
     <span>Carland Admin</span>
     <nav class="nav-links">
       <a class="nav-link" href="/admin/cars">Cars</a>
@@ -31,33 +30,36 @@
 
 <main class="container wide" id="main">
   <div class="page-head">
-    <h1>Partners</h1>
+    <div>
+      <h1>Partners</h1>
+      <p class="muted"><span th:text="${#lists.size(partners)}">0</span> qeyd</p>
+    </div>
   </div>
 
   <div class="ok-box" th:if="${partnersMessage}" th:text="${partnersMessage}"></div>
   <div class="error-box" th:if="${partnersError}" th:text="${partnersError}"></div>
 
-  <form class="filter-bar" method="post" action="/admin/booking-partners">
-    <div class="filter-field">
-      <label for="name">Yeni Partner</label>
-      <input type="text" id="name" name="name" required placeholder="HyperService">
+  <form class="booking-form" method="post" action="/admin/booking-partners">
+    <div class="booking-form-title">Yeni partner</div>
+    <div class="booking-form-grid booking-form-grid-partner">
+      <div class="filter-field">
+        <label for="name">Ad</label>
+        <input type="text" id="name" name="name" required placeholder="HyperService">
+      </div>
+      <div class="filter-field">
+        <label for="contactPhone">Telefon</label>
+        <input type="text" id="contactPhone" name="contactPhone" placeholder="+99470xxxxxxx">
+      </div>
+      <div class="filter-field">
+        <label for="contactEmail">Email</label>
+        <input type="email" id="contactEmail" name="contactEmail" placeholder="ops@partner.az">
+      </div>
+      <div class="filter-field">
+        <label for="photo">Logo URL</label>
+        <input type="text" id="photo" name="photo" placeholder="https://…">
+      </div>
+      <button class="btn btn-filter" type="submit">Yarat</button>
     </div>
-    <div class="filter-field">
-      <label for="contactPhone">Telefon</label>
-      <input type="text" id="contactPhone" name="contactPhone" placeholder="+99470xxxxxxx">
-    </div>
-    <div class="filter-field">
-      <label for="contactEmail">Email</label>
-      <input type="email" id="contactEmail" name="contactEmail" placeholder="ops@partner.az">
-    </div>
-    <div class="filter-field grow">
-      <label for="photo">Logo URL</label>
-      <input type="text" id="photo" name="photo" placeholder="https://…">
-    </div>
-    <label class="filter-field">
-      <input type="checkbox" name="active" value="true" checked> ACTIVE
-    </label>
-    <button class="btn btn-filter" type="submit">Yarat</button>
   </form>
 
   <div class="card">
@@ -67,27 +69,28 @@
         <tr>
           <th>ID</th>
           <th>Partner</th>
-          <th>Source</th>
           <th>Telefon</th>
           <th>Email</th>
-          <th>Status</th>
-          <th>HQ user</th>
+          <th>HQ</th>
           <th></th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="p : ${partners}">
           <td th:text="${p.id}">1</td>
-          <td th:text="${p.name}">Name</td>
-          <td th:text="${p.source != null} ? ${p.source} : '—'">—</td>
+          <td>
+            <div class="booking-name">
+              <strong th:text="${p.name}">Name</strong>
+              <span th:text="${p.source != null} ? ${p.source} : '—'">—</span>
+            </div>
+          </td>
           <td th:text="${p.contactPhone != null} ? ${p.contactPhone} : '—'">—</td>
           <td th:text="${p.contactEmail != null} ? ${p.contactEmail} : '—'">—</td>
-          <td th:text="${p.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</td>
           <td th:text="${p.hqUserId != null} ? ${p.hqUserId} : '—'">—</td>
-          <td><a class="btn btn-filter" th:href="@{/admin/booking-partners/{id}(id=${p.id})}">Aç</a></td>
+          <td><a class="btn btn-filter btn-open" th:href="@{/admin/booking-partners/{id}(id=${p.id})}">Aç</a></td>
         </tr>
-        <tr th:if="${#lists.isEmpty(partners)}">
-          <td colspan="8">Hələ Partner yoxdur</td>
+        <tr class="empty-row" th:if="${#lists.isEmpty(partners)}">
+          <td colspan="6">Hələ partner yoxdur</td>
         </tr>
         </tbody>
       </table>

@@ -7,6 +7,104 @@
     return n < 10 ? "0" + n : String(n);
   }
 
+  function parseClock(value) {
+    var raw = (value || "09:00").trim();
+    var parts = raw.split(":");
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    if (isNaN(h) || h < 0 || h > 23) h = 9;
+    if (isNaN(m) || m < 0 || m > 59) m = 0;
+    return { h: h, m: m };
+  }
+
+  function fillTimeCol(col, max, selected) {
+    if (!col) return;
+    col.innerHTML = "";
+    for (var i = 0; i < max; i++) {
+      var opt = document.createElement("button");
+      opt.type = "button";
+      opt.className = "time-opt" + (i === selected ? " is-on" : "");
+      opt.textContent = pad(i);
+      opt.dataset.val = String(i);
+      col.appendChild(opt);
+    }
+  }
+
+  function syncTimeWheel(root) {
+    var hidden = root.querySelector("input[type='hidden']");
+    var face = root.querySelector(".time-wheel-face");
+    var clock = parseClock(hidden.value);
+    hidden.value = pad(clock.h) + ":" + pad(clock.m);
+    if (face) face.textContent = hidden.value;
+    root.querySelectorAll(".time-col[data-part='h'] .time-opt").forEach(function (el) {
+      el.classList.toggle("is-on", parseInt(el.dataset.val, 10) === clock.h);
+    });
+    root.querySelectorAll(".time-col[data-part='m'] .time-opt").forEach(function (el) {
+      el.classList.toggle("is-on", parseInt(el.dataset.val, 10) === clock.m);
+    });
+  }
+
+  function closeTimeWheels(except) {
+    document.querySelectorAll(".time-wheel.is-open").forEach(function (el) {
+      if (el === except) return;
+      el.classList.remove("is-open");
+      var pop = el.querySelector(".time-wheel-pop");
+      var btn = el.querySelector(".time-wheel-toggle");
+      if (pop) pop.hidden = true;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function initTimeWheels() {
+    document.querySelectorAll(".time-wheel[data-time]").forEach(function (root) {
+      var hidden = root.querySelector("input[type='hidden']");
+      if (root.getAttribute("data-default") && (!hidden.value || !hidden.value.trim())) {
+        hidden.value = root.getAttribute("data-default");
+      }
+      var clock = parseClock(hidden.value || root.getAttribute("data-default"));
+      fillTimeCol(root.querySelector(".time-col[data-part='h']"), 24, clock.h);
+      fillTimeCol(root.querySelector(".time-col[data-part='m']"), 60, clock.m);
+      hidden.value = pad(clock.h) + ":" + pad(clock.m);
+      syncTimeWheel(root);
+
+      var toggle = root.querySelector(".time-wheel-toggle");
+      var pop = root.querySelector(".time-wheel-pop");
+      toggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = !root.classList.contains("is-open");
+        closeTimeWheels(open ? root : null);
+        root.classList.toggle("is-open", open);
+        pop.hidden = !open;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) {
+          ["h", "m"].forEach(function (part) {
+            var col = root.querySelector(".time-col[data-part='" + part + "']");
+            var on = col && col.querySelector(".time-opt.is-on");
+            if (col && on) col.scrollTop = Math.max(0, on.offsetTop - col.clientHeight / 2 + on.clientHeight / 2);
+          });
+        }
+      });
+      pop.addEventListener("click", function (e) { e.stopPropagation(); });
+      root.querySelectorAll(".time-col").forEach(function (col) {
+        col.addEventListener("click", function (e) {
+          var opt = e.target.closest(".time-opt");
+          if (!opt) return;
+          e.stopPropagation();
+          var current = parseClock(hidden.value);
+          var n = parseInt(opt.dataset.val, 10);
+          if (col.getAttribute("data-part") === "h") current.h = n;
+          else current.m = n;
+          hidden.value = pad(current.h) + ":" + pad(current.m);
+          syncTimeWheel(root);
+        });
+      });
+    });
+    document.addEventListener("click", function () { closeTimeWheels(null); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeTimeWheels(null);
+    });
+  }
+
   function formatAdminDate(value) {
     if (!value) return "";
     var d = value instanceof Date ? value : new Date(value);
@@ -178,6 +276,7 @@
     formatAdminDate: formatAdminDate,
     confirmModal: confirmModal,
     initColumnToggle: initColumnToggle,
-    initExpandCells: initExpandCells
+    initExpandCells: initExpandCells,
+    initTimeWheels: initTimeWheels
   };
 })(window);

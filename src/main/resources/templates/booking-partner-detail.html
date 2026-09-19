@@ -4,15 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="'Partner ' + ${partner.name}">Partner</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=premium7">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=booking1">
 </head>
-<body>
+<body class="booking-page">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="topbar">
   <div class="brand">
-    <span class="logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14l2-5.2A2 2 0 0 1 6.9 7.5h10.2A2 2 0 0 1 19 8.8L21 14"/><path d="M3 14h18v2.5A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5V14z"/><circle cx="7" cy="16.5" r="1.35"/><circle cx="17" cy="16.5" r="1.35"/></svg>
-    </span>
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
     <span>Carland Admin</span>
     <nav class="nav-links">
       <a class="nav-link" href="/admin/cars">Cars</a>
@@ -31,14 +30,18 @@
 
 <main class="container wide" id="main">
   <div class="page-head">
-    <h1 th:text="${partner.name}">Partner</h1>
+    <div>
+      <h1 th:text="${partner.name}">Partner</h1>
+      <p class="muted" th:text="${partner.source != null} ? ${partner.source} : ''"></p>
+    </div>
     <a href="/admin/booking-partners">← Partners</a>
   </div>
-  <p>
-    Status: <strong th:text="${partner.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</strong>
-    · Telefon: <span th:text="${partner.contactPhone != null} ? ${partner.contactPhone} : '—'">—</span>
-    · Email: <span th:text="${partner.contactEmail != null} ? ${partner.contactEmail} : '—'">—</span>
-  </p>
+  <div class="meta-line">
+    <span class="badge" th:classappend="${partner.active} ? ' badge-success' : ' badge-neutral'"
+          th:text="${partner.active} ? 'Aktiv' : 'Passiv'">Aktiv</span>
+    <span class="badge badge-neutral" th:text="${partner.contactPhone != null} ? ${partner.contactPhone} : 'Telefon yoxdur'">—</span>
+    <span class="badge badge-neutral" th:text="${partner.contactEmail != null} ? ${partner.contactEmail} : 'Email yoxdur'">—</span>
+  </div>
 
   <div class="ok-box" th:if="${detailMessage}" th:text="${detailMessage}"></div>
   <div class="error-box" th:if="${detailError}" th:text="${detailError}"></div>
@@ -46,47 +49,75 @@
     <p>Birdəfəlik şifrə (<span th:text="${oneTimePhone}"></span>) — yalnız indi görünür:</p>
     <p>
       <code id="oneTimePassword" th:text="${oneTimePassword}"></code>
-      <button type="button" class="btn btn-filter" id="copyOneTime">Kopyala</button>
+      <button type="button" class="btn btn-filter btn-open" id="copyOneTime">Kopyala</button>
       <span id="copyOneTimeStatus" hidden>Kopyalandı</span>
     </p>
   </div>
 
-  <h2>List of Branch</h2>
-  <form class="filter-bar" method="post" th:action="@{/admin/booking-partners/{id}/branches(id=${partner.id})}">
-    <div class="filter-field">
-      <label>Ad</label>
-      <input type="text" name="name" required>
+  <h2 class="booking-sec">Şöbələr</h2>
+  <form class="booking-form" method="post" th:action="@{/admin/booking-partners/{id}/branches(id=${partner.id})}">
+    <div class="booking-form-title">Yeni şöbə</div>
+    <div class="booking-form-grid booking-form-grid-branch">
+      <div class="filter-field">
+        <label>Ad</label>
+        <input type="text" name="name" required>
+      </div>
+      <div class="filter-field">
+        <label>Ünvan</label>
+        <input type="text" name="address">
+      </div>
+      <div class="filter-field">
+        <label>Lat</label>
+        <input type="text" name="lat" placeholder="40.37">
+      </div>
+      <div class="filter-field">
+        <label>Lng</label>
+        <input type="text" name="lng" placeholder="49.83">
+      </div>
+      <div class="filter-field">
+        <label>Telefon</label>
+        <input type="text" name="contactPhone" placeholder="+99470xxxxxxx">
+      </div>
+      <div class="filter-field">
+        <label>Açılış</label>
+        <div class="time-wheel" data-time data-default="09:00">
+          <input type="hidden" name="hoursStart" value="09:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">09:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Bağlanış</label>
+        <div class="time-wheel" data-time data-default="18:00">
+          <input type="hidden" name="hoursEnd" value="18:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">18:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Photo URL</label>
+        <input type="text" name="photo">
+      </div>
+      <button class="btn btn-filter" type="submit">Əlavə et</button>
     </div>
-    <div class="filter-field grow">
-      <label>Ünvan</label>
-      <input type="text" name="address">
-    </div>
-    <div class="filter-field">
-      <label>Lat</label>
-      <input type="text" name="lat" placeholder="40.37">
-    </div>
-    <div class="filter-field">
-      <label>Lng</label>
-      <input type="text" name="lng" placeholder="49.83">
-    </div>
-    <div class="filter-field">
-      <label>Telefon</label>
-      <input type="text" name="contactPhone" placeholder="+99470xxxxxxx">
-    </div>
-    <div class="filter-field">
-      <label>Açılış</label>
-      <input type="time" name="hoursStart" step="60" value="09:00">
-    </div>
-    <div class="filter-field">
-      <label>Bağlanış</label>
-      <input type="time" name="hoursEnd" step="60" value="18:00">
-    </div>
-    <div class="filter-field grow">
-      <label>Photo URL</label>
-      <input type="text" name="photo">
-    </div>
-    <label class="filter-field"><input type="checkbox" name="active" value="true" checked> ACTIVE</label>
-    <button class="btn btn-filter" type="submit">Branch əlavə et</button>
   </form>
 
   <div class="card">
@@ -94,8 +125,8 @@
       <table class="data-table">
         <thead>
         <tr>
-          <th>ID</th><th>Branch</th><th>Ünvan</th><th>Telefon</th><th>Saat</th>
-          <th>Məkan</th><th>Status</th>
+          <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th><th>Saat</th>
+          <th>Məkan</th>
         </tr>
         </thead>
         <tbody>
@@ -106,50 +137,52 @@
           <td th:text="${b.contactPhone != null} ? ${b.contactPhone} : '—'">—</td>
           <td th:text="${b.workingHours != null} ? ${b.workingHours} : '—'">—</td>
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
-          <td th:text="${b.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(branches)}"><td colspan="7">Branch yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="6">Şöbə yoxdur</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <h2>Staff</h2>
-  <form class="filter-bar" method="post" th:action="@{/admin/booking-partners/{id}/staff(id=${partner.id})}">
-    <div class="filter-field">
-      <label>Rol</label>
-      <select name="role" required>
-        <option value="PARTNER_ADMIN" th:disabled="${partner.hqUserId != null}">PARTNER_ADMIN (HQ)</option>
-        <option value="BRANCH_ADMIN">BRANCH_ADMIN</option>
-      </select>
+  <h2 class="booking-sec">Staff</h2>
+  <form class="booking-form" method="post" th:action="@{/admin/booking-partners/{id}/staff(id=${partner.id})}">
+    <div class="booking-form-title">Yeni staff</div>
+    <div class="booking-form-grid booking-form-grid-staff">
+      <div class="filter-field">
+        <label>Rol</label>
+        <select name="role" required>
+          <option value="PARTNER_ADMIN" th:disabled="${partner.hqUserId != null}">PARTNER_ADMIN (HQ)</option>
+          <option value="BRANCH_ADMIN">BRANCH_ADMIN</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Şöbə</label>
+        <select name="branchId">
+          <option value="">HQ</option>
+          <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}">branch</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Telefon</label>
+        <input type="text" name="phoneNumber" required placeholder="+99470xxxxxxx">
+      </div>
+      <div class="filter-field">
+        <label>Ad</label>
+        <input type="text" name="name">
+      </div>
+      <div class="filter-field">
+        <label>Soyad</label>
+        <input type="text" name="surname">
+      </div>
+      <button class="btn btn-filter" type="submit">Yarat</button>
     </div>
-    <div class="filter-field">
-      <label>Branch (branch admin)</label>
-      <select name="branchId">
-        <option value="">—</option>
-        <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}">branch</option>
-      </select>
-    </div>
-    <div class="filter-field">
-      <label>Telefon</label>
-      <input type="text" name="phoneNumber" required placeholder="+99470xxxxxxx">
-    </div>
-    <div class="filter-field">
-      <label>Ad</label>
-      <input type="text" name="name">
-    </div>
-    <div class="filter-field">
-      <label>Soyad</label>
-      <input type="text" name="surname">
-    </div>
-    <button class="btn btn-filter" type="submit">Staff yarat</button>
   </form>
 
   <div class="card">
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-        <tr><th>User</th><th>Rol</th><th>Branch</th><th>Telefon</th><th>Status</th></tr>
+        <tr><th>User</th><th>Rol</th><th>Şöbə</th><th>Telefon</th><th>Status</th></tr>
         </thead>
         <tbody>
         <tr th:each="s : ${staff}">
@@ -159,13 +192,13 @@
           <td th:text="${s.phoneNumber}">+994</td>
           <td th:text="${s.status}">INVITED</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(staff)}"><td colspan="5">Staff yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="5">Staff yoxdur</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <h2>Audit</h2>
+  <h2 class="booking-sec">Audit</h2>
   <div class="card">
     <div class="table-wrap">
       <table class="data-table">
@@ -183,13 +216,15 @@
           <td th:text="${a.success == null} ? '—' : (${a.success} ? 'ok' : 'fail')">ok</td>
           <td th:text="${a.detail}">—</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(audit)}"><td colspan="8">Audit yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(audit)}"><td colspan="8">Audit yoxdur</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </main>
+<script src="/admin/admin.js?v=booking1"></script>
 <script>
+  CarlandAdmin.initTimeWheels();
   const copyBtn = document.getElementById('copyOneTime');
   if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
