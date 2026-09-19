@@ -102,6 +102,9 @@ hyper:
   auth:
     base-url: https://api.hyper.az
     token-url: /partner/v1/oauth/token
+  api-client-id: ${HYPER_API_CLIENT_ID:}
+  api-client-secret: ${HYPER_API_CLIENT_SECRET:}
+  webhook-secret: ${HYPER_WEBHOOK_SECRET:}
 
 brevo:
   api-key: ${BREVO_API_KEY}

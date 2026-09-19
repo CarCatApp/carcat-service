@@ -14,7 +14,6 @@ import com.carland.carland_service.service.PartnerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 /**
  * tr: İş ortaklarını (Partner) yöneten servis; süper admin yetkisiyle partner oluşturma ve güncelleme işlemlerini yapar, isim+source ikilisinin benzersizliğini kontrol eder.
@@ -51,13 +50,9 @@ public class PartnerServiceImpl implements PartnerService {
 
         Partner partner = Partner.builder()
                 .name(name)
-                .dealer(request.getDealer())
                 .logoUrl(request.getLogoUrl())
                 .active(request.getActive() != null ? request.getActive() : true)
                 .source(source)
-                .webhookSecret(request.getWebhookSecret())
-                .apiClientId(trimToNull(request.getApiClientId()))
-                .apiClientSecret(trimToNull(request.getApiClientSecret()))
                 .build();
 
         Partner saved = partnerRepository.save(partner);
@@ -97,25 +92,11 @@ public class PartnerServiceImpl implements PartnerService {
             partner.setSource(newSource);
         }
 
-        if (request.getDealer() != null) {
-            partner.setDealer(request.getDealer());
-        }
         if (request.getLogoUrl() != null) {
             partner.setLogoUrl(request.getLogoUrl());
         }
         if (request.getActive() != null) {
             partner.setActive(request.getActive());
-        }
-        if (request.getWebhookSecret() != null) {
-            partner.setWebhookSecret(StringUtils.hasText(request.getWebhookSecret())
-                    ? request.getWebhookSecret().trim()
-                    : null);
-        }
-        if (request.getApiClientId() != null) {
-            partner.setApiClientId(trimToNull(request.getApiClientId()));
-        }
-        if (request.getApiClientSecret() != null) {
-            partner.setApiClientSecret(trimToNull(request.getApiClientSecret()));
         }
 
         Partner saved = partnerRepository.save(partner);
@@ -134,18 +115,10 @@ public class PartnerServiceImpl implements PartnerService {
                 .partner(PartnerDataResponse.builder()
                         .id(partner.getId())
                         .name(partner.getName())
-                        .dealer(partner.getDealer())
                         .logoUrl(partner.getLogoUrl())
                         .active(partner.getActive())
                         .source(partner.getSource())
                         .build())
                 .build();
-    }
-
-    private static String trimToNull(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
     }
 }

@@ -8,6 +8,7 @@ import com.carland.carland_service.feign.HyperAuthClient;
 import com.carland.carland_service.repository.PartnerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,14 +20,14 @@ import org.springframework.util.StringUtils;
 
 /**
  * Manages OAuth tokens for outbound partner API calls (currently Hyper).
- * Credentials are loaded from {@code partners.api_client_id} / {@code api_client_secret}.
+ * Credentials come from env ({@code HYPER_API_CLIENT_ID} / {@code HYPER_API_CLIENT_SECRET}).
  *
  * tr: Dışa giden partner API çağrıları (şu an Hyper) için OAuth token'larını yönetir: token'ı
  *     client_credentials akışıyla alır, cache'te saklar ve zamanlanmış görevle periyodik yeniler.
- *     Kimlik bilgileri partners tablosundaki api_client_id / api_client_secret alanlarından okunur.
+ *     Kimlik bilgileri env'den okunur (partners tablosunda secret kolon yok).
  * en: Manages OAuth tokens for outbound partner API calls (currently Hyper): obtains the token via
  *     the client_credentials flow, stores it in a cache, and refreshes it periodically with a
- *     scheduled task. Credentials are read from the partners table's api_client_id / api_client_secret.
+ *     scheduled task. Credentials are read from env (no secret columns on partners).
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +39,12 @@ public class HyperTokenService {
     private final HyperAuthClient hyperAuthClient;
     private final PartnerRepository partnerRepository;
     private final CacheManager cacheManager;
+
+    @Value("${hyper.api-client-id:}")
+    private String hyperApiClientId;
+
+    @Value("${hyper.api-client-secret:}")
+    private String hyperApiClientSecret;
 
     /**
      * tr: Zamanlanmış görev (59 dakikada bir): Hyper partneri için token'ı yeniden alır ve cache'i günceller.
@@ -112,11 +119,14 @@ public class HyperTokenService {
             throw new MissingFieldException("Partner is not active for partnerId=" + partnerId);
         }
 
-        String clientId = partner.getApiClientId();
-        String clientSecret = partner.getApiClientSecret();
+        if (!PartnerId.HYPER.getId().equals(partnerId)) {
+            throw new MissingFieldException("OAuth credentials are only configured for Hyper, partnerId=" + partnerId);
+        }
+        String clientId = hyperApiClientId;
+        String clientSecret = hyperApiClientSecret;
         if (!StringUtils.hasText(clientId) || !StringUtils.hasText(clientSecret)) {
             throw new MissingFieldException(
-                    "partners.api_client_id and api_client_secret must be configured for partnerId=" + partnerId
+                    "HYPER_API_CLIENT_ID and HYPER_API_CLIENT_SECRET must be configured for partnerId=" + partnerId
             );
         }
 

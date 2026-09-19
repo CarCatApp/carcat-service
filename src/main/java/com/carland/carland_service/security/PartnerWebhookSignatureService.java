@@ -1,12 +1,14 @@
 package com.carland.carland_service.security;
 
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,6 +30,9 @@ public class PartnerWebhookSignatureService {
     private final PartnerRepository partnerRepository;
     private final HmacSignatureValidator hmacSignatureValidator;
     private final ObjectMapper objectMapper;
+
+    @Value("${hyper.webhook-secret:}")
+    private String hyperWebhookSecret;
 
     /**
      * tr: Sırasıyla kontrol eder: partnerId çözülemezse MISSING_PARTNER_ID, partner yoksa PARTNER_NOT_FOUND,
@@ -52,7 +57,7 @@ public class PartnerWebhookSignatureService {
             return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_INACTIVE, partnerId);
         }
 
-        String secret = partner.getWebhookSecret();
+        String secret = resolveWebhookSecret(partnerId);
         if (!StringUtils.hasText(secret)) {
             return WebhookAuthValidationResult.failure(WebhookAuthFailure.PARTNER_WEBHOOK_SECRET_NOT_CONFIGURED, partnerId);
         }
@@ -66,7 +71,7 @@ public class PartnerWebhookSignatureService {
         byte[] payload = hmacSignatureValidator.resolvePayload(request, body);
         if (!hmacSignatureValidator.isValid(secret, payload, provided.trim())) {
             log.warn(
-                    "Partner webhook signature mismatch: partnerId={}, secretSource=db, secretLength={}, path={}, payloadBytes={}, payloadSha256Prefix={}",
+                    "Partner webhook signature mismatch: partnerId={}, secretSource=env, secretLength={}, path={}, payloadBytes={}, payloadSha256Prefix={}",
                     partnerId,
                     secret.length(),
                     request.getRequestURI(),
@@ -93,6 +98,13 @@ public class PartnerWebhookSignatureService {
             }
         }
         return extractPartnerIdFromBody(body);
+    }
+
+    private String resolveWebhookSecret(Long partnerId) {
+        if (PartnerId.HYPER.getId().equals(partnerId)) {
+            return hyperWebhookSecret;
+        }
+        return null;
     }
 
     /**

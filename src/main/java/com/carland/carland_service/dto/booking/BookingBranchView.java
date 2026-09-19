@@ -22,6 +22,5 @@ public class BookingBranchView {
     String contactPhone;
     String workingHours;
     String photo;
-    Double rating;
     Integer ratingCount;
 }

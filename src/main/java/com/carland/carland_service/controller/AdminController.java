@@ -374,7 +374,6 @@ public class AdminController {
             byId.put(partner.getId(), PartnerDataResponse.builder()
                     .id(partner.getId())
                     .name(partner.getName())
-                    .dealer(partner.getDealer())
                     .logoUrl(partner.getLogoUrl())
                     .active(partner.getActive())
                     .source(partner.getSource())

@@ -5,10 +5,12 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * tr: Partner şubesi (List of Branch). {@code partners} kaydına bağlıdır.
- * en: Partner branch (List of Branch). Belongs to a {@code partners} row.
+ * tr: Partner şubesi. {@code ratingCount} ortalama puan (daha sonra Rating listesinden hesaplanır).
+ * en: Partner branch. {@code ratingCount} is the average score (later derived from the Rating list).
  */
 @Entity
 @Data
@@ -48,12 +50,19 @@ public class Branch {
     @Column(length = 512)
     String photo;
 
-    /** Filled by customer votes later; admin does not set this. */
-    Double rating;
-
+    /**
+     * Average score from {@link Rating} rows. Recalc method comes later (PO).
+     * Column name is historical: it is the average, not the number of ratings.
+     */
     @Builder.Default
     @Column(name = "rating_count")
     Integer ratingCount = 0;
+
+    @OneToMany(mappedBy = "branch")
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Rating> ratings = new ArrayList<>();
 
     @Builder.Default
     @Column(nullable = false)

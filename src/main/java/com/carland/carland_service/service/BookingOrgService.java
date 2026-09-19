@@ -268,7 +268,6 @@ public class BookingOrgService {
                 .contactPhone(branch.getContactPhone())
                 .workingHours(branch.getWorkingHours())
                 .photo(branch.getPhoto())
-                .rating(branch.getRating())
                 .ratingCount(branch.getRatingCount())
                 .build();
     }

@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * tr: {@code partners} tablosu — Hyper entegrasyon + booking org (HQ) aynı kayıt.
- * en: {@code partners} table — Hyper integration and booking org (HQ) share one row.
+ * tr: {@code partners} tablosu — booking HQ + entegrasyon kaydı (secret kolon yok; env).
+ * en: {@code partners} table — booking HQ + integration row (no secret columns; env).
  */
 @Entity
 @Data
@@ -27,14 +27,9 @@ public class Partner {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    /** Display name (e.g. HyperService, AvtoVaz). */
     @Column(nullable = false)
     String name;
 
-    /** Branch / workshop name (e.g. Babək Ekspress). Nullable when unknown. */
-    String dealer;
-
-    /** Optional branding asset for mobile (Screen 2 logo). Booking admin "Photo URL" writes here. */
     String logoUrl;
 
     @Column(name = "contact_phone", length = 32)
@@ -47,26 +42,9 @@ public class Partner {
     @Column(nullable = false)
     Boolean active = true;
 
-    /** Integration source (e.g. hyper, avtovaz, carcat). */
     @Column(nullable = false)
     String source;
 
-    /** HMAC secret for partner webhook requests (X-Signature). */
-    @ToString.Exclude
-    @Column(name = "webhook_secret")
-    String webhookSecret;
-
-    /** OAuth client id for outbound API calls to this partner (e.g. Hyper). */
-    @ToString.Exclude
-    @Column(name = "api_client_id")
-    String apiClientId;
-
-    /** OAuth client secret for outbound API calls to this partner. */
-    @ToString.Exclude
-    @Column(name = "api_client_secret")
-    String apiClientSecret;
-
-    /** Auth users.id of the single HQ / partner admin. */
     @Column(name = "hq_user_id", unique = true)
     Long hqUserId;
 

@@ -38,6 +38,14 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS hq_user_id int8");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS created_at timestamp");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS updated_at timestamp");
+        jdbc.execute("ALTER TABLE partners DROP COLUMN IF EXISTS dealer");
+        jdbc.execute("ALTER TABLE partners DROP COLUMN IF EXISTS webhook_secret");
+        jdbc.execute("ALTER TABLE partners DROP COLUMN IF EXISTS api_client_id");
+        jdbc.execute("ALTER TABLE partners DROP COLUMN IF EXISTS api_client_secret");
+        if (tableExists("branches")) {
+            jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS photos");
+            jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS rating");
+        }
         clearOrphanBranchIds();
 
         if (!tableExists("booking_partners") && !tableExists("booking_branches")) {
