@@ -74,24 +74,16 @@
       <input type="text" name="contactPhone" placeholder="+99470xxxxxxx">
     </div>
     <div class="filter-field">
-      <label>Working hours</label>
-      <input type="text" name="workingHours" placeholder="09:00-18:00">
+      <label>Açılış</label>
+      <input type="time" name="hoursStart" step="60" value="09:00">
+    </div>
+    <div class="filter-field">
+      <label>Bağlanış</label>
+      <input type="time" name="hoursEnd" step="60" value="18:00">
     </div>
     <div class="filter-field grow">
       <label>Photo URL</label>
       <input type="text" name="photo">
-    </div>
-    <div class="filter-field grow">
-      <label>Photos (URL, sətir-sətir)</label>
-      <input type="text" name="photos">
-    </div>
-    <div class="filter-field">
-      <label>Rating</label>
-      <input type="text" name="rating" placeholder="0">
-    </div>
-    <div class="filter-field">
-      <label>Rating count</label>
-      <input type="text" name="ratingCount" placeholder="0">
     </div>
     <label class="filter-field"><input type="checkbox" name="active" value="true" checked> ACTIVE</label>
     <button class="btn btn-filter" type="submit">Branch əlavə et</button>
@@ -103,7 +95,7 @@
         <thead>
         <tr>
           <th>ID</th><th>Branch</th><th>Ünvan</th><th>Telefon</th><th>Saat</th>
-          <th>Rating</th><th>Məkan</th><th>Status</th>
+          <th>Məkan</th><th>Status</th>
         </tr>
         </thead>
         <tbody>
@@ -113,11 +105,10 @@
           <td th:text="${b.address}">—</td>
           <td th:text="${b.contactPhone != null} ? ${b.contactPhone} : '—'">—</td>
           <td th:text="${b.workingHours != null} ? ${b.workingHours} : '—'">—</td>
-          <td th:text="${b.rating != null} ? ${b.rating} + ' (' + ${b.ratingCount} + ')' : '—'">—</td>
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
           <td th:text="${b.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</td>
         </tr>
-        <tr th:if="${#lists.isEmpty(branches)}"><td colspan="8">Branch yoxdur</td></tr>
+        <tr th:if="${#lists.isEmpty(branches)}"><td colspan="7">Branch yoxdur</td></tr>
         </tbody>
       </table>
     </div>

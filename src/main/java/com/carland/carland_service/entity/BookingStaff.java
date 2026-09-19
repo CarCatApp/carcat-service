@@ -33,17 +33,19 @@ public class BookingStaff {
     Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "partner_id", nullable = false)
+    @JoinColumn(name = "partner_id", nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    BookingPartner partner;
+    Partner partner;
 
     /** Null = partner admin (all branches). */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id")
+    @JoinColumn(name = "branch_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    BookingBranch branch;
+    Branch branch;
 
     @Column(nullable = false, length = 32)
     String role;

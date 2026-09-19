@@ -1,7 +1,7 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
-import com.carland.carland_service.entity.BookingPartner;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.BookingOrgService;
 import com.carland.carland_service.service.BookingStaffAuditService;
@@ -44,7 +44,7 @@ public class BookingAdminController {
         if (!adminAccessService.isPanelAdmin(request)) {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
-        BookingPartner partner = bookingOrgService.getPartner(id);
+        Partner partner = bookingOrgService.getPartner(id);
         model.addAttribute("partner", partner);
         model.addAttribute("branches", bookingOrgService.listBranches(id));
         model.addAttribute("staff", bookingOrgService.listStaff(id));
@@ -66,7 +66,7 @@ public class BookingAdminController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         try {
-            BookingPartner created = bookingOrgService.createPartner(
+            Partner created = bookingOrgService.createPartner(
                     name, active != null, photo, contactPhone, contactEmail);
             return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + created.getId();
         } catch (RuntimeException ex) {
@@ -84,11 +84,9 @@ public class BookingAdminController {
             @RequestParam(required = false) String lng,
             @RequestParam(required = false) String active,
             @RequestParam(required = false) String contactPhone,
-            @RequestParam(required = false) String workingHours,
+            @RequestParam(required = false) String hoursStart,
+            @RequestParam(required = false) String hoursEnd,
             @RequestParam(required = false) String photo,
-            @RequestParam(required = false) String photos,
-            @RequestParam(required = false) String rating,
-            @RequestParam(required = false) String ratingCount,
             HttpServletRequest request,
             RedirectAttributes redirect
     ) {
@@ -97,7 +95,7 @@ public class BookingAdminController {
         }
         try {
             bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), active != null,
-                    contactPhone, workingHours, photo, photos, parseDouble(rating), parseInteger(ratingCount));
+                    contactPhone, joinWorkingHours(hoursStart, hoursEnd), photo);
             redirect.addFlashAttribute("detailMessage", "Branch əlavə olundu");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
@@ -131,23 +129,37 @@ public class BookingAdminController {
         return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
     }
 
+    private static String joinWorkingHours(String start, String end) {
+        boolean hasStart = start != null && !start.isBlank();
+        boolean hasEnd = end != null && !end.isBlank();
+        if (!hasStart && !hasEnd) {
+            return null;
+        }
+        if (!hasStart || !hasEnd) {
+            return null;
+        }
+        String from = normalizeClock(start);
+        String to = normalizeClock(end);
+        if (from == null || to == null) {
+            return null;
+        }
+        return from + "-" + to;
+    }
+
+    private static String normalizeClock(String raw) {
+        String value = raw.trim();
+        if (value.length() >= 5) {
+            return value.substring(0, 5);
+        }
+        return null;
+    }
+
     private static Double parseDouble(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
         try {
             return Double.valueOf(raw.trim().replace(",", "."));
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
-    private static Integer parseInteger(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return Integer.valueOf(raw.trim());
         } catch (NumberFormatException ex) {
             return null;
         }

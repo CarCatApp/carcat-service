@@ -1,16 +1,16 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingBranchView;
-import com.carland.carland_service.entity.BookingBranch;
-import com.carland.carland_service.entity.BookingPartner;
+import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BookingStaff;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.feign.AuthStaffFeign;
-import com.carland.carland_service.repository.BookingBranchRepository;
-import com.carland.carland_service.repository.BookingPartnerRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
+import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.PartnerRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,8 +27,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BookingOrgServiceVisibilityTest {
 
-    @Mock BookingPartnerRepository partnerRepository;
-    @Mock BookingBranchRepository branchRepository;
+    @Mock PartnerRepository partnerRepository;
+    @Mock BranchRepository branchRepository;
     @Mock BookingStaffRepository staffRepository;
     @Mock AuthStaffFeign authStaffFeign;
     @Mock BookingStaffAuditService staffAuditService;
@@ -42,9 +42,9 @@ class BookingOrgServiceVisibilityTest {
 
     @Test
     void partnerAdminSeesAllBranches() {
-        BookingPartner partner = BookingPartner.builder().id(1L).name("HS").active(true).build();
-        BookingBranch a = BookingBranch.builder().id(10L).name("A").partner(partner).active(true).build();
-        BookingBranch b = BookingBranch.builder().id(11L).name("B").partner(partner).active(false).build();
+        Partner partner = Partner.builder().id(1L).name("HS").active(true).source("hyper").build();
+        Branch a = Branch.builder().id(10L).name("A").partner(partner).active(true).build();
+        Branch b = Branch.builder().id(11L).name("B").partner(partner).active(false).build();
         BookingStaff hq = BookingStaff.builder()
                 .userId(9L)
                 .partner(partner)
@@ -63,8 +63,8 @@ class BookingOrgServiceVisibilityTest {
 
     @Test
     void branchAdminSeesOnlyOwnBranch() {
-        BookingPartner partner = BookingPartner.builder().id(1L).name("HS").active(true).build();
-        BookingBranch mine = BookingBranch.builder().id(10L).name("Mine").partner(partner).active(true).build();
+        Partner partner = Partner.builder().id(1L).name("HS").active(true).source("hyper").build();
+        Branch mine = Branch.builder().id(10L).name("Mine").partner(partner).active(true).build();
         BookingStaff row = BookingStaff.builder()
                 .userId(8L)
                 .partner(partner)
@@ -82,7 +82,7 @@ class BookingOrgServiceVisibilityTest {
 
     @Test
     void inactivePartnerHidesBranches() {
-        BookingPartner partner = BookingPartner.builder().id(1L).name("HS").active(false).build();
+        Partner partner = Partner.builder().id(1L).name("HS").active(false).source("hyper").build();
         BookingStaff hq = BookingStaff.builder()
                 .userId(9L)
                 .partner(partner)

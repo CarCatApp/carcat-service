@@ -4,9 +4,9 @@ import com.carland.carland_service.dto.booking.BookingBranchView;
 import com.carland.carland_service.dto.booking.StaffDisableRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
-import com.carland.carland_service.entity.BookingBranch;
-import com.carland.carland_service.entity.BookingPartner;
+import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BookingStaff;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
 import com.carland.carland_service.exceptions.ConflictException;
@@ -14,9 +14,9 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.feign.AuthStaffFeign;
-import com.carland.carland_service.repository.BookingBranchRepository;
-import com.carland.carland_service.repository.BookingPartnerRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
+import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.util.PhoneNumbers;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -36,19 +36,21 @@ import java.util.Map;
 @Slf4j
 public class BookingOrgService {
 
-    private final BookingPartnerRepository partnerRepository;
-    private final BookingBranchRepository branchRepository;
+    private static final String ADMIN_CREATED_SOURCE = "carcat";
+
+    private final PartnerRepository partnerRepository;
+    private final BranchRepository branchRepository;
     private final BookingStaffRepository staffRepository;
     private final AuthStaffFeign authStaffFeign;
     private final BookingStaffAuditService staffAuditService;
 
     @Transactional(readOnly = true)
-    public List<BookingPartner> listPartners() {
+    public List<Partner> listPartners() {
         return partnerRepository.findAllByOrderByIdDesc();
     }
 
     @Transactional(readOnly = true)
-    public BookingPartner getPartner(Long id) {
+    public Partner getPartner(Long id) {
         return partnerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Partner tapılmadı"));
     }
@@ -59,35 +61,39 @@ public class BookingOrgService {
     }
 
     @Transactional(readOnly = true)
-    public List<BookingBranch> listBranches(Long partnerId) {
+    public List<Branch> listBranches(Long partnerId) {
         getPartner(partnerId);
         return branchRepository.findByPartnerIdOrderByIdAsc(partnerId);
     }
 
     @Transactional
-    public BookingPartner createPartner(String name, boolean active, String photo, String contactPhone, String contactEmail) {
+    public Partner createPartner(String name, boolean active, String photo, String contactPhone, String contactEmail) {
         if (name == null || name.isBlank()) {
             throw new MissingFieldException("Partner adı boş ola bilməz");
         }
-        BookingPartner partner = BookingPartner.builder()
-                .name(name.trim())
+        String trimmed = name.trim();
+        if (partnerRepository.findFirstByNameIgnoreCase(trimmed).isPresent()) {
+            throw new ConflictException("Bu adla partner artıq var — mövcud qeydi açın");
+        }
+        Partner partner = Partner.builder()
+                .name(trimmed)
                 .active(active)
-                .photo(blankToNull(photo))
+                .logoUrl(blankToNull(photo))
                 .contactPhone(blankToNull(contactPhone))
                 .contactEmail(blankToNull(contactEmail))
+                .source(ADMIN_CREATED_SOURCE)
                 .build();
         return partnerRepository.save(partner);
     }
 
     @Transactional
-    public BookingBranch addBranch(Long partnerId, String name, String address, Double lat, Double lng, boolean active,
-                                   String contactPhone, String workingHours, String photo, String photos,
-                                   Double rating, Integer ratingCount) {
-        BookingPartner partner = getPartner(partnerId);
+    public Branch addBranch(Long partnerId, String name, String address, Double lat, Double lng, boolean active,
+                            String contactPhone, String workingHours, String photo) {
+        Partner partner = getPartner(partnerId);
         if (name == null || name.isBlank()) {
             throw new MissingFieldException("Branch adı boş ola bilməz");
         }
-        BookingBranch branch = BookingBranch.builder()
+        Branch branch = Branch.builder()
                 .partner(partner)
                 .name(name.trim())
                 .address(blankToNull(address))
@@ -97,9 +103,6 @@ public class BookingOrgService {
                 .contactPhone(blankToNull(contactPhone))
                 .workingHours(blankToNull(workingHours))
                 .photo(blankToNull(photo))
-                .photos(blankToNull(photos))
-                .rating(rating)
-                .ratingCount(ratingCount == null ? 0 : ratingCount)
                 .build();
         return branchRepository.save(branch);
     }
@@ -111,13 +114,13 @@ public class BookingOrgService {
     @Transactional
     public StaffProvisionResponse addStaff(Long partnerId, Long branchId, String roleRaw, String phoneRaw,
                                            String name, String surname, String actor) {
-        BookingPartner partner = getPartner(partnerId);
+        Partner partner = getPartner(partnerId);
         String phone = PhoneNumbers.normalize(phoneRaw);
         if (phone == null) {
             throw new MissingFieldException("Telefon +994XXXXXXXXX formatında olmalıdır");
         }
         String role = roleRaw == null ? "" : roleRaw.trim().toUpperCase();
-        BookingBranch branch = null;
+        Branch branch = null;
         if (BookingStaffRole.PARTNER_ADMIN.name().equals(role)) {
             if (partner.getHqUserId() != null || staffRepository.existsByPartnerIdAndBranchIsNull(partnerId)) {
                 throw new ConflictException("Bu partnerin artıq HQ admini var");
@@ -227,31 +230,31 @@ public class BookingOrgService {
                     .toList();
         }
 
-        BookingPartner partner = rows.get(0).getPartner();
+        Partner partner = rows.get(0).getPartner();
         if (Boolean.FALSE.equals(partner.getActive())) {
             return List.of();
         }
         boolean hq = rows.stream().anyMatch(row ->
                 BookingStaffRole.PARTNER_ADMIN.name().equals(row.getRole()) && row.getBranch() == null);
-        List<BookingBranch> branches;
+        List<Branch> branches;
         if (hq) {
             branches = branchRepository.findByPartnerIdOrderByIdAsc(partner.getId());
         } else {
-            Map<Long, BookingBranch> unique = new LinkedHashMap<>();
+            Map<Long, Branch> unique = new LinkedHashMap<>();
             for (BookingStaff row : rows) {
                 if (row.getBranch() != null) {
                     unique.put(row.getBranch().getId(), row.getBranch());
                 }
             }
             branches = new ArrayList<>(unique.values());
-            branches.sort(Comparator.comparing(BookingBranch::getId));
+            branches.sort(Comparator.comparing(Branch::getId));
         }
         return branches.stream()
                 .map(branch -> toView(partner, branch))
                 .toList();
     }
 
-    private static BookingBranchView toView(BookingPartner partner, BookingBranch branch) {
+    private static BookingBranchView toView(Partner partner, Branch branch) {
         return BookingBranchView.builder()
                 .id(branch.getId())
                 .partnerId(partner.getId())

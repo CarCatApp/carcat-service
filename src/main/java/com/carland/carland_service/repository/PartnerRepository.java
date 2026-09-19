@@ -4,6 +4,7 @@ import com.carland.carland_service.entity.Partner;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -18,4 +19,10 @@ public interface PartnerRepository extends JpaRepository<Partner, Long> {
 
     /** tr: Kaynağa göre aktif partneri bulur. / en: Finds the active partner by source. */
     Optional<Partner> findBySourceIgnoreCaseAndActiveTrue(String source);
+
+    List<Partner> findAllByOrderByIdDesc();
+
+    Optional<Partner> findFirstByNameIgnoreCase(String name);
+
+    Optional<Partner> findByHqUserId(Long hqUserId);
 }

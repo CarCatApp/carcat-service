@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * tr: Booking şubesi (adres + koordinat). Hyper {@code partners} ve eski {@code auto_services} tablolarından ayrıdır.
- * en: Booking branch (address + coordinates). Separate from Hyper {@code partners} and legacy {@code auto_services}.
+ * tr: Partner şubesi (List of Branch). {@code partners} kaydına bağlıdır.
+ * en: Partner branch (List of Branch). Belongs to a {@code partners} row.
  */
 @Entity
 @Data
@@ -16,18 +16,19 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "booking_branches")
-public class BookingBranch {
+@Table(name = "branches")
+public class Branch {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "partner_id", nullable = false)
+    @JoinColumn(name = "partner_id", nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    BookingPartner partner;
+    Partner partner;
 
     @Column(nullable = false)
     String name;
@@ -47,10 +48,7 @@ public class BookingBranch {
     @Column(length = 512)
     String photo;
 
-    /** Extra photo URLs, one per line. */
-    @Column(length = 2000)
-    String photos;
-
+    /** Filled by customer votes later; admin does not set this. */
     Double rating;
 
     @Builder.Default

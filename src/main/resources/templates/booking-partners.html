@@ -67,6 +67,7 @@
         <tr>
           <th>ID</th>
           <th>Partner</th>
+          <th>Source</th>
           <th>Telefon</th>
           <th>Email</th>
           <th>Status</th>
@@ -78,6 +79,7 @@
         <tr th:each="p : ${partners}">
           <td th:text="${p.id}">1</td>
           <td th:text="${p.name}">Name</td>
+          <td th:text="${p.source != null} ? ${p.source} : '—'">—</td>
           <td th:text="${p.contactPhone != null} ? ${p.contactPhone} : '—'">—</td>
           <td th:text="${p.contactEmail != null} ? ${p.contactEmail} : '—'">—</td>
           <td th:text="${p.active} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</td>
@@ -85,7 +87,7 @@
           <td><a class="btn btn-filter" th:href="@{/admin/booking-partners/{id}(id=${p.id})}">Aç</a></td>
         </tr>
         <tr th:if="${#lists.isEmpty(partners)}">
-          <td colspan="7">Hələ Partner yoxdur</td>
+          <td colspan="8">Hələ Partner yoxdur</td>
         </tr>
         </tbody>
       </table>

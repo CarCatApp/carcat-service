@@ -1,6 +1,6 @@
 package com.carland.carland_service.service;
 
-import com.carland.carland_service.entity.BookingPartner;
+import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.BookingStaffAudit;
 import com.carland.carland_service.repository.BookingStaffAuditRepository;
@@ -41,7 +41,7 @@ class BookingStaffAuditServiceTest {
 
     @Test
     void loginResolvesPartnerFromMembership() {
-        BookingPartner partner = BookingPartner.builder().id(4L).name("HS").active(true).build();
+        Partner partner = Partner.builder().id(4L).name("HS").active(true).source("hyper").build();
         BookingStaff staff = BookingStaff.builder()
                 .userId(8L)
                 .partner(partner)
