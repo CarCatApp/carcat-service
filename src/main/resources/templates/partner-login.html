@@ -31,9 +31,7 @@
     error.hidden = true;
     const body = {
       phoneNumber: document.getElementById('phoneNumber').value,
-      password: document.getElementById('password').value,
-      deviceId: 'partner-web',
-      platform: 'WEB'
+      password: document.getElementById('password').value
     };
     try {
       const res = await fetch(AUTH + '/api/v1/staff/login', {

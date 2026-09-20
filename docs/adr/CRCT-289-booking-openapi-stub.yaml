@@ -1,0 +1,196 @@
+# CarCat booking API stub (CRCT-289)
+# Not implemented. Group A Hyper calendar producer is out of this slice.
+# Owner-app JWT = existing customer JWT. Ids are bigint as strings or numbers.
+
+openapi: 3.0.3
+info:
+  title: CarCat owner booking (stub)
+  version: "0.1.0"
+  description: |
+    CRCT-289 lock. Implement in CRCT-281…287.
+    Errors: { error, message, details }. Money: integer qəpik. Zone: Asia/Baku.
+    Feature flag: booking.
+
+servers:
+  - url: /api/v1
+
+paths:
+  /partners:
+    get:
+      summary: Discover partners (CRCT-281)
+      tags: [GroupB-discovery]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        "200":
+          description: Partner list (bigint ids)
+        "404":
+          description: booking flag off or empty
+
+  /partners/{partnerId}:
+    get:
+      summary: Partner + branches
+      tags: [GroupB-discovery]
+      parameters:
+        - in: path
+          name: partnerId
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: Partner }
+        "404": { description: Not found }
+
+  /branches/{branchId}:
+    get:
+      summary: Branch profile
+      tags: [GroupB-discovery]
+      parameters:
+        - in: path
+          name: branchId
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: Branch }
+
+  /branches/{branchId}/catalog:
+    get:
+      summary: Packages + services (CRCT-282)
+      tags: [GroupB-catalog]
+      parameters:
+        - in: path
+          name: branchId
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: serviceKey list pkg: / svc: / dir:
+
+  /branches/{branchId}/availability:
+    get:
+      summary: Slots = ranges (CRCT-283)
+      tags: [GroupB-availability]
+      parameters:
+        - in: path
+          name: branchId
+          required: true
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: serviceKeys
+          schema: { type: string }
+          description: CSV
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: slotId is rangeId; capacity is workerCount
+
+  /bookings/quote:
+    post:
+      summary: Price range (CRCT-284)
+      tags: [GroupB-booking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "200": { description: priceMin / priceMax qəpik }
+
+  /bookings:
+    post:
+      summary: Create booking (CRCT-284)
+      tags: [GroupB-booking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: |
+            instant slot → confirmed; approval slot → pending.
+            Body includes ref CC-######.
+    get:
+      summary: My bookings (CRCT-285)
+      tags: [GroupB-booking]
+      responses:
+        "200": { description: List }
+
+  /bookings/{bookingId}:
+    get:
+      summary: Booking detail
+      tags: [GroupB-booking]
+      parameters:
+        - in: path
+          name: bookingId
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: Detail }
+
+  /bookings/{bookingId}/cancel:
+    post:
+      summary: Customer cancel (CRCT-285)
+      tags: [GroupB-booking]
+      responses:
+        "200": { description: Cancelled }
+        "409": { description: Past or completed }
+
+  /bookings/{bookingId}/messages:
+    get:
+      summary: Chat (CRCT-286)
+      tags: [GroupB-chat]
+      responses:
+        "200": { description: Messages in CarCat DB }
+    post:
+      summary: Send chat
+      tags: [GroupB-chat]
+      responses:
+        "201": { description: Stored }
+
+  /staff/bookings/{bookingId}/accept:
+    post:
+      summary: Approval slot accept (CarCat only)
+      tags: [GroupB-staff]
+      responses:
+        "200": { description: confirmed }
+
+  /staff/bookings/{bookingId}/reject:
+    post:
+      summary: Approval slot reject
+      tags: [GroupB-staff]
+      responses:
+        "200": { description: rejected }
+
+components:
+  schemas:
+    QuoteRequest:
+      type: object
+      required: [branchId, slotId, serviceKeys]
+      properties:
+        branchId: { type: integer, format: int64 }
+        slotId: { type: integer, format: int64, description: ranges.range_id }
+        serviceKeys:
+          type: array
+          items: { type: string }
+    CreateBookingRequest:
+      allOf:
+        - $ref: "#/components/schemas/QuoteRequest"
+        - type: object
+          properties:
+            vin: { type: string }
+            carId: { type: integer, format: int64 }
+    ErrorBody:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+        details: { type: object }
