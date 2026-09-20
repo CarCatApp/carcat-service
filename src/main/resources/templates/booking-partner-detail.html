@@ -182,17 +182,19 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-        <tr><th>User</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Status</th></tr>
+        <tr><th>User</th><th>Ad</th><th>Soyad</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Status</th></tr>
         </thead>
         <tbody>
         <tr th:each="s : ${staff}">
           <td th:text="${s.userId}">1</td>
+          <td th:text="${#strings.isEmpty(s.name) ? '—' : s.name}">—</td>
+          <td th:text="${#strings.isEmpty(s.surname) ? '—' : s.surname}">—</td>
           <td th:text="${s.role}">ROLE</td>
           <td th:text="${s.role == 'PARTNER_ADMIN'} ? 'Tüm partner şubeleri' : (${s.branch != null} ? ${s.branch.name} : '—')">—</td>
           <td th:text="${s.phoneNumber}">+994</td>
           <td th:text="${s.status}">INVITED</td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="5">Staff yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="7">Staff yoxdur</td></tr>
         </tbody>
       </table>
     </div>
