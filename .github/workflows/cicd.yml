@@ -22,12 +22,23 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle
 
       - name: Grant execute permission
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: bash gradlew clean build -x test
+        run: |
+          n=0
+          until bash gradlew clean build -x test; do
+            n=$((n+1))
+            if [ "$n" -ge 3 ]; then
+              echo "Gradle build failed after $n attempts"
+              exit 1
+            fi
+            echo "Gradle attempt $n failed (often wrapper download). Retrying in 20s..."
+            sleep 20
+          done
 
       # VERSION
       - name: Calculate version

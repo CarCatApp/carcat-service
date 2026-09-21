@@ -39,11 +39,21 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
 
       - name: Build jar
         run: |
           chmod +x gradlew
-          ./gradlew clean bootJar -x test
+          n=0
+          until ./gradlew clean bootJar -x test; do
+            n=$((n+1))
+            if [ "$n" -ge 3 ]; then
+              echo "Gradle build failed after $n attempts"
+              exit 1
+            fi
+            echo "Gradle attempt $n failed (often wrapper download). Retrying in 20s..."
+            sleep 20
+          done
 
       - name: Login Docker Hub
         uses: docker/login-action@v3
