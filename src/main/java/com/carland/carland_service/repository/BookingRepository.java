@@ -18,6 +18,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     long countByRange_RangeIdAndStatusIn(Long rangeId, Collection<String> statuses);
 
+    long countByRange_RangeIdAndStatusInAndIdNot(Long rangeId, Collection<String> statuses, Long id);
+
     boolean existsByRef(String ref);
 
     @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})

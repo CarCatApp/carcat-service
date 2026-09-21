@@ -13,4 +13,6 @@ public interface BookingItemRepository extends JpaRepository<BookingItem, Long> 
     List<BookingItem> findByBooking_IdOrderByIdAsc(Long bookingId);
 
     List<BookingItem> findByBooking_IdIn(Collection<Long> bookingIds);
+
+    void deleteByBooking_Id(Long bookingId);
 }

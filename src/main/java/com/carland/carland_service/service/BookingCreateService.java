@@ -64,7 +64,7 @@ public class BookingCreateService {
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
-        Prepared prepared = prepare(request, false);
+        Prepared prepared = prepare(request, false, null);
         return BookingQuoteResponse.builder()
                 .branchId(prepared.branch.getId())
                 .slotId(prepared.range.getRangeId())
@@ -81,7 +81,7 @@ public class BookingCreateService {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
-        Prepared prepared = prepare(request, true);
+        Prepared prepared = prepare(request, true, null);
         Car car = requireOwnedCar(customerUserId, request);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         String mode = modeOf(prepared.range);
@@ -133,7 +133,41 @@ public class BookingCreateService {
                 .build();
     }
 
-    private Prepared prepare(BookingWriteRequest request, boolean lock) {
+    @Transactional
+    public void applyEdit(Booking booking, Long slotId, List<String> serviceKeys) {
+        if (booking == null || booking.getBranch() == null || booking.getRange() == null) {
+            throw new ResourceNotFoundException("booking not found");
+        }
+        Long targetSlot = slotId != null ? slotId : booking.getRange().getRangeId();
+        List<String> keys = normalizeKeys(serviceKeys);
+        if (keys.isEmpty()) {
+            keys = bookingItemRepository.findByBooking_IdOrderByIdAsc(booking.getId()).stream()
+                    .map(BookingItem::getServiceKey)
+                    .filter(key -> key != null && !key.isBlank())
+                    .map(String::trim)
+                    .toList();
+        }
+        Prepared prepared = prepare(BookingWriteRequest.builder()
+                .branchId(booking.getBranch().getId())
+                .slotId(targetSlot)
+                .serviceKeys(keys)
+                .build(), true, booking.getId());
+        booking.setRange(prepared.range);
+        booking.setPriceMin(prepared.priceMin);
+        booking.setPriceMax(prepared.priceMax);
+        bookingItemRepository.deleteByBooking_Id(booking.getId());
+        for (Line line : prepared.lines) {
+            bookingItemRepository.save(BookingItem.builder()
+                    .booking(booking)
+                    .serviceKey(line.key)
+                    .titleSnapshot(line.title)
+                    .priceMin(line.priceMin)
+                    .priceMax(line.priceMax)
+                    .build());
+        }
+    }
+
+    private Prepared prepare(BookingWriteRequest request, boolean lock, Long excludeBookingId) {
         if (request == null || request.getBranchId() == null || request.getSlotId() == null) {
             throw MissingFieldException.required("branchId, slotId");
         }
@@ -164,7 +198,7 @@ public class BookingCreateService {
         if (!BookingAvailabilityService.matchesKey(range.getServiceKey(), keys)) {
             throw new ConflictException("slot_unavailable");
         }
-        int remaining = remaining(range);
+        int remaining = remaining(range, excludeBookingId);
         if (remaining <= 0) {
             throw new ConflictException("capacity_full");
         }
@@ -187,11 +221,16 @@ public class BookingCreateService {
         return range;
     }
 
-    private int remaining(Range range) {
+    private int remaining(Range range, Long excludeBookingId) {
         int capacity = range.getWorkerCount() == null ? 0 : range.getWorkerCount();
         int appointments = range.getAppointments() == null ? 0 : range.getAppointments().size();
-        long live = range.getRangeId() == null ? 0
-                : bookingRepository.countByRange_RangeIdAndStatusIn(range.getRangeId(), LIVE);
+        long live = 0;
+        if (range.getRangeId() != null) {
+            live = excludeBookingId == null
+                    ? bookingRepository.countByRange_RangeIdAndStatusIn(range.getRangeId(), LIVE)
+                    : bookingRepository.countByRange_RangeIdAndStatusInAndIdNot(
+                            range.getRangeId(), LIVE, excludeBookingId);
+        }
         return Math.max(0, capacity - appointments - (int) live);
     }
 

@@ -43,7 +43,8 @@ public class BookingFlagEndpointAttacher {
             new OwnerRoute("POST", CREATE_PATH),
             new OwnerRoute("GET", CREATE_PATH),
             new OwnerRoute("GET", MINE_PATH),
-            new OwnerRoute("GET", DETAIL_PATH)
+            new OwnerRoute("GET", DETAIL_PATH),
+            new OwnerRoute("PATCH", DETAIL_PATH)
     );
 
     private final FeatureFlagRepository flagRepository;

@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.booking.BookingCarView;
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingLineView;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
+import com.carland.carland_service.dto.booking.BookingPatchRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingItem;
@@ -15,6 +16,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStatus;
+import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -54,6 +56,7 @@ public class BookingMineService {
     private final BookingRepository bookingRepository;
     private final BookingItemRepository bookingItemRepository;
     private final CarRepository carRepository;
+    private final BookingCreateService bookingCreateService;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -138,6 +141,35 @@ public class BookingMineService {
                 .unreadCount(0)
                 .canceledReason(null)
                 .build();
+    }
+
+    @Transactional
+    public BookingDetailResponse patch(Long customerUserId, String bookingKey, BookingPatchRequest request,
+                                       String timezoneHeader) {
+        if (customerUserId == null) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        if (bookingKey == null || bookingKey.isBlank()) {
+            throw MissingFieldException.required("bookingId");
+        }
+        Booking booking = loadOwned(customerUserId, bookingKey.trim());
+        String status = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
+        if (BookingStatus.COMPLETED.apiValue().equals(status)) {
+            throw new ConflictException("Completed bookings cannot be edited");
+        }
+        if (!BookingStatus.PENDING.apiValue().equals(status)
+                && !BookingStatus.CONFIRMED.apiValue().equals(status)
+                && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            throw new ConflictException("booking cannot be edited");
+        }
+        Long slotId = request == null ? null : request.getSlotId();
+        List<String> keys = request == null ? null : request.getServiceKeys();
+        boolean hasKeys = keys != null && !BookingCreateService.normalizeKeys(keys).isEmpty();
+        if (slotId == null && !hasKeys) {
+            throw MissingFieldException.required("slotId or serviceKeys");
+        }
+        bookingCreateService.applyEdit(booking, slotId, hasKeys ? keys : null);
+        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader);
     }
 
     private void requireOwnedCar(Long customerUserId, Long carId) {

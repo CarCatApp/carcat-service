@@ -2,6 +2,7 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
+import com.carland.carland_service.dto.booking.BookingPatchRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.Branch;
@@ -10,6 +11,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -36,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +48,7 @@ class BookingMineServiceTest {
     @Mock BookingRepository bookingRepository;
     @Mock BookingItemRepository bookingItemRepository;
     @Mock CarRepository carRepository;
+    @Mock BookingCreateService bookingCreateService;
 
     BookingMineService service;
     Booking booking;
@@ -52,7 +56,7 @@ class BookingMineServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new BookingMineService(bookingRepository, bookingItemRepository, carRepository);
+        service = new BookingMineService(bookingRepository, bookingItemRepository, carRepository, bookingCreateService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
@@ -208,6 +212,37 @@ class BookingMineServiceTest {
     void detailMissingIsNotFound() {
         when(bookingRepository.findById(9L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.detail(54L, "9", "Asia/Baku"));
+    }
+
+    @Test
+    void patchRejectedCannotEdit() {
+        booking.setStatus("rejected");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        assertThrows(ConflictException.class, () -> service.patch(
+                54L, "3", BookingPatchRequest.builder().slotId(88L).build(), "Asia/Baku"));
+        verify(bookingCreateService, never()).applyEdit(any(), any(), any());
+    }
+
+    @Test
+    void patchCompletedCannotEdit() {
+        booking.setStatus("completed");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        ConflictException ex = assertThrows(ConflictException.class, () -> service.patch(
+                54L, "3", BookingPatchRequest.builder().slotId(88L).build(), "Asia/Baku"));
+        assertEquals("Completed bookings cannot be edited", ex.getMessage());
+    }
+
+    @Test
+    void patchMovesSlot() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of());
+        when(carRepository.findByCarId(55L)).thenReturn(null);
+
+        BookingDetailResponse out = service.patch(
+                54L, "3", BookingPatchRequest.builder().slotId(88L).build(), "Asia/Baku");
+
+        assertEquals(3L, out.getBookingId());
+        verify(bookingCreateService).applyEdit(booking, 88L, null);
     }
 
     private void stubOwnedCar(Long carId, Long ownerUserId) {

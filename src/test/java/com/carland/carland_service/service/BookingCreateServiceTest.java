@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -196,6 +197,41 @@ class BookingCreateServiceTest {
 
         ConflictException ex = assertThrows(ConflictException.class, () -> service.quote(request()));
         assertEquals("capacity_full", ex.getMessage());
+    }
+
+    @Test
+    void applyEditSameSlotIgnoresOwnOccupancy() {
+        stubCatalogAndRange(true);
+        when(bookingRepository.countByRange_RangeIdAndStatusInAndIdNot(eq(105L), any(), eq(44L))).thenReturn(2L);
+        Booking booking = Booking.builder()
+                .id(44L)
+                .branch(branch)
+                .range(range)
+                .status("pending")
+                .build();
+
+        service.applyEdit(booking, 105L, List.of("pkg:hyper-extra"));
+
+        assertEquals(105L, booking.getRange().getRangeId());
+        assertEquals(12900, booking.getPriceMin());
+        verify(bookingItemRepository).deleteByBooking_Id(44L);
+    }
+
+    @Test
+    void applyEditFullTargetConflicts() {
+        when(rangeRepository.lockByRangeId(105L)).thenReturn(Optional.of(range));
+        when(bookingRepository.countByRange_RangeIdAndStatusInAndIdNot(eq(105L), any(), eq(44L))).thenReturn(3L);
+        Booking booking = Booking.builder()
+                .id(44L)
+                .branch(branch)
+                .range(range)
+                .status("auto_accepted")
+                .build();
+
+        ConflictException ex = assertThrows(ConflictException.class,
+                () -> service.applyEdit(booking, 105L, List.of("pkg:hyper-extra")));
+        assertEquals("capacity_full", ex.getMessage());
+        verify(bookingItemRepository, never()).deleteByBooking_Id(any());
     }
 
     private void stubOwnedCar() {
