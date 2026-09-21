@@ -15,8 +15,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,35 +32,33 @@ class BookingFlagEndpointAttacherTest {
     @InjectMocks BookingFlagEndpointAttacher attacher;
 
     @Test
-    void attachesDiscoverWhenUnclaimed() {
+    void attachesDiscoverAndCatalogWhenUnclaimed() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").defaultState(FeatureFlagState.HIDDEN).build();
-        FeatureFlagEndpoint ep = FeatureFlagEndpoint.builder()
-                .id(11L)
-                .httpMethod("GET")
-                .pathPattern(BookingFlagEndpointAttacher.DISCOVER_PATH)
-                .neverGuard(false)
-                .build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
-        when(featureFlagService.upsertEndpoint("GET", BookingFlagEndpointAttacher.DISCOVER_PATH, false)).thenReturn(ep);
+        when(featureFlagService.upsertEndpoint(eq("GET"), anyString(), eq(false)))
+                .thenAnswer(inv -> FeatureFlagEndpoint.builder()
+                        .httpMethod("GET")
+                        .pathPattern(inv.getArgument(1))
+                        .neverGuard(false)
+                        .build());
         when(roleStateRepository.existsByFlag(flag)).thenReturn(true);
 
         attacher.attachDiscover();
 
-        verify(endpointRepository).save(ep);
+        verify(endpointRepository, times(2)).save(any(FeatureFlagEndpoint.class));
         verify(featureFlagService).reloadCache();
     }
 
     @Test
     void skipsSaveWhenAlreadyAttached() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").build();
-        FeatureFlagEndpoint ep = FeatureFlagEndpoint.builder()
-                .flag(flag)
-                .httpMethod("GET")
-                .pathPattern(BookingFlagEndpointAttacher.DISCOVER_PATH)
-                .build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
-        when(featureFlagService.upsertEndpoint(eq("GET"), eq(BookingFlagEndpointAttacher.DISCOVER_PATH), eq(false)))
-                .thenReturn(ep);
+        when(featureFlagService.upsertEndpoint(eq("GET"), anyString(), eq(false)))
+                .thenAnswer(inv -> FeatureFlagEndpoint.builder()
+                        .flag(flag)
+                        .httpMethod("GET")
+                        .pathPattern(inv.getArgument(1))
+                        .build());
         when(roleStateRepository.existsByFlag(flag)).thenReturn(true);
 
         attacher.attachDiscover();

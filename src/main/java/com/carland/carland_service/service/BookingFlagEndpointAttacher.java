@@ -15,9 +15,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * tr: Discover path'i booking flag'e bağlar (scanner'dan sonra). State'i açmaz — PO/Aziz admin'den açar.
- * en: Attaches the discover path to the booking flag after scan. Does not enable the flag.
+ * tr: Owner booking path'lerini booking flag'e bağlar (scanner'dan sonra). State'i açmaz.
+ * en: Attaches owner booking paths to the booking flag after scan. Does not enable the flag.
  */
 @Slf4j
 @Component
@@ -25,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookingFlagEndpointAttacher {
 
     static final String DISCOVER_PATH = "/api/v1/booking/partners";
+    static final String CATALOG_PATH = "/api/v1/booking/branches/{branchId}/catalog";
+    static final List<String> OWNER_GET_PATHS = List.of(DISCOVER_PATH, CATALOG_PATH);
 
     private final FeatureFlagRepository flagRepository;
     private final FeatureFlagEndpointRepository endpointRepository;
@@ -39,11 +43,13 @@ public class BookingFlagEndpointAttacher {
             log.info("BOOKING_FLAG_ATTACH_SKIP flag missing");
             return;
         }
-        FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint("GET", DISCOVER_PATH, false);
-        if (endpoint.getFlag() == null || !BookingFeatureFlagSeeder.FLAG_NAME.equals(endpoint.getFlag().getName())) {
-            endpoint.setFlag(flag);
-            endpointRepository.save(endpoint);
-            log.info("BOOKING_FLAG_ATTACHED method=GET path={}", DISCOVER_PATH);
+        for (String path : OWNER_GET_PATHS) {
+            FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint("GET", path, false);
+            if (endpoint.getFlag() == null || !BookingFeatureFlagSeeder.FLAG_NAME.equals(endpoint.getFlag().getName())) {
+                endpoint.setFlag(flag);
+                endpointRepository.save(endpoint);
+                log.info("BOOKING_FLAG_ATTACHED method=GET path={}", path);
+            }
         }
         if (!roleStateRepository.existsByFlag(flag)) {
             FeatureFlagState state = flag.getDefaultState() == null ? FeatureFlagState.HIDDEN : flag.getDefaultState();
