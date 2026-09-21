@@ -69,6 +69,12 @@ public class Booking {
     @Column(name = "car_id")
     Long carId;
 
+    @Column(name = "cancel_reason_code", length = 64)
+    String cancelReasonCode;
+
+    @Column(name = "cancel_note", length = 500)
+    String cancelNote;
+
     @Column(name = "pending_expires_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime pendingExpiresAt;
 

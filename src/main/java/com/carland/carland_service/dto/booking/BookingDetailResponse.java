@@ -33,5 +33,5 @@ public class BookingDetailResponse {
     String currency;
     String unit;
     Integer unreadCount;
-    Object canceledReason;
+    BookingCanceledReasonView canceledReason;
 }

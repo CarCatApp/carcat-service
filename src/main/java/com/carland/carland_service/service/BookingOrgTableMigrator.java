@@ -39,6 +39,10 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
             jdbc.execute("UPDATE ranges SET booking_mode = 'instant' WHERE booking_mode IS NULL");
             jdbc.execute("UPDATE ranges SET service_key = '*' WHERE service_key IS NULL");
         }
+        if (tableExists("bookings")) {
+            jdbc.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancel_reason_code varchar(64)");
+            jdbc.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancel_note varchar(500)");
+        }
 
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_phone varchar(32)");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_email varchar(128)");

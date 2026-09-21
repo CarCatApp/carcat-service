@@ -1,5 +1,9 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingCancelRequest;
+import com.carland.carland_service.dto.booking.BookingCancelReasonView;
+import com.carland.carland_service.dto.booking.BookingCancelReasonsResponse;
+import com.carland.carland_service.dto.booking.BookingCanceledReasonView;
 import com.carland.carland_service.dto.booking.BookingCarView;
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingLineView;
@@ -7,6 +11,7 @@ import com.carland.carland_service.dto.booking.BookingMineResponse;
 import com.carland.carland_service.dto.booking.BookingPatchRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingCancelReason;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
@@ -20,9 +25,12 @@ import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,14 +50,16 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * tr: Owner rezervasyon listesi + detay (CRCT-285). unread=0 ta ki 286.
- * en: Owner booking list + detail (CRCT-285). unread=0 until 286.
+ * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). unread=0 ta ki 286.
+ * en: Owner booking list + detail + cancel (CRCT-285). unread=0 until 286.
  */
 @Service
 @RequiredArgsConstructor
 public class BookingMineService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
+    static final String PAST_OR_COMPLETED = "Cannot cancel a completed or past booking";
+    static final String OTHER_CODE = "other";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter STARTS = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
@@ -57,6 +67,8 @@ public class BookingMineService {
     private final BookingItemRepository bookingItemRepository;
     private final CarRepository carRepository;
     private final BookingCreateService bookingCreateService;
+    private final BookingCancelReasonRepository cancelReasonRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -139,8 +151,20 @@ public class BookingMineService {
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
-                .canceledReason(null)
+                .canceledReason(canceledReasonOf(booking))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public BookingCancelReasonsResponse cancelReasons() {
+        List<BookingCancelReasonView> items = new ArrayList<>();
+        for (BookingCancelReason row : cancelReasonRepository.findByActiveTrueOrderBySortOrderAscIdAsc()) {
+            items.add(BookingCancelReasonView.builder()
+                    .code(row.getCode())
+                    .title(titles(row.getTitleJson()))
+                    .build());
+        }
+        return BookingCancelReasonsResponse.builder().items(items).build();
     }
 
     @Transactional
@@ -169,6 +193,49 @@ public class BookingMineService {
             throw MissingFieldException.required("slotId or serviceKeys");
         }
         bookingCreateService.applyEdit(booking, slotId, hasKeys ? keys : null);
+        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader);
+    }
+
+    @Transactional
+    public BookingDetailResponse cancel(Long customerUserId, String bookingKey, BookingCancelRequest request,
+                                        String timezoneHeader) {
+        if (customerUserId == null) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        if (bookingKey == null || bookingKey.isBlank()) {
+            throw MissingFieldException.required("bookingId");
+        }
+        Booking booking = loadOwned(customerUserId, bookingKey.trim());
+        String status = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
+        if (BookingStatus.COMPLETED.apiValue().equals(status)) {
+            throw new ConflictException(PAST_OR_COMPLETED);
+        }
+        if (!BookingStatus.PENDING.apiValue().equals(status)
+                && !BookingStatus.CONFIRMED.apiValue().equals(status)
+                && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            throw new ConflictException("booking cannot be cancelled");
+        }
+        Range range = booking.getRange();
+        OffsetDateTime start = range == null ? null : range.getStart();
+        if (start == null || !start.isAfter(OffsetDateTime.now())) {
+            throw new ConflictException(PAST_OR_COMPLETED);
+        }
+        String code = request == null || request.getReason() == null ? "" : request.getReason().trim();
+        if (code.isEmpty()) {
+            throw MissingFieldException.required("reason");
+        }
+        BookingCancelReason reason = cancelReasonRepository.findByCodeAndActiveTrue(code)
+                .orElseThrow(() -> new ResourceNotFoundException("cancel reason not found"));
+        String note = request.getNote() == null ? null : request.getNote().trim();
+        if (note != null && note.isEmpty()) {
+            note = null;
+        }
+        if (OTHER_CODE.equals(reason.getCode()) && note == null) {
+            throw MissingFieldException.required("note");
+        }
+        booking.setStatus(BookingStatus.CANCELLED.apiValue());
+        booking.setCancelReasonCode(reason.getCode());
+        booking.setCancelNote(note);
         return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader);
     }
 
@@ -320,6 +387,30 @@ public class BookingMineService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .build();
+    }
+
+    private BookingCanceledReasonView canceledReasonOf(Booking booking) {
+        String code = booking.getCancelReasonCode();
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        BookingCancelReason row = cancelReasonRepository.findByCodeAndActiveTrue(code).orElse(null);
+        return BookingCanceledReasonView.builder()
+                .code(code)
+                .title(row == null ? Map.of() : titles(row.getTitleJson()))
+                .note(booking.getCancelNote())
+                .build();
+    }
+
+    private Map<String, String> titles(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
+        } catch (Exception ex) {
+            return Map.of("az", json);
+        }
     }
 
     private static String clock(OffsetDateTime utc, String timezone) {

@@ -1,9 +1,12 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingCancelRequest;
+import com.carland.carland_service.dto.booking.BookingCancelReasonsResponse;
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
 import com.carland.carland_service.dto.booking.BookingPatchRequest;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingCancelReason;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
@@ -15,9 +18,11 @@ import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +54,7 @@ class BookingMineServiceTest {
     @Mock BookingItemRepository bookingItemRepository;
     @Mock CarRepository carRepository;
     @Mock BookingCreateService bookingCreateService;
+    @Mock BookingCancelReasonRepository cancelReasonRepository;
 
     BookingMineService service;
     Booking booking;
@@ -56,7 +62,9 @@ class BookingMineServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new BookingMineService(bookingRepository, bookingItemRepository, carRepository, bookingCreateService);
+        service = new BookingMineService(
+                bookingRepository, bookingItemRepository, carRepository, bookingCreateService,
+                cancelReasonRepository, new ObjectMapper());
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
@@ -243,6 +251,101 @@ class BookingMineServiceTest {
 
         assertEquals(3L, out.getBookingId());
         verify(bookingCreateService).applyEdit(booking, 88L, null);
+    }
+
+    @Test
+    void cancelReasonsListsActive() {
+        when(cancelReasonRepository.findByActiveTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of(
+                BookingCancelReason.builder()
+                        .code("change_of_plans")
+                        .titleJson("{\"az\":\"Plan dəyişdi\",\"en\":\"Change of plans\",\"ru\":\"Планы изменились\"}")
+                        .sortOrder(1)
+                        .active(true)
+                        .build()
+        ));
+
+        BookingCancelReasonsResponse out = service.cancelReasons();
+
+        assertEquals(1, out.getItems().size());
+        assertEquals("change_of_plans", out.getItems().get(0).getCode());
+        assertEquals("Change of plans", out.getItems().get(0).getTitle().get("en"));
+    }
+
+    @Test
+    void cancelPendingBooking() {
+        stubCancelLookups();
+        when(cancelReasonRepository.findByCodeAndActiveTrue("change_of_plans"))
+                .thenReturn(Optional.of(reason("change_of_plans")));
+
+        BookingDetailResponse out = service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("change_of_plans").build(), "Asia/Baku");
+
+        assertEquals("cancelled", out.getStatus());
+        assertEquals("cancelled", booking.getStatus());
+        assertEquals("change_of_plans", booking.getCancelReasonCode());
+        assertEquals("change_of_plans", out.getCanceledReason().getCode());
+        assertEquals("Change of plans", out.getCanceledReason().getTitle().get("en"));
+    }
+
+    @Test
+    void cancelOtherRequiresNote() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(cancelReasonRepository.findByCodeAndActiveTrue("other"))
+                .thenReturn(Optional.of(reason("other")));
+
+        assertThrows(MissingFieldException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("other").build(), "Asia/Baku"));
+    }
+
+    @Test
+    void cancelCompletedIsConflict() {
+        booking.setStatus("completed");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("change_of_plans").build(), "Asia/Baku"));
+        assertEquals(BookingMineService.PAST_OR_COMPLETED, ex.getMessage());
+    }
+
+    @Test
+    void cancelPastStartIsConflict() {
+        booking.getRange().setStart(OffsetDateTime.parse("2020-01-01T05:00:00Z"));
+        booking.getRange().setEnd(OffsetDateTime.parse("2020-01-01T05:30:00Z"));
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("change_of_plans").build(), "Asia/Baku"));
+        assertEquals(BookingMineService.PAST_OR_COMPLETED, ex.getMessage());
+    }
+
+    @Test
+    void cancelRejectedIsConflict() {
+        booking.setStatus("rejected");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        assertThrows(ConflictException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("change_of_plans").build(), "Asia/Baku"));
+    }
+
+    @Test
+    void cancelUnknownReasonIsNotFound() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(cancelReasonRepository.findByCodeAndActiveTrue("nope")).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("nope").build(), "Asia/Baku"));
+    }
+
+    private void stubCancelLookups() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of());
+        when(carRepository.findByCarId(55L)).thenReturn(null);
+    }
+
+    private static BookingCancelReason reason(String code) {
+        return BookingCancelReason.builder()
+                .code(code)
+                .titleJson("{\"az\":\"Plan dəyişdi\",\"en\":\"Change of plans\",\"ru\":\"Планы изменились\"}")
+                .active(true)
+                .build();
     }
 
     private void stubOwnedCar(Long carId, Long ownerUserId) {
