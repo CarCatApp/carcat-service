@@ -1,18 +1,26 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingCarView;
+import com.carland.carland_service.dto.booking.BookingDetailResponse;
+import com.carland.carland_service.dto.booking.BookingLineView;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStatus;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.CarRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,8 +40,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * tr: Owner rezervasyon listesi (CRCT-285 mine). unread=0 ta ki 286.
- * en: Owner booking list (CRCT-285 mine). unread=0 until 286.
+ * tr: Owner rezervasyon listesi + detay (CRCT-285). unread=0 ta ki 286.
+ * en: Owner booking list + detail (CRCT-285). unread=0 until 286.
  */
 @Service
 @RequiredArgsConstructor
@@ -45,6 +53,7 @@ public class BookingMineService {
 
     private final BookingRepository bookingRepository;
     private final BookingItemRepository bookingItemRepository;
+    private final CarRepository carRepository;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -52,6 +61,7 @@ public class BookingMineService {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
+        requireOwnedCar(customerUserId, carId);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         int safePage = page == null || page < 1 ? 1 : page;
         int size = limit != null ? limit : (pageSize == null ? 20 : pageSize);
@@ -73,6 +83,112 @@ public class BookingMineService {
                 .pageSize(size)
                 .total(result.getTotalElements())
                 .items(items)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public BookingDetailResponse detail(Long customerUserId, String bookingKey, String timezoneHeader) {
+        if (customerUserId == null) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        if (bookingKey == null || bookingKey.isBlank()) {
+            throw MissingFieldException.required("bookingId");
+        }
+        String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
+        Booking booking = loadOwned(customerUserId, bookingKey.trim());
+        List<BookingItem> rows = booking.getId() == null
+                ? List.of()
+                : bookingItemRepository.findByBooking_IdOrderByIdAsc(booking.getId());
+        List<BookingLineView> lines = new ArrayList<>();
+        for (BookingItem row : rows) {
+            lines.add(BookingLineView.builder()
+                    .serviceKey(row.getServiceKey())
+                    .title(row.getTitleSnapshot())
+                    .priceMin(row.getPriceMin())
+                    .priceMax(row.getPriceMax())
+                    .build());
+        }
+        Range range = booking.getRange();
+        Calendar calendar = range == null ? null : range.getCalendar();
+        Branch branch = booking.getBranch();
+        Partner partner = branch == null ? null : branch.getPartner();
+        String mode = range == null || range.getBookingMode() == null || range.getBookingMode().isBlank()
+                ? BookingMode.INSTANT.apiValue() : range.getBookingMode();
+        return BookingDetailResponse.builder()
+                .bookingId(booking.getId())
+                .ref(booking.getRef())
+                .status(booking.getStatus())
+                .bookingMode(mode)
+                .branchId(branch == null ? null : branch.getId())
+                .branchName(branch == null ? null : branch.getName())
+                .branchAddress(branch == null ? null : branch.getAddress())
+                .partnerName(partner == null ? null : partner.getName())
+                .slotId(range == null ? null : range.getRangeId())
+                .day(calendar == null || calendar.getDay() == null ? null : calendar.getDay().toString())
+                .start(clock(range == null ? null : range.getStart(), timezone))
+                .end(clock(range == null ? null : range.getEnd(), timezone))
+                .startsAt(startsAt(range == null ? null : range.getStart(), timezone))
+                .timezone(timezone)
+                .car(carOf(booking))
+                .items(lines)
+                .priceMin(booking.getPriceMin())
+                .priceMax(booking.getPriceMax())
+                .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
+                .unit(BookingCreateService.UNIT)
+                .unreadCount(0)
+                .canceledReason(null)
+                .build();
+    }
+
+    private void requireOwnedCar(Long customerUserId, Long carId) {
+        if (carId == null) {
+            return;
+        }
+        Car car = carRepository.findByCarId(carId);
+        if (car == null) {
+            throw new ResourceNotFoundException("car not found");
+        }
+        Customer owner = car.getCustomer();
+        if (owner == null || owner.getUserId() == null || !owner.getUserId().equals(customerUserId)) {
+            throw new ForbiddenException("car is not yours");
+        }
+    }
+
+    private Booking loadOwned(Long customerUserId, String bookingKey) {
+        Booking booking;
+        if (bookingKey.regionMatches(true, 0, "CC-", 0, 3)) {
+            booking = bookingRepository.findByRef(bookingKey.toUpperCase())
+                    .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        } else {
+            Long id;
+            try {
+                id = Long.valueOf(bookingKey);
+            } catch (NumberFormatException ex) {
+                throw new ResourceNotFoundException("booking not found");
+            }
+            booking = bookingRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        }
+        if (booking.getCustomerUserId() == null || !booking.getCustomerUserId().equals(customerUserId)) {
+            throw new ForbiddenException("booking is not yours");
+        }
+        return booking;
+    }
+
+    private BookingCarView carOf(Booking booking) {
+        Car car = booking.getCarId() == null ? null : carRepository.findByCarId(booking.getCarId());
+        if (car == null) {
+            return BookingCarView.builder()
+                    .carId(booking.getCarId())
+                    .vin(booking.getVin())
+                    .build();
+        }
+        return BookingCarView.builder()
+                .carId(car.getCarId())
+                .vin(car.getVin() == null ? booking.getVin() : car.getVin())
+                .brand(car.getBrand())
+                .model(car.getModel())
+                .year(car.getModelYear())
                 .build();
     }
 

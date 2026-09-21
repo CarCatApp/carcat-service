@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
@@ -18,6 +19,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countByRange_RangeIdAndStatusIn(Long rangeId, Collection<String> statuses);
 
     boolean existsByRef(String ref);
+
+    @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
+    Optional<Booking> findByRef(String ref);
+
+    @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
+    @Override
+    Optional<Booking> findById(Long id);
 
     Page<Booking> findByBranch_IdAndStatusOrderByCreatedAtDesc(Long branchId, String status, Pageable pageable);
 

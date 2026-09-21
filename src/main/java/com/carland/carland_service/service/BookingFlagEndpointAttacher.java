@@ -34,6 +34,7 @@ public class BookingFlagEndpointAttacher {
     static final String QUOTE_PATH = "/api/v1/booking/bookings/quote";
     static final String CREATE_PATH = "/api/v1/booking/bookings";
     static final String MINE_PATH = "/api/v1/booking/bookings/mine";
+    static final String DETAIL_PATH = "/api/v1/booking/bookings/{bookingId}";
     static final List<OwnerRoute> OWNER_ROUTES = List.of(
             new OwnerRoute("GET", DISCOVER_PATH),
             new OwnerRoute("GET", CATALOG_PATH),
@@ -41,7 +42,8 @@ public class BookingFlagEndpointAttacher {
             new OwnerRoute("POST", QUOTE_PATH),
             new OwnerRoute("POST", CREATE_PATH),
             new OwnerRoute("GET", CREATE_PATH),
-            new OwnerRoute("GET", MINE_PATH)
+            new OwnerRoute("GET", MINE_PATH),
+            new OwnerRoute("GET", DETAIL_PATH)
     );
 
     private final FeatureFlagRepository flagRepository;

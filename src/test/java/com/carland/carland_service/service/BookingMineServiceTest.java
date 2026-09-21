@@ -1,14 +1,21 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.CarRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +29,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,15 +44,17 @@ class BookingMineServiceTest {
 
     @Mock BookingRepository bookingRepository;
     @Mock BookingItemRepository bookingItemRepository;
+    @Mock CarRepository carRepository;
 
     BookingMineService service;
     Booking booking;
+    Branch branch;
 
     @BeforeEach
     void setUp() {
-        service = new BookingMineService(bookingRepository, bookingItemRepository);
+        service = new BookingMineService(bookingRepository, bookingItemRepository, carRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
-        Branch branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
+        branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
         Range range = Range.builder()
                 .rangeId(87L)
@@ -110,6 +120,7 @@ class BookingMineServiceTest {
 
     @Test
     void carIdFiltersList() {
+        stubOwnedCar(55L, 54L);
         when(bookingRepository.findByCustomerUserIdAndCarId(eq(54L), eq(55L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(booking)));
         when(bookingRepository.countGroupByStatusAndCarId(54L, 55L)).thenReturn(List.of());
@@ -122,6 +133,18 @@ class BookingMineServiceTest {
     }
 
     @Test
+    void foreignCarIdIsForbidden() {
+        stubOwnedCar(99L, 12L);
+        assertThrows(ForbiddenException.class, () -> service.mine(54L, null, 99L, 1, 20, null, "Asia/Baku"));
+    }
+
+    @Test
+    void unknownCarIdIsNotFound() {
+        when(carRepository.findByCarId(404L)).thenReturn(null);
+        assertThrows(ResourceNotFoundException.class, () -> service.mine(54L, null, 404L, 1, 20, null, "Asia/Baku"));
+    }
+
+    @Test
     void requiresUserId() {
         assertThrows(MissingFieldException.class,
                 () -> service.mine(null, null, null, 1, 20, null, "Asia/Baku"));
@@ -131,5 +154,64 @@ class BookingMineServiceTest {
     void parseCanceledAlias() {
         List<String> statuses = BookingMineService.parseStatuses("canceled");
         assertEquals(List.of("cancelled"), statuses);
+    }
+
+    @Test
+    void detailByIdReturnsCarAndLines() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of(
+                BookingItem.builder()
+                        .serviceKey("pkg:hyper-extra")
+                        .titleSnapshot("Hyper Extra")
+                        .priceMin(12900)
+                        .priceMax(12900)
+                        .build()
+        ));
+        when(carRepository.findByCarId(55L)).thenReturn(Car.builder()
+                .carId(55L)
+                .vin("3FA6P0HDXKR168752")
+                .brand("BMW")
+                .model("3 Series")
+                .modelYear(2019)
+                .build());
+
+        BookingDetailResponse out = service.detail(54L, "3", "Asia/Baku");
+
+        assertEquals("CC-147055", out.getRef());
+        assertEquals("auto_accepted", out.getStatus());
+        assertEquals("BMW", out.getCar().getBrand());
+        assertEquals(2019, out.getCar().getYear());
+        assertEquals("Hyper Extra", out.getItems().get(0).getTitle());
+        assertEquals("Xeqani", out.getBranchAddress());
+        assertEquals("2026-10-27T09:00:00+04:00", out.getStartsAt());
+    }
+
+    @Test
+    void detailByRef() {
+        when(bookingRepository.findByRef("CC-147055")).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of());
+        when(carRepository.findByCarId(55L)).thenReturn(null);
+
+        BookingDetailResponse out = service.detail(54L, "cc-147055", "Asia/Baku");
+
+        assertEquals(3L, out.getBookingId());
+        assertEquals(55L, out.getCar().getCarId());
+    }
+
+    @Test
+    void detailForbiddenForOtherOwner() {
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        assertThrows(ForbiddenException.class, () -> service.detail(99L, "3", "Asia/Baku"));
+    }
+
+    @Test
+    void detailMissingIsNotFound() {
+        when(bookingRepository.findById(9L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.detail(54L, "9", "Asia/Baku"));
+    }
+
+    private void stubOwnedCar(Long carId, Long ownerUserId) {
+        Customer owner = Customer.builder().userId(ownerUserId).build();
+        when(carRepository.findByCarId(carId)).thenReturn(Car.builder().carId(carId).customer(owner).build());
     }
 }
