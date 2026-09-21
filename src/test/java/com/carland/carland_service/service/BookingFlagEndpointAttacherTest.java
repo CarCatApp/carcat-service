@@ -32,12 +32,12 @@ class BookingFlagEndpointAttacherTest {
     @InjectMocks BookingFlagEndpointAttacher attacher;
 
     @Test
-    void attachesDiscoverAndCatalogWhenUnclaimed() {
+    void attachesOwnerRoutesWhenUnclaimed() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").defaultState(FeatureFlagState.HIDDEN).build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
-        when(featureFlagService.upsertEndpoint(eq("GET"), anyString(), eq(false)))
+        when(featureFlagService.upsertEndpoint(anyString(), anyString(), eq(false)))
                 .thenAnswer(inv -> FeatureFlagEndpoint.builder()
-                        .httpMethod("GET")
+                        .httpMethod(inv.getArgument(0))
                         .pathPattern(inv.getArgument(1))
                         .neverGuard(false)
                         .build());
@@ -45,7 +45,8 @@ class BookingFlagEndpointAttacherTest {
 
         attacher.attachDiscover();
 
-        verify(endpointRepository, times(3)).save(any(FeatureFlagEndpoint.class));
+        verify(endpointRepository, times(BookingFlagEndpointAttacher.OWNER_ROUTES.size()))
+                .save(any(FeatureFlagEndpoint.class));
         verify(featureFlagService).reloadCache();
     }
 
@@ -53,10 +54,10 @@ class BookingFlagEndpointAttacherTest {
     void skipsSaveWhenAlreadyAttached() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
-        when(featureFlagService.upsertEndpoint(eq("GET"), anyString(), eq(false)))
+        when(featureFlagService.upsertEndpoint(anyString(), anyString(), eq(false)))
                 .thenAnswer(inv -> FeatureFlagEndpoint.builder()
                         .flag(flag)
-                        .httpMethod("GET")
+                        .httpMethod(inv.getArgument(0))
                         .pathPattern(inv.getArgument(1))
                         .build());
         when(roleStateRepository.existsByFlag(flag)).thenReturn(true);

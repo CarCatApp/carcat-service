@@ -10,4 +10,6 @@ import java.util.Collection;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     long countByRange_RangeIdAndStatusIn(Long rangeId, Collection<String> statuses);
+
+    boolean existsByRef(String ref);
 }

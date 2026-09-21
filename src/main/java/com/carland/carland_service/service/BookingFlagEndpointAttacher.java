@@ -26,10 +26,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BookingFlagEndpointAttacher {
 
+    record OwnerRoute(String method, String path) {}
+
     static final String DISCOVER_PATH = "/api/v1/booking/partners";
     static final String CATALOG_PATH = "/api/v1/booking/branches/{branchId}/catalog";
     static final String AVAILABILITY_PATH = "/api/v1/booking/branches/{branchId}/availability";
-    static final List<String> OWNER_GET_PATHS = List.of(DISCOVER_PATH, CATALOG_PATH, AVAILABILITY_PATH);
+    static final String QUOTE_PATH = "/api/v1/booking/bookings/quote";
+    static final String CREATE_PATH = "/api/v1/booking/bookings";
+    static final List<OwnerRoute> OWNER_ROUTES = List.of(
+            new OwnerRoute("GET", DISCOVER_PATH),
+            new OwnerRoute("GET", CATALOG_PATH),
+            new OwnerRoute("GET", AVAILABILITY_PATH),
+            new OwnerRoute("POST", QUOTE_PATH),
+            new OwnerRoute("POST", CREATE_PATH)
+    );
 
     private final FeatureFlagRepository flagRepository;
     private final FeatureFlagEndpointRepository endpointRepository;
@@ -44,12 +54,12 @@ public class BookingFlagEndpointAttacher {
             log.info("BOOKING_FLAG_ATTACH_SKIP flag missing");
             return;
         }
-        for (String path : OWNER_GET_PATHS) {
-            FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint("GET", path, false);
+        for (OwnerRoute route : OWNER_ROUTES) {
+            FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint(route.method(), route.path(), false);
             if (endpoint.getFlag() == null || !BookingFeatureFlagSeeder.FLAG_NAME.equals(endpoint.getFlag().getName())) {
                 endpoint.setFlag(flag);
                 endpointRepository.save(endpoint);
-                log.info("BOOKING_FLAG_ATTACHED method=GET path={}", path);
+                log.info("BOOKING_FLAG_ATTACHED method={} path={}", route.method(), route.path());
             }
         }
         if (!roleStateRepository.existsByFlag(flag)) {
