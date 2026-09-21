@@ -40,8 +40,7 @@ public class BookingAvailabilityService {
     static final String DEFAULT_TZ = "Asia/Baku";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter ISO_DAY = DateTimeFormatter.ISO_LOCAL_DATE;
-    private static final List<String> LIVE_BOOKING = List.of(
-            BookingStatus.PENDING.apiValue(), BookingStatus.CONFIRMED.apiValue());
+    private static final List<String> LIVE_BOOKING = BookingStatus.occupyingCapacity();
 
     private final BranchRepository branchRepository;
     private final CalendarRepository calendarRepository;

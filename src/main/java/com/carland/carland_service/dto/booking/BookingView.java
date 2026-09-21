@@ -24,6 +24,9 @@ public class BookingView {
     String timezone;
     String vin;
     Long carId;
+    String startsAt;
+    String branchName;
+    String partnerName;
     List<String> serviceKeys;
     Integer priceMin;
     Integer priceMax;

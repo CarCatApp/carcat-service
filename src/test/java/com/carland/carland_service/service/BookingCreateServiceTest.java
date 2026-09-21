@@ -7,13 +7,19 @@ import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BranchPackageRepository;
 import com.carland.carland_service.repository.BranchServiceRepository;
+import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,16 +51,22 @@ class BookingCreateServiceTest {
     @Mock BookingItemRepository bookingItemRepository;
     @Mock BranchPackageRepository packageRepository;
     @Mock BranchServiceRepository serviceRepository;
+    @Mock CustomerRepository customerRepository;
+    @Mock CarRepository carRepository;
 
     BookingCreateService service;
     Range range;
     Branch branch;
+    Customer customer;
+    Car car;
 
     @BeforeEach
     void setUp() {
         service = new BookingCreateService(
                 rangeRepository, bookingRepository, bookingItemRepository,
-                packageRepository, serviceRepository, new ObjectMapper());
+                packageRepository, serviceRepository, customerRepository, carRepository, new ObjectMapper());
+        customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
+        car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();
         branch = Branch.builder().id(7L).active(true).name("Xeqani").partner(hyper).build();
         Calendar calendar = Calendar.builder()
@@ -90,6 +102,7 @@ class BookingCreateServiceTest {
     @Test
     void createApprovalIsPending() {
         stubCatalogAndRange(true);
+        stubOwnedCar();
         when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
         when(bookingRepository.existsByRef(any())).thenReturn(false);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
@@ -104,9 +117,56 @@ class BookingCreateServiceTest {
         assertEquals("approval", out.getBookingMode());
         assertEquals("CC-", out.getRef().substring(0, 3));
         assertEquals("09:00", out.getStart());
+        assertEquals(55L, out.getCarId());
+        assertEquals("3FA6P0HDXKR168752", out.getVin());
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).save(captor.capture());
         assertEquals(77L, captor.getValue().getCustomerUserId());
+        assertEquals(55L, captor.getValue().getCarId());
+    }
+
+    @Test
+    void createInstantIsAutoAccepted() {
+        range.setBookingMode("instant");
+        stubCatalogAndRange(true);
+        stubOwnedCar();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.existsByRef(any())).thenReturn(false);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking b = inv.getArgument(0);
+            b.setId(45L);
+            return b;
+        });
+
+        BookingView out = service.create(request(), 77L, "Asia/Baku");
+
+        assertEquals("auto_accepted", out.getStatus());
+        assertEquals("instant", out.getBookingMode());
+        ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(captor.capture());
+        assertEquals("auto_accepted", captor.getValue().getStatus());
+    }
+
+    @Test
+    void createRequiresCarId() {
+        stubCatalogAndRange(true);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        BookingWriteRequest req = request();
+        req.setCarId(null);
+
+        assertThrows(MissingFieldException.class, () -> service.create(req, 77L, "Asia/Baku"));
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsCarNotOwned() {
+        stubCatalogAndRange(true);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(customerRepository.findByUserId(77L)).thenReturn(customer);
+        when(carRepository.findByCarIdAndCustomer(55L, customer)).thenReturn(null);
+
+        assertThrows(ResourceNotFoundException.class, () -> service.create(request(), 77L, "Asia/Baku"));
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -138,6 +198,11 @@ class BookingCreateServiceTest {
         assertEquals("capacity_full", ex.getMessage());
     }
 
+    private void stubOwnedCar() {
+        when(customerRepository.findByUserId(77L)).thenReturn(customer);
+        when(carRepository.findByCarIdAndCustomer(55L, customer)).thenReturn(car);
+    }
+
     private void stubCatalogAndRange(boolean lock) {
         if (lock) {
             when(rangeRepository.lockByRangeId(105L)).thenReturn(Optional.of(range));
@@ -163,6 +228,7 @@ class BookingCreateServiceTest {
                 .branchId(7L)
                 .slotId(105L)
                 .serviceKeys(List.of("pkg:hyper-extra"))
+                .carId(55L)
                 .build();
     }
 }

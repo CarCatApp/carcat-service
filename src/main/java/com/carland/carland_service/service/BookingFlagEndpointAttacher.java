@@ -33,12 +33,15 @@ public class BookingFlagEndpointAttacher {
     static final String AVAILABILITY_PATH = "/api/v1/booking/branches/{branchId}/availability";
     static final String QUOTE_PATH = "/api/v1/booking/bookings/quote";
     static final String CREATE_PATH = "/api/v1/booking/bookings";
+    static final String MINE_PATH = "/api/v1/booking/bookings/mine";
     static final List<OwnerRoute> OWNER_ROUTES = List.of(
             new OwnerRoute("GET", DISCOVER_PATH),
             new OwnerRoute("GET", CATALOG_PATH),
             new OwnerRoute("GET", AVAILABILITY_PATH),
             new OwnerRoute("POST", QUOTE_PATH),
-            new OwnerRoute("POST", CREATE_PATH)
+            new OwnerRoute("POST", CREATE_PATH),
+            new OwnerRoute("GET", CREATE_PATH),
+            new OwnerRoute("GET", MINE_PATH)
     );
 
     private final FeatureFlagRepository flagRepository;

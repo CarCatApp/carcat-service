@@ -205,7 +205,7 @@ public class CalendarServiceImpl implements CalendarService {
         if (range.getRangeId() != null) {
             bookingCount = bookingRepository.countByRange_RangeIdAndStatusIn(
                     range.getRangeId(),
-                    List.of(BookingStatus.PENDING.apiValue(), BookingStatus.CONFIRMED.apiValue()));
+                    BookingStatus.occupyingCapacity());
         }
         int workerCount = range.getWorkerCount() == null ? 0 : range.getWorkerCount();
         int remaining = Math.max(0, workerCount - appointmentCount - (int) bookingCount);

@@ -9,6 +9,8 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.BranchService;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStatus;
@@ -20,6 +22,8 @@ import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BranchPackageRepository;
 import com.carland.carland_service.repository.BranchServiceRepository;
+import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,8 +41,8 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * tr: Quote (yazmaz) + create. instant→confirmed, approval→pending. Kapasite kilitli.
- * en: Quote (no write) + create. instant→confirmed, approval→pending. Locked capacity.
+ * tr: Quote (yazmaz) + create. instant→auto_accepted, approval→pending. Kapasite kilitli.
+ * en: Quote (no write) + create. instant→auto_accepted, approval→pending. Locked capacity.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,14 +51,15 @@ public class BookingCreateService {
     static final String UNIT = "qepik";
     static final String DEFAULT_TZ = "Asia/Baku";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
-    private static final List<String> LIVE = List.of(
-            BookingStatus.PENDING.apiValue(), BookingStatus.CONFIRMED.apiValue());
+    private static final List<String> LIVE = BookingStatus.occupyingCapacity();
 
     private final RangeRepository rangeRepository;
     private final BookingRepository bookingRepository;
     private final BookingItemRepository bookingItemRepository;
     private final BranchPackageRepository packageRepository;
     private final BranchServiceRepository serviceRepository;
+    private final CustomerRepository customerRepository;
+    private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -77,12 +82,13 @@ public class BookingCreateService {
             throw MissingFieldException.required("X-User-Id");
         }
         Prepared prepared = prepare(request, true);
+        Car car = requireOwnedCar(customerUserId, request);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         String mode = modeOf(prepared.range);
         String status = BookingMode.APPROVAL.apiValue().equals(mode)
                 ? BookingStatus.PENDING.apiValue()
-                : BookingStatus.CONFIRMED.apiValue();
-        String vin = blankToNull(request.getVin());
+                : BookingStatus.AUTO_ACCEPTED.apiValue();
+        String vin = car.getVin();
         Booking booking = bookingRepository.save(Booking.builder()
                 .ref(nextRef())
                 .customerUserId(customerUserId)
@@ -93,7 +99,7 @@ public class BookingCreateService {
                 .priceMax(prepared.priceMax)
                 .currency("AZN")
                 .vin(vin)
-                .carId(request.getCarId())
+                .carId(car.getCarId())
                 .build());
         for (Line line : prepared.lines) {
             bookingItemRepository.save(BookingItem.builder()
@@ -117,7 +123,7 @@ public class BookingCreateService {
                 .end(clock(prepared.range.getEnd(), timezone))
                 .timezone(timezone)
                 .vin(vin)
-                .carId(request.getCarId())
+                .carId(car.getCarId())
                 .serviceKeys(prepared.keys)
                 .priceMin(prepared.priceMin)
                 .priceMax(prepared.priceMax)
@@ -249,6 +255,21 @@ public class BookingCreateService {
         }
     }
 
+    private Car requireOwnedCar(Long customerUserId, BookingWriteRequest request) {
+        if (request == null || request.getCarId() == null) {
+            throw MissingFieldException.required("carId");
+        }
+        Customer customer = customerRepository.findByUserId(customerUserId);
+        if (customer == null) {
+            throw new ResourceNotFoundException("customer not found");
+        }
+        Car car = carRepository.findByCarIdAndCustomer(request.getCarId(), customer);
+        if (car == null) {
+            throw new ResourceNotFoundException("car not found");
+        }
+        return car;
+    }
+
     private String nextRef() {
         for (int i = 0; i < 25; i++) {
             String ref = "CC-" + String.format("%06d", ThreadLocalRandom.current().nextInt(0, 1_000_000));
@@ -282,10 +303,6 @@ public class BookingCreateService {
             return null;
         }
         return utc.atZoneSameInstant(ZoneId.of(timezone)).toLocalTime().format(CLOCK);
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private record Line(String key, String title, Integer priceMin, Integer priceMax, List<String> included) {}
