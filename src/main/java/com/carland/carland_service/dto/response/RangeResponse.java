@@ -19,6 +19,8 @@ import java.util.List;
 @Builder
 public class RangeResponse {
     Long rangeId;
+    /** Same as rangeId — PO slotId. */
+    Long slotId;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm")
     LocalTime start;
@@ -28,5 +30,10 @@ public class RangeResponse {
     String status;
     String message;
     Integer freeCount;
+    Integer capacity;
+    Integer remaining;
+    Boolean bookable;
+    String bookingMode;
+    String serviceKey;
     List<AppointmentResponse> appointmentResponses;
 }

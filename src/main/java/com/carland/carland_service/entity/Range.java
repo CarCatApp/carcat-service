@@ -33,6 +33,14 @@ public class Range {
     String status;
     Integer workerCount;
 
+    /** instant | approval. Staff sets this when creating the day's ranges. */
+    @Column(name = "booking_mode", length = 16)
+    String bookingMode;
+
+    /** * or one catalog serviceKey. */
+    @Column(name = "service_key", length = 64)
+    String serviceKey;
+
 
     @OneToMany
     @JoinColumn(name = "range_id")

@@ -23,4 +23,8 @@ public class CalendarRequest {
     String serviceCategory;
     Integer workerCount;
     Long branchId;
+    /** instant | approval. Default instant. */
+    String bookingMode;
+    /** * or one catalog key. Default *. */
+    String serviceKey;
 }

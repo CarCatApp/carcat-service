@@ -33,6 +33,13 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
     }
 
     private void migrate() {
+        if (tableExists("ranges")) {
+            jdbc.execute("ALTER TABLE ranges ADD COLUMN IF NOT EXISTS booking_mode varchar(16)");
+            jdbc.execute("ALTER TABLE ranges ADD COLUMN IF NOT EXISTS service_key varchar(64)");
+            jdbc.execute("UPDATE ranges SET booking_mode = 'instant' WHERE booking_mode IS NULL");
+            jdbc.execute("UPDATE ranges SET service_key = '*' WHERE service_key IS NULL");
+        }
+
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_phone varchar(32)");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_email varchar(128)");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS hq_user_id int8");

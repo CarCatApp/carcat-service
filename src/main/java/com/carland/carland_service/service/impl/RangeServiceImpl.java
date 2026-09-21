@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.AppointmentStatus;
+import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.enums.UserRoles;
@@ -122,14 +123,21 @@ public class RangeServiceImpl implements RangeService {
 
         rangeRepository.save(range);
 
+        int remaining = range.getWorkerCount() - range.getAppointments().size();
         return RangeResponse.builder()
                 .rangeId(range.getRangeId())
+                .slotId(range.getRangeId())
                 .start(helper.getLocalTimeFromUtcUseTZ(range.getStart(), timezone))
                 .end(helper.getLocalTimeFromUtcUseTZ(range.getEnd(), timezone))
                 .status(range.getStatus())
                 .appointmentResponses(List.of(convertToResponse(appointment, timezone, acceptLanguage)))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
-                .freeCount(range.getWorkerCount() - range.getAppointments().size())
+                .freeCount(remaining)
+                .capacity(range.getWorkerCount())
+                .remaining(remaining)
+                .bookable(remaining > 0)
+                .bookingMode(range.getBookingMode() == null ? BookingMode.INSTANT.apiValue() : range.getBookingMode())
+                .serviceKey(range.getServiceKey() == null ? "*" : range.getServiceKey())
                 .build();
     }
 

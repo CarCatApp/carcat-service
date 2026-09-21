@@ -16,6 +16,10 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class CalendarResponse {
+    Long calendarId;
+    Long branchId;
+    String bookingMode;
+    String serviceKey;
     List<RangeResponse> timeRanges;
     String message;
 }

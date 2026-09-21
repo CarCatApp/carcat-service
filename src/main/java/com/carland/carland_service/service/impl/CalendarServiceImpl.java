@@ -7,6 +7,8 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.enums.BookingMode;
+import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.CalendarStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.RangeStatus;
@@ -14,6 +16,7 @@ import com.carland.carland_service.exceptions.AlreadyExistsException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CalendarRepository;
 import com.carland.carland_service.service.BookingStaffAccess;
@@ -37,6 +40,7 @@ public class CalendarServiceImpl implements CalendarService {
 
     private final CalendarRepository calendarRepository;
     private final BranchRepository branchRepository;
+    private final BookingRepository bookingRepository;
     private final BookingStaffAccess bookingStaffAccess;
     private final Helper helper;
 
@@ -59,6 +63,14 @@ public class CalendarServiceImpl implements CalendarService {
         if (calendarRequest.getRangeMinutes() <= 0) {
             throw new MissingFieldException(MessagesLangValues.INVALID_RANGE_MINUTES.getMessageByLang(acceptLanguage));
         }
+
+        String bookingMode = BookingMode.normalizeOrDefault(calendarRequest.getBookingMode());
+        if (bookingMode == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        String serviceKey = calendarRequest.getServiceKey() == null || calendarRequest.getServiceKey().isBlank()
+                ? "*"
+                : calendarRequest.getServiceKey().trim();
 
         LocalDate todayLocal = LocalDate.now(ZoneId.of(timezone));
         LocalTime nowLocal = LocalTime.now(ZoneId.of(timezone));
@@ -91,7 +103,9 @@ public class CalendarServiceImpl implements CalendarService {
                 calendarRequest.getEnd(),
                 calendarRequest.getRangeMinutes(),
                 timezone,
-                calendarRequest.getWorkerCount()
+                calendarRequest.getWorkerCount(),
+                bookingMode,
+                serviceKey
         );
 
         Calendar calendar = Calendar.builder()
@@ -108,6 +122,10 @@ public class CalendarServiceImpl implements CalendarService {
         calendarRepository.save(calendar);
 
         return CalendarResponse.builder()
+                .calendarId(calendar.getCalendarId())
+                .branchId(branch.getId())
+                .bookingMode(bookingMode)
+                .serviceKey(serviceKey)
                 .timeRanges(mapToRangeResponseList(rangeList, timezone, acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
@@ -132,6 +150,10 @@ public class CalendarServiceImpl implements CalendarService {
         }
 
         return CalendarResponse.builder()
+                .calendarId(calendar.getCalendarId())
+                .branchId(branch.getId())
+                .bookingMode(firstMode(calendar))
+                .serviceKey(firstServiceKey(calendar))
                 .timeRanges(mapToRangeResponseList(calendar.getTimeRanges(), timezone, acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
@@ -146,19 +168,12 @@ public class CalendarServiceImpl implements CalendarService {
         return rangeList.stream()
                 .sorted(Comparator.comparing(Range::getStart))
                 .filter(range -> cutoffUtc == null || range.getStart().isAfter(cutoffUtc))
-                .map(range -> RangeResponse.builder()
-                        .rangeId(range.getRangeId())
-                        .start(helper.getLocalTimeFromUtcUseTZ(range.getStart(), timezone))
-                        .end(helper.getLocalTimeFromUtcUseTZ(range.getEnd(), timezone))
-                        .status(range.getStatus())
-                        .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
-                        .freeCount(range.getWorkerCount() - range.getAppointments().size())
-                        .build())
+                .map(range -> toRangeResponse(range, timezone, acceptLanguage))
                 .toList();
     }
 
     private List<Range> createRangeList(LocalDate day, LocalTime start, LocalTime end, Integer rangeMinutes,
-                                        String timezone, Integer workerCount) {
+                                        String timezone, Integer workerCount, String bookingMode, String serviceKey) {
         List<Range> ranges = new ArrayList<>();
         OffsetDateTime currentStartUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(day, start, timezone);
         OffsetDateTime endUtc = helper.getUtcTimeFromDayAndTimeAndTimeZone(day, end, timezone);
@@ -173,6 +188,8 @@ public class CalendarServiceImpl implements CalendarService {
                     .end(currentEndUtc)
                     .workerCount(workerCount)
                     .status(RangeStatus.AVAILABLE.name())
+                    .bookingMode(bookingMode)
+                    .serviceKey(serviceKey)
                     .build());
             if (currentEndUtc.equals(endUtc)) {
                 break;
@@ -180,5 +197,48 @@ public class CalendarServiceImpl implements CalendarService {
             currentStartUtc = currentEndUtc;
         }
         return ranges;
+    }
+
+    private RangeResponse toRangeResponse(Range range, String timezone, String acceptLanguage) {
+        int appointmentCount = range.getAppointments() == null ? 0 : range.getAppointments().size();
+        long bookingCount = 0;
+        if (range.getRangeId() != null) {
+            bookingCount = bookingRepository.countByRange_RangeIdAndStatusIn(
+                    range.getRangeId(),
+                    List.of(BookingStatus.PENDING.apiValue(), BookingStatus.CONFIRMED.apiValue()));
+        }
+        int workerCount = range.getWorkerCount() == null ? 0 : range.getWorkerCount();
+        int remaining = Math.max(0, workerCount - appointmentCount - (int) bookingCount);
+        boolean available = RangeStatus.AVAILABLE.name().equals(range.getStatus());
+        return RangeResponse.builder()
+                .rangeId(range.getRangeId())
+                .slotId(range.getRangeId())
+                .start(helper.getLocalTimeFromUtcUseTZ(range.getStart(), timezone))
+                .end(helper.getLocalTimeFromUtcUseTZ(range.getEnd(), timezone))
+                .status(range.getStatus())
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .freeCount(remaining)
+                .capacity(workerCount)
+                .remaining(remaining)
+                .bookable(available && remaining > 0)
+                .bookingMode(range.getBookingMode() == null ? BookingMode.INSTANT.apiValue() : range.getBookingMode())
+                .serviceKey(range.getServiceKey() == null ? "*" : range.getServiceKey())
+                .build();
+    }
+
+    private static String firstMode(Calendar calendar) {
+        if (calendar.getTimeRanges() == null || calendar.getTimeRanges().isEmpty()) {
+            return BookingMode.INSTANT.apiValue();
+        }
+        String mode = calendar.getTimeRanges().get(0).getBookingMode();
+        return mode == null ? BookingMode.INSTANT.apiValue() : mode;
+    }
+
+    private static String firstServiceKey(Calendar calendar) {
+        if (calendar.getTimeRanges() == null || calendar.getTimeRanges().isEmpty()) {
+            return "*";
+        }
+        String key = calendar.getTimeRanges().get(0).getServiceKey();
+        return key == null || key.isBlank() ? "*" : key;
     }
 }
