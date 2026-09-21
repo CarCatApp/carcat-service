@@ -45,7 +45,7 @@ class BookingFlagEndpointAttacherTest {
 
         attacher.attachDiscover();
 
-        verify(endpointRepository, times(2)).save(any(FeatureFlagEndpoint.class));
+        verify(endpointRepository, times(3)).save(any(FeatureFlagEndpoint.class));
         verify(featureFlagService).reloadCache();
     }
 

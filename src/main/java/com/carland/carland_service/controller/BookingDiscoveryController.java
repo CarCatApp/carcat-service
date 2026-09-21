@@ -1,7 +1,9 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.booking.BookingAvailabilityResponse;
 import com.carland.carland_service.dto.booking.BookingCatalogResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
+import com.carland.carland_service.service.BookingAvailabilityService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * tr: Müşteri şube keşfi + katalog (CRCT-281/282). Flag: booking.
- * en: Owner-app discovery + catalog (CRCT-281/282). Flag: booking.
+ * tr: Müşteri keşif + katalog + müsaitlik. Flag: booking.
+ * en: Owner discovery + catalog + availability. Flag: booking.
  */
 @RestController
 @RequiredArgsConstructor
@@ -21,6 +23,7 @@ public class BookingDiscoveryController {
 
     private final BookingDiscoveryService bookingDiscoveryService;
     private final BookingCatalogService bookingCatalogService;
+    private final BookingAvailabilityService bookingAvailabilityService;
 
     @GetMapping("/api/v1/booking/partners")
     public BookingDiscoveryResponse discover(
@@ -42,5 +45,17 @@ public class BookingDiscoveryController {
             @PathVariable Long branchId
     ) {
         return bookingCatalogService.catalog(branchId);
+    }
+
+    @GetMapping("/api/v1/booking/branches/{branchId}/availability")
+    public BookingAvailabilityResponse availability(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @PathVariable Long branchId,
+            @RequestParam(required = false) String serviceKeys,
+            @RequestParam String from,
+            @RequestParam String to
+    ) {
+        return bookingAvailabilityService.availability(branchId, serviceKeys, from, to, timezone);
     }
 }

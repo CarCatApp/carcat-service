@@ -28,7 +28,8 @@ public class BookingFlagEndpointAttacher {
 
     static final String DISCOVER_PATH = "/api/v1/booking/partners";
     static final String CATALOG_PATH = "/api/v1/booking/branches/{branchId}/catalog";
-    static final List<String> OWNER_GET_PATHS = List.of(DISCOVER_PATH, CATALOG_PATH);
+    static final String AVAILABILITY_PATH = "/api/v1/booking/branches/{branchId}/availability";
+    static final List<String> OWNER_GET_PATHS = List.of(DISCOVER_PATH, CATALOG_PATH, AVAILABILITY_PATH);
 
     private final FeatureFlagRepository flagRepository;
     private final FeatureFlagEndpointRepository endpointRepository;
