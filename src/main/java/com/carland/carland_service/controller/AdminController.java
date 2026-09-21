@@ -23,6 +23,7 @@ import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.repository.PartnerRepository;
+import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
@@ -97,6 +98,8 @@ public class AdminController {
     private final PhotoService photoService;
 
     private final SimaAttemptLimitService simaAttemptLimitService;
+
+    private final SimaKycRecordRepository simaKycRecordRepository;
 
     private final AdminCarPurgeService adminCarPurgeService;
 
@@ -639,6 +642,69 @@ public class AdminController {
         }
     }
 
+    /**
+     * tr: sima_kyc_records tablosunun tamamını XLSX olarak indirir (admin cookie).
+     * en: Downloads the full sima_kyc_records table as XLSX (admin cookie).
+     */
+    @GetMapping("/admin/users/sima-transactions/export")
+    @Transactional(readOnly = true)
+    public void exportSimaTransactions(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            response.sendRedirect(ADMIN_URL + "/admin/");
+            return;
+        }
+        List<SimaKycRecord> rows = simaKycRecordRepository.findAllWithCustomerOrderByIdAsc();
+        String[] headers = {
+                "id", "customer_id", "channel", "verified", "applied_to_profile", "idempotency_key",
+                "transaction_id", "process_time", "pin", "document_number", "name", "surname", "patronymic",
+                "birth_date", "birth_address", "address", "nationality", "gender", "exp_date",
+                "document_type", "issuing_country", "liveness_score", "liveness_status", "liveness_failure_reason",
+                "similarity_score", "similarity_status", "sima_http_status", "sima_response_code", "sima_message",
+                "outcome", "created_at"
+        };
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("sima_kyc_records");
+            createHeaderRow(workbook, sheet, headers);
+            int rowIndex = 1;
+            for (SimaKycRecord rec : rows) {
+                Row row = sheet.createRow(rowIndex++);
+                Long customerId = rec.getCustomer() == null ? null : rec.getCustomer().getUserId();
+                setNumericCell(row, 0, rec.getId());
+                setNumericCell(row, 1, customerId);
+                setCell(row, 2, rec.getChannel());
+                setCell(row, 3, String.valueOf(rec.isVerified()));
+                setCell(row, 4, String.valueOf(rec.isAppliedToProfile()));
+                setCell(row, 5, rec.getIdempotencyKey());
+                setCell(row, 6, rec.getTransactionId());
+                setCell(row, 7, rec.getProcessTime());
+                setCell(row, 8, rec.getPin());
+                setCell(row, 9, rec.getDocumentNumber());
+                setCell(row, 10, rec.getName());
+                setCell(row, 11, rec.getSurname());
+                setCell(row, 12, rec.getPatronymic());
+                setCell(row, 13, rec.getBirthDate());
+                setCell(row, 14, rec.getBirthAddress());
+                setCell(row, 15, rec.getAddress());
+                setCell(row, 16, rec.getNationality());
+                setCell(row, 17, rec.getGender());
+                setCell(row, 18, rec.getExpDate());
+                setCell(row, 19, rec.getDocumentType());
+                setCell(row, 20, rec.getIssuingCountry());
+                setNumericCell(row, 21, rec.getLivenessScore());
+                setCell(row, 22, boolCell(rec.getLivenessStatus()));
+                setCell(row, 23, rec.getLivenessFailureReason());
+                setNumericCell(row, 24, rec.getSimilarityScore());
+                setCell(row, 25, boolCell(rec.getSimilarityStatus()));
+                setNumericCell(row, 26, rec.getSimaHttpStatus());
+                setNumericCell(row, 27, rec.getSimaResponseCode());
+                setCell(row, 28, rec.getSimaMessage());
+                setCell(row, 29, rec.getOutcome());
+                setCell(row, 30, formatDate(rec.getCreatedAt()));
+            }
+            writeWorkbook(workbook, sheet, headers.length, "sima-transactions", response);
+        }
+    }
+
 
     // ==================== FEEDBACKS ====================
 
@@ -1073,6 +1139,13 @@ public class AdminController {
         if (value != null) {
             cell.setCellValue(value.doubleValue());
         }
+    }
+
+    private static String boolCell(Boolean value) {
+        if (value == null) {
+            return "";
+        }
+        return Boolean.TRUE.equals(value) ? "true" : "false";
     }
 
     /**

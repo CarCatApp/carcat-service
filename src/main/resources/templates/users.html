@@ -53,11 +53,13 @@
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel (filtered)
     </a>
-    <a class="btn"
-       th:classappend="${from != null || to != null || filterPhone != null || filterSima != 'all'} ? 'btn-excel-outline' : 'btn-excel'"
-       href="/admin/users/export">
+    <a class="btn btn-excel" href="/admin/users/export">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel (full list)
+    </a>
+    <a class="btn btn-excel" href="/admin/users/sima-transactions/export">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+      download sima transactions
     </a>
     <a class="btn btn-logout" href="/admin/logout">Logout</a>
   </div>

@@ -3,6 +3,7 @@ package com.carland.carland_service.repository;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.SimaKycRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -28,4 +29,7 @@ public interface SimaKycRecordRepository extends JpaRepository<SimaKycRecord, Lo
 
     List<SimaKycRecord> findByCustomerAndChannelInOrderByCreatedAtAsc(
             Customer customer, Collection<String> channels);
+
+    @Query("SELECT r FROM SimaKycRecord r JOIN FETCH r.customer ORDER BY r.id ASC")
+    List<SimaKycRecord> findAllWithCustomerOrderByIdAsc();
 }
