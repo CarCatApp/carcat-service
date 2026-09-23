@@ -8,6 +8,7 @@ import lombok.Getter;
  */
 @Getter
 
+
 public enum UserRoles {
     BOSS,
     USER,
