@@ -167,6 +167,17 @@
         <input type="text" name="phoneNumber" required placeholder="+99470xxxxxxx">
       </div>
       <div class="filter-field">
+        <label>Email</label>
+        <input type="email" name="email" required placeholder="staff@example.com">
+      </div>
+      <div class="filter-field">
+        <label>İlk şifrə</label>
+        <select name="notifyChannel" required>
+          <option value="SMS">SMS</option>
+          <option value="EMAIL">Email</option>
+        </select>
+      </div>
+      <div class="filter-field">
         <label>Ad</label>
         <input type="text" name="name">
       </div>
@@ -182,7 +193,7 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-        <tr><th>User</th><th>Ad</th><th>Soyad</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Status</th></tr>
+          <tr><th>User</th><th>Ad</th><th>Soyad</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Email</th><th>Status</th></tr>
         </thead>
         <tbody>
         <tr th:each="s : ${staff}">
@@ -192,9 +203,10 @@
           <td th:text="${s.role}">ROLE</td>
           <td th:text="${s.role == 'PARTNER_ADMIN'} ? 'Tüm partner şubeleri' : (${s.branch != null} ? ${s.branch.name} : '—')">—</td>
           <td th:text="${s.phoneNumber}">+994</td>
+          <td th:text="${#strings.isEmpty(s.email) ? '—' : s.email}">—</td>
           <td th:text="${s.status}">INVITED</td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="7">Staff yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="8">Staff yoxdur</td></tr>
         </tbody>
       </table>
     </div>

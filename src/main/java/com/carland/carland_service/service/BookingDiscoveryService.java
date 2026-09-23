@@ -75,6 +75,8 @@ public class BookingDiscoveryService {
             all.add(BookingDiscoveryPartnerView.builder()
                     .partnerId(partner.getId())
                     .name(partner.getName())
+                    .rating(partner.getRating())
+                    .ratingCount(BookingRatingService.storedCount(partner.getRatingCount()))
                     .branches(views)
                     .build());
         }
@@ -101,7 +103,8 @@ public class BookingDiscoveryService {
                 .contactPhone(branch.getContactPhone())
                 .workingHours(branch.getWorkingHours())
                 .photo(branch.getPhoto())
-                .ratingCount(branch.getRatingCount())
+                .rating(branch.getRating())
+                .ratingCount(BookingRatingService.storedCount(branch.getRatingCount()))
                 .build();
     }
 

@@ -5,16 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingDiscoveryPartnerView {
-    Long partnerId;
-    String name;
-    Double rating;
-    Long ratingCount;
-    List<BookingDiscoveryBranchView> branches;
+public class BookingStaffOrgResponse {
+    BookingStaffPartnerView partner;
 }

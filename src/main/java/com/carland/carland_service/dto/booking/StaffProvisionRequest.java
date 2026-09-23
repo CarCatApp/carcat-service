@@ -14,4 +14,5 @@ public class StaffProvisionRequest {
     String role;
     String name;
     String surname;
+    String email;
 }

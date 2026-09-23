@@ -5,21 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingDiscoveryBranchView {
-    Long partnerId;
-    Long branchId;
+public class BookingStaffPartnerView {
+    Long id;
     String name;
-    String address;
-    Double lat;
-    Double lng;
-    Boolean active;
-    String contactPhone;
-    String workingHours;
-    String photo;
+    String logoUrl;
     Double rating;
     Long ratingCount;
+    List<BookingBranchView> branches;
 }

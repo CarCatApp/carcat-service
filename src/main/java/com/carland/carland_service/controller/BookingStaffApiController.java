@@ -1,7 +1,7 @@
 package com.carland.carland_service.controller;
 
-import com.carland.carland_service.dto.booking.BookingBranchView;
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
+import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffAuditRequest;
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -38,10 +37,10 @@ public class BookingStaffApiController {
     private final StaffBookingService staffBookingService;
 
     @GetMapping("/api/v1/booking/staff/branches")
-    public List<BookingBranchView> myBranches(HttpServletRequest request) {
+    public BookingStaffOrgResponse myBranches(HttpServletRequest request) {
         Long userId = bookingStaffRequestAuth.userId(request);
         boolean mustChange = bookingStaffRequestAuth.mustChangePassword(request);
-        return bookingOrgService.visibleBranches(userId, mustChange);
+        return bookingOrgService.visiblePartner(userId, mustChange);
     }
 
     @GetMapping("/api/v1/booking/staff/bookings")

@@ -30,7 +30,7 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-        <tr><th>ID</th><th>Partner</th><th>Şöbə</th><th>Ünvan</th><th>Aktiv</th></tr>
+        <tr><th>ID</th><th>Partner</th><th>Şöbə</th><th>Ünvan</th><th>Reytinq</th><th>Aktiv</th></tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
@@ -91,17 +91,20 @@
       error.hidden = false;
       return;
     }
-    const list = await res.json();
+    const body = await res.json();
+    const partner = body.partner || {};
+    const list = partner.branches || [];
     const tbody = document.getElementById('rows');
     tbody.innerHTML = '';
     if (!list.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Şöbə yoxdur</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Şöbə yoxdur</td></tr>';
       return;
     }
     for (const b of list) {
+      const rating = b.ratingCount ? (b.rating + ' (' + b.ratingCount + ')') : '—';
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + b.id + '</td><td>' + (b.partnerName || '') + '</td><td>' + (b.name || '') +
-        '</td><td>' + (b.address || '—') + '</td><td>' + (b.active ? 'bəli' : 'xeyr') + '</td>';
+      tr.innerHTML = '<td>' + b.id + '</td><td>' + (partner.name || b.partnerName || '') + '</td><td>' + (b.name || '') +
+        '</td><td>' + (b.address || '—') + '</td><td>' + rating + '</td><td>' + (b.active ? 'bəli' : 'xeyr') + '</td>';
       tbody.appendChild(tr);
     }
   }

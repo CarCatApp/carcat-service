@@ -90,6 +90,36 @@ public class BrevoMailServiceImpl implements MailService {
         }
     }
 
+    @Override
+    public void sendPlainMail(String toEmail, String subject, String htmlContent) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("sender", Map.of("name", "CarCat", "email", "noreply@digital-innovation.agency"));
+            body.put("to", List.of(Map.of("email", toEmail)));
+            body.put("subject", subject);
+            body.put("htmlContent", htmlContent);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            headers.add("api-key", brevoApiKey);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    BREVO_URL, new HttpEntity<>(body, headers), String.class);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new RuntimeException("Brevo error: " + response.getBody());
+            }
+        } catch (HttpClientErrorException e) {
+            throw new RuntimeException("Brevo 4xx error: " + e.getResponseBodyAsString(), e);
+        } catch (HttpServerErrorException e) {
+            throw new RuntimeException("Brevo 5xx error: " + e.getResponseBodyAsString(), e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Mail göndərilərkən xəta baş verdi", e);
+        }
+    }
+
     private String buildBody(FeedbackRequest request,
                              String ticketId,
                              String customerPhone) {

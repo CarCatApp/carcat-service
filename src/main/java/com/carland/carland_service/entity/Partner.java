@@ -48,6 +48,12 @@ public class Partner {
     @Column(name = "hq_user_id", unique = true)
     Long hqUserId;
 
+    Double rating;
+
+    @Builder.Default
+    @Column(name = "rating_count")
+    Long ratingCount = 0L;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
@@ -67,6 +73,9 @@ public class Partner {
         updatedAt = now;
         if (active == null) {
             active = true;
+        }
+        if (ratingCount == null) {
+            ratingCount = 0L;
         }
     }
 

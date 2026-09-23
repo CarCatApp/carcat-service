@@ -46,6 +46,11 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
 
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_phone varchar(32)");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS contact_email varchar(128)");
+        jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS rating float8");
+        jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS rating_count int8");
+        if (tableExists("booking_staff")) {
+            jdbc.execute("ALTER TABLE booking_staff ADD COLUMN IF NOT EXISTS email varchar(128)");
+        }
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS hq_user_id int8");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS created_at timestamp");
         jdbc.execute("ALTER TABLE partners ADD COLUMN IF NOT EXISTS updated_at timestamp");
@@ -55,7 +60,12 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
         jdbc.execute("ALTER TABLE partners DROP COLUMN IF EXISTS api_client_secret");
         if (tableExists("branches")) {
             jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS photos");
-            jdbc.execute("ALTER TABLE branches DROP COLUMN IF EXISTS rating");
+            jdbc.execute("ALTER TABLE branches ADD COLUMN IF NOT EXISTS rating float8");
+            if (columnExists("branches", "rating_count")) {
+                jdbc.execute("ALTER TABLE branches ALTER COLUMN rating_count TYPE int8 USING rating_count::int8");
+            } else {
+                jdbc.execute("ALTER TABLE branches ADD COLUMN IF NOT EXISTS rating_count int8");
+            }
         }
         relinkLegacyAutoService("calendars");
         relinkLegacyAutoService("appointments");

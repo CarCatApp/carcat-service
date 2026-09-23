@@ -14,6 +14,9 @@ public interface MailService {
      */
     void sendFeedbackMail(FeedbackRequest feedbackRequest, MultipartFile file, String string, String customerPhone);
 
+    /** Staff invite / OTP — plaintext in body, never log the secret. */
+    void sendPlainMail(String toEmail, String subject, String htmlContent);
+
 
 
 }

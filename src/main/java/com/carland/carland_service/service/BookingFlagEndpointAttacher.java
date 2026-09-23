@@ -38,6 +38,7 @@ public class BookingFlagEndpointAttacher {
     static final String CANCEL_PATH = "/api/v1/booking/bookings/{bookingId}/cancel";
     static final String CANCEL_REASONS_PATH = "/api/v1/booking/cancel-reasons";
     static final String CANCEL_REASONS_ALIAS = "/api/v1/booking/bookings/cancel-reasons";
+    static final String RATING_PATH = "/api/v1/booking/branches/{branchId}/ratings";
     static final List<OwnerRoute> OWNER_ROUTES = List.of(
             new OwnerRoute("GET", DISCOVER_PATH),
             new OwnerRoute("GET", CATALOG_PATH),
@@ -50,7 +51,8 @@ public class BookingFlagEndpointAttacher {
             new OwnerRoute("PATCH", DETAIL_PATH),
             new OwnerRoute("GET", CANCEL_REASONS_PATH),
             new OwnerRoute("GET", CANCEL_REASONS_ALIAS),
-            new OwnerRoute("POST", CANCEL_PATH)
+            new OwnerRoute("POST", CANCEL_PATH),
+            new OwnerRoute("POST", RATING_PATH)
     );
 
     private final FeatureFlagRepository flagRepository;

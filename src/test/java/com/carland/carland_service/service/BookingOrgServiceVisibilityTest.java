@@ -1,6 +1,6 @@
 package com.carland.carland_service.service;
 
-import com.carland.carland_service.dto.booking.BookingBranchView;
+import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Partner;
@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
@@ -32,12 +33,13 @@ class BookingOrgServiceVisibilityTest {
     @Mock BookingStaffRepository staffRepository;
     @Mock AuthStaffFeign authStaffFeign;
     @Mock BookingStaffAuditService staffAuditService;
+    @Mock MailService mailService;
 
     @InjectMocks BookingOrgService service;
 
     @Test
     void invitedJwtBlocksUntilPasswordChange() {
-        assertThrows(ForbiddenException.class, () -> service.visibleBranches(9L, true));
+        assertThrows(ForbiddenException.class, () -> service.visiblePartner(9L, true));
     }
 
     @Test
@@ -55,10 +57,12 @@ class BookingOrgServiceVisibilityTest {
         when(staffRepository.findByUserId(9L)).thenReturn(List.of(hq));
         when(branchRepository.findByPartnerIdOrderByIdAsc(1L)).thenReturn(List.of(a, b));
 
-        List<BookingBranchView> views = service.visibleBranches(9L, false);
-        assertEquals(2, views.size());
-        assertEquals("A", views.get(0).getName());
-        assertEquals("B", views.get(1).getName());
+        BookingStaffOrgResponse out = service.visiblePartner(9L, false);
+        assertEquals(2, out.getPartner().getBranches().size());
+        assertEquals("A", out.getPartner().getBranches().get(0).getName());
+        assertEquals("B", out.getPartner().getBranches().get(1).getName());
+        assertEquals(0L, out.getPartner().getRatingCount());
+        assertNull(out.getPartner().getRating());
     }
 
     @Test
@@ -75,9 +79,10 @@ class BookingOrgServiceVisibilityTest {
                 .build();
         when(staffRepository.findByUserId(8L)).thenReturn(List.of(row));
 
-        List<BookingBranchView> views = service.visibleBranches(8L, false);
-        assertEquals(1, views.size());
-        assertEquals("Mine", views.get(0).getName());
+        BookingStaffOrgResponse out = service.visiblePartner(8L, false);
+        assertEquals(1, out.getPartner().getBranches().size());
+        assertEquals("Mine", out.getPartner().getBranches().get(0).getName());
+        assertEquals(10L, out.getPartner().getBranches().get(0).getId());
     }
 
     @Test
@@ -91,6 +96,6 @@ class BookingOrgServiceVisibilityTest {
                 .phoneNumber("+994701111111")
                 .build();
         when(staffRepository.findByUserId(9L)).thenReturn(List.of(hq));
-        assertTrue(service.visibleBranches(9L, false).isEmpty());
+        assertTrue(service.visiblePartner(9L, false).getPartner().getBranches().isEmpty());
     }
 }

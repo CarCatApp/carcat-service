@@ -106,6 +106,8 @@ public class BookingAdminController {
             @PathVariable Long id,
             @RequestParam String role,
             @RequestParam String phoneNumber,
+            @RequestParam String email,
+            @RequestParam(defaultValue = "SMS") String notifyChannel,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String surname,
@@ -117,10 +119,13 @@ public class BookingAdminController {
         }
         try {
             StaffProvisionResponse created = bookingOrgService.addStaff(
-                    id, branchId, role, phoneNumber, name, surname, adminAccessService.actor(request));
+                    id, branchId, role, phoneNumber, name, surname, email, notifyChannel,
+                    adminAccessService.actor(request));
             redirect.addFlashAttribute("oneTimePassword", created.getOneTimePassword());
             redirect.addFlashAttribute("oneTimePhone", created.getPhoneNumber());
-            redirect.addFlashAttribute("detailMessage", "Staff yaradıldı — birdəfəlik şifrəni indi kopyalayın");
+            String via = "EMAIL".equalsIgnoreCase(notifyChannel) ? "mailə" : "SMS-ə";
+            redirect.addFlashAttribute("detailMessage",
+                    "Staff yaradıldı — şifrə " + via + " göndərildi, eyni zamanda aşağıda görünür");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
         }

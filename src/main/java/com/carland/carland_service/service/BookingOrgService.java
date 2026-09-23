@@ -1,7 +1,10 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingBranchView;
+import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
+import com.carland.carland_service.dto.booking.BookingStaffPartnerView;
 import com.carland.carland_service.dto.booking.StaffDisableRequest;
+import com.carland.carland_service.dto.booking.StaffNotifySmsRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
 import com.carland.carland_service.entity.Branch;
@@ -43,6 +46,7 @@ public class BookingOrgService {
     private final BookingStaffRepository staffRepository;
     private final AuthStaffFeign authStaffFeign;
     private final BookingStaffAuditService staffAuditService;
+    private final MailService mailService;
 
     @Transactional(readOnly = true)
     public List<Partner> listPartners() {
@@ -113,11 +117,20 @@ public class BookingOrgService {
      */
     @Transactional
     public StaffProvisionResponse addStaff(Long partnerId, Long branchId, String roleRaw, String phoneRaw,
-                                           String name, String surname, String actor) {
+                                           String name, String surname, String emailRaw, String notifyChannelRaw,
+                                           String actor) {
         Partner partner = getPartner(partnerId);
         String phone = PhoneNumbers.normalize(phoneRaw);
         if (phone == null) {
             throw new MissingFieldException("Telefon +994XXXXXXXXX formatında olmalıdır");
+        }
+        String email = normalizeEmail(emailRaw);
+        if (email == null) {
+            throw new MissingFieldException("Email boş ola bilməz");
+        }
+        String notifyChannel = normalizeNotifyChannel(notifyChannelRaw);
+        if (staffRepository.existsByEmailIgnoreCase(email)) {
+            throw new ConflictException("Bu email artıq staff kimi mövcuddur");
         }
         String role = roleRaw == null ? "" : roleRaw.trim().toUpperCase();
         Branch branch = null;
@@ -145,10 +158,11 @@ public class BookingOrgService {
                     .role(role)
                     .name(blankToNull(name))
                     .surname(blankToNull(surname))
+                    .email(email)
                     .build());
         } catch (FeignException ex) {
             if (ex.status() == 409) {
-                throw new ConflictException("Bu nömrə artıq user kimi mövcuddur");
+                    throw new ConflictException("Bu telefon və ya email artıq mövcuddur");
             }
             log.warn("STAFF_PROVISION_FEIGN_FAIL status={}", ex.status());
             throw new ConflictException("Auth-da istifadəçi yaradıla bilmədi");
@@ -170,6 +184,7 @@ public class BookingOrgService {
                     .role(role)
                     .status(BookingStaffStatus.INVITED.name())
                     .phoneNumber(phone)
+                    .email(email)
                     .name(blankToNull(name))
                     .surname(blankToNull(surname))
                     .createdAt(LocalDateTime.now())
@@ -191,7 +206,9 @@ public class BookingOrgService {
             }
             throw ex;
         }
-        log.info("BOOKING_STAFF_ADDED partnerId={} userId={} role={}", partnerId, userId, role);
+        log.info("BOOKING_STAFF_ADDED partnerId={} userId={} role={} channel={}",
+                partnerId, userId, role, notifyChannel);
+        deliverOneTimePassword(phone, email, notifyChannel, provisioned.getOneTimePassword());
         return provisioned;
     }
 
@@ -208,7 +225,7 @@ public class BookingOrgService {
     }
 
     @Transactional
-    public List<BookingBranchView> visibleBranches(Long userId, boolean mustChangePassword) {
+    public BookingStaffOrgResponse visiblePartner(Long userId, boolean mustChangePassword) {
         if (userId == null) {
             throw new ForbiddenException("Staff token required");
         }
@@ -232,7 +249,9 @@ public class BookingOrgService {
 
         Partner partner = rows.get(0).getPartner();
         if (Boolean.FALSE.equals(partner.getActive())) {
-            return List.of();
+            return BookingStaffOrgResponse.builder()
+                    .partner(toPartnerView(partner, List.of()))
+                    .build();
         }
         boolean hq = rows.stream().anyMatch(row ->
                 BookingStaffRole.PARTNER_ADMIN.name().equals(row.getRole()) && row.getBranch() == null);
@@ -249,9 +268,23 @@ public class BookingOrgService {
             branches = new ArrayList<>(unique.values());
             branches.sort(Comparator.comparing(Branch::getId));
         }
-        return branches.stream()
+        return BookingStaffOrgResponse.builder()
+                .partner(toPartnerView(partner, branches))
+                .build();
+    }
+
+    private BookingStaffPartnerView toPartnerView(Partner partner, List<Branch> branches) {
+        List<BookingBranchView> views = branches.stream()
                 .map(branch -> toView(partner, branch))
                 .toList();
+        return BookingStaffPartnerView.builder()
+                .id(partner.getId())
+                .name(partner.getName())
+                .logoUrl(partner.getLogoUrl())
+                .rating(partner.getRating())
+                .ratingCount(BookingRatingService.storedCount(partner.getRatingCount()))
+                .branches(views)
+                .build();
     }
 
     private static BookingBranchView toView(Partner partner, Branch branch) {
@@ -268,8 +301,51 @@ public class BookingOrgService {
                 .contactPhone(branch.getContactPhone())
                 .workingHours(branch.getWorkingHours())
                 .photo(branch.getPhoto())
-                .ratingCount(branch.getRatingCount())
+                .rating(branch.getRating())
+                .ratingCount(BookingRatingService.storedCount(branch.getRatingCount()))
                 .build();
+    }
+
+    private void deliverOneTimePassword(String phone, String email, String channel, String oneTime) {
+        if (oneTime == null || oneTime.isBlank()) {
+            return;
+        }
+        try {
+            if ("EMAIL".equals(channel)) {
+                mailService.sendPlainMail(email, "CarCat staff şifrəsi",
+                        "<p>CarCat staff müvəqqəti şifrəniz:</p><p><b>" + oneTime + "</b></p>");
+            } else {
+                authStaffFeign.notifySms(StaffNotifySmsRequest.builder()
+                        .phoneNumber(phone)
+                        .text("CarCat staff şifrəniz: " + oneTime)
+                        .build());
+            }
+        } catch (Exception ex) {
+            log.warn("STAFF_NOTIFY_FAIL channel={} phone={}", channel, phone);
+        }
+    }
+
+    private static String normalizeEmail(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String email = raw.trim().toLowerCase();
+        int at = email.indexOf('@');
+        if (at < 1 || at != email.lastIndexOf('@') || at == email.length() - 1 || !email.contains(".")) {
+            throw new MissingFieldException("Email formatı yanlışdır");
+        }
+        return email;
+    }
+
+    private static String normalizeNotifyChannel(String raw) {
+        String channel = raw == null ? "SMS" : raw.trim().toUpperCase();
+        if ("MAIL".equals(channel) || "E-MAIL".equals(channel)) {
+            channel = "EMAIL";
+        }
+        if (!"SMS".equals(channel) && !"EMAIL".equals(channel)) {
+            throw new MissingFieldException("Kanal SMS və ya EMAIL olmalıdır");
+        }
+        return channel;
     }
 
     private static String blankToNull(String value) {

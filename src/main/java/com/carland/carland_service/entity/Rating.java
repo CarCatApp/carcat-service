@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * tr: Şube yorumu — metin, reaksiyon, puan. Ortalama henüz hesaplanmaz (PO).
- * en: Branch review — text, reaction, score. Average not computed yet (PO).
+ * tr: Şube yorumu — metin, reaksiyon, puan (score gönüllü 1–5).
+ * en: Branch review — text, reaction, score (score optional 1–5).
  */
 @Entity
 @Data

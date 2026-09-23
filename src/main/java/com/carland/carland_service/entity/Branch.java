@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * tr: Partner şubesi. {@code ratingCount} ortalama puan (daha sonra Rating listesinden hesaplanır).
- * en: Partner branch. {@code ratingCount} is the average score (later derived from the Rating list).
+ * tr: Partner şubesi. {@code rating} ve {@code ratingCount} yazımda güncellenir, GET DB kolonunu okur.
+ * en: Partner branch. {@code rating} / {@code ratingCount} updated on write; GET reads columns.
  */
 @Entity
 @Data
@@ -51,12 +51,16 @@ public class Branch {
     String photo;
 
     /**
-     * Average score from {@link Rating} rows. Recalc method comes later (PO).
-     * Column name is historical: it is the average, not the number of ratings.
+     * Stored average of non-null {@link Rating#getScore()} values. Null if nobody scored.
+     */
+    Double rating;
+
+    /**
+     * Stored count of {@link Rating} rows for this branch (including comment-only).
      */
     @Builder.Default
     @Column(name = "rating_count")
-    Integer ratingCount = 0;
+    Long ratingCount = 0L;
 
     @OneToMany(mappedBy = "branch")
     @Builder.Default
@@ -83,7 +87,7 @@ public class Branch {
             active = true;
         }
         if (ratingCount == null) {
-            ratingCount = 0;
+            ratingCount = 0L;
         }
     }
 

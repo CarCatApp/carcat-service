@@ -29,4 +29,6 @@ public interface BookingStaffRepository extends JpaRepository<BookingStaff, Long
     boolean existsByUserIdAndPartnerIdNot(Long userId, Long partnerId);
 
     boolean existsByUserId(Long userId);
+
+    boolean existsByEmailIgnoreCase(String email);
 }

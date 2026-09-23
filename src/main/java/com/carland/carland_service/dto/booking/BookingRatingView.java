@@ -5,21 +5,23 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingDiscoveryBranchView {
-    Long partnerId;
+public class BookingRatingView {
+    Long id;
     Long branchId;
-    String name;
-    String address;
-    Double lat;
-    Double lng;
-    Boolean active;
-    String contactPhone;
-    String workingHours;
-    String photo;
+    Long partnerId;
+    Long userId;
+    Integer score;
+    String text;
+    String reaction;
+    LocalDateTime createdAt;
     Double rating;
     Long ratingCount;
+    Double partnerRating;
+    Long partnerRatingCount;
 }

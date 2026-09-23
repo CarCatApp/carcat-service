@@ -17,4 +17,7 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
 
     @Query("select b from Branch b join fetch b.partner p where b.active = true and p.active = true order by p.id asc, b.id asc")
     List<Branch> findActiveWithActivePartner();
+
+    @Query("select b from Branch b join fetch b.partner")
+    List<Branch> findAllWithPartner();
 }

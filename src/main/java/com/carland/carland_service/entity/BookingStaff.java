@@ -59,6 +59,9 @@ public class BookingStaff {
     @Column(nullable = false)
     String phoneNumber;
 
+    @Column(length = 128)
+    String email;
+
     String name;
     String surname;
 
