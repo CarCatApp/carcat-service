@@ -16,19 +16,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * tr: Mevcut Hyper partner şubelerine katalog + iptal sebepleri. Yeni partner satırı yok.
- * en: Catalog + cancel reasons on existing Hyper partner branches. No new partner row.
+ * tr: Eski Hyper katalog/iptal seed'i. Prod'da veri var; boot'ta çalışmaz.
+ *     Boş ortam için testten {@code run()} çağrılır.
+ * en: Legacy Hyper catalog/cancel seed. Prod already has rows; not run on boot.
+ *     Empty env: call {@code run()} from tests.
  */
 @Slf4j
-@Component
-@Order(21)
 @RequiredArgsConstructor
 public class BookingCatalogSeeder implements ApplicationRunner {
 

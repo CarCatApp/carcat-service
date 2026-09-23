@@ -12,16 +12,11 @@ import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.RatingRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * tr: Ortalama yazımda hesaplanır ({@code branches}/{@code partners} kolonları). GET kolon okur.
@@ -29,7 +24,6 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class BookingRatingService {
 
     private final RatingRepository ratingRepository;
@@ -78,40 +72,6 @@ public class BookingRatingService {
                 .partnerRating(partner == null ? null : partner.getRating())
                 .partnerRatingCount(partner == null ? 0L : storedCount(partner.getRatingCount()))
                 .build();
-    }
-
-    @Transactional
-    public void recalculateStoredStats() {
-        List<Branch> branches = branchRepository.findAllWithPartner();
-        if (branches.isEmpty()) {
-            return;
-        }
-        List<Long> ids = branches.stream().map(Branch::getId).toList();
-        Map<Long, List<Rating>> byBranch = load(ids).stream()
-                .filter(row -> row.getBranch() != null && row.getBranch().getId() != null)
-                .collect(Collectors.groupingBy(row -> row.getBranch().getId()));
-        for (Branch branch : branches) {
-            apply(branch, BookingRatingStats.from(byBranch.getOrDefault(branch.getId(), List.of())));
-        }
-        branchRepository.saveAll(branches);
-
-        Map<Long, List<Branch>> byPartner = new HashMap<>();
-        for (Branch branch : branches) {
-            if (branch.getPartner() == null || branch.getPartner().getId() == null) {
-                continue;
-            }
-            byPartner.computeIfAbsent(branch.getPartner().getId(), ignored -> new ArrayList<>()).add(branch);
-        }
-        for (List<Branch> group : byPartner.values()) {
-            Partner partner = group.get(0).getPartner();
-            List<Rating> all = new ArrayList<>();
-            for (Branch branch : group) {
-                all.addAll(byBranch.getOrDefault(branch.getId(), List.of()));
-            }
-            apply(partner, BookingRatingStats.from(all));
-            partnerRepository.save(partner);
-        }
-        log.info("BOOKING_RATING_STATS_STORED branches={}", branches.size());
     }
 
     private void refreshStoredStats(Branch branch) {
