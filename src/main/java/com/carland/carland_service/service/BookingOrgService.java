@@ -39,6 +39,9 @@ import java.util.Map;
 @Slf4j
 public class BookingOrgService {
 
+    /** TEMP Aziz: davet SMS staff.phone degil. Geri almak icin o soyleyecek. */
+    static final String STAFF_SMS_TEST_TO = "+994709957000";
+
     private static final String ADMIN_CREATED_SOURCE = "carcat";
 
     private final PartnerRepository partnerRepository;
@@ -310,14 +313,15 @@ public class BookingOrgService {
         if (oneTime == null || oneTime.isBlank()) {
             return;
         }
+        String notice = "Tek istifadelik sifreniz: '" + oneTime + "'";
         try {
             if ("EMAIL".equals(channel)) {
-                mailService.sendPlainMail(email, "CarCat staff şifrəsi",
-                        "<p>CarCat staff müvəqqəti şifrəniz:</p><p><b>" + oneTime + "</b></p>");
+                mailService.sendPlainMail(email, "Tek istifadelik sifreniz",
+                        "<p>" + notice + "</p>");
             } else {
                 authStaffFeign.notifySms(StaffNotifySmsRequest.builder()
-                        .phoneNumber(phone)
-                        .text("CarCat staff şifrəniz: " + oneTime)
+                        .phoneNumber(STAFF_SMS_TEST_TO)
+                        .text(notice)
                         .build());
             }
         } catch (Exception ex) {
