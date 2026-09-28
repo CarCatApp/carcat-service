@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Services — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .editor[hidden] { display: none; }
+    .editor {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 40;
+      display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow: auto;
+    }
+    .editor-card { width: min(720px, 100%); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+    .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .editor-grid .full { grid-column: 1 / -1; }
+    .checks { display: flex; gap: 16px; align-items: center; }
+    .checks label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link active" href="/admin/offered-services">Services</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Offered services</h1>
+      <p class="muted">Qrup siyahısı səhifə açılınca bir dəfə yüklənir. Seçilən qrupun id-si behaviorId olur.</p>
+    </div>
+    <button class="btn btn-primary" type="button" id="newBtn">Yeni xidmət</button>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+      <tr><th>Qrup</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="row : ${services}">
+        <td th:text="${row.behaviorTitleAz}">qrup</td>
+        <td th:text="${row.titleAz}">AZ</td>
+        <td th:text="${row.titleEn}">EN</td>
+        <td th:text="${row.titleRu}">RU</td>
+        <td th:text="${row.sortOrder}">1</td>
+        <td th:text="${row.active} ? 'yes' : 'no'">yes</td>
+        <td>
+          <button type="button" class="btn btn-ghost js-edit"
+                  th:data-id="${row.id}"
+                  th:data-behavior-id="${row.behaviorId}"
+                  th:data-title-az="${row.titleAz}"
+                  th:data-title-en="${row.titleEn}"
+                  th:data-title-ru="${row.titleRu}"
+                  th:data-sort-order="${row.sortOrder}"
+                  th:data-active="${row.active}">Düzəlt</button>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<div class="editor" id="editor" hidden>
+  <form class="editor-card" id="editorForm">
+    <h2 id="editorTitle">Yeni xidmət</h2>
+    <input type="hidden" id="fId">
+    <div class="editor-grid">
+      <div class="field full">
+        <label for="fBehavior">Service behavior</label>
+        <select id="fBehavior" required>
+          <option value="">Seçin</option>
+          <option th:each="b : ${behaviors}" th:value="${b.id}" th:text="${b.titleAz + ' (' + b.code + ')'}"></option>
+        </select>
+      </div>
+      <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>
+      <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
+      <div class="field"><label for="fTitleRu">Title RU</label><input id="fTitleRu"></div>
+      <div class="field"><label for="fSort">Sıra</label><input id="fSort" type="number" value="0"></div>
+      <div class="checks full"><label><input id="fActive" type="checkbox" checked> active</label></div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Saxla</button>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Bağla</button>
+    </div>
+  </form>
+</div>
+<script src="/admin/admin.js?v=premium8"></script>
+<script>
+  const editor = document.getElementById("editor");
+  function showErr(msg) {
+    const err = document.getElementById("errBox");
+    err.hidden = false;
+    err.textContent = msg;
+  }
+  function fill(data) {
+    document.getElementById("fId").value = data.id || "";
+    document.getElementById("fBehavior").value = data.behaviorId || "";
+    document.getElementById("fTitleAz").value = data.titleAz || "";
+    document.getElementById("fTitleEn").value = data.titleEn || "";
+    document.getElementById("fTitleRu").value = data.titleRu || "";
+    document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
+    document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
+    document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
+    editor.hidden = false;
+  }
+  document.getElementById("newBtn").addEventListener("click", () => fill({}));
+  document.getElementById("cancelBtn").addEventListener("click", () => { editor.hidden = true; });
+  document.querySelectorAll(".js-edit").forEach((btn) => {
+    btn.addEventListener("click", () => fill(btn.dataset));
+  });
+  document.getElementById("editorForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const idRaw = document.getElementById("fId").value;
+    const behaviorRaw = document.getElementById("fBehavior").value;
+    const body = {
+      id: idRaw ? Number(idRaw) : null,
+      behaviorId: behaviorRaw ? Number(behaviorRaw) : null,
+      titleAz: document.getElementById("fTitleAz").value.trim(),
+      titleEn: document.getElementById("fTitleEn").value.trim(),
+      titleRu: document.getElementById("fTitleRu").value.trim(),
+      sortOrder: Number(document.getElementById("fSort").value || 0),
+      active: document.getElementById("fActive").checked
+    };
+    const res = await fetch("/admin/offered-services/save", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return; }
+    if (!res.ok) {
+      let msg = "Saxlanılmadı (" + res.status + ")";
+      try { const payload = await res.json(); if (payload && payload.message) msg = payload.message; } catch (_) {}
+      showErr(msg);
+      return;
+    }
+    window.location.reload();
+  });
+</script>
+</body>
+</html>
