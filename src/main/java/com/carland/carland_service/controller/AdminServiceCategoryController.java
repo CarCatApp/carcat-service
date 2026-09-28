@@ -83,8 +83,8 @@ public class AdminServiceCategoryController {
     }
 
     /**
-     * tr: Kategori ikonunu yükler. PhotoService iconVersion artırır ve Redis'i commit sonrası siler.
-     * en: Uploads the category icon. PhotoService bumps iconVersion and evicts Redis after commit.
+     * tr: Kategori ikonunu yükler. PhotoService Redis'i commit sonrası siler.
+     * en: Uploads the category icon. PhotoService evicts Redis after commit.
      */
     @PostMapping(value = "/admin/service-categories/icon/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseBody

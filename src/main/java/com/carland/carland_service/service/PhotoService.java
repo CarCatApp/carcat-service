@@ -128,14 +128,14 @@ public interface PhotoService {
     ResponseEntity<byte[]> getServiceCategoryPhoto(Long categoryId);
 
     /**
-     * tr: Hizmet kategorisi ikonunu yükler. Eski byte'ın üzerine yazar, iconVersion artar, Redis commit sonrası silinir.
-     * en: Uploads a service-category icon. Overwrites existing bytes, bumps iconVersion, and evicts Redis after commit.
+     * tr: Hizmet kategorisi ikonunu yükler. Eski byte'ın üzerine yazar, Redis commit sonrası silinir.
+     * en: Uploads a service-category icon. Overwrites existing bytes and evicts Redis after commit.
      */
     PhotoResponse uploadServiceCategoryPhoto(MultipartFile file, Long categoryId);
 
     /**
-     * tr: Hizmet kategorisi ikonunu siler. iconVersion artar, Redis commit sonrası silinir.
-     * en: Deletes the service-category icon. Bumps iconVersion and evicts Redis after commit.
+     * tr: Hizmet kategorisi ikonunu siler. Redis commit sonrası silinir.
+     * en: Deletes the service-category icon and evicts Redis after commit.
      */
     PhotoResponse deleteServiceCategoryPhoto(Long categoryId);
 

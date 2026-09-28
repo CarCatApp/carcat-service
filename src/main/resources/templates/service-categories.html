@@ -109,7 +109,7 @@
       <tr th:each="row : ${categories}">
         <td>
           <img th:if="${row.hasIcon}" class="cat-icon" alt=""
-               th:src="@{/admin/service-categories/icon(categoryId=${row.id},v=${row.iconVersion})}">
+               th:src="@{/admin/service-categories/icon(categoryId=${row.id})}">
           <div th:unless="${row.hasIcon}" class="cat-ph">No icon</div>
           <div class="icon-actions">
             <input type="file" accept="image/*" class="js-file" th:attr="data-id=${row.id}">
@@ -195,6 +195,10 @@
         <label for="fKeys">Direction keys</label>
         <input id="fKeys" placeholder="dir:repair,dir:inspection">
       </div>
+      <div class="field full">
+        <label for="fIcon">Icon</label>
+        <input id="fIcon" type="file" accept="image/*">
+      </div>
       <div class="checks full">
         <label><input id="fOpenable" type="checkbox"> openable</label>
         <label><input id="fToggleable" type="checkbox" checked> toggleable</label>
@@ -240,6 +244,7 @@
     document.getElementById("fOpenable").checked = data.openable === true || data.openable === "true";
     document.getElementById("fToggleable").checked = data.id ? (data.toggleable === true || data.toggleable === "true") : true;
     document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
+    document.getElementById("fIcon").value = "";
     document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni kateqoriya";
     editor.hidden = false;
   }
@@ -301,6 +306,25 @@
       } catch (_) {}
       showErr(msg);
       return;
+    }
+    const saved = await res.json();
+    const icon = document.getElementById("fIcon").files && document.getElementById("fIcon").files[0];
+    if (icon && saved && saved.id) {
+      const fd = new FormData();
+      fd.append("file", icon);
+      const upload = await fetch("/admin/service-categories/icon/upload?categoryId=" + encodeURIComponent(saved.id), {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin"
+      });
+      if (upload.status === 401 || upload.status === 403) {
+        window.location.href = "/admin/";
+        return;
+      }
+      if (!upload.ok) {
+        showErr("Kateqoriya saxlandı, ikon yüklənmədi (" + upload.status + ")");
+        return;
+      }
     }
     window.location.reload();
   });

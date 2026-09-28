@@ -27,6 +27,5 @@ public class AdminServiceCategoryRow {
     Boolean toggleable;
     Boolean active;
     String directionKeys;
-    Integer iconVersion;
     Boolean hasIcon;
 }

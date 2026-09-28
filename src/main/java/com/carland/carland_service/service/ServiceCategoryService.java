@@ -127,7 +127,6 @@ public class ServiceCategoryService {
             }
             category = ServiceCategory.builder()
                     .code(code)
-                    .iconVersion(0)
                     .build();
         } else {
             category = categoryRepository.findById(body.getId())
@@ -194,14 +193,13 @@ public class ServiceCategoryService {
 
     private StaffCatalogCategoryView toView(ServiceCategory category, boolean activeForBranch) {
         boolean hasIcon = photoRepository.existsByCategoryId(category.getId());
-        int version = category.getIconVersion() == null ? 0 : category.getIconVersion();
         return StaffCatalogCategoryView.builder()
                 .id(category.getId())
                 .code(category.getCode())
                 .title(json.read(category.getTitleJson()))
                 .description(json.read(category.getDescriptionJson()))
                 .iconUrl(hasIcon
-                        ? "/api/v1/photo/for/service-category/get?categoryId=" + category.getId() + "&v=" + version
+                        ? "/api/v1/photo/for/service-category/get?categoryId=" + category.getId()
                         : null)
                 .openable(Boolean.TRUE.equals(category.getOpenable()))
                 .toggleable(Boolean.TRUE.equals(category.getToggleable()))
@@ -227,7 +225,6 @@ public class ServiceCategoryService {
                 .toggleable(category.getToggleable())
                 .active(category.getActive())
                 .directionKeys(category.getDirectionKeys())
-                .iconVersion(category.getIconVersion())
                 .hasIcon(photoRepository.existsByCategoryId(category.getId()))
                 .build();
     }

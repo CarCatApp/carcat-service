@@ -76,7 +76,6 @@ class ServiceCategoryServiceTest {
                 .openable(true)
                 .toggleable(false)
                 .active(true)
-                .iconVersion(3)
                 .build();
         repair = ServiceCategory.builder()
                 .id(2L)
@@ -87,7 +86,6 @@ class ServiceCategoryServiceTest {
                 .toggleable(true)
                 .active(true)
                 .directionKeys("dir:repair,dir:inspection")
-                .iconVersion(0)
                 .build();
     }
 
@@ -108,7 +106,7 @@ class ServiceCategoryServiceTest {
         assertEquals("Dövri Qulluq", first.getTitle().get("az"));
         assertTrue(first.getActive());
         assertFalse(first.getToggleable());
-        assertEquals("/api/v1/photo/for/service-category/get?categoryId=1&v=3", first.getIconUrl());
+        assertEquals("/api/v1/photo/for/service-category/get?categoryId=1", first.getIconUrl());
         StaffCatalogCategoryView second = response.getItems().get(1);
         assertFalse(second.getActive());
         assertNull(second.getIconUrl());

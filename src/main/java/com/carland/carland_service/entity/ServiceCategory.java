@@ -57,9 +57,4 @@ public class ServiceCategory {
     /** virgüllü BranchService.serviceKey listesi, örn. "dir:repair,dir:inspection" */
     @Column(name = "direction_keys", length = 256)
     String directionKeys;
-
-    /** her ikon yükleme/silmede +1 (tarayıcı önbelleği için URL'e eklenir) */
-    @Column(name = "icon_version", nullable = false)
-    @Builder.Default
-    Integer iconVersion = 0;
 }

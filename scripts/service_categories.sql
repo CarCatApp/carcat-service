@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS service_categories (
     toggleable        boolean      NOT NULL DEFAULT true,
     active            boolean      NOT NULL DEFAULT true,
     direction_keys    varchar(256),
-    icon_version      integer      NOT NULL DEFAULT 0,
     CONSTRAINT uk_service_categories_code UNIQUE (code)
 );
 
@@ -34,19 +33,19 @@ CREATE TABLE IF NOT EXISTS service_category_photos (
 );
 
 INSERT INTO service_categories (
-    code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys, icon_version
+    code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys
 ) VALUES (
     'routine',
     '{"az":"Dövri Qulluq","en":"Routine Care","ru":"Плановое обслуживание"}',
     '{"az":"Paketlər və fərdi dövri qulluq xidmətləri","en":"Packages and individual routine care services","ru":"Пакеты и отдельные услуги планового обслуживания"}',
-    1, true, false, true, NULL, 0
+    1, true, false, true, NULL
 ) ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO service_categories (
-    code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys, icon_version
+    code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys
 ) VALUES (
     'repair_inspection',
     '{"az":"Təmir Xidməti və Yoxlanış","en":"Repair & Inspection","ru":"Ремонт и диагностика"}',
     '{"az":"Avtomobil təmir və yoxlanış xidmətləri","en":"Vehicle repair and inspection services","ru":"Ремонт и диагностика автомобиля"}',
-    2, false, true, true, 'dir:repair,dir:inspection', 0
+    2, false, true, true, 'dir:repair,dir:inspection'
 ) ON CONFLICT (code) DO NOTHING;

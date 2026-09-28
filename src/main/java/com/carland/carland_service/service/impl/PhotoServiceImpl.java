@@ -20,7 +20,6 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
-import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -30,7 +29,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -760,16 +758,9 @@ public class PhotoServiceImpl implements PhotoService {
         return ResponseEntity.ok().contentType(mediaType).body(empty.getImageData());
     }
 
-    private static final CacheControl SERVICE_CATEGORY_ICON_CACHE = CacheControl
-            .maxAge(31536000, TimeUnit.SECONDS)
-            .cachePrivate()
-            .immutable();
-
     /**
      * tr: Kategori ikonunu Redis sonra DB'den döner. Kategori veya foto yoksa 404. Empty-state yok.
-     *     Başarılı yanıt Cache-Control: private, max-age=31536000, immutable.
-     * en: Returns the category icon from Redis then DB. 404 when the category or photo is missing.
-     *     No empty-state. Success sets Cache-Control private, max-age=31536000, immutable.
+     * en: Returns the category icon from Redis then DB. 404 when the category or photo is missing. No empty-state.
      */
     @Override
     public ResponseEntity<byte[]> getServiceCategoryPhoto(Long categoryId) {
@@ -781,7 +772,7 @@ public class PhotoServiceImpl implements PhotoService {
         }
         ResponseEntity<byte[]> cached = redisCacheService.getServiceCategoryPhoto(categoryId);
         if (cached != null && cached.getBody() != null && cached.getBody().length > 0) {
-            return iconResponse(cached.getHeaders().getContentType(), cached.getBody());
+            return cached;
         }
         ServiceCategoryPhoto photo = serviceCategoryPhotoRepository.findByCategoryId(categoryId);
         if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {
@@ -789,12 +780,12 @@ public class PhotoServiceImpl implements PhotoService {
         }
         MediaType mediaType = mediaTypeOf(photo.getFileType());
         redisCacheService.putServiceCategoryPhoto(categoryId, mediaType, photo.getImageData());
-        return iconResponse(mediaType, photo.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
     }
 
     /**
-     * tr: Kategori ikonunu yükler. Satır varsa byte güncellenir. iconVersion +1. Redis commit sonrası DEL.
-     * en: Uploads a category icon. Updates bytes when a row exists. iconVersion +1. DELs Redis after commit.
+     * tr: Kategori ikonunu yükler. Satır varsa byte güncellenir. Redis commit sonrası DEL.
+     * en: Uploads a category icon. Updates bytes when a row exists. DELs Redis after commit.
      */
     @Override
     @Transactional
@@ -802,8 +793,9 @@ public class PhotoServiceImpl implements PhotoService {
         if (file == null || categoryId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
-        ServiceCategory category = serviceCategoryRepository.findById(categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("category not found"));
+        if (!serviceCategoryRepository.existsById(categoryId)) {
+            throw new ResourceNotFoundException("category not found");
+        }
         try {
             DetectedImage image = detectImage(file);
             ServiceCategoryPhoto photo = serviceCategoryPhotoRepository.findByCategoryId(categoryId);
@@ -814,7 +806,6 @@ public class PhotoServiceImpl implements PhotoService {
             photo.setFileType(image.fileType());
             photo.setImageData(image.bytes());
             serviceCategoryPhotoRepository.save(photo);
-            bumpIconVersion(category);
             redisCacheService.evictServiceCategoryPhotoAfterCommit(categoryId);
             return PhotoResponse.builder()
                     .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
@@ -825,8 +816,8 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: Kategori ikon satırını siler. Foto yoksa 404. iconVersion +1. Redis commit sonrası DEL.
-     * en: Deletes the category icon row. 404 when no photo. iconVersion +1. DELs Redis after commit.
+     * tr: Kategori ikon satırını siler. Foto yoksa 404. Redis commit sonrası DEL.
+     * en: Deletes the category icon row. 404 when no photo. DELs Redis after commit.
      */
     @Override
     @Transactional
@@ -834,31 +825,17 @@ public class PhotoServiceImpl implements PhotoService {
         if (categoryId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
-        ServiceCategory category = serviceCategoryRepository.findById(categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("category not found"));
+        if (!serviceCategoryRepository.existsById(categoryId)) {
+            throw new ResourceNotFoundException("category not found");
+        }
         if (!serviceCategoryPhotoRepository.existsByCategoryId(categoryId)) {
             throw new ResourceNotFoundException("category photo not found");
         }
         serviceCategoryPhotoRepository.deleteByCategoryId(categoryId);
-        bumpIconVersion(category);
         redisCacheService.evictServiceCategoryPhotoAfterCommit(categoryId);
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
                 .build();
-    }
-
-    private void bumpIconVersion(ServiceCategory category) {
-        int next = category.getIconVersion() == null ? 1 : category.getIconVersion() + 1;
-        category.setIconVersion(next);
-        serviceCategoryRepository.save(category);
-    }
-
-    private static ResponseEntity<byte[]> iconResponse(MediaType mediaType, byte[] bytes) {
-        MediaType type = mediaType == null ? MediaType.APPLICATION_OCTET_STREAM : mediaType;
-        return ResponseEntity.ok()
-                .contentType(type)
-                .cacheControl(SERVICE_CATEGORY_ICON_CACHE)
-                .body(bytes);
     }
 
     /**
