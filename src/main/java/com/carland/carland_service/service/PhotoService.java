@@ -121,4 +121,22 @@ public interface PhotoService {
      */
     ResponseEntity<byte[]> getPercentageEmptyPhoto();
 
+    /**
+     * tr: Hizmet kategorisi ikonunu döner. Kategori veya foto yoksa 404. Empty-state yok.
+     * en: Returns the service-category icon. 404 when the category or the photo is missing. No empty-state.
+     */
+    ResponseEntity<byte[]> getServiceCategoryPhoto(Long categoryId);
+
+    /**
+     * tr: Hizmet kategorisi ikonunu yükler. Eski byte'ın üzerine yazar, iconVersion artar, Redis commit sonrası silinir.
+     * en: Uploads a service-category icon. Overwrites existing bytes, bumps iconVersion, and evicts Redis after commit.
+     */
+    PhotoResponse uploadServiceCategoryPhoto(MultipartFile file, Long categoryId);
+
+    /**
+     * tr: Hizmet kategorisi ikonunu siler. iconVersion artar, Redis commit sonrası silinir.
+     * en: Deletes the service-category icon. Bumps iconVersion and evicts Redis after commit.
+     */
+    PhotoResponse deleteServiceCategoryPhoto(Long categoryId);
+
 }

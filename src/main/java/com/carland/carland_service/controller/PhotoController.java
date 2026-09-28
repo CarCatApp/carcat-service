@@ -13,9 +13,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * tr: Fotoğraf REST controller'ı; araç fotoğrafı, partner logosu/rozet logosu, kullanıcı profil fotoğrafı
- *     ve bakım kalemi (percentage) ikonları için yükleme/getirme uçlarını sunar.
+ *     bakım kalemi (percentage) ve hizmet kategorisi ikonları için yükleme/getirme uçlarını sunar.
  * en: REST controller for photos; exposes upload/fetch for car photos, partner logos/badge logos,
- *     user profile pictures, and maintenance-item (percentage) icons.
+ *     user profile pictures, maintenance-item (percentage) icons, and service-category icons.
  */
 @RestController
 @RequestMapping("/api/v1/photo")
@@ -177,6 +177,35 @@ public class PhotoController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     public PhotoResponse uploadPercentageEmptyPhoto(@RequestPart("file") MultipartFile file) {
         return photoService.uploadPercentageEmptyPhoto(file);
+    }
+
+    /**
+     * tr: Hizmet kategorisi ikonunu döner. Foto yoksa 404 (empty-state yok). role / X-User-Id gerekmez.
+     * en: Returns the service-category icon. 404 when the photo is missing (no empty-state). No role / X-User-Id.
+     */
+    @GetMapping(value = "/for/service-category/get", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getServiceCategoryPhoto(@RequestParam("categoryId") Long categoryId) {
+        return photoService.getServiceCategoryPhoto(categoryId);
+    }
+
+    /**
+     * tr: Hizmet kategorisi ikonunu yükler. Postman: form-data key = file, query categoryId.
+     * en: Uploads the service-category icon. Postman: form-data key = file, query categoryId.
+     */
+    @PostMapping(value = "/for/service-category/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadServiceCategoryPhoto(@RequestPart("file") MultipartFile file,
+                                                    @RequestParam("categoryId") Long categoryId) {
+        return photoService.uploadServiceCategoryPhoto(file, categoryId);
+    }
+
+    /**
+     * tr: Hizmet kategorisi ikonunu siler.
+     * en: Deletes the service-category icon.
+     */
+    @DeleteMapping(value = "/for/service-category/delete", produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse deleteServiceCategoryPhoto(@RequestParam("categoryId") Long categoryId) {
+        return photoService.deleteServiceCategoryPhoto(categoryId);
     }
 
 

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Categories — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .cat-icon, .cat-ph {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: var(--primary-soft);
+      object-fit: contain;
+      display: block;
+    }
+    .cat-ph {
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .icon-actions { display: flex; flex-direction: column; gap: 6px; min-width: 120px; }
+    .icon-actions input[type=file] { width: 100%; font-size: 12px; }
+    .yes { color: var(--text); font-weight: 700; }
+    .no { color: var(--text-muted); }
+    .editor[hidden] { display: none; }
+    .editor {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 40;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 16px;
+      overflow: auto;
+    }
+    .editor-card {
+      width: min(720px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+    .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .editor-grid .full { grid-column: 1 / -1; }
+    .checks { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .checks label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+    @media (max-width: 720px) {
+      .editor-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link active" href="/admin/service-categories">Categories</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Service categories</h1>
+      <p class="muted">Partner panel <code>GET /api/v1/booking/staff/catalog/categories</code>. Silme yok — kapatmak için active kapatın.</p>
+    </div>
+    <button class="btn btn-primary" type="button" id="newBtn">Yeni kateqoriya</button>
+  </div>
+  <div class="ok-box" id="okBox" hidden></div>
+  <div class="error-box" id="errBox" hidden></div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+      <tr>
+        <th>Icon</th>
+        <th>Code</th>
+        <th>AZ / EN / RU</th>
+        <th>AZ açıqlama</th>
+        <th>Sıra</th>
+        <th>Open</th>
+        <th>Toggle</th>
+        <th>Active</th>
+        <th>Directions</th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="row : ${categories}">
+        <td>
+          <img th:if="${row.hasIcon}" class="cat-icon" alt=""
+               th:src="@{/admin/service-categories/icon(categoryId=${row.id},v=${row.iconVersion})}">
+          <div th:unless="${row.hasIcon}" class="cat-ph">No icon</div>
+          <div class="icon-actions">
+            <input type="file" accept="image/*" class="js-file" th:attr="data-id=${row.id}">
+            <button class="btn btn-filter js-upload" type="button" th:attr="data-id=${row.id}">Yüklə</button>
+            <button class="btn btn-ghost js-delete" type="button" th:if="${row.hasIcon}" th:attr="data-id=${row.id}">Sil</button>
+          </div>
+        </td>
+        <td th:text="${row.code}">routine</td>
+        <td>
+          <div th:text="${row.titleAz}">AZ</div>
+          <div class="muted" th:text="${row.titleEn}">EN</div>
+          <div class="muted" th:text="${row.titleRu}">RU</div>
+        </td>
+        <td th:text="${row.descriptionAz}">desc</td>
+        <td th:text="${row.sortOrder}">1</td>
+        <td th:text="${row.openable} ? 'yes' : 'no'" th:classappend="${row.openable} ? 'yes' : 'no'">no</td>
+        <td th:text="${row.toggleable} ? 'yes' : 'no'" th:classappend="${row.toggleable} ? 'yes' : 'no'">yes</td>
+        <td th:text="${row.active} ? 'yes' : 'no'" th:classappend="${row.active} ? 'yes' : 'no'">yes</td>
+        <td th:text="${row.directionKeys}">dir:repair</td>
+        <td>
+          <button type="button" class="btn btn-ghost js-edit"
+                  th:data-id="${row.id}"
+                  th:data-code="${row.code}"
+                  th:data-title-az="${row.titleAz}"
+                  th:data-title-en="${row.titleEn}"
+                  th:data-title-ru="${row.titleRu}"
+                  th:data-description-az="${row.descriptionAz}"
+                  th:data-description-en="${row.descriptionEn}"
+                  th:data-description-ru="${row.descriptionRu}"
+                  th:data-sort-order="${row.sortOrder}"
+                  th:data-openable="${row.openable}"
+                  th:data-toggleable="${row.toggleable}"
+                  th:data-active="${row.active}"
+                  th:data-direction-keys="${row.directionKeys}">Düzəlt</button>
+        </td>
+      </tr>
+      <tr th:if="${categories == null || categories.isEmpty()}">
+        <td colspan="10">Kateqoriya yoxdur. <code>scripts/service_categories.sql</code> işlədin.</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="editor" id="editor" hidden>
+  <form class="editor-card" id="editorForm">
+    <h2 id="editorTitle">Yeni kateqoriya</h2>
+    <input type="hidden" id="fId">
+    <div class="editor-grid">
+      <div class="field">
+        <label for="fCode">Code</label>
+        <input id="fCode" maxlength="64" autocomplete="off" placeholder="repair_inspection">
+      </div>
+      <div class="field">
+        <label for="fSort">Sıra</label>
+        <input id="fSort" type="number" value="0">
+      </div>
+      <div class="field">
+        <label for="fTitleAz">Title AZ</label>
+        <input id="fTitleAz" required>
+      </div>
+      <div class="field">
+        <label for="fTitleEn">Title EN</label>
+        <input id="fTitleEn">
+      </div>
+      <div class="field full">
+        <label for="fTitleRu">Title RU</label>
+        <input id="fTitleRu">
+      </div>
+      <div class="field">
+        <label for="fDescAz">Description AZ</label>
+        <input id="fDescAz">
+      </div>
+      <div class="field">
+        <label for="fDescEn">Description EN</label>
+        <input id="fDescEn">
+      </div>
+      <div class="field full">
+        <label for="fDescRu">Description RU</label>
+        <input id="fDescRu">
+      </div>
+      <div class="field full">
+        <label for="fKeys">Direction keys</label>
+        <input id="fKeys" placeholder="dir:repair,dir:inspection">
+      </div>
+      <div class="checks full">
+        <label><input id="fOpenable" type="checkbox"> openable</label>
+        <label><input id="fToggleable" type="checkbox" checked> toggleable</label>
+        <label><input id="fActive" type="checkbox" checked> active</label>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Saxla</button>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Bağla</button>
+    </div>
+  </form>
+</div>
+
+<script src="/admin/admin.js?v=premium8"></script>
+<script>
+  const editor = document.getElementById("editor");
+  const codeInput = document.getElementById("fCode");
+
+  function showErr(msg) {
+    const ok = document.getElementById("okBox");
+    const err = document.getElementById("errBox");
+    err.hidden = false;
+    err.textContent = msg;
+    ok.hidden = true;
+  }
+
+  function val(id) {
+    return document.getElementById(id).value;
+  }
+
+  function fill(data) {
+    document.getElementById("fId").value = data.id || "";
+    codeInput.value = data.code || "";
+    codeInput.readOnly = !!data.id;
+    document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
+    document.getElementById("fTitleAz").value = data.titleAz || "";
+    document.getElementById("fTitleEn").value = data.titleEn || "";
+    document.getElementById("fTitleRu").value = data.titleRu || "";
+    document.getElementById("fDescAz").value = data.descriptionAz || "";
+    document.getElementById("fDescEn").value = data.descriptionEn || "";
+    document.getElementById("fDescRu").value = data.descriptionRu || "";
+    document.getElementById("fKeys").value = data.directionKeys || "";
+    document.getElementById("fOpenable").checked = data.openable === true || data.openable === "true";
+    document.getElementById("fToggleable").checked = data.id ? (data.toggleable === true || data.toggleable === "true") : true;
+    document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
+    document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni kateqoriya";
+    editor.hidden = false;
+  }
+
+  document.getElementById("newBtn").addEventListener("click", () => fill({}));
+  document.getElementById("cancelBtn").addEventListener("click", () => { editor.hidden = true; });
+
+  document.querySelectorAll(".js-edit").forEach((btn) => {
+    btn.addEventListener("click", () => fill({
+      id: btn.dataset.id,
+      code: btn.dataset.code,
+      titleAz: btn.dataset.titleAz,
+      titleEn: btn.dataset.titleEn,
+      titleRu: btn.dataset.titleRu,
+      descriptionAz: btn.dataset.descriptionAz,
+      descriptionEn: btn.dataset.descriptionEn,
+      descriptionRu: btn.dataset.descriptionRu,
+      sortOrder: btn.dataset.sortOrder,
+      openable: btn.dataset.openable,
+      toggleable: btn.dataset.toggleable,
+      active: btn.dataset.active,
+      directionKeys: btn.dataset.directionKeys
+    }));
+  });
+
+  document.getElementById("editorForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const idRaw = val("fId");
+    const body = {
+      id: idRaw ? Number(idRaw) : null,
+      code: val("fCode").trim(),
+      titleAz: val("fTitleAz").trim(),
+      titleEn: val("fTitleEn").trim(),
+      titleRu: val("fTitleRu").trim(),
+      descriptionAz: val("fDescAz").trim(),
+      descriptionEn: val("fDescEn").trim(),
+      descriptionRu: val("fDescRu").trim(),
+      sortOrder: Number(val("fSort") || 0),
+      openable: document.getElementById("fOpenable").checked,
+      toggleable: document.getElementById("fToggleable").checked,
+      active: document.getElementById("fActive").checked,
+      directionKeys: val("fKeys").trim()
+    };
+    const res = await fetch("/admin/service-categories/save", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return;
+    }
+    if (!res.ok) {
+      let msg = "Saxlanılmadı (" + res.status + ")";
+      try {
+        const payload = await res.json();
+        if (payload && payload.message) msg = payload.message;
+      } catch (_) {}
+      showErr(msg);
+      return;
+    }
+    window.location.reload();
+  });
+
+  async function postFile(categoryId) {
+    const input = document.querySelector('.js-file[data-id="' + categoryId + '"]');
+    const file = input && input.files && input.files[0];
+    if (!file) { showErr("Foto seçin."); return; }
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/admin/service-categories/icon/upload?categoryId=" + encodeURIComponent(categoryId), {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin"
+    });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return;
+    }
+    if (!res.ok) {
+      let msg = "Yükləmə uğursuz (" + res.status + ")";
+      try {
+        const payload = await res.json();
+        if (payload && payload.message) msg = payload.message;
+      } catch (_) {}
+      showErr(msg);
+      return;
+    }
+    window.location.reload();
+  }
+
+  document.querySelectorAll(".js-upload").forEach((btn) => {
+    btn.addEventListener("click", () => postFile(btn.dataset.id));
+  });
+
+  document.querySelectorAll(".js-delete").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const res = await fetch("/admin/service-categories/icon/delete?categoryId=" + encodeURIComponent(btn.dataset.id), {
+        method: "POST",
+        credentials: "same-origin"
+      });
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/admin/";
+        return;
+      }
+      if (!res.ok) {
+        showErr("Silinmədi (" + res.status + ")");
+        return;
+      }
+      window.location.reload();
+    });
+  });
+</script>
+</body>
+</html>

@@ -133,6 +133,26 @@ public class RedisCacheService {
         runAfterCommit(this::evictPercentageEmptyPhoto);
     }
 
+    /**
+     * tr: Hizmet kategorisi ikonu. Key photo:service-category:{categoryId}. Yazan: PhotoServiceImpl upload/delete → evict after commit.
+     * en: Service-category icon. Key photo:service-category:{categoryId}. Writers: PhotoServiceImpl upload/delete evict after commit.
+     */
+    public ResponseEntity<byte[]> getServiceCategoryPhoto(Long categoryId) {
+        return getPhoto("photo:service-category:" + categoryId, "service-category-photo categoryId=" + categoryId);
+    }
+
+    public void putServiceCategoryPhoto(Long categoryId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:service-category:" + categoryId, mediaType, bytes);
+    }
+
+    public void evictServiceCategoryPhoto(Long categoryId) {
+        deletePhoto("photo:service-category:" + categoryId);
+    }
+
+    public void evictServiceCategoryPhotoAfterCommit(Long categoryId) {
+        runAfterCommit(() -> evictServiceCategoryPhoto(categoryId));
+    }
+
     public VisitHistoryResponse getOrLoadHistoryV2(String vin, String lang, Supplier<VisitHistoryResponse> loader) {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);

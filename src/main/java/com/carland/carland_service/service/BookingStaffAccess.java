@@ -6,6 +6,7 @@ import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -24,6 +25,21 @@ public class BookingStaffAccess {
 
     private final BookingStaffRepository staffRepository;
     private final BranchRepository branchRepository;
+
+    /**
+     * tr: Staff token, şifre değişim kilidi ve aktif üyelik. StaffBookingService.requireStaff ile aynı kural.
+     * en: Staff token, password-change lock, and active membership. Same rule as StaffBookingService.requireStaff.
+     */
+    public BookingStaff requireStaff(Long userId, boolean mustChangePassword, String acceptLanguage) {
+        if (userId == null) {
+            throw new ForbiddenException("Staff token required");
+        }
+        if (mustChangePassword) {
+            throw new ForbiddenException("Şifrəni dəyişdirməlisiniz");
+        }
+        String lang = acceptLanguage == null ? "az" : acceptLanguage;
+        return requireActive(userId, lang);
+    }
 
     public BookingStaff requireActive(Long userId, String acceptLanguage) {
         return staffRepository.findByUserId(userId).stream()
