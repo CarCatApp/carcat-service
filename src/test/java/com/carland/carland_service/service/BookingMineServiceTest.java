@@ -112,6 +112,7 @@ class BookingMineServiceTest {
         assertEquals("auto_accepted", out.getItems().get(0).getStatus());
         assertEquals(55L, out.getItems().get(0).getCarId());
         assertEquals("Xeqani", out.getItems().get(0).getBranchName());
+        assertEquals("Xeqani", out.getItems().get(0).getBranchAddress());
         assertEquals("Hyper", out.getItems().get(0).getPartnerName());
         assertEquals(1L, out.getItems().get(0).getPartnerId());
         assertEquals(7L, out.getItems().get(0).getBranchId());

@@ -27,6 +27,7 @@ public class BookingView {
     Long carId;
     String startsAt;
     String branchName;
+    String branchAddress;
     String partnerName;
     String logoUrl;
     List<String> serviceKeys;

@@ -404,6 +404,7 @@ public class BookingMineService {
                 .branchId(branch == null ? null : branch.getId())
                 .partnerId(partner == null ? null : partner.getId())
                 .branchName(branch == null ? null : branch.getName())
+                .branchAddress(branch == null ? null : branch.getAddress())
                 .partnerName(partner == null ? null : partner.getName())
                 .logoUrl(logoUrl(partner, withPhoto))
                 .slotId(range == null ? null : range.getRangeId())
