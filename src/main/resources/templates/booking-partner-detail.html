@@ -6,6 +6,22 @@
   <title th:text="'Partner ' + ${partner.name}">Partner</title>
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
   <link rel="stylesheet" href="/admin/admin.css?v=booking2">
+  <style>
+    .verified-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+    .verified-switch {
+      appearance: none; width: 36px; height: 20px; margin: 0; border-radius: 999px;
+      background: var(--border, #d4d4d4); position: relative; cursor: pointer; flex: none;
+    }
+    .verified-switch::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff; transition: transform .15s ease;
+    }
+    .verified-switch:checked { background: var(--text, #111); }
+    .verified-switch:checked::after { transform: translateX(16px); }
+    .branch-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .branch-edit label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+    .branch-edit input[type="time"] { height: 32px; }
+  </style>
 </head>
 <body class="booking-page">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -82,9 +98,9 @@
         <input type="text" name="contactPhone" placeholder="+99470xxxxxxx">
       </div>
       <div class="filter-field">
-        <label>Açılış</label>
+        <label>Həftə içi açılış</label>
         <div class="time-wheel" data-time data-default="09:00">
-          <input type="hidden" name="hoursStart" value="09:00">
+          <input type="hidden" name="weekdayStart" value="09:00">
           <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
             <span class="time-wheel-face">09:00</span>
             <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -99,9 +115,9 @@
         </div>
       </div>
       <div class="filter-field">
-        <label>Bağlanış</label>
+        <label>Həftə içi bağlanış</label>
         <div class="time-wheel" data-time data-default="18:00">
-          <input type="hidden" name="hoursEnd" value="18:00">
+          <input type="hidden" name="weekdayEnd" value="18:00">
           <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
             <span class="time-wheel-face">18:00</span>
             <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -116,6 +132,47 @@
         </div>
       </div>
       <div class="filter-field">
+        <label>Həftə sonu açılış</label>
+        <div class="time-wheel" data-time data-default="10:00">
+          <input type="hidden" name="weekendStart" value="10:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">10:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Həftə sonu bağlanış</label>
+        <div class="time-wheel" data-time data-default="16:00">
+          <input type="hidden" name="weekendEnd" value="16:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">16:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Verified</label>
+        <label class="verified-label">
+          <input class="verified-switch" type="checkbox" name="verified" value="true">
+          <span>Verified</span>
+        </label>
+      </div>
+      <div class="filter-field">
         <label>Photo URL</label>
         <input type="text" name="photo">
       </div>
@@ -128,20 +185,42 @@
       <table class="data-table">
         <thead>
         <tr>
-          <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th><th>Saat</th>
-          <th>Məkan</th>
+          <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th>
+          <th>Həftə içi</th><th>Həftə sonu</th><th>Verified</th><th>Məkan</th><th></th>
         </tr>
         </thead>
         <tbody>
-        <tr th:each="b : ${branches}">
+        <tr th:each="b : ${branches}"
+            th:with="day=${b.workingHoursWeekday != null ? b.workingHoursWeekday : b.workingHours}">
           <td th:text="${b.id}">1</td>
           <td th:text="${b.name}">Ad</td>
           <td th:text="${b.address}">—</td>
           <td th:text="${b.contactPhone != null} ? ${b.contactPhone} : '—'">—</td>
-          <td th:text="${b.workingHours != null} ? ${b.workingHours} : '—'">—</td>
+          <td>
+            <form class="branch-edit" th:id="'branch-edit-' + ${b.id}" method="post"
+                  th:action="@{/admin/booking-partners/{id}/branches/{branchId}(id=${partner.id}, branchId=${b.id})}">
+              <input type="time" name="weekdayStart" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(day) ? '' : #strings.substring(day, 0, 5)}">
+              <input type="time" name="weekdayEnd" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(day) or #strings.length(day) < 11 ? '' : #strings.substring(day, 6, 11)}">
+            </form>
+          </td>
+          <td>
+            <input type="time" name="weekendStart" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(b.workingHoursWeekend) ? '' : #strings.substring(b.workingHoursWeekend, 0, 5)}">
+            <input type="time" name="weekendEnd" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(b.workingHoursWeekend) or #strings.length(b.workingHoursWeekend) < 11 ? '' : #strings.substring(b.workingHoursWeekend, 6, 11)}">
+          </td>
+          <td>
+            <label class="verified-label">
+              <input class="verified-switch" type="checkbox" name="verified" value="true"
+                     th:form="'branch-edit-' + ${b.id}" th:checked="${b.verified}">
+            </label>
+          </td>
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
+          <td><button class="btn btn-filter" type="submit" th:form="'branch-edit-' + ${b.id}">Saxla</button></td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="6">Şöbə yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="9">Şöbə yoxdur</td></tr>
         </tbody>
       </table>
     </div>

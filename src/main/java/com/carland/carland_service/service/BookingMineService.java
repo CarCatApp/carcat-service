@@ -8,11 +8,14 @@ import com.carland.carland_service.dto.booking.BookingCarView;
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
 import com.carland.carland_service.dto.booking.BookingLineView;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
+import com.carland.carland_service.dto.booking.BookingPackageView;
 import com.carland.carland_service.dto.booking.BookingPatchRequest;
+import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingCancelReason;
 import com.carland.carland_service.entity.BookingItem;
+import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
@@ -28,7 +31,9 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.PartnerPhotoRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -60,14 +66,17 @@ public class BookingMineService {
     static final String DEFAULT_TZ = "Asia/Baku";
     static final String PAST_OR_COMPLETED = "Cannot cancel a completed or past booking";
     static final String OTHER_CODE = "other";
+    static final String LOGO_PATH = "/api/v1/photo/for/partner/get/";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter STARTS = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     private final BookingRepository bookingRepository;
     private final BookingItemRepository bookingItemRepository;
+    private final BookingSelectedServiceRepository bookingSelectedServiceRepository;
     private final CarRepository carRepository;
     private final BookingCreateService bookingCreateService;
     private final BookingCancelReasonRepository cancelReasonRepository;
+    private final PartnerPhotoRepository partnerPhotoRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -84,13 +93,15 @@ public class BookingMineService {
             size = 20;
         }
         size = Math.min(size, 50);
-        PageRequest pageable = PageRequest.of(safePage - 1, size, Sort.by("range.start").ascending());
+        PageRequest pageable = PageRequest.of(safePage - 1, size,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         List<String> statuses = parseStatuses(statusCsv);
         Page<Booking> result = loadPage(customerUserId, carId, statuses, pageable);
         Map<Long, List<String>> keys = keysByBooking(result.getContent());
+        Set<Long> withPhoto = partnerIdsWithPhoto(result.getContent());
         List<BookingView> items = new ArrayList<>();
         for (Booking booking : result.getContent()) {
-            items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone));
+            items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone, withPhoto));
         }
         return BookingMineResponse.builder()
                 .counts(countsOf(customerUserId, carId))
@@ -103,6 +114,12 @@ public class BookingMineService {
 
     @Transactional(readOnly = true)
     public BookingDetailResponse detail(Long customerUserId, String bookingKey, String timezoneHeader) {
+        return detail(customerUserId, bookingKey, timezoneHeader, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingDetailResponse detail(Long customerUserId, String bookingKey, String timezoneHeader,
+                                        String acceptLanguage) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
@@ -138,6 +155,7 @@ public class BookingMineService {
                 .branchName(branch == null ? null : branch.getName())
                 .branchAddress(branch == null ? null : branch.getAddress())
                 .partnerName(partner == null ? null : partner.getName())
+                .logoUrl(logoUrl(partner))
                 .slotId(range == null ? null : range.getRangeId())
                 .day(calendar == null || calendar.getDay() == null ? null : calendar.getDay().toString())
                 .start(clock(range == null ? null : range.getStart(), timezone))
@@ -145,12 +163,15 @@ public class BookingMineService {
                 .startsAt(startsAt(range == null ? null : range.getStart(), timezone))
                 .timezone(timezone)
                 .car(carOf(booking))
+                .bookedPackage(packageOf(booking))
+                .services(servicesOf(booking, acceptLanguage))
                 .items(lines)
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
+                .canceledBy(canceledBy(booking.getStatus()))
                 .canceledReason(canceledReasonOf(booking))
                 .build();
     }
@@ -167,9 +188,14 @@ public class BookingMineService {
         return BookingCancelReasonsResponse.builder().items(items).build();
     }
 
-    @Transactional
     public BookingDetailResponse patch(Long customerUserId, String bookingKey, BookingPatchRequest request,
                                        String timezoneHeader) {
+        return patch(customerUserId, bookingKey, request, timezoneHeader, null);
+    }
+
+    @Transactional
+    public BookingDetailResponse patch(Long customerUserId, String bookingKey, BookingPatchRequest request,
+                                       String timezoneHeader, String acceptLanguage) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
@@ -193,12 +219,17 @@ public class BookingMineService {
             throw MissingFieldException.required("slotId or serviceKeys");
         }
         bookingCreateService.applyEdit(booking, slotId, hasKeys ? keys : null);
-        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader);
+        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader, acceptLanguage);
+    }
+
+    public BookingDetailResponse cancel(Long customerUserId, String bookingKey, BookingCancelRequest request,
+                                        String timezoneHeader) {
+        return cancel(customerUserId, bookingKey, request, timezoneHeader, null);
     }
 
     @Transactional
     public BookingDetailResponse cancel(Long customerUserId, String bookingKey, BookingCancelRequest request,
-                                        String timezoneHeader) {
+                                        String timezoneHeader, String acceptLanguage) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
@@ -236,7 +267,7 @@ public class BookingMineService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(reason.getCode());
         booking.setCancelNote(note);
-        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader);
+        return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader, acceptLanguage);
     }
 
     private void requireOwnedCar(Long customerUserId, Long carId) {
@@ -357,7 +388,7 @@ public class BookingMineService {
                 ));
     }
 
-    private BookingView toView(Booking booking, List<String> keys, String timezone) {
+    private BookingView toView(Booking booking, List<String> keys, String timezone, Set<Long> withPhoto) {
         Range range = booking.getRange();
         Calendar calendar = range == null ? null : range.getCalendar();
         Branch branch = booking.getBranch();
@@ -372,6 +403,7 @@ public class BookingMineService {
                 .branchId(branch == null ? null : branch.getId())
                 .branchName(branch == null ? null : branch.getName())
                 .partnerName(partner == null ? null : partner.getName())
+                .logoUrl(logoUrl(partner, withPhoto))
                 .slotId(range == null ? null : range.getRangeId())
                 .day(calendar == null || calendar.getDay() == null ? null : calendar.getDay().toString())
                 .start(clock(range == null ? null : range.getStart(), timezone))
@@ -387,6 +419,119 @@ public class BookingMineService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .build();
+    }
+
+    private BookingPackageView packageOf(Booking booking) {
+        if (booking.getPackageName() == null && booking.getPackagePrice() == null) {
+            return null;
+        }
+        Integer price = booking.getPackagePrice();
+        return BookingPackageView.builder()
+                .name(booking.getPackageName())
+                .priceMin(price)
+                .priceMax(price)
+                .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
+                .unit(BookingCreateService.UNIT)
+                .build();
+    }
+
+    private List<BookingServiceLineView> servicesOf(Booking booking, String acceptLanguage) {
+        if (booking.getId() == null) {
+            return List.of();
+        }
+        List<BookingSelectedService> rows = bookingSelectedServiceRepository.findByBooking_IdOrderByIdAsc(booking.getId());
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        String lang = langOf(acceptLanguage);
+        List<BookingServiceLineView> lines = new ArrayList<>();
+        for (BookingSelectedService row : rows) {
+            lines.add(BookingServiceLineView.builder()
+                    .name(catalogText(titles(row.getTitleJson()), lang))
+                    .priceMin(null)
+                    .priceMax(null)
+                    .currency("AZN")
+                    .unit(BookingCreateService.UNIT)
+                    .build());
+        }
+        return lines;
+    }
+
+    private String logoUrl(Partner partner) {
+        if (partner == null || partner.getId() == null) {
+            return null;
+        }
+        return partnerPhotoRepository.existsByPartnerId(partner.getId())
+                ? LOGO_PATH + partner.getId() : null;
+    }
+
+    private String logoUrl(Partner partner, Set<Long> withPhoto) {
+        if (partner == null || partner.getId() == null || withPhoto == null || !withPhoto.contains(partner.getId())) {
+            return null;
+        }
+        return LOGO_PATH + partner.getId();
+    }
+
+    private Set<Long> partnerIdsWithPhoto(List<Booking> bookings) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (Booking booking : bookings) {
+            Branch branch = booking.getBranch();
+            Partner partner = branch == null ? null : branch.getPartner();
+            if (partner != null && partner.getId() != null) {
+                ids.add(partner.getId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> found = partnerPhotoRepository.findPartnerIdsByPartnerIdIn(ids);
+        if (found == null || found.isEmpty()) {
+            return Set.of();
+        }
+        return new LinkedHashSet<>(found);
+    }
+
+    private static String canceledBy(String status) {
+        if (BookingStatus.CANCELLED.apiValue().equals(status)) {
+            return BookingStatus.CANCELLED.apiValue();
+        }
+        if (BookingStatus.REJECTED.apiValue().equals(status)) {
+            return BookingStatus.REJECTED.apiValue();
+        }
+        return null;
+    }
+
+    static String langOf(String header) {
+        if (header == null || header.isBlank()) {
+            return "az";
+        }
+        String value = header.trim().toLowerCase(Locale.ROOT);
+        int comma = value.indexOf(',');
+        if (comma > 0) {
+            value = value.substring(0, comma).trim();
+        }
+        int dash = value.indexOf('-');
+        if (dash > 0) {
+            value = value.substring(0, dash);
+        }
+        return value.isBlank() ? "az" : value;
+    }
+
+    static String catalogText(Map<String, String> titles, String lang) {
+        if (titles == null || titles.isEmpty()) {
+            return null;
+        }
+        String picked = titles.get(lang);
+        if (picked != null && !picked.isBlank()) {
+            return picked;
+        }
+        for (String fallback : List.of("az", "en", "ru")) {
+            String value = titles.get(fallback);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private BookingCanceledReasonView canceledReasonOf(Booking booking) {

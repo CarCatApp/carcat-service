@@ -82,8 +82,11 @@ public class BookingAdminController {
             @RequestParam(required = false) String lat,
             @RequestParam(required = false) String lng,
             @RequestParam(required = false) String contactPhone,
-            @RequestParam(required = false) String hoursStart,
-            @RequestParam(required = false) String hoursEnd,
+            @RequestParam(required = false) String weekdayStart,
+            @RequestParam(required = false) String weekdayEnd,
+            @RequestParam(required = false) String weekendStart,
+            @RequestParam(required = false) String weekendEnd,
+            @RequestParam(required = false) String verified,
             @RequestParam(required = false) String photo,
             HttpServletRequest request,
             RedirectAttributes redirect
@@ -93,8 +96,34 @@ public class BookingAdminController {
         }
         try {
             bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), true,
-                    contactPhone, joinWorkingHours(hoursStart, hoursEnd), photo);
+                    contactPhone, joinWorkingHours(weekdayStart, weekdayEnd),
+                    joinWorkingHours(weekendStart, weekendEnd), "true".equals(verified), photo);
             redirect.addFlashAttribute("detailMessage", "Branch əlavə olundu");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
+    @PostMapping("/admin/booking-partners/{id}/branches/{branchId}")
+    public String updateBranch(
+            @PathVariable Long id,
+            @PathVariable Long branchId,
+            @RequestParam(required = false) String weekdayStart,
+            @RequestParam(required = false) String weekdayEnd,
+            @RequestParam(required = false) String weekendStart,
+            @RequestParam(required = false) String weekendEnd,
+            @RequestParam(required = false) String verified,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            bookingOrgService.updateBranchHours(id, branchId, "true".equals(verified),
+                    joinWorkingHours(weekdayStart, weekdayEnd), joinWorkingHours(weekendStart, weekendEnd));
+            redirect.addFlashAttribute("detailMessage", "Şöbə yeniləndi");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
         }

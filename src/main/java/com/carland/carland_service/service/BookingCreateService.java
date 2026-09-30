@@ -5,9 +5,12 @@ import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.BookingWriteRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingItem;
+import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.BranchService;
+import com.carland.carland_service.entity.OfferedService;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
@@ -20,10 +23,13 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.BookingSelectedServiceRepository;
+import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.BranchPackageRepository;
 import com.carland.carland_service.repository.BranchServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
+import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +42,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -58,6 +65,9 @@ public class BookingCreateService {
     private final BookingItemRepository bookingItemRepository;
     private final BranchPackageRepository packageRepository;
     private final BranchServiceRepository serviceRepository;
+    private final BranchCarePackageRepository carePackageRepository;
+    private final OfferedServiceRepository offeredServiceRepository;
+    private final BookingSelectedServiceRepository bookingSelectedServiceRepository;
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
@@ -89,7 +99,7 @@ public class BookingCreateService {
                 ? BookingStatus.PENDING.apiValue()
                 : BookingStatus.AUTO_ACCEPTED.apiValue();
         String vin = car.getVin();
-        Booking booking = bookingRepository.save(Booking.builder()
+        Booking booking = Booking.builder()
                 .ref(nextRef())
                 .customerUserId(customerUserId)
                 .branch(prepared.branch)
@@ -100,7 +110,9 @@ public class BookingCreateService {
                 .currency("AZN")
                 .vin(vin)
                 .carId(car.getCarId())
-                .build());
+                .build();
+        applyCarePackage(booking, prepared.branch, request.getCarePackageId());
+        booking = bookingRepository.save(booking);
         for (Line line : prepared.lines) {
             bookingItemRepository.save(BookingItem.builder()
                     .booking(booking)
@@ -110,6 +122,7 @@ public class BookingCreateService {
                     .priceMax(line.priceMax)
                     .build());
         }
+        attachOfferedServices(booking, request.getOfferedServiceIds());
         Calendar calendar = prepared.range.getCalendar();
         return BookingView.builder()
                 .bookingId(booking.getId())
@@ -125,8 +138,8 @@ public class BookingCreateService {
                 .vin(vin)
                 .carId(car.getCarId())
                 .serviceKeys(prepared.keys)
-                .priceMin(prepared.priceMin)
-                .priceMax(prepared.priceMax)
+                .priceMin(booking.getPriceMin())
+                .priceMax(booking.getPriceMax())
                 .currency("AZN")
                 .unit(UNIT)
                 .unreadCount(0)
@@ -163,6 +176,50 @@ public class BookingCreateService {
                     .titleSnapshot(line.title)
                     .priceMin(line.priceMin)
                     .priceMax(line.priceMax)
+                    .build());
+        }
+    }
+
+    private void applyCarePackage(Booking booking, Branch branch, Long carePackageId) {
+        if (carePackageId == null) {
+            return;
+        }
+        BranchCarePackage pkg = carePackageRepository.findById(carePackageId)
+                .orElseThrow(() -> new ResourceNotFoundException("care package not found"));
+        if (!Boolean.TRUE.equals(pkg.getActive())
+                || pkg.getBranch() == null
+                || branch == null
+                || !branch.getId().equals(pkg.getBranch().getId())) {
+            throw new ResourceNotFoundException("care package not found");
+        }
+        int qepik = pkg.getPrice() == null ? 0 : Math.multiplyExact(pkg.getPrice(), 100);
+        booking.setCarePackageId(pkg.getId());
+        booking.setPackageName(pkg.getName());
+        booking.setPackagePrice(qepik);
+        int min = booking.getPriceMin() == null ? 0 : booking.getPriceMin();
+        int max = booking.getPriceMax() == null ? 0 : booking.getPriceMax();
+        booking.setPriceMin(min + qepik);
+        booking.setPriceMax(max + qepik);
+    }
+
+    private void attachOfferedServices(Booking booking, List<Long> offeredServiceIds) {
+        if (offeredServiceIds == null || offeredServiceIds.isEmpty()) {
+            return;
+        }
+        Set<Long> seen = new LinkedHashSet<>();
+        for (Long id : offeredServiceIds) {
+            if (id == null || !seen.add(id)) {
+                continue;
+            }
+            OfferedService service = offeredServiceRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("offered service not found"));
+            if (!Boolean.TRUE.equals(service.getActive())) {
+                throw new ResourceNotFoundException("offered service not found");
+            }
+            bookingSelectedServiceRepository.save(BookingSelectedService.builder()
+                    .booking(booking)
+                    .offeredServiceId(service.getId())
+                    .titleJson(service.getTitleJson())
                     .build());
         }
     }

@@ -5,26 +5,26 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingBranchView {
-    Long id;
+public class BookingBranchProfileResponse {
+    Long branchId;
+    String name;
     Long partnerId;
     String partnerName;
-    String name;
+    Boolean verified;
+    String logoUrl;
     String address;
     Double lat;
     Double lng;
-    Boolean active;
-    Boolean partnerActive;
-    String contactPhone;
-    String workingHours;
+    Double distanceKm;
     String workingHoursWeekday;
     String workingHoursWeekend;
-    Boolean verified;
-    String photo;
-    Double rating;
-    Long ratingCount;
+    Boolean open;
+    List<BookingBranchProfileServiceView> services;
+    List<BookingBranchProfileProductView> products;
 }

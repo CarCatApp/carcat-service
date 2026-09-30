@@ -8,6 +8,7 @@ import com.carland.carland_service.dto.booking.BookingPatchRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingCancelReason;
 import com.carland.carland_service.entity.BookingItem;
+import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
@@ -21,7 +22,9 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.PartnerPhotoRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -39,6 +43,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,9 +57,11 @@ class BookingMineServiceTest {
 
     @Mock BookingRepository bookingRepository;
     @Mock BookingItemRepository bookingItemRepository;
+    @Mock BookingSelectedServiceRepository bookingSelectedServiceRepository;
     @Mock CarRepository carRepository;
     @Mock BookingCreateService bookingCreateService;
     @Mock BookingCancelReasonRepository cancelReasonRepository;
+    @Mock PartnerPhotoRepository partnerPhotoRepository;
 
     BookingMineService service;
     Booking booking;
@@ -63,8 +70,8 @@ class BookingMineServiceTest {
     @BeforeEach
     void setUp() {
         service = new BookingMineService(
-                bookingRepository, bookingItemRepository, carRepository, bookingCreateService,
-                cancelReasonRepository, new ObjectMapper());
+                bookingRepository, bookingItemRepository, bookingSelectedServiceRepository, carRepository,
+                bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper());
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
@@ -111,6 +118,9 @@ class BookingMineServiceTest {
         assertEquals(1L, out.getCounts().get("auto_accepted"));
         assertEquals(0L, out.getCounts().get("pending"));
         assertEquals(1, out.getTotal());
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(bookingRepository).findByCustomerUserId(eq(54L), pageable.capture());
+        assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
     }
 
     @Test
@@ -196,6 +206,39 @@ class BookingMineServiceTest {
         assertEquals("Hyper Extra", out.getItems().get(0).getTitle());
         assertEquals("Xeqani", out.getBranchAddress());
         assertEquals("2026-10-27T09:00:00+04:00", out.getStartsAt());
+        assertNull(out.getBookedPackage());
+        assertTrue(out.getServices().isEmpty());
+        assertNull(out.getCanceledBy());
+    }
+
+    @Test
+    void detailReturnsPackageAndOfferedServiceNameWithoutPrice() {
+        booking.setPackageName("Hyper Xaqani Extra");
+        booking.setPackagePrice(28500);
+        booking.setStatus("cancelled");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of());
+        when(bookingSelectedServiceRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of(
+                BookingSelectedService.builder()
+                        .offeredServiceId(12L)
+                        .titleJson("{\"az\":\"Mühərrik yağı\",\"en\":\"Engine oil\",\"ru\":\"Моторное масло\"}")
+                        .build()
+        ));
+        when(partnerPhotoRepository.existsByPartnerId(1L)).thenReturn(true);
+        when(carRepository.findByCarId(55L)).thenReturn(null);
+
+        BookingDetailResponse out = service.detail(54L, "3", "Asia/Baku", "ru");
+
+        assertEquals("Hyper Xaqani Extra", out.getBookedPackage().getName());
+        assertEquals(28500, out.getBookedPackage().getPriceMin());
+        assertEquals(28500, out.getBookedPackage().getPriceMax());
+        assertEquals("qepik", out.getBookedPackage().getUnit());
+        assertEquals("Моторное масло", out.getServices().get(0).getName());
+        assertNull(out.getServices().get(0).getPriceMin());
+        assertNull(out.getServices().get(0).getPriceMax());
+        assertEquals("qepik", out.getServices().get(0).getUnit());
+        assertEquals("cancelled", out.getCanceledBy());
+        assertEquals("/api/v1/photo/for/partner/get/1", out.getLogoUrl());
     }
 
     @Test

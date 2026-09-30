@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BookingDiscoveryBranchView {
     Long partnerId;
+    String partnerName;
     Long branchId;
     String name;
     String address;
@@ -19,6 +20,9 @@ public class BookingDiscoveryBranchView {
     Boolean active;
     String contactPhone;
     String workingHours;
+    String workingHoursWeekday;
+    String workingHoursWeekend;
+    Boolean verified;
     String photo;
     Double rating;
     Long ratingCount;

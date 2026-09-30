@@ -69,6 +69,17 @@ public class Booking {
     @Column(name = "car_id")
     Long carId;
 
+    /** Şubenin care paketi. İçerik satırları cevapta yok; ad ve fiyat kopyası. */
+    @Column(name = "care_package_id")
+    Long carePackageId;
+
+    @Column(name = "package_name", length = 80)
+    String packageName;
+
+    /** Care paket fiyatının qəpik kopyası. Aralık yok, min ve max aynı değer. */
+    @Column(name = "package_price")
+    Integer packagePrice;
+
     @Column(name = "cancel_reason_code", length = 64)
     String cancelReasonCode;
 

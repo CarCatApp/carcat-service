@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,6 +21,7 @@ public class BookingDetailResponse {
     String branchName;
     String branchAddress;
     String partnerName;
+    String logoUrl;
     Long slotId;
     String day;
     String start;
@@ -27,11 +29,15 @@ public class BookingDetailResponse {
     String startsAt;
     String timezone;
     BookingCarView car;
+    @JsonProperty("package")
+    BookingPackageView bookedPackage;
+    List<BookingServiceLineView> services;
     List<BookingLineView> items;
     Integer priceMin;
     Integer priceMax;
     String currency;
     String unit;
     Integer unreadCount;
+    String canceledBy;
     BookingCanceledReasonView canceledReason;
 }

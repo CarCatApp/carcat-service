@@ -44,8 +44,18 @@ public class Branch {
     @Column(name = "contact_phone", length = 32)
     String contactPhone;
 
+    /** Köhnə tək aralıq. Həftə içi saatı ilə eyni yazılır ki, köhnə cavab boş qalmasın. */
     @Column(name = "working_hours", length = 512)
     String workingHours;
+
+    @Column(name = "working_hours_weekday", length = 32)
+    String workingHoursWeekday;
+
+    @Column(name = "working_hours_weekend", length = 32)
+    String workingHoursWeekend;
+
+    @Builder.Default
+    Boolean verified = false;
 
     @Column(length = 512)
     String photo;
@@ -88,6 +98,9 @@ public class Branch {
         }
         if (ratingCount == null) {
             ratingCount = 0L;
+        }
+        if (verified == null) {
+            verified = false;
         }
     }
 

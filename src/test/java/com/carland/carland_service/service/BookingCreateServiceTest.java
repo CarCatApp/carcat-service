@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.booking.BookingQuoteResponse;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.BookingWriteRequest;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.Calendar;
@@ -14,12 +15,17 @@ import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.entity.BranchCarePackage;
+import com.carland.carland_service.entity.OfferedService;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.BookingSelectedServiceRepository;
+import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.BranchPackageRepository;
 import com.carland.carland_service.repository.BranchServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
+import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -52,6 +59,9 @@ class BookingCreateServiceTest {
     @Mock BookingItemRepository bookingItemRepository;
     @Mock BranchPackageRepository packageRepository;
     @Mock BranchServiceRepository serviceRepository;
+    @Mock BranchCarePackageRepository carePackageRepository;
+    @Mock OfferedServiceRepository offeredServiceRepository;
+    @Mock BookingSelectedServiceRepository bookingSelectedServiceRepository;
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
 
@@ -65,7 +75,8 @@ class BookingCreateServiceTest {
     void setUp() {
         service = new BookingCreateService(
                 rangeRepository, bookingRepository, bookingItemRepository,
-                packageRepository, serviceRepository, customerRepository, carRepository, new ObjectMapper());
+                packageRepository, serviceRepository, carePackageRepository, offeredServiceRepository,
+                bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper());
         customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
         car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();
@@ -124,6 +135,47 @@ class BookingCreateServiceTest {
         verify(bookingRepository).save(captor.capture());
         assertEquals(77L, captor.getValue().getCustomerUserId());
         assertEquals(55L, captor.getValue().getCarId());
+    }
+
+    @Test
+    void createCopiesCarePackageAndOfferedServiceName() {
+        stubCatalogAndRange(true);
+        stubOwnedCar();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.existsByRef(any())).thenReturn(false);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking saved = inv.getArgument(0);
+            saved.setId(46L);
+            return saved;
+        });
+        when(carePackageRepository.findById(4L)).thenReturn(Optional.of(BranchCarePackage.builder()
+                .id(4L)
+                .branch(branch)
+                .name("Hyper Xaqani Extra")
+                .price(285)
+                .active(true)
+                .build()));
+        when(offeredServiceRepository.findById(12L)).thenReturn(Optional.of(OfferedService.builder()
+                .id(12L)
+                .titleJson("{\"az\":\"Mühərrik yağı\",\"en\":\"Engine oil\",\"ru\":\"Моторное масло\"}")
+                .active(true)
+                .build()));
+        BookingWriteRequest req = request();
+        req.setCarePackageId(4L);
+        req.setOfferedServiceIds(List.of(12L));
+
+        BookingView out = service.create(req, 77L, "Asia/Baku");
+
+        assertEquals(12900 + 28500, out.getPriceMin());
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(bookingCaptor.capture());
+        assertEquals("Hyper Xaqani Extra", bookingCaptor.getValue().getPackageName());
+        assertEquals(28500, bookingCaptor.getValue().getPackagePrice());
+        ArgumentCaptor<BookingSelectedService> lineCaptor = ArgumentCaptor.forClass(BookingSelectedService.class);
+        verify(bookingSelectedServiceRepository).save(lineCaptor.capture());
+        assertEquals(12L, lineCaptor.getValue().getOfferedServiceId());
+        assertEquals("{\"az\":\"Mühərrik yağı\",\"en\":\"Engine oil\",\"ru\":\"Моторное масло\"}",
+                lineCaptor.getValue().getTitleJson());
     }
 
     @Test

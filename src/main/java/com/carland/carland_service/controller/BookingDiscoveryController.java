@@ -1,9 +1,12 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.BookingAvailabilityResponse;
+import com.carland.carland_service.dto.booking.BookingBranchListResponse;
+import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
 import com.carland.carland_service.dto.booking.BookingCatalogResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.service.BookingAvailabilityService;
+import com.carland.carland_service.service.BookingBranchProfileService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ public class BookingDiscoveryController {
     private final BookingDiscoveryService bookingDiscoveryService;
     private final BookingCatalogService bookingCatalogService;
     private final BookingAvailabilityService bookingAvailabilityService;
+    private final BookingBranchProfileService bookingBranchProfileService;
 
     @GetMapping("/api/v1/booking/partners")
     public BookingDiscoveryResponse discover(
@@ -37,6 +41,24 @@ public class BookingDiscoveryController {
             @RequestParam(required = false) Integer pageSize
     ) {
         return bookingDiscoveryService.discover(partnerId, q, lat, lng, radius, page, pageSize);
+    }
+
+    @GetMapping("/api/v1/booking/branches")
+    public BookingBranchListResponse branches(
+            @RequestHeader("Authorization") String token
+    ) {
+        return bookingDiscoveryService.listActive();
+    }
+
+    @GetMapping("/api/v1/booking/branches/{branchId}")
+    public BookingBranchProfileResponse profile(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng
+    ) {
+        return bookingBranchProfileService.profile(branchId, lat, lng, acceptLanguage);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/catalog")

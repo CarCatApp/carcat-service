@@ -27,6 +27,7 @@ public class BookingView {
     String startsAt;
     String branchName;
     String partnerName;
+    String logoUrl;
     List<String> serviceKeys;
     Integer priceMin;
     Integer priceMax;

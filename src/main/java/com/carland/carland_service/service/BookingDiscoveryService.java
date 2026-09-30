@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryBranchView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryPartnerView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
@@ -90,10 +91,21 @@ public class BookingDiscoveryService {
                 .build();
     }
 
+    /** Aktif şube + aktif partner. Sayfa yok, hepsi. */
+    @Transactional(readOnly = true)
+    public BookingBranchListResponse listActive() {
+        List<BookingDiscoveryBranchView> branches = new ArrayList<>();
+        for (Branch branch : branchRepository.findActiveWithActivePartner()) {
+            branches.add(toBranch(branch));
+        }
+        return BookingBranchListResponse.builder().branches(branches).build();
+    }
+
     private static BookingDiscoveryBranchView toBranch(Branch branch) {
         Partner partner = branch.getPartner();
         return BookingDiscoveryBranchView.builder()
                 .partnerId(partner.getId())
+                .partnerName(partner.getName())
                 .branchId(branch.getId())
                 .name(branch.getName())
                 .address(branch.getAddress())
@@ -102,6 +114,9 @@ public class BookingDiscoveryService {
                 .active(Boolean.TRUE.equals(branch.getActive()))
                 .contactPhone(branch.getContactPhone())
                 .workingHours(branch.getWorkingHours())
+                .workingHoursWeekday(branch.getWorkingHoursWeekday())
+                .workingHoursWeekend(branch.getWorkingHoursWeekend())
+                .verified(Boolean.TRUE.equals(branch.getVerified()))
                 .photo(branch.getPhoto())
                 .rating(branch.getRating())
                 .ratingCount(BookingRatingService.storedCount(branch.getRatingCount()))

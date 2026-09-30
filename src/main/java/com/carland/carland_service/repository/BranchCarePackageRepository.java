@@ -14,4 +14,6 @@ import java.util.List;
 public interface BranchCarePackageRepository extends JpaRepository<BranchCarePackage, Long> {
 
     List<BranchCarePackage> findByBranch_IdOrderByIdAsc(Long branchId);
+
+    long countByBranch_IdAndActiveTrue(Long branchId);
 }

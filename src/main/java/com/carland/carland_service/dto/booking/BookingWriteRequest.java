@@ -15,6 +15,10 @@ public class BookingWriteRequest {
     Long branchId;
     Long slotId;
     List<String> serviceKeys;
+    /** Şubenin branch_care_packages id. Yoksa paket dönmez. */
+    Long carePackageId;
+    /** Tekil hizmet: offered_services id. Fiyat aralığı yazılmaz. */
+    List<Long> offeredServiceIds;
     /** Ignored on create; VIN is copied from the owned car. Quote does not use it. */
     String vin;
     /** Required on create. Must belong to X-User-Id. Quote does not require it. */

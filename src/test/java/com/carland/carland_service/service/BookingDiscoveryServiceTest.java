@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryPartnerView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.entity.Branch;
@@ -62,6 +63,20 @@ class BookingDiscoveryServiceTest {
         assertEquals(1L, partner.getPartnerId());
         assertEquals("Hyper", partner.getName());
         assertEquals(7L, partner.getBranches().get(0).getBranchId());
+    }
+
+    @Test
+    void listActiveReturnsEveryActiveBranch() {
+        Branch closedPartnerBranch = Branch.builder().id(9L).name("Closed").active(true).partner(hyper).build();
+        when(branchRepository.findActiveWithActivePartner()).thenReturn(List.of(baku, far));
+
+        BookingBranchListResponse out = service.listActive();
+
+        assertEquals(2, out.getBranches().size());
+        assertEquals(7L, out.getBranches().get(0).getBranchId());
+        assertEquals("Hyper", out.getBranches().get(0).getPartnerName());
+        assertEquals(8L, out.getBranches().get(1).getBranchId());
+        assertTrue(out.getBranches().stream().noneMatch(b -> b.getBranchId().equals(closedPartnerBranch.getId())));
     }
 
     @Test

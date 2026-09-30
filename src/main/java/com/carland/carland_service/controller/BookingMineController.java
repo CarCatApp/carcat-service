@@ -53,9 +53,10 @@ public class BookingMineController {
             @RequestHeader("Authorization") String token,
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable String bookingId
     ) {
-        return bookingMineService.detail(parseUserId(userIdHeader), bookingId, timezone);
+        return bookingMineService.detail(parseUserId(userIdHeader), bookingId, timezone, acceptLanguage);
     }
 
     @PatchMapping("/api/v1/booking/bookings/{bookingId}")
@@ -63,10 +64,11 @@ public class BookingMineController {
             @RequestHeader("Authorization") String token,
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable String bookingId,
             @RequestBody(required = false) BookingPatchRequest request
     ) {
-        return bookingMineService.patch(parseUserId(userIdHeader), bookingId, request, timezone);
+        return bookingMineService.patch(parseUserId(userIdHeader), bookingId, request, timezone, acceptLanguage);
     }
 
     @PostMapping("/api/v1/booking/bookings/{bookingId}/cancel")
@@ -74,10 +76,11 @@ public class BookingMineController {
             @RequestHeader("Authorization") String token,
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable String bookingId,
             @RequestBody(required = false) BookingCancelRequest request
     ) {
-        return bookingMineService.cancel(parseUserId(userIdHeader), bookingId, request, timezone);
+        return bookingMineService.cancel(parseUserId(userIdHeader), bookingId, request, timezone, acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {
