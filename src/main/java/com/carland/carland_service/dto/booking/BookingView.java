@@ -17,6 +17,7 @@ public class BookingView {
     String status;
     String bookingMode;
     Long branchId;
+    Long partnerId;
     Long slotId;
     String day;
     String start;

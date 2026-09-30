@@ -113,6 +113,8 @@ class BookingMineServiceTest {
         assertEquals(55L, out.getItems().get(0).getCarId());
         assertEquals("Xeqani", out.getItems().get(0).getBranchName());
         assertEquals("Hyper", out.getItems().get(0).getPartnerName());
+        assertEquals(1L, out.getItems().get(0).getPartnerId());
+        assertEquals(7L, out.getItems().get(0).getBranchId());
         assertEquals("09:00", out.getItems().get(0).getStart());
         assertEquals("2026-10-27T09:00:00+04:00", out.getItems().get(0).getStartsAt());
         assertEquals(1L, out.getCounts().get("auto_accepted"));
@@ -205,6 +207,7 @@ class BookingMineServiceTest {
         assertEquals(2019, out.getCar().getYear());
         assertEquals("Hyper Extra", out.getItems().get(0).getTitle());
         assertEquals("Xeqani", out.getBranchAddress());
+        assertEquals(1L, out.getPartnerId());
         assertEquals("2026-10-27T09:00:00+04:00", out.getStartsAt());
         assertNull(out.getBookedPackage());
         assertTrue(out.getServices().isEmpty());

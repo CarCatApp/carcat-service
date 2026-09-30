@@ -20,6 +20,7 @@ public class BookingDetailResponse {
     Long branchId;
     String branchName;
     String branchAddress;
+    Long partnerId;
     String partnerName;
     String logoUrl;
     Long slotId;
