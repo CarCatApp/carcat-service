@@ -146,7 +146,7 @@ class BranchProfileServiceTest {
 
         ArgumentCaptor<BrandModel> captor = ArgumentCaptor.forClass(BrandModel.class);
         verify(brandModelRepository).save(captor.capture());
-        assertEquals("litr", captor.getValue().getUnit());
+        assertEquals("kq", captor.getValue().getUnit());
         assertEquals("Top Tec", captor.getValue().getSeries());
         assertEquals("5W-30", captor.getValue().getViscosity());
         assertEquals(Boolean.TRUE, view.getCanUploadBranchPhoto());

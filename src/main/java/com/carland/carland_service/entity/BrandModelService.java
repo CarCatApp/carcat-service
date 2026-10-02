@@ -47,7 +47,7 @@ public class BrandModelService {
     @Column(nullable = false, length = 120)
     String title;
 
-    @Column(nullable = false)
+    @Column(name = "is_oil", nullable = false)
     @Builder.Default
     Boolean oil = false;
 

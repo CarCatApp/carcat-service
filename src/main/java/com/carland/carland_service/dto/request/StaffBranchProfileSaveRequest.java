@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class StaffBranchProfileSaveRequest {
     String name;
     String instagram;
+    String contactEmail;
 }

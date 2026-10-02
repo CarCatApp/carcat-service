@@ -52,6 +52,18 @@ public class BookingStaffBranchProfileController {
                 acceptLanguage);
     }
 
+    @PatchMapping("/api/v1/booking/staff/branch/profile/email")
+    public StaffBranchProfileView updateContactEmail(
+            HttpServletRequest request,
+            @RequestBody StaffBranchProfileSaveRequest body,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return branchProfileService.updateContactEmail(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                body,
+                acceptLanguage);
+    }
+
     @PatchMapping("/api/v1/booking/staff/me")
     public StaffBranchProfileView updateStaffName(
             HttpServletRequest request,
@@ -122,6 +134,22 @@ public class BookingStaffBranchProfileController {
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 serviceId,
+                body,
+                acceptLanguage);
+    }
+
+    @PatchMapping("/api/v1/booking/staff/branch/brand-model-services/{serviceId}/models/{modelId}")
+    public StaffBranchProfileView updateBrandModel(
+            HttpServletRequest request,
+            @PathVariable Long serviceId,
+            @PathVariable Long modelId,
+            @RequestBody StaffBrandModelSaveRequest body,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return branchProfileService.updateBrandModel(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                serviceId,
+                modelId,
                 body,
                 acceptLanguage);
     }

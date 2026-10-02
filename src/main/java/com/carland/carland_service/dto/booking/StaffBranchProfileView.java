@@ -19,6 +19,7 @@ public class StaffBranchProfileView {
     Long branchId;
     String name;
     String instagram;
+    String contactEmail;
     Boolean hasPhoto;
     Boolean canUploadBranchPhoto;
     String staffName;

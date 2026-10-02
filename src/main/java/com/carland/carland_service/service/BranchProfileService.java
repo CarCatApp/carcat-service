@@ -72,6 +72,20 @@ public class BranchProfileService {
         return view(staff, branch);
     }
 
+    /**
+     * tr: Şube e-postasını yazar. Ad və Instagram dəyişmir.
+     * en: Writes the branch email. Name and Instagram stay as they are.
+     */
+    @Transactional
+    public StaffBranchProfileView updateContactEmail(Long userId, boolean mustChangePassword,
+                                                      StaffBranchProfileSaveRequest body, String acceptLanguage) {
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
+        Branch branch = resolveBranch(staff, acceptLanguage);
+        branch.setContactEmail(email(body == null ? null : body.getContactEmail()));
+        branchRepository.save(branch);
+        return view(staff, branch);
+    }
+
     @Transactional
     public StaffBranchProfileView updateStaffName(Long userId, boolean mustChangePassword,
                                                    StaffNameSaveRequest body, String acceptLanguage) {
@@ -163,10 +177,8 @@ public class BranchProfileService {
         if (Boolean.TRUE.equals(heading.getOil())) {
             series = required(body.getSeries(), "series", 80);
             viscosity = required(body.getViscosity(), "viscosity", 40);
-            unit = "litr";
-        } else {
-            unit = unit(body.getUnit());
         }
+        unit = unit(body.getUnit());
         brandModelRepository.save(BrandModel.builder()
                 .brandModelService(heading)
                 .name(required(body.getName(), "name", 80))
@@ -174,6 +186,34 @@ public class BranchProfileService {
                 .viscosity(viscosity)
                 .unit(unit)
                 .build());
+        return view(staff, branch);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
+                                                    Long modelId, StaffBrandModelSaveRequest body,
+                                                    String acceptLanguage) {
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
+        Branch branch = resolveBranch(staff, acceptLanguage);
+        BrandModelService heading = ownedHeading(branch, serviceId);
+        BrandModel model = brandModelRepository.findById(modelId)
+                .orElseThrow(() -> new ResourceNotFoundException("brand model not found"));
+        if (model.getBrandModelService() == null || !heading.getId().equals(model.getBrandModelService().getId())) {
+            throw new ResourceNotFoundException("brand model not found");
+        }
+        if (body == null) {
+            throw MissingFieldException.required("name");
+        }
+        model.setName(required(body.getName(), "name", 80));
+        if (Boolean.TRUE.equals(heading.getOil())) {
+            model.setSeries(required(body.getSeries(), "series", 80));
+            model.setViscosity(required(body.getViscosity(), "viscosity", 40));
+        } else {
+            model.setSeries(null);
+            model.setViscosity(null);
+        }
+        model.setUnit(unit(body.getUnit()));
+        brandModelRepository.save(model);
         return view(staff, branch);
     }
 
@@ -221,6 +261,7 @@ public class BranchProfileService {
                 .branchId(branch.getId())
                 .name(branch.getName())
                 .instagram(branch.getInstagram())
+                .contactEmail(branch.getContactEmail())
                 .hasPhoto(branchPhotoRepository.existsByBranchId(branch.getId()))
                 .canUploadBranchPhoto(!partnerAdmin)
                 .staffName(staff.getName())
@@ -262,6 +303,17 @@ public class BranchProfileService {
         String trimmed = value.trim();
         if (trimmed.length() > max) {
             throw new MissingFieldException(field + " is too long");
+        }
+        return trimmed;
+    }
+
+    private static String email(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > 128 || !trimmed.contains("@")) {
+            throw new MissingFieldException("contactEmail is invalid");
         }
         return trimmed;
     }
