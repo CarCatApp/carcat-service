@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import org.hibernate.annotations.ColumnDefault;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,6 +49,7 @@ public class BrandModelService {
     String title;
 
     @Column(name = "is_oil", nullable = false)
+    @ColumnDefault("false")
     @Builder.Default
     Boolean oil = false;
 
