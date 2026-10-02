@@ -21,8 +21,8 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
 /**
- * tr: Bir başlığın altındaki marka. Yağ değilse seriya və özüllük boş kalır.
- * en: A brand under one heading. Series and viscosity stay null unless the heading is oil.
+ * tr: Bir başlığın altındaki marka. Seriya her satırda durur; özüllük yalnız yağ listesinde dolar.
+ * en: A brand under one heading. Series is always stored; viscosity is filled only on oil lists.
  */
 @Entity
 @Data

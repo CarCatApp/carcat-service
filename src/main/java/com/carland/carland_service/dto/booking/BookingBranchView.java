@@ -20,6 +20,8 @@ public class BookingBranchView {
     Boolean active;
     Boolean partnerActive;
     String contactPhone;
+    String contactEmail;
+    String instagram;
     String workingHours;
     String workingHoursWeekday;
     String workingHoursWeekend;

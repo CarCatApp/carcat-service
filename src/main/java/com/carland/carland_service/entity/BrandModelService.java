@@ -22,8 +22,8 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
 /**
- * tr: Şubenin marka listesi başlığı. oil true ise satırlarda seriya və özüllük dolu olur.
- * en: A branch brand-list heading. When oil is true, rows carry series and viscosity.
+ * tr: Şubenin marka listesi başlığı. oil true ise satırlarda özüllük de dolu olur.
+ * en: A branch brand-list heading. When oil is true, rows also carry viscosity.
  */
 @Entity
 @Data
@@ -48,7 +48,7 @@ public class BrandModelService {
     @Column(nullable = false, length = 120)
     String title;
 
-    @Column(name = "is_oil", nullable = false)
+    @Column(name = "oil", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
     Boolean oil = false;

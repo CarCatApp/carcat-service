@@ -15,6 +15,8 @@ public interface UserPhotoRepository extends JpaRepository<UserPhoto, Long> {
     /** tr: Kullanıcı id'si ve telefonuna göre profil fotoğrafını bulur. / en: Finds the profile photo by user id and phone number. */
     UserPhoto findByUserIdAndUserPhoneNumber(Long userId, String phoneNumber);
 
+    UserPhoto findFirstByUserIdOrderByImageIdDesc(Long userId);
+
 
 
 }

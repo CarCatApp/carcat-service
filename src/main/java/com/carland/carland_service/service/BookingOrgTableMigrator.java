@@ -67,6 +67,9 @@ public class BookingOrgTableMigrator implements ApplicationRunner {
                 jdbc.execute("ALTER TABLE branches ADD COLUMN IF NOT EXISTS rating_count int8");
             }
         }
+        if (tableExists("brand_model_services") && columnExists("brand_model_services", "is_oil")) {
+            jdbc.execute("ALTER TABLE brand_model_services DROP COLUMN is_oil");
+        }
         relinkLegacyAutoService("calendars");
         relinkLegacyAutoService("appointments");
         dropForeignKeys("admins");

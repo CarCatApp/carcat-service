@@ -5,6 +5,7 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchPhoto;
 import com.carland.carland_service.entity.StaffPhoto;
+import com.carland.carland_service.entity.UserPhoto;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.FileStorageException;
@@ -15,6 +16,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.StaffPhotoRepository;
+import com.carland.carland_service.repository.UserPhotoRepository;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;
 import org.springframework.http.MediaType;
@@ -39,6 +41,7 @@ public class StaffMediaService {
     private final BranchRepository branchRepository;
     private final BranchPhotoRepository branchPhotoRepository;
     private final StaffPhotoRepository staffPhotoRepository;
+    private final UserPhotoRepository userPhotoRepository;
     private final RedisCacheService redisCacheService;
 
     /**
@@ -130,12 +133,38 @@ public class StaffMediaService {
             return cached;
         }
         StaffPhoto photo = staffPhotoRepository.findByUserId(staff.getUserId());
-        if (photo == null || photo.getImageData() == null) {
+        if (photo != null && photo.getImageData() != null) {
+            MediaType mediaType = mediaType(photo.getFileType());
+            redisCacheService.putStaffPhoto(staff.getUserId(), mediaType, photo.getImageData());
+            return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
+        }
+        return userProfilePhoto(staff, acceptLanguage);
+    }
+
+    /**
+     * tr: Staff fotoğrafı yoksa user_photos döner. Miss olunca photo:user dolar.
+     *     Silen: PhotoServiceImpl kullanıcı foto upload/delete.
+     * en: Falls back to user_photos. A miss fills photo:user. PhotoServiceImpl evicts that key.
+     */
+    private ResponseEntity<byte[]> userProfilePhoto(BookingStaff staff, String acceptLanguage) {
+        String userKey = String.valueOf(staff.getUserId());
+        ResponseEntity<byte[]> cached = redisCacheService.getUserPhoto(userKey);
+        if (cached != null) {
+            return cached;
+        }
+        UserPhoto userPhoto = null;
+        if (staff.getPhoneNumber() != null && !staff.getPhoneNumber().isBlank()) {
+            userPhoto = userPhotoRepository.findByUserIdAndUserPhoneNumber(staff.getUserId(), staff.getPhoneNumber());
+        }
+        if (userPhoto == null || userPhoto.getImageData() == null) {
+            userPhoto = userPhotoRepository.findFirstByUserIdOrderByImageIdDesc(staff.getUserId());
+        }
+        if (userPhoto == null || userPhoto.getImageData() == null) {
             throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
-        MediaType mediaType = mediaType(photo.getFileType());
-        redisCacheService.putStaffPhoto(staff.getUserId(), mediaType, photo.getImageData());
-        return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
+        MediaType mediaType = mediaType(userPhoto.getFileType());
+        redisCacheService.putUserPhoto(userKey, mediaType, userPhoto.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(userPhoto.getImageData());
     }
 
     private static byte[] imageBytes(MultipartFile file) {

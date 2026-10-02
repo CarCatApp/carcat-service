@@ -16,6 +16,7 @@ import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
 import com.carland.carland_service.repository.BrandModelServiceRepository;
 import com.carland.carland_service.repository.StaffPhotoRepository;
+import com.carland.carland_service.repository.UserPhotoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +47,7 @@ class BranchProfileServiceTest {
     @Mock BrandModelRepository brandModelRepository;
     @Mock BranchPhotoRepository branchPhotoRepository;
     @Mock StaffPhotoRepository staffPhotoRepository;
+    @Mock UserPhotoRepository userPhotoRepository;
     @Mock RedisCacheService redisCacheService;
 
     BranchProfileService profile;
@@ -72,6 +74,7 @@ class BranchProfileServiceTest {
                 branchRepository,
                 branchPhotoRepository,
                 staffPhotoRepository,
+                userPhotoRepository,
                 redisCacheService);
         Partner partner = Partner.builder().id(3L).build();
         branch = Branch.builder().id(12L).partner(partner).name("Hyper").build();
@@ -105,7 +108,7 @@ class BranchProfileServiceTest {
     }
 
     @Test
-    void nonOilModelKeepsSeriesAndViscosityNull() {
+    void nonOilModelKeepsSeriesAndDropsViscosity() {
         when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
         when(brandModelServiceRepository.findById(2L)).thenReturn(Optional.of(filterHeading));
         when(branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
@@ -124,7 +127,7 @@ class BranchProfileServiceTest {
         verify(brandModelRepository).save(captor.capture());
         assertEquals("Mann", captor.getValue().getName());
         assertEquals("eded", captor.getValue().getUnit());
-        assertNull(captor.getValue().getSeries());
+        assertEquals("should drop", captor.getValue().getSeries());
         assertNull(captor.getValue().getViscosity());
     }
 

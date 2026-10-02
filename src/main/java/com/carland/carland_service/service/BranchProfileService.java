@@ -172,14 +172,12 @@ public class BranchProfileService {
         if (body == null) {
             throw MissingFieldException.required("name");
         }
-        String series = null;
+        String series = required(body.getSeries(), "series", 80);
         String viscosity = null;
-        String unit;
         if (Boolean.TRUE.equals(heading.getOil())) {
-            series = required(body.getSeries(), "series", 80);
             viscosity = required(body.getViscosity(), "viscosity", 40);
         }
-        unit = unit(body.getUnit());
+        String unit = unit(body.getUnit());
         brandModelRepository.save(BrandModel.builder()
                 .brandModelService(heading)
                 .name(required(body.getName(), "name", 80))
@@ -206,11 +204,10 @@ public class BranchProfileService {
             throw MissingFieldException.required("name");
         }
         model.setName(required(body.getName(), "name", 80));
+        model.setSeries(required(body.getSeries(), "series", 80));
         if (Boolean.TRUE.equals(heading.getOil())) {
-            model.setSeries(required(body.getSeries(), "series", 80));
             model.setViscosity(required(body.getViscosity(), "viscosity", 40));
         } else {
-            model.setSeries(null);
             model.setViscosity(null);
         }
         model.setUnit(unit(body.getUnit()));

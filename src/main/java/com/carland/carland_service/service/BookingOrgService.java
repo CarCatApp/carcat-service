@@ -340,6 +340,8 @@ public class BookingOrgService {
                 .active(branch.getActive())
                 .partnerActive(partner.getActive())
                 .contactPhone(branch.getContactPhone())
+                .contactEmail(branch.getContactEmail())
+                .instagram(branch.getInstagram())
                 .workingHours(branch.getWorkingHours())
                 .workingHoursWeekday(branch.getWorkingHoursWeekday())
                 .workingHoursWeekend(branch.getWorkingHoursWeekend())
