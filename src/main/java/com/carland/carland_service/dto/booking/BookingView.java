@@ -31,6 +31,11 @@ public class BookingView {
     String partnerName;
     String logoUrl;
     List<String> serviceKeys;
+    String packageName;
+    Integer packagePrice;
+    List<BookingServiceLineView> individualServices;
+    BookingInspectionView inspection;
+    String serviceLabel;
     Integer priceMin;
     Integer priceMax;
     String currency;

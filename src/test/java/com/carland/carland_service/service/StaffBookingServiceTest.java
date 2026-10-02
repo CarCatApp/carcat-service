@@ -11,6 +11,8 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.repository.BookingIndividualLineRepository;
+import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +41,8 @@ class StaffBookingServiceTest {
     @Mock BookingStaffAccess bookingStaffAccess;
     @Mock BookingRepository bookingRepository;
     @Mock BookingItemRepository bookingItemRepository;
+    @Mock BookingIndividualLineRepository individualLineRepository;
+    @Mock BookingInspectionRepository inspectionRepository;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -47,7 +51,9 @@ class StaffBookingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StaffBookingService(bookingStaffAccess, bookingRepository, bookingItemRepository);
+        service = new StaffBookingService(
+                bookingStaffAccess, bookingRepository, bookingItemRepository,
+                individualLineRepository, inspectionRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()

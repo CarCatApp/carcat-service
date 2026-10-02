@@ -33,6 +33,9 @@ public class BookingDetailResponse {
     @JsonProperty("package")
     BookingPackageView bookedPackage;
     List<BookingServiceLineView> services;
+    List<BookingServiceLineView> individualServices;
+    BookingInspectionView inspection;
+    String serviceLabel;
     List<BookingLineView> items;
     Integer priceMin;
     Integer priceMax;

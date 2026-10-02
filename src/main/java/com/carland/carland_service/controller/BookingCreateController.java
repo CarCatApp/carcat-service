@@ -37,9 +37,10 @@ public class BookingCreateController {
             @RequestHeader("Authorization") String token,
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @RequestBody BookingWriteRequest request
     ) {
-        return bookingCreateService.create(request, parseUserId(userIdHeader), timezone);
+        return bookingCreateService.create(request, parseUserId(userIdHeader), timezone, acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {

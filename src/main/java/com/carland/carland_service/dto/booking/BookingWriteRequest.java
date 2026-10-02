@@ -19,6 +19,10 @@ public class BookingWriteRequest {
     Long carePackageId;
     /** Tekil hizmet: offered_services id. Fiyat aralığı yazılmaz. */
     List<Long> offeredServiceIds;
+    /** Fərdi dövri qulluq: individual_services id. Bir veya birden fazla. */
+    List<Long> individualServiceIds;
+    /** Təmir və yoxlanış metni. Doluysa booking_inspections satırı açılır. */
+    String issue;
     /** Ignored on create; VIN is copied from the owned car. Quote does not use it. */
     String vin;
     /** Required on create. Must belong to X-User-Id. Quote does not require it. */

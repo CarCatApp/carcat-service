@@ -4,7 +4,10 @@ import com.carland.carland_service.dto.booking.BookingQuoteResponse;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.BookingWriteRequest;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingSelectedService;
+import com.carland.carland_service.entity.BranchIndividualService;
+import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.Calendar;
@@ -64,6 +67,7 @@ class BookingCreateServiceTest {
     @Mock BookingSelectedServiceRepository bookingSelectedServiceRepository;
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
+    @Mock BookingSelectionWriter selectionWriter;
 
     BookingCreateService service;
     Range range;
@@ -76,7 +80,8 @@ class BookingCreateServiceTest {
         service = new BookingCreateService(
                 rangeRepository, bookingRepository, bookingItemRepository,
                 packageRepository, serviceRepository, carePackageRepository, offeredServiceRepository,
-                bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper());
+                bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper(),
+                selectionWriter);
         customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
         car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();
@@ -198,6 +203,51 @@ class BookingCreateServiceTest {
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).save(captor.capture());
         assertEquals("auto_accepted", captor.getValue().getStatus());
+    }
+
+    @Test
+    void createStoresPackageServicesAndInspection() {
+        stubCatalogAndRange(true);
+        stubOwnedCar();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.existsByRef(any())).thenReturn(false);
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking b = inv.getArgument(0);
+            b.setId(501L);
+            return b;
+        });
+        when(carePackageRepository.findById(5L)).thenReturn(Optional.of(BranchCarePackage.builder()
+                .id(5L).branch(branch).name("Hyper extra").price(129).active(true).build()));
+        IndividualService oil = IndividualService.builder()
+                .id(3L).code("MYF").titleJson("{\"az\":\"Yağ dəyişimi\"}").active(true).build();
+        BranchIndividualService row = BranchIndividualService.builder()
+                .individualService(oil).active(true).priceSimple(35).priceComplex(75).build();
+        BookingSelectionWriter.Priced priced = new BookingSelectionWriter.Priced(
+                List.of(row), "Generator akkumulyatoru doldurmur", 3500, 7500);
+        when(selectionWriter.price(eq(branch), eq(List.of(3L)), eq("Generator akkumulyatoru doldurmur")))
+                .thenReturn(priced);
+        when(selectionWriter.save(any(), any(), any(), eq(priced))).thenReturn(BookingInspection.builder()
+                .id(9L)
+                .message("Generator akkumulyatoru doldurmur")
+                .branchName("Xeqani")
+                .build());
+        BookingWriteRequest req = BookingWriteRequest.builder()
+                .branchId(7L)
+                .slotId(105L)
+                .carId(55L)
+                .carePackageId(5L)
+                .individualServiceIds(List.of(3L))
+                .issue("Generator akkumulyatoru doldurmur")
+                .build();
+
+        BookingView out = service.create(req, 77L, "Asia/Baku", "az");
+
+        assertEquals("Hyper extra", out.getPackageName());
+        assertEquals(12900, out.getPackagePrice());
+        assertEquals("Yağ dəyişimi", out.getIndividualServices().get(0).getName());
+        assertEquals("Generator akkumulyatoru doldurmur", out.getInspection().getMessage());
+        assertEquals("Dövri Qulluq + Təmir Xidməti və Yoxlanış", out.getServiceLabel());
+        assertEquals(16400, out.getPriceMin());
     }
 
     @Test

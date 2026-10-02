@@ -20,6 +20,8 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingCancelReasonRepository;
+import com.carland.carland_service.repository.BookingIndividualLineRepository;
+import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
@@ -58,6 +60,8 @@ class BookingMineServiceTest {
     @Mock BookingRepository bookingRepository;
     @Mock BookingItemRepository bookingItemRepository;
     @Mock BookingSelectedServiceRepository bookingSelectedServiceRepository;
+    @Mock BookingIndividualLineRepository individualLineRepository;
+    @Mock BookingInspectionRepository inspectionRepository;
     @Mock CarRepository carRepository;
     @Mock BookingCreateService bookingCreateService;
     @Mock BookingCancelReasonRepository cancelReasonRepository;
@@ -70,7 +74,8 @@ class BookingMineServiceTest {
     @BeforeEach
     void setUp() {
         service = new BookingMineService(
-                bookingRepository, bookingItemRepository, bookingSelectedServiceRepository, carRepository,
+                bookingRepository, bookingItemRepository, bookingSelectedServiceRepository,
+                individualLineRepository, inspectionRepository, carRepository,
                 bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper());
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();

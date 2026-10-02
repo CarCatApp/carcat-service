@@ -1,15 +1,20 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingQuoteResponse;
+import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.BookingWriteRequest;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingIndividualLine;
+import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchPackage;
+import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.BranchService;
+import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.OfferedService;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
@@ -71,16 +76,21 @@ public class BookingCreateService {
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
+    private final BookingSelectionWriter selectionWriter;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
         Prepared prepared = prepare(request, false, null);
+        BookingSelectionWriter.Priced priced = extras(prepared.branch, request);
+        int pack = carePackageQepik(prepared.branch, request == null ? null : request.getCarePackageId());
+        int extraMin = pack + (priced == null ? 0 : priced.priceMin());
+        int extraMax = pack + (priced == null ? 0 : priced.priceMax());
         return BookingQuoteResponse.builder()
                 .branchId(prepared.branch.getId())
                 .slotId(prepared.range.getRangeId())
                 .serviceKeys(prepared.keys)
-                .priceMin(prepared.priceMin)
-                .priceMax(prepared.priceMax)
+                .priceMin(prepared.priceMin + extraMin)
+                .priceMax(prepared.priceMax + extraMax)
                 .currency("AZN")
                 .unit(UNIT)
                 .build();
@@ -88,11 +98,18 @@ public class BookingCreateService {
 
     @Transactional
     public BookingView create(BookingWriteRequest request, Long customerUserId, String timezoneHeader) {
+        return create(request, customerUserId, timezoneHeader, "az");
+    }
+
+    @Transactional
+    public BookingView create(BookingWriteRequest request, Long customerUserId, String timezoneHeader,
+                              String acceptLanguage) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
         Prepared prepared = prepare(request, true, null);
         Car car = requireOwnedCar(customerUserId, request);
+        BookingSelectionWriter.Priced priced = extras(prepared.branch, request);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         String mode = modeOf(prepared.range);
         String status = BookingMode.APPROVAL.apiValue().equals(mode)
@@ -112,7 +129,18 @@ public class BookingCreateService {
                 .carId(car.getCarId())
                 .build();
         applyCarePackage(booking, prepared.branch, request.getCarePackageId());
+        if (priced != null) {
+            int min = booking.getPriceMin() == null ? 0 : booking.getPriceMin();
+            int max = booking.getPriceMax() == null ? 0 : booking.getPriceMax();
+            booking.setPriceMin(min + priced.priceMin());
+            booking.setPriceMax(max + priced.priceMax());
+        }
         booking = bookingRepository.save(booking);
+        BookingInspection inspection = null;
+        if (priced != null) {
+            Customer customer = customerRepository.findByUserId(customerUserId);
+            inspection = selectionWriter.save(booking, customer, car, priced);
+        }
         for (Line line : prepared.lines) {
             bookingItemRepository.save(BookingItem.builder()
                     .booking(booking)
@@ -138,6 +166,15 @@ public class BookingCreateService {
                 .vin(vin)
                 .carId(car.getCarId())
                 .serviceKeys(prepared.keys)
+                .packageName(booking.getPackageName())
+                .packagePrice(booking.getPackagePrice())
+                .individualServices(individualViews(priced, acceptLanguage))
+                .inspection(BookingSelectionViews.inspection(inspection))
+                .serviceLabel(BookingSelectionViews.label(
+                        booking.getPackageName(),
+                        priced != null && !priced.rows().isEmpty(),
+                        !prepared.keys.isEmpty(),
+                        inspection != null))
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
                 .currency("AZN")
@@ -178,6 +215,73 @@ public class BookingCreateService {
                     .priceMax(line.priceMax)
                     .build());
         }
+    }
+
+    private BookingSelectionWriter.Priced extras(Branch branch, BookingWriteRequest request) {
+        if (request == null || (!hasIds(request.getIndividualServiceIds()) && !hasText(request.getIssue()))) {
+            return null;
+        }
+        return selectionWriter.price(branch, request.getIndividualServiceIds(), request.getIssue());
+    }
+
+    private int carePackageQepik(Branch branch, Long carePackageId) {
+        if (carePackageId == null) {
+            return 0;
+        }
+        BranchCarePackage pkg = carePackageRepository.findById(carePackageId)
+                .orElseThrow(() -> new ResourceNotFoundException("care package not found"));
+        if (!Boolean.TRUE.equals(pkg.getActive())
+                || pkg.getBranch() == null
+                || branch == null
+                || !branch.getId().equals(pkg.getBranch().getId())) {
+            throw new ResourceNotFoundException("care package not found");
+        }
+        return pkg.getPrice() == null ? 0 : Math.multiplyExact(pkg.getPrice(), 100);
+    }
+
+    private List<BookingServiceLineView> individualViews(BookingSelectionWriter.Priced priced, String acceptLanguage) {
+        if (priced == null || priced.rows().isEmpty()) {
+            return List.of();
+        }
+        String lang = BookingMineService.langOf(acceptLanguage);
+        List<BookingServiceLineView> views = new ArrayList<>();
+        for (BranchIndividualService row : priced.rows()) {
+            IndividualService catalog = row.getIndividualService();
+            views.add(BookingSelectionViews.line(BookingIndividualLine.builder()
+                    .individualServiceId(catalog.getId())
+                    .code(catalog.getCode())
+                    .titleJson(catalog.getTitleJson())
+                    .priceSimple(row.getPriceSimple())
+                    .priceMedium(row.getPriceMedium())
+                    .priceComplex(row.getPriceComplex())
+                    .build(), lang));
+        }
+        return views;
+    }
+
+    private static boolean hasSelection(BookingWriteRequest request) {
+        if (request == null) {
+            return false;
+        }
+        return request.getCarePackageId() != null
+                || hasIds(request.getIndividualServiceIds())
+                || hasText(request.getIssue());
+    }
+
+    private static boolean hasIds(List<Long> ids) {
+        if (ids == null) {
+            return false;
+        }
+        for (Long id : ids) {
+            if (id != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasText(String issue) {
+        return issue != null && !issue.trim().isEmpty();
     }
 
     private void applyCarePackage(Booking booking, Branch branch, Long carePackageId) {
@@ -229,7 +333,7 @@ public class BookingCreateService {
             throw MissingFieldException.required("branchId, slotId");
         }
         List<String> keys = normalizeKeys(request.getServiceKeys());
-        if (keys.isEmpty()) {
+        if (keys.isEmpty() && !hasSelection(request)) {
             throw MissingFieldException.required("serviceKeys");
         }
         Range range = lock

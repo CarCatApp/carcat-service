@@ -1,13 +1,19 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.BookingAvailabilityResponse;
+import com.carland.carland_service.dto.booking.BookingCarePackagesResponse;
 import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
 import com.carland.carland_service.dto.booking.BookingBrandModelsResponse;
+import com.carland.carland_service.dto.booking.BookingIndividualServicesResponse;
+import com.carland.carland_service.dto.booking.BookingPackagePriceInfoResponse;
 import com.carland.carland_service.dto.booking.BookingCatalogResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.service.BookingAvailabilityService;
+import com.carland.carland_service.service.BookingCarePackageCatalogService;
 import com.carland.carland_service.service.BookingBranchBrandsService;
+import com.carland.carland_service.service.BookingIndividualCatalogService;
+import com.carland.carland_service.service.BookingPackagePriceInfoService;
 import com.carland.carland_service.service.BookingBranchProfileService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
@@ -31,6 +37,9 @@ public class BookingDiscoveryController {
     private final BookingAvailabilityService bookingAvailabilityService;
     private final BookingBranchProfileService bookingBranchProfileService;
     private final BookingBranchBrandsService bookingBranchBrandsService;
+    private final BookingIndividualCatalogService bookingIndividualCatalogService;
+    private final BookingCarePackageCatalogService bookingCarePackageCatalogService;
+    private final BookingPackagePriceInfoService bookingPackagePriceInfoService;
 
     @GetMapping("/api/v1/booking/partners")
     public BookingDiscoveryResponse discover(
@@ -70,6 +79,33 @@ public class BookingDiscoveryController {
             @PathVariable Long branchId
     ) {
         return bookingBranchBrandsService.list(branchId);
+    }
+
+    @GetMapping("/api/v1/booking/care-packages/{packageId}/price-info")
+    public BookingPackagePriceInfoResponse packagePriceInfo(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long packageId
+    ) {
+        return bookingPackagePriceInfoService.info(packageId, acceptLanguage);
+    }
+
+    @GetMapping("/api/v1/booking/branches/{branchId}/care-packages")
+    public BookingCarePackagesResponse carePackages(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId
+    ) {
+        return bookingCarePackageCatalogService.list(branchId, acceptLanguage);
+    }
+
+    @GetMapping("/api/v1/booking/branches/{branchId}/individual-services")
+    public BookingIndividualServicesResponse individualServices(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId
+    ) {
+        return bookingIndividualCatalogService.list(branchId, acceptLanguage);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/catalog")

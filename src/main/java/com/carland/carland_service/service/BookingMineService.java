@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.booking.BookingCancelReasonsResponse;
 import com.carland.carland_service.dto.booking.BookingCanceledReasonView;
 import com.carland.carland_service.dto.booking.BookingCarView;
 import com.carland.carland_service.dto.booking.BookingDetailResponse;
+import com.carland.carland_service.dto.booking.BookingInspectionView;
 import com.carland.carland_service.dto.booking.BookingLineView;
 import com.carland.carland_service.dto.booking.BookingMineResponse;
 import com.carland.carland_service.dto.booking.BookingPackageView;
@@ -14,6 +15,8 @@ import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingCancelReason;
+import com.carland.carland_service.entity.BookingIndividualLine;
+import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
@@ -29,6 +32,8 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingCancelReasonRepository;
+import com.carland.carland_service.repository.BookingIndividualLineRepository;
+import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
@@ -73,6 +78,8 @@ public class BookingMineService {
     private final BookingRepository bookingRepository;
     private final BookingItemRepository bookingItemRepository;
     private final BookingSelectedServiceRepository bookingSelectedServiceRepository;
+    private final BookingIndividualLineRepository individualLineRepository;
+    private final BookingInspectionRepository inspectionRepository;
     private final CarRepository carRepository;
     private final BookingCreateService bookingCreateService;
     private final BookingCancelReasonRepository cancelReasonRepository;
@@ -146,6 +153,8 @@ public class BookingMineService {
         Partner partner = branch == null ? null : branch.getPartner();
         String mode = range == null || range.getBookingMode() == null || range.getBookingMode().isBlank()
                 ? BookingMode.INSTANT.apiValue() : range.getBookingMode();
+        List<BookingServiceLineView> individualServices = individualLines(booking, acceptLanguage);
+        BookingInspectionView inspection = inspectionOf(booking);
         return BookingDetailResponse.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())
@@ -166,6 +175,13 @@ public class BookingMineService {
                 .car(carOf(booking))
                 .bookedPackage(packageOf(booking))
                 .services(servicesOf(booking, acceptLanguage))
+                .individualServices(individualServices)
+                .inspection(inspection)
+                .serviceLabel(BookingSelectionViews.label(
+                        booking.getPackageName(),
+                        !individualServices.isEmpty(),
+                        !lines.isEmpty(),
+                        inspection != null))
                 .items(lines)
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
@@ -436,6 +452,33 @@ public class BookingMineService {
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .build();
+    }
+
+    private List<BookingServiceLineView> individualLines(Booking booking, String acceptLanguage) {
+        if (booking.getId() == null) {
+            return List.of();
+        }
+        List<BookingIndividualLine> rows = individualLineRepository.findByBooking_IdOrderByIdAsc(booking.getId());
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        String lang = langOf(acceptLanguage);
+        List<BookingServiceLineView> lines = new ArrayList<>();
+        for (BookingIndividualLine row : rows) {
+            lines.add(BookingSelectionViews.line(row, lang));
+        }
+        return lines;
+    }
+
+    private BookingInspectionView inspectionOf(Booking booking) {
+        if (booking.getId() == null) {
+            return null;
+        }
+        java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(booking.getId());
+        if (found == null || found.isEmpty()) {
+            return null;
+        }
+        return BookingSelectionViews.inspection(found.get());
     }
 
     private List<BookingServiceLineView> servicesOf(Booking booking, String acceptLanguage) {
