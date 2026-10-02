@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
-  <title>Behaviors — Carland Admin</title>
+  <title>Individual services — Carland Admin</title>
   <link rel="stylesheet" href="/admin/admin.css?v=brand1">
   <style>
     .editor[hidden] { display: none; }
@@ -34,9 +34,9 @@
       <a class="nav-link" href="/admin/booking-partners">Booking</a>
       <a class="nav-link" href="/admin/percentage-photos">Icons</a>
       <a class="nav-link" href="/admin/service-categories">Categories</a>
-      <a class="nav-link active" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
       <a class="nav-link" href="/admin/offered-services">Services</a>
-      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link active" href="/admin/individual-services">Individual</a>
     </nav>
   </div>
   <div class="topbar-actions">
@@ -46,20 +46,20 @@
 <main class="container wide" id="main">
   <div class="page-head">
     <div>
-      <h1>Service behaviors</h1>
-      <p class="muted">Dövri qulluq qrupları. Silmə yoxdur — bağlamaq üçün active söndürün.</p>
+      <h1>Individual services</h1>
+      <p class="muted">Ortak katalog. Şube fiyatı burada yoxdur. Kod bütün filiallar üçün eynidir.</p>
     </div>
-    <button class="btn btn-primary" type="button" id="newBtn">Yeni qrup</button>
+    <button class="btn btn-primary" type="button" id="newBtn">Yeni xidmət</button>
   </div>
   <div class="error-box" id="errBox" hidden></div>
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th>Code</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
+      <tr><th>Kod</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
       </thead>
       <tbody>
-      <tr th:each="row : ${behaviors}">
-        <td th:text="${row.code}">replace</td>
+      <tr th:each="row : ${services}">
+        <td th:text="${row.code}">MYF</td>
         <td th:text="${row.titleAz}">AZ</td>
         <td th:text="${row.titleEn}">EN</td>
         <td th:text="${row.titleRu}">RU</td>
@@ -82,15 +82,15 @@
 </main>
 <div class="editor" id="editor" hidden>
   <form class="editor-card" id="editorForm">
-    <h2 id="editorTitle">Yeni qrup</h2>
+    <h2 id="editorTitle">Yeni xidmət</h2>
     <input type="hidden" id="fId">
     <div class="editor-grid">
-      <div class="field"><label for="fCode">Code</label><input id="fCode" maxlength="64" placeholder="replace"></div>
+      <div class="field"><label for="fCode">Kod</label><input id="fCode" required maxlength="8" placeholder="RZV"></div>
       <div class="field"><label for="fSort">Sıra</label><input id="fSort" type="number" value="0"></div>
       <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>
       <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
       <div class="field full"><label for="fTitleRu">Title RU</label><input id="fTitleRu"></div>
-      <div class="checks full"><label><input id="fActive" type="checkbox" checked> active</label></div>
+      <div class="checks full"><label><input id="fActive" type="checkbox" checked> kataloqda aktiv</label></div>
     </div>
     <div style="display:flex; gap:8px; margin-top:16px;">
       <button class="btn btn-primary" type="submit">Saxla</button>
@@ -101,7 +101,6 @@
 <script src="/admin/admin.js?v=premium8"></script>
 <script>
   const editor = document.getElementById("editor");
-  const codeInput = document.getElementById("fCode");
   function showErr(msg) {
     const err = document.getElementById("errBox");
     err.hidden = false;
@@ -109,14 +108,13 @@
   }
   function fill(data) {
     document.getElementById("fId").value = data.id || "";
-    codeInput.value = data.code || "";
-    codeInput.readOnly = !!data.id;
-    document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
+    document.getElementById("fCode").value = data.code || "";
     document.getElementById("fTitleAz").value = data.titleAz || "";
     document.getElementById("fTitleEn").value = data.titleEn || "";
     document.getElementById("fTitleRu").value = data.titleRu || "";
+    document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
     document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
-    document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni qrup";
+    document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
     editor.hidden = false;
   }
   document.getElementById("newBtn").addEventListener("click", () => fill({}));
@@ -129,14 +127,14 @@
     const idRaw = document.getElementById("fId").value;
     const body = {
       id: idRaw ? Number(idRaw) : null,
-      code: codeInput.value.trim(),
+      code: document.getElementById("fCode").value.trim().toUpperCase(),
       titleAz: document.getElementById("fTitleAz").value.trim(),
       titleEn: document.getElementById("fTitleEn").value.trim(),
       titleRu: document.getElementById("fTitleRu").value.trim(),
       sortOrder: Number(document.getElementById("fSort").value || 0),
       active: document.getElementById("fActive").checked
     };
-    const res = await fetch("/admin/service-behaviors/save", {
+    const res = await fetch("/admin/individual-services/save", {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
