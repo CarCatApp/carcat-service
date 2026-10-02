@@ -68,6 +68,7 @@ public class BranchProfileService {
         }
         branch.setName(required(body.getName(), "name", 120));
         branch.setInstagram(optional(body.getInstagram(), 64));
+        branch.setContactEmail(email(body.getContactEmail()));
         branchRepository.save(branch);
         return view(staff, branch);
     }
@@ -256,6 +257,7 @@ public class BranchProfileService {
                     .models(models)
                     .build());
         }
+        BookingStaff named = staffOnBranch(staff.getUserId(), branch, staff);
         boolean partnerAdmin = BookingStaffRole.PARTNER_ADMIN.name().equals(staff.getRole());
         return StaffBranchProfileView.builder()
                 .branchId(branch.getId())
@@ -264,13 +266,23 @@ public class BranchProfileService {
                 .contactEmail(branch.getContactEmail())
                 .hasPhoto(branchPhotoRepository.existsByBranchId(branch.getId()))
                 .canUploadBranchPhoto(!partnerAdmin)
-                .staffName(staff.getName())
-                .staffSurname(staff.getSurname())
-                .staffRole(staff.getRole())
+                .staffName(named.getName())
+                .staffSurname(named.getSurname())
+                .staffRole(named.getRole())
                 .hasStaffPhoto(staff.getUserId() != null && staffPhotoRepository.existsByUserId(staff.getUserId()))
                 .goods(goods)
                 .brandModelServices(headings)
                 .build();
+    }
+
+    private BookingStaff staffOnBranch(Long userId, Branch branch, BookingStaff fallback) {
+        if (userId == null || branch == null || branch.getId() == null) {
+            return fallback;
+        }
+        return bookingStaffRepository.findByUserId(userId).stream()
+                .filter(row -> row.getBranch() != null && branch.getId().equals(row.getBranch().getId()))
+                .findFirst()
+                .orElse(fallback);
     }
 
     private BrandModelService ownedHeading(Branch branch, Long serviceId) {

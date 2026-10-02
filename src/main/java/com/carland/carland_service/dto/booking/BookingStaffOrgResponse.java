@@ -11,4 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BookingStaffOrgResponse {
     BookingStaffPartnerView partner;
+    String staffName;
+    String staffSurname;
+    String staffRole;
 }

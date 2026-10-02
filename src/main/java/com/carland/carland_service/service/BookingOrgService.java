@@ -293,9 +293,25 @@ public class BookingOrgService {
             branches = new ArrayList<>(unique.values());
             branches.sort(Comparator.comparing(Branch::getId));
         }
+        BookingStaff self = staffForBranches(rows, branches);
         return BookingStaffOrgResponse.builder()
                 .partner(toPartnerView(partner, branches))
+                .staffName(self.getName())
+                .staffSurname(self.getSurname())
+                .staffRole(self.getRole())
                 .build();
+    }
+
+    /** The membership tied to a returned branch. A partner-wide row is only the fallback. */
+    private static BookingStaff staffForBranches(List<BookingStaff> rows, List<Branch> branches) {
+        for (Branch branch : branches) {
+            for (BookingStaff row : rows) {
+                if (row.getBranch() != null && branch.getId().equals(row.getBranch().getId())) {
+                    return row;
+                }
+            }
+        }
+        return rows.get(0);
     }
 
     private BookingStaffPartnerView toPartnerView(Partner partner, List<Branch> branches) {
