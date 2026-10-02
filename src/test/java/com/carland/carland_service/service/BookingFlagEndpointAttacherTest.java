@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +36,7 @@ class BookingFlagEndpointAttacherTest {
     void attachesOwnerRoutesWhenUnclaimed() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").defaultState(FeatureFlagState.HIDDEN).build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
+        when(endpointRepository.findAllWithFlag()).thenReturn(List.of());
         when(featureFlagService.upsertEndpoint(anyString(), anyString(), eq(false)))
                 .thenAnswer(inv -> FeatureFlagEndpoint.builder()
                         .httpMethod(inv.getArgument(0))
@@ -54,17 +56,19 @@ class BookingFlagEndpointAttacherTest {
     void skipsSaveWhenAlreadyAttached() {
         FeatureFlag flag = FeatureFlag.builder().id(3L).name("booking").build();
         when(flagRepository.findByName("booking")).thenReturn(Optional.of(flag));
-        when(featureFlagService.upsertEndpoint(anyString(), anyString(), eq(false)))
-                .thenAnswer(inv -> FeatureFlagEndpoint.builder()
+        when(endpointRepository.findAllWithFlag()).thenReturn(BookingFlagEndpointAttacher.OWNER_ROUTES.stream()
+                .map(route -> FeatureFlagEndpoint.builder()
                         .flag(flag)
-                        .httpMethod(inv.getArgument(0))
-                        .pathPattern(inv.getArgument(1))
-                        .build());
+                        .httpMethod(route.method())
+                        .pathPattern(route.path())
+                        .build())
+                .toList());
         when(roleStateRepository.existsByFlag(flag)).thenReturn(true);
 
         attacher.attachDiscover();
 
+        verify(featureFlagService, never()).upsertEndpoint(anyString(), anyString(), eq(false));
         verify(endpointRepository, never()).save(any());
-        verify(featureFlagService).reloadCache();
+        verify(featureFlagService, never()).reloadCache();
     }
 }

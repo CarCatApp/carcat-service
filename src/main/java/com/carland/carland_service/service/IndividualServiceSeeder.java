@@ -6,16 +6,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 /**
- * tr: Mock fərdi xidmət listesini kataloga ekler. Var olan kodu yeniden yazmaz.
- * en: Inserts the mock individual-service list into the catalog. An existing code is left as edited.
+ * tr: Mock fərdi xidmət listesi. Prod'da satırlar var; boot'ta çalışmaz.
+ * en: Mock individual-service list. Prod already has rows; not run on boot.
  */
 @Slf4j
-@Component
-@Order(20)
 @RequiredArgsConstructor
 public class IndividualServiceSeeder implements ApplicationRunner {
 

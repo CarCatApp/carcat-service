@@ -15,7 +15,10 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * tr: Owner booking path'lerini booking flag'e bağlar (scanner'dan sonra). State'i açmaz.
@@ -72,18 +75,39 @@ public class BookingFlagEndpointAttacher {
     @Transactional
     public void attachDiscover() {
         FeatureFlag flag = flagRepository.findByName(BookingFeatureFlagSeeder.FLAG_NAME).orElse(null);
+        boolean created = false;
         if (flag == null) {
-            log.info("BOOKING_FLAG_ATTACH_SKIP flag missing");
-            return;
+            LocalDateTime now = LocalDateTime.now();
+            flag = flagRepository.save(FeatureFlag.builder()
+                    .name(BookingFeatureFlagSeeder.FLAG_NAME)
+                    .description("Owner-app booking APIs (CRCT-281+)")
+                    .defaultState(FeatureFlagState.HIDDEN)
+                    .minAvailableVersion("0.0.0")
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build());
+            created = true;
+            log.info("BOOKING_FLAG_SEEDED name={}", flag.getName());
         }
+        Map<String, FeatureFlagEndpoint> byKey = new HashMap<>();
+        for (FeatureFlagEndpoint endpoint : endpointRepository.findAllWithFlag()) {
+            byKey.put(endpoint.getHttpMethod() + " " + endpoint.getPathPattern(), endpoint);
+        }
+        boolean attached = false;
         for (OwnerRoute route : OWNER_ROUTES) {
-            FeatureFlagEndpoint endpoint = featureFlagService.upsertEndpoint(route.method(), route.path(), false);
-            if (endpoint.getFlag() == null || !BookingFeatureFlagSeeder.FLAG_NAME.equals(endpoint.getFlag().getName())) {
+            FeatureFlagEndpoint endpoint = byKey.get(route.method() + " " + route.path());
+            if (endpoint != null && sameFlag(endpoint, flag)) {
+                continue;
+            }
+            endpoint = featureFlagService.upsertEndpoint(route.method(), route.path(), false);
+            if (!sameFlag(endpoint, flag)) {
                 endpoint.setFlag(flag);
                 endpointRepository.save(endpoint);
+                attached = true;
                 log.info("BOOKING_FLAG_ATTACHED method={} path={}", route.method(), route.path());
             }
         }
+        boolean rolesSeeded = false;
         if (!roleStateRepository.existsByFlag(flag)) {
             FeatureFlagState state = flag.getDefaultState() == null ? FeatureFlagState.HIDDEN : flag.getDefaultState();
             for (UserRoles role : UserRoles.values()) {
@@ -93,8 +117,17 @@ public class BookingFlagEndpointAttacher {
                         .state(state)
                         .build());
             }
+            rolesSeeded = true;
             log.info("BOOKING_FLAG_ROLE_STATES_SEEDED name={}", flag.getName());
         }
-        featureFlagService.reloadCache();
+        if (created || attached || rolesSeeded) {
+            featureFlagService.reloadCache();
+        }
+    }
+
+    private static boolean sameFlag(FeatureFlagEndpoint endpoint, FeatureFlag flag) {
+        return endpoint.getFlag() != null
+                && flag.getId() != null
+                && flag.getId().equals(endpoint.getFlag().getId());
     }
 }

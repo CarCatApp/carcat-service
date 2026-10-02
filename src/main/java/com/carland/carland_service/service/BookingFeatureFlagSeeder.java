@@ -10,18 +10,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 /**
- * tr: Owner-app booking flag satırı. HIDDEN = 404 until PO/Aziz enables.
- * en: Owner-app booking flag row. HIDDEN = 404 until PO/Aziz enables.
+ * tr: Owner-app booking flag satırı. Prod'da satır var; boot'ta çalışmaz.
+ *     Boş ortamda {@link BookingFlagEndpointAttacher} eksikse oluşturur.
+ * en: Owner-app booking flag row. Prod already has the row; not run on boot.
+ *     Empty env: {@link BookingFlagEndpointAttacher} creates it when missing.
  */
 @Slf4j
-@Component
-@Order(15)
 @RequiredArgsConstructor
 public class BookingFeatureFlagSeeder implements ApplicationRunner {
 
