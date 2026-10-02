@@ -143,15 +143,11 @@ public class PhotoServiceImpl implements PhotoService {
         MediaType mediaType = MediaType.parseMediaType(fileType);
         byte[] bytes = carPhoto.getImageData() == null ? new byte[0] : carPhoto.getImageData();
 
-        var response = ResponseEntity.ok()
+        return ResponseEntity.ok()
                 .contentType(mediaType)
                 .header("X-Photo-Status", status)
-                .header("X-Photo-Source", source);
-        if (CarPhotoStatus.FAILED.equalsIgnoreCase(status)) {
-            response.header("X-Photo-Message",
-                    MessagesLangValues.PHOTO_AI_FAILED.getMessageByLang(acceptLanguage));
-        }
-        return response.body(CarPhotoStatus.READY.equalsIgnoreCase(status) ? bytes : new byte[0]);
+                .header("X-Photo-Source", source)
+                .body(CarPhotoStatus.READY.equalsIgnoreCase(status) ? bytes : new byte[0]);
     }
 
     @Override
