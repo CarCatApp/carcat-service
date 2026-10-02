@@ -30,6 +30,7 @@ public class BookingFlagEndpointAttacher {
 
     static final String DISCOVER_PATH = "/api/v1/booking/partners";
     static final String CATALOG_PATH = "/api/v1/booking/branches/{branchId}/catalog";
+    static final String BRAND_MODELS_PATH = "/api/v1/booking/branches/{branchId}/brand-models";
     static final String AVAILABILITY_PATH = "/api/v1/booking/branches/{branchId}/availability";
     static final String QUOTE_PATH = "/api/v1/booking/bookings/quote";
     static final String CREATE_PATH = "/api/v1/booking/bookings";
@@ -42,6 +43,7 @@ public class BookingFlagEndpointAttacher {
     static final List<OwnerRoute> OWNER_ROUTES = List.of(
             new OwnerRoute("GET", DISCOVER_PATH),
             new OwnerRoute("GET", CATALOG_PATH),
+            new OwnerRoute("GET", BRAND_MODELS_PATH),
             new OwnerRoute("GET", AVAILABILITY_PATH),
             new OwnerRoute("POST", QUOTE_PATH),
             new OwnerRoute("POST", CREATE_PATH),
