@@ -3,7 +3,10 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.enums.CarPhotoStatus;
+import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.service.PhotoService;
+import com.carland.carland_service.service.StaffMediaService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +27,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class PhotoController {
 
     private final PhotoService photoService;
+    private final StaffMediaService staffMediaService;
+    private final BookingStaffRequestAuth bookingStaffRequestAuth;
 
     /**
      * tr: Multipart "file" bölümündeki fotoğrafı verilen carId'ye ait araca yükler ve sonucu döner.
@@ -251,5 +256,61 @@ public class PhotoController {
         return photoService.getUserPP(role, phoneNumber, userIdHeader, timezone, acceptLanguage);
     }
 
+    /**
+     * tr: Şubenin tek fotoğrafını yükler. Partner admin reddedilir. Partner logosu değildir.
+     * en: Uploads the branch's single photo. Partner admin is rejected. This is not the partner logo.
+     */
+    @PostMapping(value = "/for/branch/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadBranchPhoto(HttpServletRequest request,
+                                           @RequestPart("file") MultipartFile file,
+                                           @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.uploadBranchPhoto(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                file,
+                acceptLanguage);
+    }
 
+    /**
+     * tr: Şube fotoğrafını döner. Staff token gerekir.
+     * en: Returns the branch photo. A staff token is required.
+     */
+    @GetMapping(value = "/for/branch/get/{branchId}", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getBranchPhoto(HttpServletRequest request,
+                                                 @PathVariable("branchId") Long branchId,
+                                                 @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.getBranchPhoto(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                branchId,
+                acceptLanguage);
+    }
+
+    /**
+     * tr: Giriş yapan staff'ın fotoğrafını yükler ve cache'i commit sonrası düşürür.
+     * en: Uploads the signed-in staff photo and evicts the cache after commit.
+     */
+    @PostMapping(value = "/for/staff/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadStaffPhoto(HttpServletRequest request,
+                                          @RequestPart("file") MultipartFile file,
+                                          @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.uploadStaffPhoto(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                file,
+                acceptLanguage);
+    }
+
+    /**
+     * tr: Giriş yapan staff'ın fotoğrafını döner. Cache miss olursa DB'den dolar.
+     * en: Returns the signed-in staff photo. A cache miss loads from the database.
+     */
+    @GetMapping(value = "/for/staff/me", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getStaffPhoto(HttpServletRequest request,
+                                                @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.getStaffPhoto(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                acceptLanguage);
+    }
 }

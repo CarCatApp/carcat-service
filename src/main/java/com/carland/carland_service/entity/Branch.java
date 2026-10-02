@@ -60,6 +60,9 @@ public class Branch {
     @Column(length = 512)
     String photo;
 
+    @Column(length = 64)
+    String instagram;
+
     /**
      * Stored average of non-null {@link Rating#getScore()} values. Null if nobody scored.
      */

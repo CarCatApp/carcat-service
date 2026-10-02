@@ -153,6 +153,38 @@ public class RedisCacheService {
         runAfterCommit(() -> evictServiceCategoryPhoto(categoryId));
     }
 
+    /**
+     * tr: Şube fotoğrafı. Key photo:branch:{branchId}. Yazan: StaffMediaService upload → evict after commit.
+     * en: Branch photo. Key photo:branch:{branchId}. Writer: StaffMediaService upload evicts after commit.
+     */
+    public ResponseEntity<byte[]> getBranchPhoto(Long branchId) {
+        return getPhoto("photo:branch:" + branchId, "branch-photo branchId=" + branchId);
+    }
+
+    public void putBranchPhoto(Long branchId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:branch:" + branchId, mediaType, bytes);
+    }
+
+    public void evictBranchPhotoAfterCommit(Long branchId) {
+        runAfterCommit(() -> deletePhoto("photo:branch:" + branchId));
+    }
+
+    /**
+     * tr: Staff profil fotoğrafı. Key photo:staff:{userId}. Yazan: StaffMediaService upload → evict after commit.
+     * en: Staff profile photo. Key photo:staff:{userId}. Writer: StaffMediaService upload evicts after commit.
+     */
+    public ResponseEntity<byte[]> getStaffPhoto(Long userId) {
+        return getPhoto("photo:staff:" + userId, "staff-photo userId=" + userId);
+    }
+
+    public void putStaffPhoto(Long userId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:staff:" + userId, mediaType, bytes);
+    }
+
+    public void evictStaffPhotoAfterCommit(Long userId) {
+        runAfterCommit(() -> deletePhoto("photo:staff:" + userId));
+    }
+
     public VisitHistoryResponse getOrLoadHistoryV2(String vin, String lang, Supplier<VisitHistoryResponse> loader) {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);
