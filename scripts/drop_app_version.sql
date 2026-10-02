@@ -1,6 +1,6 @@
 -- Drop leftover global app_version catalog (PO: version is a field on the flag).
--- Boot also runs this in FeatureFlagLegacyCleanup after per-flag min migration.
--- Hibernate ddl-auto=update does not drop tables/columns; this (or boot) is required.
+-- Already applied. This file does not run on boot.
+-- Hibernate ddl-auto=update does not drop tables/columns; this script was the one-shot drop.
 
 ALTER TABLE feature_flag_role_state DROP CONSTRAINT IF EXISTS uk_ffrs_flag_version_role;
 ALTER TABLE feature_flag_role_state DROP COLUMN IF EXISTS version_id CASCADE;
