@@ -17,4 +17,6 @@ public interface BranchIndividualServiceRepository extends JpaRepository<BranchI
     List<BranchIndividualService> findByBranch_Id(Long branchId);
 
     Optional<BranchIndividualService> findByBranch_IdAndIndividualService_Id(Long branchId, Long individualServiceId);
+
+    void deleteByIndividualService_Id(Long individualServiceId);
 }
