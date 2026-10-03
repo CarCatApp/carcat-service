@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.booking.BookingCarePackagesResponse;
 import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
 import com.carland.carland_service.dto.booking.BookingBrandModelsResponse;
+import com.carland.carland_service.dto.booking.BookingIndividualServiceFiltersResponse;
 import com.carland.carland_service.dto.booking.BookingIndividualServicesResponse;
 import com.carland.carland_service.dto.booking.BookingPackagePriceInfoResponse;
 import com.carland.carland_service.dto.booking.BookingCatalogResponse;
@@ -99,13 +100,21 @@ public class BookingDiscoveryController {
         return bookingCarePackageCatalogService.list(branchId, acceptLanguage);
     }
 
+    @GetMapping("/api/v1/booking/individual-service-filters")
+    public BookingIndividualServiceFiltersResponse individualServiceFilters(
+            @RequestHeader("Authorization") String token
+    ) {
+        return bookingIndividualCatalogService.filters();
+    }
+
     @GetMapping("/api/v1/booking/branches/{branchId}/individual-services")
     public BookingIndividualServicesResponse individualServices(
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
-            @PathVariable Long branchId
+            @PathVariable Long branchId,
+            @RequestParam(required = false) String filter
     ) {
-        return bookingIndividualCatalogService.list(branchId, acceptLanguage);
+        return bookingIndividualCatalogService.list(branchId, acceptLanguage, filter);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/catalog")

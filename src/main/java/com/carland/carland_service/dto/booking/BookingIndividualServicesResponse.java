@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: Her çağrı aynı düz liste. filter=all hepsi, filter={id} yalnız o filter id.
+ * en: Every call is the same flat list. filter=all is everything, filter={id} is that filter id only.
+ */
 @Data
 @Builder
 @NoArgsConstructor
