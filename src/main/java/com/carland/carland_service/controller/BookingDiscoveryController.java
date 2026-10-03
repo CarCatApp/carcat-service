@@ -21,6 +21,7 @@ import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -113,9 +114,12 @@ public class BookingDiscoveryController {
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable Long branchId,
-            @RequestParam(required = false) String filter
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) Long carId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        return bookingIndividualCatalogService.list(branchId, acceptLanguage, filter);
+        Long userId = carId == null ? null : parseUserId(userIdHeader);
+        return bookingIndividualCatalogService.list(branchId, acceptLanguage, filter, carId, userId);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/catalog")
@@ -136,5 +140,16 @@ public class BookingDiscoveryController {
             @RequestParam String to
     ) {
         return bookingAvailabilityService.availability(branchId, serviceKeys, from, to, timezone);
+    }
+
+    private static Long parseUserId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        try {
+            return Long.valueOf(raw.trim());
+        } catch (NumberFormatException ex) {
+            throw MissingFieldException.required("X-User-Id");
+        }
     }
 }

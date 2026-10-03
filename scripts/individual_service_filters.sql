@@ -8,7 +8,8 @@ INSERT INTO individual_service_filters (id, name_az, name_en, name_ru) VALUES
     (4, 'Təkərlər', 'Tyres', 'Шины'),
     (5, 'Alışdırma', 'Ignition', 'Зажигание'),
     (6, 'Mühərrik', 'Engine', 'Двигатель'),
-    (7, 'Elektrik', 'Electrical', 'Электрика')
+    (7, 'Elektrik', 'Electrical', 'Электрика'),
+    (8, 'Qaz sistemi', 'Gas system', 'Газовая система')
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval(

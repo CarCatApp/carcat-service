@@ -37,7 +37,7 @@ public class IndividualServiceFilter {
     @Column(name = "name_az", nullable = false, length = 64)
     String nameAz;
 
-    /** Filters, Brakes, Fluids, Tyres, Ignition, Engine, Electrical */
+    /** Filters, Brakes, Fluids, Tyres, Ignition, Engine, Electrical, Gas system */
     @Column(name = "name_en", nullable = false, length = 64)
     String nameEn;
 

@@ -142,6 +142,14 @@ public class IndividualCatalogSync {
         return out;
     }
 
+    static String codeOf(String az, String en, String ru) {
+        String key = key(clip(az), clip(en), clip(ru));
+        if (key.isEmpty()) {
+            return "";
+        }
+        return codeFor(key, new HashSet<>());
+    }
+
     static String codeFor(String key, Set<String> used) {
         byte[] hash = sha256(key);
         for (int offset = 0; offset + 4 <= hash.length; offset++) {

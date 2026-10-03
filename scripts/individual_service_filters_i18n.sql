@@ -26,6 +26,7 @@ UPDATE individual_service_filters SET name_az = 'Təkərlər',    name_en = 'Tyr
 UPDATE individual_service_filters SET name_az = 'Alışdırma',   name_en = 'Ignition',   name_ru = 'Зажигание'  WHERE id = 5;
 UPDATE individual_service_filters SET name_az = 'Mühərrik',    name_en = 'Engine',     name_ru = 'Двигатель'  WHERE id = 6;
 UPDATE individual_service_filters SET name_az = 'Elektrik',    name_en = 'Electrical', name_ru = 'Электрика'  WHERE id = 7;
+UPDATE individual_service_filters SET name_az = 'Qaz sistemi', name_en = 'Gas system', name_ru = 'Газовая система' WHERE id = 8;
 
 ALTER TABLE individual_service_filters ALTER COLUMN name_en SET NOT NULL;
 ALTER TABLE individual_service_filters ALTER COLUMN name_az SET NOT NULL;
