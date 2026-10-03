@@ -139,4 +139,16 @@ public interface PhotoService {
      */
     PhotoResponse deleteServiceCategoryPhoto(Long categoryId);
 
+    /**
+     * tr: Offered service ikonunu döner. Satır veya foto yoksa 404. Empty-state yok.
+     * en: Returns the offered-service icon. 404 when the service or the photo is missing. No empty-state.
+     */
+    ResponseEntity<byte[]> getOfferedServicePhoto(Long offeredServiceId);
+
+    /**
+     * tr: Offered service ikonunu yükler. Eski byte'ın üzerine yazar. Redis commit sonrası silinir.
+     * en: Uploads an offered-service icon. Overwrites existing bytes. Evicts Redis after commit.
+     */
+    PhotoResponse uploadOfferedServicePhoto(MultipartFile file, Long offeredServiceId);
+
 }

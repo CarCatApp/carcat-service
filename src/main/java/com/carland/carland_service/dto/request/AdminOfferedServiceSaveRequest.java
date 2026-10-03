@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 public class AdminOfferedServiceSaveRequest {
     Long id;
     Long behaviorId;
+    Long filterId;
     String titleAz;
     String titleEn;
     String titleRu;

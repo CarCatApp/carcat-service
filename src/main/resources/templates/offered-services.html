@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
-  <title>Services — Carland Admin</title>
+  <title>Offered services — Carland Admin</title>
   <link rel="stylesheet" href="/admin/admin.css?v=brand1">
   <style>
     .editor[hidden] { display: none; }
@@ -35,7 +35,7 @@
       <a class="nav-link" href="/admin/percentage-photos">Icons</a>
       <a class="nav-link" href="/admin/service-categories">Categories</a>
       <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
-      <a class="nav-link active" href="/admin/offered-services">Services</a>
+      <a class="nav-link active" href="/admin/offered-services">Offered services</a>
       <a class="nav-link" href="/admin/individual-services">Individual</a>
     </nav>
   </div>
@@ -47,7 +47,7 @@
   <div class="page-head">
     <div>
       <h1>Offered services</h1>
-      <p class="muted">Qrup siyahısı səhifə açılınca bir dəfə yüklənir. Seçilən qrupun id-si behaviorId olur.</p>
+      <p class="muted">Behavior və filter səhifə açılınca yüklənir. Icon ayrıca yüklənir.</p>
     </div>
     <button class="btn btn-primary" type="button" id="newBtn">Yeni xidmət</button>
   </div>
@@ -55,11 +55,13 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th>Qrup</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
+      <tr><th></th><th>Qrup</th><th>Filter</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
       </thead>
       <tbody>
       <tr th:each="row : ${services}">
+        <td><img th:src="@{/admin/offered-services/photo(offeredServiceId=${row.id})}" alt="" width="28" height="28" style="object-fit:contain" onerror="this.style.visibility='hidden'"></td>
         <td th:text="${row.behaviorTitleAz}">qrup</td>
+        <td th:text="${row.filterName}">filter</td>
         <td th:text="${row.titleAz}">AZ</td>
         <td th:text="${row.titleEn}">EN</td>
         <td th:text="${row.titleRu}">RU</td>
@@ -69,6 +71,7 @@
           <button type="button" class="btn btn-ghost js-edit"
                   th:data-id="${row.id}"
                   th:data-behavior-id="${row.behaviorId}"
+                  th:data-filter-id="${row.filterId}"
                   th:data-title-az="${row.titleAz}"
                   th:data-title-en="${row.titleEn}"
                   th:data-title-ru="${row.titleRu}"
@@ -91,6 +94,17 @@
           <option value="">Seçin</option>
           <option th:each="b : ${behaviors}" th:value="${b.id}" th:text="${b.titleAz + ' (' + b.code + ')'}"></option>
         </select>
+      </div>
+      <div class="field full">
+        <label for="fFilter">Filter</label>
+        <select id="fFilter" required>
+          <option value="">Seçin</option>
+          <option th:each="f : ${filters}" th:value="${f.id}" th:text="${f.nameEn}"></option>
+        </select>
+      </div>
+      <div class="field full">
+        <label for="fIconFile">Icon</label>
+        <input id="fIconFile" type="file" accept="image/*">
       </div>
       <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>
       <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
@@ -115,6 +129,8 @@
   function fill(data) {
     document.getElementById("fId").value = data.id || "";
     document.getElementById("fBehavior").value = data.behaviorId || "";
+    document.getElementById("fFilter").value = data.filterId || "";
+    document.getElementById("fIconFile").value = "";
     document.getElementById("fTitleAz").value = data.titleAz || "";
     document.getElementById("fTitleEn").value = data.titleEn || "";
     document.getElementById("fTitleRu").value = data.titleRu || "";
@@ -132,9 +148,11 @@
     e.preventDefault();
     const idRaw = document.getElementById("fId").value;
     const behaviorRaw = document.getElementById("fBehavior").value;
+    const filterRaw = document.getElementById("fFilter").value;
     const body = {
       id: idRaw ? Number(idRaw) : null,
       behaviorId: behaviorRaw ? Number(behaviorRaw) : null,
+      filterId: filterRaw ? Number(filterRaw) : null,
       titleAz: document.getElementById("fTitleAz").value.trim(),
       titleEn: document.getElementById("fTitleEn").value.trim(),
       titleRu: document.getElementById("fTitleRu").value.trim(),
@@ -152,6 +170,20 @@
       try { const payload = await res.json(); if (payload && payload.message) msg = payload.message; } catch (_) {}
       showErr(msg);
       return;
+    }
+    const saved = await res.json();
+    const file = document.getElementById("fIconFile").files[0];
+    if (file && saved && saved.id) {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("offeredServiceId", String(saved.id));
+      const up = await fetch("/admin/offered-services/photo", {
+        method: "POST", credentials: "same-origin", body: form
+      });
+      if (!up.ok) {
+        showErr("Xidmət saxlandı, icon yüklənmədi (" + up.status + ")");
+        return;
+      }
     }
     window.location.reload();
   });

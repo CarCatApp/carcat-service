@@ -8,10 +8,12 @@ import com.carland.carland_service.dto.request.AdminServiceBehaviorSaveRequest;
 import com.carland.carland_service.dto.response.AdminOfferedServiceRow;
 import com.carland.carland_service.dto.response.AdminServiceBehaviorRow;
 import com.carland.carland_service.entity.OfferedService;
+import com.carland.carland_service.entity.OfferedServiceFilter;
 import com.carland.carland_service.entity.ServiceBehavior;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.OfferedServiceFilterRepository;
 import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.ServiceBehaviorRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class OfferedCatalogService {
 
     private final ServiceBehaviorRepository behaviorRepository;
     private final OfferedServiceRepository offeredServiceRepository;
+    private final OfferedServiceFilterRepository filterRepository;
     private final BookingStaffAccess bookingStaffAccess;
     private final ServiceCategoryJson json;
 
@@ -120,8 +123,17 @@ public class OfferedCatalogService {
     }
 
     /**
-     * tr: Xidmət oluşturur veya günceller. behaviorId seçilen grubun id'sidir.
-     * en: Creates or updates a service. behaviorId is the id of the selected group.
+     * tr: Admin filtre seçim listesi. Id sırası.
+     * en: Admin filter picker. Ordered by id.
+     */
+    @Transactional(readOnly = true)
+    public List<OfferedServiceFilter> adminFilters() {
+        return filterRepository.findAllByOrderByIdAsc();
+    }
+
+    /**
+     * tr: Xidmət oluşturur veya günceller. behaviorId ve filterId zorunludur.
+     * en: Creates or updates a service. behaviorId and filterId are required.
      */
     @Transactional
     public AdminOfferedServiceRow saveOffered(AdminOfferedServiceSaveRequest body) {
@@ -131,8 +143,13 @@ public class OfferedCatalogService {
         if (body.getBehaviorId() == null) {
             throw MissingFieldException.required("behaviorId");
         }
+        if (body.getFilterId() == null) {
+            throw MissingFieldException.required("filterId");
+        }
         ServiceBehavior behavior = behaviorRepository.findById(body.getBehaviorId())
                 .orElseThrow(() -> new ResourceNotFoundException("behavior not found"));
+        OfferedServiceFilter filter = filterRepository.findById(body.getFilterId())
+                .orElseThrow(() -> new ResourceNotFoundException("filter not found"));
         OfferedService row;
         if (body.getId() == null) {
             row = OfferedService.builder().behavior(behavior).build();
@@ -141,6 +158,7 @@ public class OfferedCatalogService {
                     .orElseThrow(() -> new ResourceNotFoundException("service not found"));
             row.setBehavior(behavior);
         }
+        row.setFilter(filter);
         row.setTitleJson(json.write(body.getTitleAz().trim(), trimToEmpty(body.getTitleEn()), trimToEmpty(body.getTitleRu())));
         row.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
         row.setActive(body.getActive() == null ? Boolean.TRUE : body.getActive());
@@ -164,11 +182,14 @@ public class OfferedCatalogService {
         Map<String, String> title = json.read(row.getTitleJson());
         ServiceBehavior behavior = row.getBehavior();
         Map<String, String> behaviorTitle = behavior == null ? Map.of() : json.read(behavior.getTitleJson());
+        OfferedServiceFilter filter = row.getFilter();
         return AdminOfferedServiceRow.builder()
                 .id(row.getId())
                 .behaviorId(behavior == null ? null : behavior.getId())
                 .behaviorCode(behavior == null ? null : behavior.getCode())
                 .behaviorTitleAz(behaviorTitle.get("az"))
+                .filterId(filter == null ? null : filter.getId())
+                .filterName(filter == null ? null : filter.getNameEn())
                 .titleAz(title.get("az"))
                 .titleEn(title.get("en"))
                 .titleRu(title.get("ru"))

@@ -16,9 +16,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * tr: Fotoğraf REST controller'ı; araç fotoğrafı, partner logosu/rozet logosu, kullanıcı profil fotoğrafı
- *     bakım kalemi (percentage) ve hizmet kategorisi ikonları için yükleme/getirme uçlarını sunar.
+ *     bakım kalemi (percentage), hizmet kategorisi ve offered service ikonları için yükleme/getirme uçlarını sunar.
  * en: REST controller for photos; exposes upload/fetch for car photos, partner logos/badge logos,
- *     user profile pictures, maintenance-item (percentage) icons, and service-category icons.
+ *     user profile pictures, maintenance-item (percentage) icons, service-category icons, and offered-service icons.
  */
 @RestController
 @RequestMapping("/api/v1/photo")
@@ -163,6 +163,26 @@ public class PhotoController {
     public PhotoResponse uploadPercentagePhoto(@RequestPart("file") MultipartFile file,
                                                @RequestParam("serviceId") Long serviceId) {
         return photoService.uploadPercentagePhoto(file, serviceId);
+    }
+
+    /**
+     * tr: Offered service ikonunu döner. Foto yoksa 404. role / X-User-Id gerekmez.
+     * en: Returns the offered-service icon. 404 when missing. No role / X-User-Id.
+     */
+    @GetMapping(value = "/for/offered-service/get", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getOfferedServicePhoto(@RequestParam("offeredServiceId") Long offeredServiceId) {
+        return photoService.getOfferedServicePhoto(offeredServiceId);
+    }
+
+    /**
+     * tr: Offered service ikonunu yükler; eski byte silinir. Postman: form-data key = file, query offeredServiceId.
+     * en: Uploads the offered-service icon; replaces existing bytes. Postman: form-data key = file, query offeredServiceId.
+     */
+    @PostMapping(value = "/for/offered-service/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadOfferedServicePhoto(@RequestPart("file") MultipartFile file,
+                                                   @RequestParam("offeredServiceId") Long offeredServiceId) {
+        return photoService.uploadOfferedServicePhoto(file, offeredServiceId);
     }
 
     /**

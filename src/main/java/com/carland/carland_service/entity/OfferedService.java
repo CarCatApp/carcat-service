@@ -55,4 +55,11 @@ public class OfferedService {
     @Column(nullable = false)
     @Builder.Default
     Boolean active = true;
+
+    /** Paket ekranındaki grup. Fərdi xidmət filteri değil. Mevcut satırda boş kalabilir. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "offered_service_filter_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    OfferedServiceFilter filter;
 }

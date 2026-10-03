@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class BookingCarePackageServiceView {
     Long id;
     String name;
+    /** Foto yoksa null. Flutter bu yolu GET /api/v1/photo ile açar. */
+    String iconUrl;
 }

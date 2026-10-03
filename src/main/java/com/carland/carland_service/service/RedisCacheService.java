@@ -154,6 +154,24 @@ public class RedisCacheService {
     }
 
     /**
+     * tr: Offered service ikonu. Key photo:offered-service:{offeredServiceId}, TTL photo ile aynı (1 saat).
+     *     Yazan: PhotoServiceImpl.uploadOfferedServicePhoto → evict after commit. Put yalnız GET miss sonrası.
+     * en: Offered-service icon. Key photo:offered-service:{offeredServiceId}, same photo TTL (1 hour).
+     *     Writer: PhotoServiceImpl.uploadOfferedServicePhoto evicts after commit. Put only after a GET miss.
+     */
+    public ResponseEntity<byte[]> getOfferedServicePhoto(Long offeredServiceId) {
+        return getPhoto("photo:offered-service:" + offeredServiceId, "offered-service-photo offeredServiceId=" + offeredServiceId);
+    }
+
+    public void putOfferedServicePhoto(Long offeredServiceId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:offered-service:" + offeredServiceId, mediaType, bytes);
+    }
+
+    public void evictOfferedServicePhotoAfterCommit(Long offeredServiceId) {
+        runAfterCommit(() -> deletePhoto("photo:offered-service:" + offeredServiceId));
+    }
+
+    /**
      * tr: Şube fotoğrafı. Key photo:branch:{branchId}. Yazan: StaffMediaService upload → evict after commit.
      * en: Branch photo. Key photo:branch:{branchId}. Writer: StaffMediaService upload evicts after commit.
      */

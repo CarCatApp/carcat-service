@@ -18,6 +18,8 @@ public class AdminOfferedServiceRow {
     Long behaviorId;
     String behaviorCode;
     String behaviorTitleAz;
+    Long filterId;
+    String filterName;
     String titleAz;
     String titleEn;
     String titleRu;

@@ -52,6 +52,8 @@ public class PhotoServiceImpl implements PhotoService {
     private final ServiceCategoryPhotoRepository serviceCategoryPhotoRepository;
     private final ServiceCategoryRepository serviceCategoryRepository;
     private final ServiceEntityRepository serviceEntityRepository;
+    private final OfferedServicePhotoRepository offeredServicePhotoRepository;
+    private final OfferedServiceRepository offeredServiceRepository;
     private final RedisCacheService redisCacheService;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
@@ -832,6 +834,64 @@ public class PhotoServiceImpl implements PhotoService {
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
                 .build();
+    }
+
+    /**
+     * tr: Offered service ikonunu döner. Servis veya foto yoksa 404. Redis key photo:offered-service:{id}.
+     * en: Returns the offered-service icon. 404 when the service or the photo is missing.
+     *     Redis key photo:offered-service:{id}.
+     */
+    @Override
+    public ResponseEntity<byte[]> getOfferedServicePhoto(Long offeredServiceId) {
+        if (offeredServiceId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        if (!offeredServiceRepository.existsById(offeredServiceId)) {
+            throw new ResourceNotFoundException("service not found");
+        }
+        ResponseEntity<byte[]> cached = redisCacheService.getOfferedServicePhoto(offeredServiceId);
+        if (cached != null && cached.getBody() != null && cached.getBody().length > 0) {
+            return cached;
+        }
+        OfferedServicePhoto photo = offeredServicePhotoRepository.findByOfferedServiceId(offeredServiceId);
+        if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {
+            throw new ResourceNotFoundException("offered service photo not found");
+        }
+        MediaType mediaType = mediaTypeOf(photo.getFileType());
+        redisCacheService.putOfferedServicePhoto(offeredServiceId, mediaType, photo.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
+    }
+
+    /**
+     * tr: Offered service ikonunu yükler. Satır varsa byte güncellenir. Redis commit sonrası DEL.
+     * en: Uploads an offered-service icon. Updates bytes when a row exists. DELs Redis after commit.
+     */
+    @Override
+    @Transactional
+    public PhotoResponse uploadOfferedServicePhoto(MultipartFile file, Long offeredServiceId) {
+        if (file == null || offeredServiceId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        if (!offeredServiceRepository.existsById(offeredServiceId)) {
+            throw new ResourceNotFoundException("service not found");
+        }
+        try {
+            DetectedImage image = detectImage(file);
+            OfferedServicePhoto photo = offeredServicePhotoRepository.findByOfferedServiceId(offeredServiceId);
+            if (photo == null) {
+                photo = OfferedServicePhoto.builder().offeredServiceId(offeredServiceId).build();
+            }
+            photo.setFileName("offered service " + offeredServiceId + " image");
+            photo.setFileType(image.fileType());
+            photo.setImageData(image.bytes());
+            offeredServicePhotoRepository.save(photo);
+            redisCacheService.evictOfferedServicePhotoAfterCommit(offeredServiceId);
+            return PhotoResponse.builder()
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .build();
+        } catch (IOException e) {
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+        }
     }
 
     /**

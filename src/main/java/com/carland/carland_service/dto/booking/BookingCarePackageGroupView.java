@@ -7,16 +7,16 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * tr: Paket içindeki bir filtre grubu. Boş grup dönmez.
+ * en: One filter group inside a care package. Empty groups are omitted.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingCarePackageView {
+public class BookingCarePackageGroupView {
     Long id;
     String name;
-    Integer price;
-    String currency;
-    /** Gruplarda görünen açık xidmət sayısı. Filtresi olmayan satır sayılmaz. */
-    Integer count;
-    List<BookingCarePackageGroupView> groups;
+    List<BookingCarePackageServiceView> services;
 }
