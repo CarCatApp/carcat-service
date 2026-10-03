@@ -93,7 +93,7 @@
         <label for="fFilter">Filter</label>
         <select id="fFilter" required>
           <option value="">Seç</option>
-          <option th:each="f : ${filters}" th:value="${f.id}" th:text="${f.name}">Filters</option>
+          <option th:each="f : ${filters}" th:value="${f.id}" th:text="${f.nameEn}">Filters</option>
         </select>
       </div>
       <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>

@@ -1,14 +1,14 @@
--- Deploy sonrası elle çalıştır. Boot'ta çalışmaz.
--- Hibernate ddl-auto=update individual_service_filters tablosunu açmış olmalı.
+-- Fresh install. Boot'ta çalışmaz.
+-- Mevcut tablo (name kolonu) için individual_service_filters_i18n.sql kullan.
 
-INSERT INTO individual_service_filters (id, name) VALUES
-    (1, 'Filters'),
-    (2, 'Brakes'),
-    (3, 'Fluids'),
-    (4, 'Tyres'),
-    (5, 'Ignition'),
-    (6, 'Engine'),
-    (7, 'Electrical')
+INSERT INTO individual_service_filters (id, name_az, name_en, name_ru) VALUES
+    (1, 'Filtrlər', 'Filters', 'Фильтры'),
+    (2, 'Əyləclər', 'Brakes', 'Тормоза'),
+    (3, 'Mayelər', 'Fluids', 'Жидкости'),
+    (4, 'Təkərlər', 'Tyres', 'Шины'),
+    (5, 'Alışdırma', 'Ignition', 'Зажигание'),
+    (6, 'Mühərrik', 'Engine', 'Двигатель'),
+    (7, 'Elektrik', 'Electrical', 'Электрика')
 ON CONFLICT (id) DO NOTHING;
 
 SELECT setval(

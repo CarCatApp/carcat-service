@@ -199,7 +199,7 @@ public class IndividualCatalogService {
                 .sortOrder(catalog.getSortOrder())
                 .active(catalog.getActive())
                 .filterId(catalog.getFilter() == null ? null : catalog.getFilter().getId())
-                .filterName(catalog.getFilter() == null ? null : catalog.getFilter().getName())
+                .filterName(catalog.getFilter() == null ? null : catalog.getFilter().getNameEn())
                 .build();
     }
 

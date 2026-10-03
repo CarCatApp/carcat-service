@@ -39,12 +39,13 @@ public class BookingIndividualCatalogService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public BookingIndividualServiceFiltersResponse filters() {
+    public BookingIndividualServiceFiltersResponse filters(String acceptLanguage) {
+        String lang = BookingMineService.langOf(acceptLanguage);
         List<BookingIndividualServiceFilterView> filters = new ArrayList<>();
         for (IndividualServiceFilter row : individualServiceFilterRepository.findAllByOrderByIdAsc()) {
             filters.add(BookingIndividualServiceFilterView.builder()
                     .id(row.getId())
-                    .name(row.getName())
+                    .name(localizedName(row, lang))
                     .build());
         }
         return BookingIndividualServiceFiltersResponse.builder().filters(filters).build();
@@ -107,7 +108,21 @@ public class BookingIndividualCatalogService {
         if (raw.equals(String.valueOf(chip.getId()))) {
             return true;
         }
-        return chip.getName() != null && chip.getName().equalsIgnoreCase(raw);
+        return equalsName(chip.getNameAz(), raw)
+                || equalsName(chip.getNameEn(), raw)
+                || equalsName(chip.getNameRu(), raw);
+    }
+
+    private static boolean equalsName(String value, String raw) {
+        return value != null && value.equalsIgnoreCase(raw);
+    }
+
+    private static String localizedName(IndividualServiceFilter row, String lang) {
+        return BookingMineService.catalogText(Map.of(
+                "az", row.getNameAz() == null ? "" : row.getNameAz(),
+                "en", row.getNameEn() == null ? "" : row.getNameEn(),
+                "ru", row.getNameRu() == null ? "" : row.getNameRu()
+        ), lang);
     }
 
     private static int sortOf(IndividualService catalog) {

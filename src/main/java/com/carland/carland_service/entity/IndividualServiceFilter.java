@@ -26,7 +26,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Table(
         name = "individual_service_filters",
-        uniqueConstraints = @UniqueConstraint(name = "uk_individual_service_filters_name", columnNames = "name")
+        uniqueConstraints = @UniqueConstraint(name = "uk_individual_service_filters_name_en", columnNames = "name_en")
 )
 public class IndividualServiceFilter {
 
@@ -34,7 +34,13 @@ public class IndividualServiceFilter {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
+    @Column(name = "name_az", nullable = false, length = 64)
+    String nameAz;
+
     /** Filters, Brakes, Fluids, Tyres, Ignition, Engine, Electrical */
-    @Column(nullable = false, length = 64)
-    String name;
+    @Column(name = "name_en", nullable = false, length = 64)
+    String nameEn;
+
+    @Column(name = "name_ru", nullable = false, length = 64)
+    String nameRu;
 }

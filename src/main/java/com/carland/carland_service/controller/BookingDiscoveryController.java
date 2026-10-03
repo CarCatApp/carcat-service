@@ -102,9 +102,10 @@ public class BookingDiscoveryController {
 
     @GetMapping("/api/v1/booking/individual-service-filters")
     public BookingIndividualServiceFiltersResponse individualServiceFilters(
-            @RequestHeader("Authorization") String token
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
     ) {
-        return bookingIndividualCatalogService.filters();
+        return bookingIndividualCatalogService.filters(acceptLanguage);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/individual-services")

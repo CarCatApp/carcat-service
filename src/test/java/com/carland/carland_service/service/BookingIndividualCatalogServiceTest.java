@@ -41,16 +41,19 @@ class BookingIndividualCatalogServiceTest {
     @Test
     void listsFiltersById() {
         when(individualServiceFilterRepository.findAllByOrderByIdAsc()).thenReturn(List.of(
-                IndividualServiceFilter.builder().id(1L).name("Filters").build(),
-                IndividualServiceFilter.builder().id(2L).name("Brakes").build()
+                IndividualServiceFilter.builder().id(1L).nameAz("Filtrlər").nameEn("Filters").nameRu("Фильтры").build(),
+                IndividualServiceFilter.builder().id(2L).nameAz("Əyləclər").nameEn("Brakes").nameRu("Тормоза").build()
         ));
 
-        BookingIndividualServiceFiltersResponse out = service.filters();
+        BookingIndividualServiceFiltersResponse az = service.filters("az");
+        assertEquals("Filtrlər", az.getFilters().get(0).getName());
+        assertEquals("Əyləclər", az.getFilters().get(1).getName());
 
-        assertEquals(2, out.getFilters().size());
-        assertEquals(1L, out.getFilters().get(0).getId());
-        assertEquals("Filters", out.getFilters().get(0).getName());
-        assertEquals("Brakes", out.getFilters().get(1).getName());
+        BookingIndividualServiceFiltersResponse en = service.filters("en");
+        assertEquals(2, en.getFilters().size());
+        assertEquals(1L, en.getFilters().get(0).getId());
+        assertEquals("Filters", en.getFilters().get(0).getName());
+        assertEquals("Brakes", en.getFilters().get(1).getName());
     }
 
     @Test
@@ -81,8 +84,8 @@ class BookingIndividualCatalogServiceTest {
     void filterIdReturnsOnlyThatFilterInTheSameList() {
         Partner partner = Partner.builder().id(1L).active(true).build();
         Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
-        IndividualServiceFilter fluids = IndividualServiceFilter.builder().id(3L).name("Fluids").build();
-        IndividualServiceFilter filters = IndividualServiceFilter.builder().id(1L).name("Filters").build();
+        IndividualServiceFilter fluids = IndividualServiceFilter.builder().id(3L).nameAz("Mayelər").nameEn("Fluids").nameRu("Жидкости").build();
+        IndividualServiceFilter filters = IndividualServiceFilter.builder().id(1L).nameAz("Filtrlər").nameEn("Filters").nameRu("Фильтры").build();
         IndividualService oil = IndividualService.builder()
                 .id(3L).code("MYF").titleJson("{\"az\":\"Yağ\"}").sortOrder(1).active(true).filter(fluids).build();
         IndividualService fuel = IndividualService.builder()
