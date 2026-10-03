@@ -55,7 +55,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th>Kod</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
+      <tr><th>Kod</th><th>AZ</th><th>EN</th><th>RU</th><th>Filter</th><th>Sıra</th><th>Active</th><th></th></tr>
       </thead>
       <tbody>
       <tr th:each="row : ${services}">
@@ -63,6 +63,7 @@
         <td th:text="${row.titleAz}">AZ</td>
         <td th:text="${row.titleEn}">EN</td>
         <td th:text="${row.titleRu}">RU</td>
+        <td th:text="${row.filterName}">Filters</td>
         <td th:text="${row.sortOrder}">1</td>
         <td th:text="${row.active} ? 'yes' : 'no'">yes</td>
         <td>
@@ -73,6 +74,7 @@
                   th:data-title-en="${row.titleEn}"
                   th:data-title-ru="${row.titleRu}"
                   th:data-sort-order="${row.sortOrder}"
+                  th:data-filter-id="${row.filterId}"
                   th:data-active="${row.active}">Düzəlt</button>
         </td>
       </tr>
@@ -87,6 +89,13 @@
     <div class="editor-grid">
       <div class="field"><label for="fCode">Kod</label><input id="fCode" required maxlength="8" placeholder="RZV"></div>
       <div class="field"><label for="fSort">Sıra</label><input id="fSort" type="number" value="0"></div>
+      <div class="field">
+        <label for="fFilter">Filter</label>
+        <select id="fFilter" required>
+          <option value="">Seç</option>
+          <option th:each="f : ${filters}" th:value="${f.id}" th:text="${f.name}">Filters</option>
+        </select>
+      </div>
       <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>
       <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
       <div class="field full"><label for="fTitleRu">Title RU</label><input id="fTitleRu"></div>
@@ -113,6 +122,7 @@
     document.getElementById("fTitleEn").value = data.titleEn || "";
     document.getElementById("fTitleRu").value = data.titleRu || "";
     document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
+    document.getElementById("fFilter").value = data.filterId || "";
     document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
     document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
     editor.hidden = false;
@@ -132,6 +142,7 @@
       titleEn: document.getElementById("fTitleEn").value.trim(),
       titleRu: document.getElementById("fTitleRu").value.trim(),
       sortOrder: Number(document.getElementById("fSort").value || 0),
+      filterId: Number(document.getElementById("fFilter").value),
       active: document.getElementById("fActive").checked
     };
     const res = await fetch("/admin/individual-services/save", {

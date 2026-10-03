@@ -9,6 +9,7 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.IndividualService;
+import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -16,6 +17,7 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class IndividualCatalogService {
     private static final Pattern CODE = Pattern.compile("^[A-Z0-9]{2,8}$");
 
     private final IndividualServiceRepository individualServiceRepository;
+    private final IndividualServiceFilterRepository individualServiceFilterRepository;
     private final BranchIndividualServiceRepository branchServiceRepository;
     private final BranchRepository branchRepository;
     private final BookingStaffAccess bookingStaffAccess;
@@ -109,6 +112,11 @@ public class IndividualCatalogService {
     }
 
     @Transactional(readOnly = true)
+    public List<IndividualServiceFilter> adminFilters() {
+        return individualServiceFilterRepository.findAllByOrderByIdAsc();
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminIndividualServiceRow> adminRows() {
         List<AdminIndividualServiceRow> rows = new ArrayList<>();
         for (IndividualService catalog : individualServiceRepository.findAllByOrderBySortOrderAscIdAsc()) {
@@ -140,6 +148,12 @@ public class IndividualCatalogService {
         row.setTitleJson(json.write(body.getTitleAz().trim(), trim(body.getTitleEn()), trim(body.getTitleRu())));
         row.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
         row.setActive(body.getActive() == null || body.getActive());
+        if (body.getFilterId() == null) {
+            throw MissingFieldException.required("filterId");
+        }
+        IndividualServiceFilter filter = individualServiceFilterRepository.findById(body.getFilterId())
+                .orElseThrow(() -> new ResourceNotFoundException("individual service filter not found"));
+        row.setFilter(filter);
         return toAdminRow(individualServiceRepository.save(row));
     }
 
@@ -184,6 +198,8 @@ public class IndividualCatalogService {
                 .titleRu(title.getOrDefault("ru", ""))
                 .sortOrder(catalog.getSortOrder())
                 .active(catalog.getActive())
+                .filterId(catalog.getFilter() == null ? null : catalog.getFilter().getId())
+                .filterName(catalog.getFilter() == null ? null : catalog.getFilter().getName())
                 .build();
     }
 

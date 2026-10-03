@@ -21,4 +21,6 @@ public class AdminIndividualServiceRow {
     String titleRu;
     Integer sortOrder;
     Boolean active;
+    Long filterId;
+    String filterName;
 }

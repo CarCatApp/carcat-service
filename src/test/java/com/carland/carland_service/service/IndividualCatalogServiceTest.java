@@ -11,6 +11,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.when;
 class IndividualCatalogServiceTest {
 
     @Mock IndividualServiceRepository individualServiceRepository;
+    @Mock IndividualServiceFilterRepository individualServiceFilterRepository;
     @Mock BranchIndividualServiceRepository branchServiceRepository;
     @Mock BranchRepository branchRepository;
     @Mock BookingStaffAccess bookingStaffAccess;
@@ -49,6 +51,7 @@ class IndividualCatalogServiceTest {
     void setUp() {
         service = new IndividualCatalogService(
                 individualServiceRepository,
+                individualServiceFilterRepository,
                 branchServiceRepository,
                 branchRepository,
                 bookingStaffAccess,

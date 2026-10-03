@@ -37,6 +37,7 @@ public class AdminIndividualServiceController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         model.addAttribute("services", individualCatalogService.adminRows());
+        model.addAttribute("filters", individualCatalogService.adminFilters());
         return "individual-services";
     }
 
