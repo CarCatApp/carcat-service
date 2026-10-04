@@ -24,6 +24,7 @@ import com.carland.carland_service.service.BookingBranchProfileService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
  * tr: Müşteri keşif + katalog + müsaitlik. Flag: booking.
  * en: Owner discovery + catalog + availability. Flag: booking.
  */
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 public class BookingDiscoveryController {
@@ -174,6 +176,12 @@ public class BookingDiscoveryController {
             @PathVariable Long branchId,
             @RequestBody BookingDayRangesRequest request
     ) {
+        log.info("RANGES_GET body branchId={} date={} packageId={} individualServiceIds={} issuePresent={}",
+                branchId,
+                request == null ? null : request.getDate(),
+                request == null ? null : request.getPackageId(),
+                request == null ? null : request.getIndividualServiceIds(),
+                request != null && request.getIssue() != null && !request.getIssue().isBlank());
         return bookingCalendarService.day(branchId, request, acceptLanguage);
     }
 

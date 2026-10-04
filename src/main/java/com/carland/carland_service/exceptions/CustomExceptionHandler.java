@@ -1,6 +1,8 @@
 package com.carland.carland_service.exceptions;
 
 import com.carland.carland_service.dto.response.ResponseException;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
  * tr: REST API genelinde fırlatılan exception'ları yakalayıp ResponseException gövdesiyle uygun HTTP durum koduna (400/401/404/409) çeviren global exception handler.
  * en: Global exception handler that catches exceptions thrown across the REST API and maps them to the appropriate HTTP status (400/401/404/409) with a ResponseException body.
  */
+@Slf4j
 @RestControllerAdvice
 public class CustomExceptionHandler {
 
@@ -84,7 +87,13 @@ public class CustomExceptionHandler {
 
 
     @ExceptionHandler(HttpMessageConversionException.class)
-    public ResponseEntity<ResponseException> handleMissingBodyException(HttpMessageConversionException ex) {
+    public ResponseEntity<ResponseException> handleMissingBodyException(HttpMessageConversionException ex,
+                                                                       HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path != null && path.contains("/ranges")) {
+            log.warn("RANGES_GET body missing method={} path={} contentType={} contentLength={} cause={}",
+                    request.getMethod(), path, request.getContentType(), request.getContentLength(), ex.getMessage());
+        }
         ResponseException responseException=ResponseException.builder()
                 .error("Body is required")
                 .message("Məlumatlar əksikdir!")
