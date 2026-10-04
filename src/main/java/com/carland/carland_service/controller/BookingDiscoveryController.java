@@ -1,6 +1,8 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.BookingAvailabilityResponse;
+import com.carland.carland_service.dto.booking.BookingCalendarRequest;
+import com.carland.carland_service.dto.booking.BookingCalendarResponse;
 import com.carland.carland_service.dto.booking.BookingCarePackagesResponse;
 import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
@@ -11,6 +13,7 @@ import com.carland.carland_service.dto.booking.BookingPackagePriceInfoResponse;
 import com.carland.carland_service.dto.booking.BookingCatalogResponse;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.service.BookingAvailabilityService;
+import com.carland.carland_service.service.BookingCalendarService;
 import com.carland.carland_service.service.BookingCarePackageCatalogService;
 import com.carland.carland_service.service.BookingBranchBrandsService;
 import com.carland.carland_service.service.BookingIndividualCatalogService;
@@ -21,6 +24,8 @@ import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,6 +42,7 @@ public class BookingDiscoveryController {
     private final BookingDiscoveryService bookingDiscoveryService;
     private final BookingCatalogService bookingCatalogService;
     private final BookingAvailabilityService bookingAvailabilityService;
+    private final BookingCalendarService bookingCalendarService;
     private final BookingBranchProfileService bookingBranchProfileService;
     private final BookingBranchBrandsService bookingBranchBrandsService;
     private final BookingIndividualCatalogService bookingIndividualCatalogService;
@@ -140,6 +146,20 @@ public class BookingDiscoveryController {
             @RequestParam String to
     ) {
         return bookingAvailabilityService.availability(branchId, serviceKeys, from, to, timezone);
+    }
+
+    /**
+     * tr: Bu ayın günleri. date gün.ay.yıl, available true/false.
+     * en: Days of this month. date is day.month.year, available is true or false.
+     */
+    @PostMapping("/api/v1/booking/branches/{branchId}/calendar")
+    public BookingCalendarResponse calendar(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId,
+            @RequestBody BookingCalendarRequest request
+    ) {
+        return bookingCalendarService.month(branchId, request, acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {

@@ -39,6 +39,7 @@ public class BookingFlagEndpointAttacher {
     static final String PACKAGE_PRICE_INFO_PATH = "/api/v1/booking/care-packages/{packageId}/price-info";
     static final String CARE_PACKAGES_PATH = "/api/v1/booking/branches/{branchId}/care-packages";
     static final String AVAILABILITY_PATH = "/api/v1/booking/branches/{branchId}/availability";
+    static final String CALENDAR_PATH = "/api/v1/booking/branches/{branchId}/calendar";
     static final String QUOTE_PATH = "/api/v1/booking/bookings/quote";
     static final String CREATE_PATH = "/api/v1/booking/bookings";
     static final String MINE_PATH = "/api/v1/booking/bookings/mine";
@@ -56,6 +57,7 @@ public class BookingFlagEndpointAttacher {
             new OwnerRoute("GET", PACKAGE_PRICE_INFO_PATH),
             new OwnerRoute("GET", CARE_PACKAGES_PATH),
             new OwnerRoute("GET", AVAILABILITY_PATH),
+            new OwnerRoute("POST", CALENDAR_PATH),
             new OwnerRoute("POST", QUOTE_PATH),
             new OwnerRoute("POST", CREATE_PATH),
             new OwnerRoute("GET", CREATE_PATH),
