@@ -49,6 +49,10 @@ class BookingAvailabilityServiceTest {
         assertTrue(BookingAvailabilityService.matchesKey("*", List.of("pkg:hyper-extra")));
         assertTrue(BookingAvailabilityService.matchesKey("pkg:hyper-extra", List.of("pkg:hyper-extra")));
         assertFalse(BookingAvailabilityService.matchesKey("pkg:hyper-extra", List.of("svc:oil-change")));
+        Range repair = Range.builder().slotTarget(StaffSlotTargets.REPAIR_INSPECTION).build();
+        assertTrue(BookingAvailabilityService.matchesOffer(repair, List.of("dir:repair")));
+        assertTrue(BookingAvailabilityService.matchesOffer(repair, List.of("dir:inspection")));
+        assertFalse(BookingAvailabilityService.matchesOffer(repair, List.of("pkg:hyper-extra")));
     }
 
     @Test

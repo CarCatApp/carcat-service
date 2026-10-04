@@ -37,9 +37,29 @@ public class Range {
     @Column(name = "booking_mode", length = 16)
     String bookingMode;
 
-    /** * or one catalog serviceKey. */
+    /** * or one catalog serviceKey. Staff-generated rows leave this empty and use slotTarget. */
     @Column(name = "service_key", length = 64)
     String serviceKey;
+
+    /** package | individual | repair_inspection. Empty on older rows. */
+    @Column(name = "slot_target", length = 32)
+    String slotTarget;
+
+    /** Partner-panel package (branch_care_packages.id). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "care_package_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    BranchCarePackage carePackage;
+
+    /** Catalog individual service id. Not a service inside a package. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "individual_service_id",
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    IndividualService individualService;
 
 
     @OneToMany

@@ -356,7 +356,7 @@ public class BookingCreateService {
                 || !range.getStart().isAfter(OffsetDateTime.now())) {
             throw new ConflictException("slot_unavailable");
         }
-        if (!BookingAvailabilityService.matchesKey(range.getServiceKey(), keys)) {
+        if (!BookingAvailabilityService.matchesOffer(range, keys)) {
             throw new ConflictException("slot_unavailable");
         }
         int remaining = remaining(range, excludeBookingId);

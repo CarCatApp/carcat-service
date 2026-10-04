@@ -81,7 +81,7 @@ public class BookingAvailabilityService {
             List<Range> ranges = new ArrayList<>(calendar.getTimeRanges());
             ranges.sort(Comparator.comparing(Range::getStart));
             for (Range range : ranges) {
-                if (!matchesKey(range.getServiceKey(), wanted)) {
+                if (!matchesOffer(range, wanted)) {
                     continue;
                 }
                 BookingAvailabilitySlotView slot = toSlot(range, timezone, nowUtc);
@@ -153,6 +153,30 @@ public class BookingAvailabilityService {
                 .status(status)
                 .bookable(bookable)
                 .build();
+    }
+
+    /**
+     * tr: Yeni staff slotu hedefe bakar. Təmir+yoxlama her iki yöne de görünür.
+     * en: A staff-created slot matches its target. Repair+inspection is visible for both directions.
+     */
+    static boolean matchesOffer(Range range, List<String> wanted) {
+        String target = range.getSlotTarget();
+        if (target != null && !target.isBlank()) {
+            if (StaffSlotTargets.REPAIR_INSPECTION.equals(target)) {
+                if (wanted.isEmpty() || wanted.contains("*")) {
+                    return true;
+                }
+                for (String key : wanted) {
+                    if ("dir:repair".equals(key) || "dir:inspection".equals(key)
+                            || StaffSlotTargets.REPAIR_INSPECTION.equals(key)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return wanted.isEmpty() || wanted.contains("*");
+        }
+        return matchesKey(range.getServiceKey(), wanted);
     }
 
     static boolean matchesKey(String rangeKey, List<String> wanted) {

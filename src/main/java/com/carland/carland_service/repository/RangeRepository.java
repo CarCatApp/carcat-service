@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 /**
@@ -18,6 +19,21 @@ import java.util.Optional;
 public interface RangeRepository extends JpaRepository<Range, Long> {
     /** tr: Aralık id'sine göre zaman aralığını bulur. / en: Finds a time slot by range id. */
     Range findByRangeId(Long rangeId);
+
+    @Query("select count(r) from Range r join r.calendar c join c.branch b "
+            + "where b.id = :branchId and c.day = :day and r.carePackage.id = :packageId")
+    long countCarePackageOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
+                               @Param("packageId") Long packageId);
+
+    @Query("select count(r) from Range r join r.calendar c join c.branch b "
+            + "where b.id = :branchId and c.day = :day and r.individualService.id = :serviceId")
+    long countIndividualOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
+                              @Param("serviceId") Long serviceId);
+
+    @Query("select count(r) from Range r join r.calendar c join c.branch b "
+            + "where b.id = :branchId and c.day = :day and r.slotTarget = :slotTarget")
+    long countTargetOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
+                          @Param("slotTarget") String slotTarget);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Range r join fetch r.calendar c join fetch c.branch b join fetch b.partner where r.rangeId = :id")
