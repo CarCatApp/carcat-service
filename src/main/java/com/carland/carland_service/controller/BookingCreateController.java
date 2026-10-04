@@ -1,12 +1,16 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.booking.BookingAppointmentRequest;
+import com.carland.carland_service.dto.booking.BookingAppointmentResponse;
 import com.carland.carland_service.dto.booking.BookingQuoteResponse;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.BookingWriteRequest;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.service.BookingAppointmentService;
 import com.carland.carland_service.service.BookingCreateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingCreateController {
 
     private final BookingCreateService bookingCreateService;
+    private final BookingAppointmentService bookingAppointmentService;
 
     @PostMapping("/api/v1/booking/bookings/quote")
     public BookingQuoteResponse quote(
@@ -41,6 +46,22 @@ public class BookingCreateController {
             @RequestBody BookingWriteRequest request
     ) {
         return bookingCreateService.create(request, parseUserId(userIdHeader), timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: Seçilen range'e book. Paket, xidmət və şikayət bu range'ə yazılır.
+     * en: Books the chosen range. The package, services and complaint are stored on that range.
+     */
+    @PostMapping("/api/v1/booking/branches/{branchId}/appointments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BookingAppointmentResponse appoint(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId,
+            @RequestBody BookingAppointmentRequest request
+    ) {
+        return bookingAppointmentService.create(branchId, request, parseUserId(userIdHeader), acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {

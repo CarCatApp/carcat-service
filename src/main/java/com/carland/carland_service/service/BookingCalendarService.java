@@ -152,8 +152,8 @@ public class BookingCalendarService {
         return BookingDayRangesResponse.builder().ranges(views).build();
     }
 
-    private Selection selection(Branch branch, Long requestedPackageId, List<Long> requestedServiceIds,
-                                String issue, String lang) {
+    Selection selection(Branch branch, Long requestedPackageId, List<Long> requestedServiceIds,
+                        String issue, String lang) {
         List<String> problems = new ArrayList<>();
         Long packageId = null;
         if (requestedPackageId != null) {
@@ -291,7 +291,7 @@ public class BookingCalendarService {
         return day;
     }
 
-    private static boolean matches(Range range, Selection selection) {
+    static boolean matches(Range range, Selection selection) {
         String target = range.getSlotTarget();
         if (StaffSlotTargets.PACKAGE.equals(target) && selection.packageId != null
                 && range.getCarePackage() != null
@@ -341,6 +341,6 @@ public class BookingCalendarService {
     private record Window(LocalTime start, LocalTime end) {
     }
 
-    private record Selection(Long packageId, Set<Long> serviceIds, boolean repair) {
+    record Selection(Long packageId, Set<Long> serviceIds, boolean repair) {
     }
 }

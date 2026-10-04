@@ -26,7 +26,6 @@ import com.carland.carland_service.service.BookingDiscoveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -154,7 +153,7 @@ public class BookingDiscoveryController {
      * tr: Bu ayın günleri. date gün.ay.yıl, available true/false.
      * en: Days of this month. date is day.month.year, available is true or false.
      */
-    @PostMapping("/api/v1/booking/branches/{branchId}/calendar")
+    @GetMapping("/api/v1/booking/branches/{branchId}/calendar")
     public BookingCalendarResponse calendar(
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
@@ -168,7 +167,7 @@ public class BookingDiscoveryController {
      * tr: Seçilen günün saatleri. Aynı pencerede yeri çok olan, eşitse paket → hizmet → təmir.
      * en: Hours of the chosen day. Same window keeps the fullest range, then package, service, repair.
      */
-    @PostMapping("/api/v1/booking/branches/{branchId}/ranges")
+    @GetMapping("/api/v1/booking/branches/{branchId}/ranges")
     public BookingDayRangesResponse ranges(
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
