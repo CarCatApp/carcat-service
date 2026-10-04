@@ -48,6 +48,8 @@ public class OfferedService {
     @Column(name = "title_json", nullable = false, length = 1024)
     String titleJson;
 
+
+
     @Column(name = "sort_order", nullable = false)
     @Builder.Default
     Integer sortOrder = 0;
