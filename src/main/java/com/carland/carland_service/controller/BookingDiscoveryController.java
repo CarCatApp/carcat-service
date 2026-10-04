@@ -3,6 +3,8 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.booking.BookingAvailabilityResponse;
 import com.carland.carland_service.dto.booking.BookingCalendarRequest;
 import com.carland.carland_service.dto.booking.BookingCalendarResponse;
+import com.carland.carland_service.dto.booking.BookingDayRangesRequest;
+import com.carland.carland_service.dto.booking.BookingDayRangesResponse;
 import com.carland.carland_service.dto.booking.BookingCarePackagesResponse;
 import com.carland.carland_service.dto.booking.BookingBranchListResponse;
 import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
@@ -160,6 +162,20 @@ public class BookingDiscoveryController {
             @RequestBody BookingCalendarRequest request
     ) {
         return bookingCalendarService.month(branchId, request, acceptLanguage);
+    }
+
+    /**
+     * tr: Seçilen günün saatleri. Aynı pencerede yeri çok olan, eşitse paket → hizmet → təmir.
+     * en: Hours of the chosen day. Same window keeps the fullest range, then package, service, repair.
+     */
+    @PostMapping("/api/v1/booking/branches/{branchId}/ranges")
+    public BookingDayRangesResponse ranges(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long branchId,
+            @RequestBody BookingDayRangesRequest request
+    ) {
+        return bookingCalendarService.day(branchId, request, acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {

@@ -3,9 +3,13 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.booking.BookingCalendarDayView;
 import com.carland.carland_service.dto.booking.BookingCalendarRequest;
 import com.carland.carland_service.dto.booking.BookingCalendarResponse;
+import com.carland.carland_service.dto.booking.BookingDayRangesRequest;
+import com.carland.carland_service.dto.booking.BookingDayRangesResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
+import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.RangeStatus;
@@ -28,6 +32,7 @@ import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -110,6 +115,114 @@ class BookingCalendarServiceTest {
         assertEquals(today.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), response.getDays().get(0).getDate());
     }
 
+    @Test
+    void sameWindowReturnsTheRangeWithMorePlaces() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        BranchCarePackage pkg = packageRow();
+        IndividualService oil = oil();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(40L, start, 2, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(55L, start, 4, StaffSlotTargets.INDIVIDUAL, null, oil),
+                        slot(70L, start, 8, StaffSlotTargets.REPAIR_INSPECTION, null, null))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, List.of(20L), "səs"), "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(70L, response.getRanges().get(0).getRangeId());
+        assertEquals(8, response.getRanges().get(0).getRemaining());
+    }
+
+    @Test
+    void equalPlacesPreferPackageThenServiceThenRepair() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        BranchCarePackage pkg = packageRow();
+        IndividualService oil = oil();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(70L, start, 4, StaffSlotTargets.REPAIR_INSPECTION, null, null),
+                        slot(55L, start, 4, StaffSlotTargets.INDIVIDUAL, null, oil),
+                        slot(40L, start, 4, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, List.of(20L), "səs"), "az");
+
+        assertEquals(40L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
+    void tiedServiceBeatsRepairWhenPackageHasFewerPlaces() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        OffsetDateTime later = start.plusHours(2);
+        BranchCarePackage pkg = packageRow();
+        IndividualService oil = oil();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(40L, start, 2, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(55L, start, 4, StaffSlotTargets.INDIVIDUAL, null, oil),
+                        slot(70L, start, 4, StaffSlotTargets.REPAIR_INSPECTION, null, null),
+                        wide(61L, later, later.plusHours(1), 2, pkg))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, List.of(20L), "səs"), "az");
+
+        assertEquals(2, response.getRanges().size());
+        assertEquals(55L, response.getRanges().get(0).getRangeId());
+        assertEquals(61L, response.getRanges().get(1).getRangeId());
+    }
+
+    @Test
+    void blankIssueIgnoresRepairRange() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(40L, start, 2, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(70L, start, 8, StaffSlotTargets.REPAIR_INSPECTION, null, null))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, null, null), "az");
+
+        assertEquals(40L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
+    void pastAndFullRangesAreLeftOut() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(eq(70L), any())).thenReturn(1L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(1L, OffsetDateTime.now(StaffSlotWindows.ZONE).minusHours(2), 4,
+                                StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(70L, start, 1, StaffSlotTargets.REPAIR_INSPECTION, null, null),
+                        slot(40L, start, 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, null, "səs"), "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(40L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
+    void dateOutsideThisMonthIsRejected() {
+        LocalDate yesterday = LocalDate.now(StaffSlotWindows.ZONE).minusDays(1);
+        assertThrows(MissingFieldException.class,
+                () -> service.day(7L, request(yesterday, null, null, "səs"), "az"));
+    }
+
     private static Boolean available(BookingCalendarResponse response, LocalDate day) {
         String formatted = day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         return response.getDays().stream()
@@ -148,6 +261,74 @@ class BookingCalendarServiceTest {
                 .workerCount(2)
                 .status(RangeStatus.AVAILABLE.name())
                 .slotTarget(StaffSlotTargets.REPAIR_INSPECTION)
+                .build();
+    }
+
+    private LocalDate openDay() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
+        return today.equals(end) ? today : today.plusDays(1);
+    }
+
+    private static OffsetDateTime at(LocalDate day, int hour, int minute) {
+        OffsetDateTime start = ZonedDateTime.of(day, LocalTime.of(hour, minute), StaffSlotWindows.ZONE).toOffsetDateTime();
+        if (start.isAfter(OffsetDateTime.now(StaffSlotWindows.ZONE))) {
+            return start;
+        }
+        return OffsetDateTime.now(StaffSlotWindows.ZONE).plusMinutes(20);
+    }
+
+    private static BookingDayRangesRequest request(LocalDate day, Long packageId, List<Long> services, String issue) {
+        BookingDayRangesRequest body = new BookingDayRangesRequest();
+        body.setDate(day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+        body.setPackageId(packageId);
+        body.setIndividualServiceIds(services);
+        body.setIssue(issue);
+        return body;
+    }
+
+    private BranchCarePackage packageRow() {
+        BranchCarePackage pkg = BranchCarePackage.builder().id(10L).name("Yağ").active(true).branch(branch).price(1).build();
+        when(carePackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        return pkg;
+    }
+
+    private IndividualService oil() {
+        IndividualService oil = IndividualService.builder().id(20L).active(true).code("oil").titleJson("{}").build();
+        when(individualServiceRepository.findById(20L)).thenReturn(Optional.of(oil));
+        when(json.read("{}")).thenReturn(Map.of("az", "Yağ"));
+        when(branchIndividualServiceRepository.findByBranch_IdAndIndividualService_Id(7L, 20L))
+                .thenReturn(Optional.of(BranchIndividualService.builder()
+                        .branch(branch)
+                        .individualService(oil)
+                        .active(true)
+                        .build()));
+        return oil;
+    }
+
+    private static Range slot(Long id, OffsetDateTime start, int capacity, String target,
+                              BranchCarePackage pkg, IndividualService service) {
+        return Range.builder()
+                .rangeId(id)
+                .start(start)
+                .end(start.plusMinutes(30))
+                .workerCount(capacity)
+                .status(RangeStatus.AVAILABLE.name())
+                .slotTarget(target)
+                .carePackage(pkg)
+                .individualService(service)
+                .build();
+    }
+
+    private static Range wide(Long id, OffsetDateTime start, OffsetDateTime end, int capacity, BranchCarePackage pkg) {
+        return Range.builder()
+                .rangeId(id)
+                .start(start)
+                .end(end)
+                .workerCount(capacity)
+                .status(RangeStatus.AVAILABLE.name())
+                .slotTarget(StaffSlotTargets.PACKAGE)
+                .carePackage(pkg)
                 .build();
     }
 }

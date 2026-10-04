@@ -3,6 +3,9 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.booking.BookingCalendarDayView;
 import com.carland.carland_service.dto.booking.BookingCalendarRequest;
 import com.carland.carland_service.dto.booking.BookingCalendarResponse;
+import com.carland.carland_service.dto.booking.BookingDayRangeView;
+import com.carland.carland_service.dto.booking.BookingDayRangesRequest;
+import com.carland.carland_service.dto.booking.BookingDayRangesResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchIndividualService;
@@ -25,9 +28,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,6 +51,7 @@ import java.util.Set;
 public class BookingCalendarService {
 
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
 
     private final BranchRepository branchRepository;
     private final CalendarRepository calendarRepository;
@@ -67,7 +75,8 @@ public class BookingCalendarService {
                 || !Boolean.TRUE.equals(branch.getPartner().getActive())) {
             throw new ResourceNotFoundException("Branch not found");
         }
-        Selection selection = selection(branch, request == null ? new BookingCalendarRequest() : request, lang);
+        BookingCalendarRequest body = request == null ? new BookingCalendarRequest() : request;
+        Selection selection = selection(branch, body.getPackageId(), body.getIndividualServiceIds(), body.getIssue(), lang);
         LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
         LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
@@ -93,11 +102,62 @@ public class BookingCalendarService {
                 .build();
     }
 
-    private Selection selection(Branch branch, BookingCalendarRequest request, String lang) {
+    /**
+     * tr: Seçilen günün boş yerli saatleri. Aynı pencerede yeri çok olan, eşitse paket → hizmet → təmir.
+     * en: Free hours of the chosen day. Same window keeps the fullest range, then package, service, repair.
+     */
+    @Transactional(readOnly = true)
+    public BookingDayRangesResponse day(Long branchId, BookingDayRangesRequest request, String acceptLanguage) {
+        String lang = lang(acceptLanguage);
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+        if (!Boolean.TRUE.equals(branch.getActive())
+                || branch.getPartner() == null
+                || !Boolean.TRUE.equals(branch.getPartner().getActive())) {
+            throw new ResourceNotFoundException("Branch not found");
+        }
+        BookingDayRangesRequest body = request == null ? new BookingDayRangesRequest() : request;
+        Selection selection = selection(branch, body.getPackageId(), body.getIndividualServiceIds(), body.getIssue(), lang);
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate day = parseDay(body.getDate(), today, end, lang);
+        OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
+        List<Range> ranges = rangesByDay(calendarRepository.findByBranchIdAndDayBetween(branch.getId(), day, day))
+                .getOrDefault(day, List.of());
+
+        Map<Window, Range> winners = new HashMap<>();
+        Map<Window, Integer> seats = new HashMap<>();
+        for (Range range : ranges) {
+            if (range.getEnd() == null || !bookable(range, now) || !matches(range, selection)) {
+                continue;
+            }
+            Window window = window(range);
+            int left = remaining(range);
+            Range current = winners.get(window);
+            if (current == null || better(range, left, current, seats.get(window))) {
+                winners.put(window, range);
+                seats.put(window, left);
+            }
+        }
+        List<BookingDayRangeView> views = winners.entrySet().stream()
+                .sorted(Comparator.comparing((Map.Entry<Window, Range> entry) -> entry.getKey().start())
+                        .thenComparing(entry -> entry.getKey().end()))
+                .map(entry -> BookingDayRangeView.builder()
+                        .rangeId(entry.getValue().getRangeId())
+                        .start(entry.getKey().start().format(CLOCK))
+                        .end(entry.getKey().end().format(CLOCK))
+                        .remaining(seats.get(entry.getKey()))
+                        .build())
+                .toList();
+        return BookingDayRangesResponse.builder().ranges(views).build();
+    }
+
+    private Selection selection(Branch branch, Long requestedPackageId, List<Long> requestedServiceIds,
+                                String issue, String lang) {
         List<String> problems = new ArrayList<>();
         Long packageId = null;
-        if (request.getPackageId() != null) {
-            BranchCarePackage pkg = carePackageRepository.findById(request.getPackageId()).orElse(null);
+        if (requestedPackageId != null) {
+            BranchCarePackage pkg = carePackageRepository.findById(requestedPackageId).orElse(null);
             if (pkg == null || pkg.getBranch() == null || !branch.getId().equals(pkg.getBranch().getId())) {
                 problems.add(sentence(lang, "Seçilmiş paket bu şubədə yoxdur.",
                         "The selected package is not on this branch.",
@@ -110,8 +170,8 @@ public class BookingCalendarService {
             }
         }
         Set<Long> serviceIds = new LinkedHashSet<>();
-        if (request.getIndividualServiceIds() != null) {
-            for (Long serviceId : request.getIndividualServiceIds()) {
+        if (requestedServiceIds != null) {
+            for (Long serviceId : requestedServiceIds) {
                 if (serviceId == null || !serviceIds.add(serviceId)) {
                     continue;
                 }
@@ -135,7 +195,7 @@ public class BookingCalendarService {
                 }
             }
         }
-        boolean repair = request.getIssue() != null && !request.getIssue().isBlank();
+        boolean repair = issue != null && !issue.isBlank();
         if (!problems.isEmpty()) {
             throw new ConflictException(String.join(" ", new LinkedHashSet<>(problems)));
         }
@@ -163,18 +223,72 @@ public class BookingCalendarService {
     }
 
     private boolean bookable(Range range, OffsetDateTime now) {
-        if (range == null || range.getStart() == null || !range.getStart().isAfter(now)) {
+        if (range == null || range.getStart() == null || range.getEnd() == null || !range.getStart().isAfter(now)) {
             return false;
         }
         if (!RangeStatus.AVAILABLE.name().equals(range.getStatus())) {
             return false;
         }
+        return remaining(range) > 0;
+    }
+
+    private int remaining(Range range) {
         int capacity = range.getWorkerCount() == null ? 0 : range.getWorkerCount();
         int appointments = range.getAppointments() == null ? 0 : range.getAppointments().size();
         long booked = range.getRangeId() == null ? 0
                 : bookingRepository.countByRange_RangeIdAndStatusIn(
                 range.getRangeId(), BookingStatus.occupyingCapacity());
-        return capacity - appointments - (int) booked > 0;
+        return capacity - appointments - (int) booked;
+    }
+
+    private static Window window(Range range) {
+        return new Window(
+                range.getStart().atZoneSameInstant(StaffSlotWindows.ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES),
+                range.getEnd().atZoneSameInstant(StaffSlotWindows.ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES));
+    }
+
+    private static boolean better(Range candidate, int candidateLeft, Range current, int currentLeft) {
+        if (candidateLeft != currentLeft) {
+            return candidateLeft > currentLeft;
+        }
+        int rank = Integer.compare(priority(candidate), priority(current));
+        if (rank != 0) {
+            return rank < 0;
+        }
+        long candidateId = candidate.getRangeId() == null ? Long.MAX_VALUE : candidate.getRangeId();
+        long currentId = current.getRangeId() == null ? Long.MAX_VALUE : current.getRangeId();
+        return candidateId < currentId;
+    }
+
+    private static int priority(Range range) {
+        if (StaffSlotTargets.PACKAGE.equals(range.getSlotTarget())) {
+            return 0;
+        }
+        if (StaffSlotTargets.INDIVIDUAL.equals(range.getSlotTarget())) {
+            return 1;
+        }
+        return 2;
+    }
+
+    private static LocalDate parseDay(String raw, LocalDate today, LocalDate end, String lang) {
+        if (raw == null || raw.isBlank()) {
+            throw new MissingFieldException(sentence(lang, "Tarix göndərin.",
+                    "Send a date.", "Отправьте дату."));
+        }
+        LocalDate day;
+        try {
+            day = LocalDate.parse(raw.trim(), DAY);
+        } catch (DateTimeParseException ex) {
+            throw new MissingFieldException(sentence(lang, "Tarix gün.ay.il olmalıdır.",
+                    "The date must be day.month.year.", "Дата должна быть в виде день.месяц.год."));
+        }
+        if (day.isBefore(today) || day.isAfter(end)) {
+            throw new MissingFieldException(sentence(lang,
+                    "Tarix bu ayın bugündən sonuna qədər olmalıdır.",
+                    "The date must be from today through the end of this month.",
+                    "Дата должна быть с сегодняшнего дня до конца этого месяца."));
+        }
+        return day;
     }
 
     private static boolean matches(Range range, Selection selection) {
@@ -222,6 +336,9 @@ public class BookingCalendarService {
             return ru;
         }
         return az;
+    }
+
+    private record Window(LocalTime start, LocalTime end) {
     }
 
     private record Selection(Long packageId, Set<Long> serviceIds, boolean repair) {
