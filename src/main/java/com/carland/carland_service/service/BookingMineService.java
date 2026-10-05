@@ -189,7 +189,7 @@ public class BookingMineService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .canceledBy(canceledBy(booking.getStatus()))
-                .canceledReason(canceledReasonOf(booking))
+                .canceledReason(canceledReasonOf(booking, BookingMineService.langOf(acceptLanguage)))
                 .build();
     }
 
@@ -580,16 +580,19 @@ public class BookingMineService {
         return null;
     }
 
-    private BookingCanceledReasonView canceledReasonOf(Booking booking) {
+    private BookingCanceledReasonView canceledReasonOf(Booking booking, String lang) {
         String code = booking.getCancelReasonCode();
         if (code == null || code.isBlank()) {
             return null;
         }
         BookingCancelReason row = cancelReasonRepository.findByCodeAndActiveTrue(code).orElse(null);
+        String note = BookingCapacityService.PLACES_FULL.equals(code)
+                ? BookingCapacityService.note(lang)
+                : booking.getCancelNote();
         return BookingCanceledReasonView.builder()
                 .code(code)
                 .title(row == null ? Map.of() : titles(row.getTitleJson()))
-                .note(booking.getCancelNote())
+                .note(note)
                 .build();
     }
 

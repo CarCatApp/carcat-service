@@ -77,6 +77,7 @@ public class BookingCreateService {
     private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
     private final BookingSelectionWriter selectionWriter;
+    private final BookingCapacityService bookingCapacityService;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
@@ -136,6 +137,9 @@ public class BookingCreateService {
             booking.setPriceMax(max + priced.priceMax());
         }
         booking = bookingRepository.save(booking);
+        if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            bookingCapacityService.closePendingWhenFull(prepared.range);
+        }
         BookingInspection inspection = null;
         if (priced != null) {
             Customer customer = customerRepository.findByUserId(customerUserId);

@@ -56,6 +56,7 @@ public class BookingAppointmentService {
     private final CarRepository carRepository;
     private final BookingCalendarService calendarService;
     private final BookingSelectionWriter selectionWriter;
+    private final BookingCapacityService bookingCapacityService;
 
     /**
      * tr: Range kilitlenir, yeri varsa book ve alt satırları yazılır.
@@ -133,6 +134,9 @@ public class BookingAppointmentService {
                 .build());
         if (priced != null) {
             selectionWriter.save(booking, customer, car, priced);
+        }
+        if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            bookingCapacityService.closePendingWhenFull(range);
         }
         return BookingAppointmentResponse.builder()
                 .bookingId(booking.getId())

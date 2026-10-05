@@ -20,6 +20,7 @@ import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +52,8 @@ public class StaffBookingService {
     private final BookingItemRepository bookingItemRepository;
     private final BookingIndividualLineRepository individualLineRepository;
     private final BookingInspectionRepository inspectionRepository;
+    private final RangeRepository rangeRepository;
+    private final BookingCapacityService bookingCapacityService;
 
     @Transactional(readOnly = true)
     public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
@@ -113,7 +116,25 @@ public class StaffBookingService {
         if (!BookingStatus.PENDING.apiValue().equals(booking.getStatus())) {
             throw new ConflictException("booking is not pending");
         }
-        booking.setStatus(nextStatus);
+        if (BookingStatus.CONFIRMED.apiValue().equals(nextStatus)) {
+            Range range = booking.getRange();
+            if (range == null || range.getRangeId() == null) {
+                throw new ResourceNotFoundException("slot not found");
+            }
+            Range locked = rangeRepository.lockByRangeId(range.getRangeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("slot not found"));
+            booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+            if (!BookingStatus.PENDING.apiValue().equals(booking.getStatus())) {
+                throw new ConflictException("booking is not pending");
+            }
+            bookingCapacityService.requirePlace(locked, acceptLanguage);
+            booking.setStatus(nextStatus);
+            bookingRepository.saveAndFlush(booking);
+            bookingCapacityService.closePendingWhenFull(locked);
+        } else {
+            booking.setStatus(nextStatus);
+        }
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
         List<String> keys = bookingItemRepository.findByBooking_IdOrderByIdAsc(bookingId).stream()

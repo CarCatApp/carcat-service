@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.booking.StaffSlotCoverageResponse;
 import com.carland.carland_service.dto.booking.StaffSlotDayResponse;
 import com.carland.carland_service.dto.booking.StaffSlotGenerateResponse;
 import com.carland.carland_service.dto.request.StaffSlotGenerateRequest;
@@ -56,6 +57,22 @@ public class BookingStaffSlotController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 branchId,
                 day,
+                acceptLanguage);
+    }
+
+    /**
+     * tr: Bugünden itibaren saati olan günler. Boş günler yok.
+     * en: Days from today that have a slot. Empty days are omitted.
+     */
+    @GetMapping("/api/v1/booking/staff/slots/coverage")
+    public StaffSlotCoverageResponse coverage(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffSlotGenerateService.coverage(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                branchId,
                 acceptLanguage);
     }
 }

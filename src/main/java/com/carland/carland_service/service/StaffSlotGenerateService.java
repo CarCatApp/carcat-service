@@ -1,5 +1,7 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.StaffSlotCoverageDayView;
+import com.carland.carland_service.dto.booking.StaffSlotCoverageResponse;
 import com.carland.carland_service.dto.booking.StaffSlotDayResponse;
 import com.carland.carland_service.dto.booking.StaffSlotGenerateResponse;
 import com.carland.carland_service.dto.booking.StaffSlotSkipView;
@@ -237,6 +239,59 @@ public class StaffSlotGenerateService {
                 .day(day.toString())
                 .slots(slots)
                 .build();
+    }
+
+    /**
+     * tr: Bugünden itibaren saati olan günler. Aradaki boş günler yok.
+     * en: Days from today that have a slot. Empty days between them are omitted.
+     */
+    @Transactional(readOnly = true)
+    public StaffSlotCoverageResponse coverage(Long userId, boolean mustChangePassword, Long branchId,
+                                              String acceptLanguage) {
+        String lang = lang(acceptLanguage);
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, lang);
+        Branch branch = resolveBranch(staff, branchId, lang);
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        List<StaffSlotCoverageDayView> days = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Object[] row : calendarRepository.findSlotDaysFrom(branch.getId(), today)) {
+            LocalDate day = asDate(row[0]);
+            String target = row[1] == null ? "" : row[1].toString();
+            Long packageId = asLong(row[2]);
+            Long serviceId = asLong(row[3]);
+            boolean repair = StaffSlotTargets.REPAIR_INSPECTION.equals(target);
+            String key = day + "|" + target + "|" + packageId + "|" + serviceId;
+            if (!seen.add(key)) {
+                continue;
+            }
+            days.add(StaffSlotCoverageDayView.builder()
+                    .day(day.toString())
+                    .packageId(StaffSlotTargets.PACKAGE.equals(target) ? packageId : null)
+                    .individualServiceId(StaffSlotTargets.INDIVIDUAL.equals(target) ? serviceId : null)
+                    .repairInspection(repair)
+                    .build());
+        }
+        return StaffSlotCoverageResponse.builder()
+                .branchId(branch.getId())
+                .days(days)
+                .build();
+    }
+
+    private static LocalDate asDate(Object value) {
+        if (value instanceof LocalDate day) {
+            return day;
+        }
+        if (value instanceof java.sql.Date sql) {
+            return sql.toLocalDate();
+        }
+        return LocalDate.parse(value.toString());
+    }
+
+    private static Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
     }
 
     private List<Target> resolveTargets(Branch branch, StaffSlotGenerateRequest request, String lang) {

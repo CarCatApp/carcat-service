@@ -14,9 +14,8 @@ class BookingStatusTest {
 
     @Test
     void occupyingIncludesAutoAcceptedAndStaffConfirmed() {
-        assertTrue(BookingStatus.occupyingCapacity().contains("pending"));
         assertTrue(BookingStatus.occupyingCapacity().contains("confirmed"));
         assertTrue(BookingStatus.occupyingCapacity().contains("auto_accepted"));
-        assertEquals(3, BookingStatus.occupyingCapacity().size());
+        assertEquals(2, BookingStatus.occupyingCapacity().size());
     }
 }

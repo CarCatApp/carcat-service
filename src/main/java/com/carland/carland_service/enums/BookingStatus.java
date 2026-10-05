@@ -20,8 +20,8 @@ public enum BookingStatus {
         return name().toLowerCase();
     }
 
-    /** Occupies range capacity until cancelled/rejected/completed. */
+    /** Accepted bookings occupy a place. Pending requests do not. */
     public static List<String> occupyingCapacity() {
-        return List.of(PENDING.apiValue(), CONFIRMED.apiValue(), AUTO_ACCEPTED.apiValue());
+        return List.of(CONFIRMED.apiValue(), AUTO_ACCEPTED.apiValue());
     }
 }

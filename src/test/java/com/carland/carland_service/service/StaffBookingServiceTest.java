@@ -15,6 +15,7 @@ import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.RangeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +45,8 @@ class StaffBookingServiceTest {
     @Mock BookingItemRepository bookingItemRepository;
     @Mock BookingIndividualLineRepository individualLineRepository;
     @Mock BookingInspectionRepository inspectionRepository;
+    @Mock RangeRepository rangeRepository;
+    @Mock BookingCapacityService bookingCapacityService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -53,7 +57,7 @@ class StaffBookingServiceTest {
     void setUp() {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
-                individualLineRepository, inspectionRepository);
+                individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -68,6 +72,7 @@ class StaffBookingServiceTest {
                 .start(OffsetDateTime.parse("2026-10-26T05:00:00Z"))
                 .end(OffsetDateTime.parse("2026-10-26T05:30:00Z"))
                 .bookingMode("approval")
+                .workerCount(2)
                 .calendar(calendar)
                 .build();
         booking = Booking.builder()
@@ -103,6 +108,7 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(rangeRepository.lockByRangeId(105L)).thenReturn(Optional.of(booking.getRange()));
         when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of(
                 BookingItem.builder().booking(booking).serviceKey("pkg:hyper-extra").build()));
 
@@ -111,6 +117,7 @@ class StaffBookingServiceTest {
         assertEquals("confirmed", out.getStatus());
         assertEquals("confirmed", booking.getStatus());
         verify(bookingStaffAccess).requireWritableBranch(staff, 7L, "az");
+        verify(bookingCapacityService).closePendingWhenFull(booking.getRange());
     }
 
     @Test
@@ -121,5 +128,18 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
 
         assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
+    }
+
+    @Test
+    void acceptIsRefusedWhenAcceptedBookingsFillTheRange() {
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(rangeRepository.lockByRangeId(105L)).thenReturn(Optional.of(booking.getRange()));
+        doThrow(new ConflictException("Yerlər dolduğu üçün rezervasiyanızı qəbul edə bilmədik."))
+                .when(bookingCapacityService).requirePlace(any(), any());
+
+        assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
+        assertEquals("pending", booking.getStatus());
     }
 }
