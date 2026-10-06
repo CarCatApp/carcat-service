@@ -1,5 +1,7 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelRequest;
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelResponse;
 import com.carland.carland_service.dto.booking.BookingAppointmentRequest;
 import com.carland.carland_service.dto.booking.BookingAppointmentResponse;
 import com.carland.carland_service.dto.booking.BookingAppointmentServiceView;
@@ -18,6 +20,7 @@ import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingRepository;
@@ -48,6 +51,9 @@ public class BookingAppointmentService {
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final List<String> LIVE = BookingStatus.occupyingCapacity();
+    /** Müştərinin öz mətn səbəbi. Katalog kodu deyil; mətn cancelNote-dadır. */
+    static final String CUSTOMER_REASON = "customer";
+    private static final int REASON_MAX = 500;
 
     private final RangeRepository rangeRepository;
     private final BookingRepository bookingRepository;
@@ -163,6 +169,52 @@ public class BookingAppointmentService {
                 .priceMax(booking.getPriceMax())
                 .currency("AZN")
                 .unit(BookingCreateService.UNIT)
+                .build();
+    }
+
+    /**
+     * tr: Book müştərinin özünə aiddirsə statusu cancelled edir və səbəbi yazır.
+     * en: Cancels the booking when it belongs to the customer and stores the reason.
+     */
+    @Transactional
+    public BookingAppointmentCancelResponse cancel(Long bookingId, BookingAppointmentCancelRequest request,
+                                                   Long customerUserId, String acceptLanguage) {
+        if (customerUserId == null) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        if (bookingId == null) {
+            throw MissingFieldException.required("bookingId");
+        }
+        String lang = lang(acceptLanguage);
+        String reason = request == null || request.getReason() == null ? "" : request.getReason().trim();
+        if (reason.isEmpty()) {
+            throw MissingFieldException.required("reason");
+        }
+        if (reason.length() > REASON_MAX) {
+            throw new ConflictException(sentence(lang, "Səbəb çox uzundur.",
+                    "The reason is too long.", "Причина слишком длинная."));
+        }
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        if (booking.getCustomerUserId() == null || !booking.getCustomerUserId().equals(customerUserId)) {
+            throw new ForbiddenException(sentence(lang, "Bu rezervasiya sizə aid deyil.",
+                    "This booking is not yours.", "Эта бронь вам не принадлежит."));
+        }
+        String status = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase(Locale.ROOT);
+        if (!BookingStatus.PENDING.apiValue().equals(status)
+                && !BookingStatus.CONFIRMED.apiValue().equals(status)
+                && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            throw new ConflictException(sentence(lang, "Bu rezervasiya ləğv edilə bilməz.",
+                    "This booking cannot be cancelled.", "Эту бронь нельзя отменить."));
+        }
+        booking.setStatus(BookingStatus.CANCELLED.apiValue());
+        booking.setCancelReasonCode(CUSTOMER_REASON);
+        booking.setCancelNote(reason);
+        return BookingAppointmentCancelResponse.builder()
+                .bookingId(booking.getId())
+                .ref(booking.getRef())
+                .status(booking.getStatus())
+                .reason(reason)
                 .build();
     }
 

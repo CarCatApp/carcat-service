@@ -1,5 +1,7 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelRequest;
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelResponse;
 import com.carland.carland_service.dto.booking.BookingAppointmentRequest;
 import com.carland.carland_service.dto.booking.BookingAppointmentResponse;
 import com.carland.carland_service.dto.booking.BookingQuoteResponse;
@@ -62,6 +64,21 @@ public class BookingCreateController {
             @RequestBody BookingAppointmentRequest request
     ) {
         return bookingAppointmentService.create(branchId, request, parseUserId(userIdHeader), acceptLanguage);
+    }
+
+    /**
+     * tr: Müştəri öz bookunu ləğv edir. Səbəb bookingə yazılır.
+     * en: The customer cancels their own booking. The reason is stored on the booking.
+     */
+    @PostMapping("/api/v1/booking/appointments/{bookingId}/cancel")
+    public BookingAppointmentCancelResponse cancel(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @PathVariable Long bookingId,
+            @RequestBody BookingAppointmentCancelRequest request
+    ) {
+        return bookingAppointmentService.cancel(bookingId, request, parseUserId(userIdHeader), acceptLanguage);
     }
 
     private static Long parseUserId(String raw) {

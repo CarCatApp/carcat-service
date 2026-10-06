@@ -1,5 +1,7 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelRequest;
+import com.carland.carland_service.dto.booking.BookingAppointmentCancelResponse;
 import com.carland.carland_service.dto.booking.BookingAppointmentRequest;
 import com.carland.carland_service.dto.booking.BookingAppointmentResponse;
 import com.carland.carland_service.entity.Booking;
@@ -12,6 +14,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.CarRepository;
@@ -144,6 +147,46 @@ class BookingAppointmentServiceTest {
         body.setPackageId(10L);
         body.setCarId(15L);
         return body;
+    }
+
+    @Test
+    void cancelWritesTheReasonWhenTheBookingBelongsToTheUser() {
+        Booking booking = Booking.builder()
+                .id(12L)
+                .ref("CC-091214")
+                .customerUserId(54L)
+                .status("auto_accepted")
+                .build();
+        when(bookingRepository.findById(12L)).thenReturn(Optional.of(booking));
+
+        BookingAppointmentCancelResponse out = service.cancel(
+                12L, new BookingAppointmentCancelRequest("plan dəyişdi"), 54L, "az");
+
+        assertEquals("cancelled", out.getStatus());
+        assertEquals("plan dəyişdi", out.getReason());
+        assertEquals("cancelled", booking.getStatus());
+        assertEquals("plan dəyişdi", booking.getCancelNote());
+        assertEquals(BookingAppointmentService.CUSTOMER_REASON, booking.getCancelReasonCode());
+    }
+
+    @Test
+    void cancelRefusesAnotherUsersBooking() {
+        Booking booking = Booking.builder().id(12L).customerUserId(54L).status("pending").build();
+        when(bookingRepository.findById(12L)).thenReturn(Optional.of(booking));
+
+        assertThrows(ForbiddenException.class, () -> service.cancel(
+                12L, new BookingAppointmentCancelRequest("plan dəyişdi"), 9L, "az"));
+        assertEquals("pending", booking.getStatus());
+    }
+
+    @Test
+    void cancelRefusesACompletedBooking() {
+        Booking booking = Booking.builder().id(12L).customerUserId(54L).status("completed").build();
+        when(bookingRepository.findById(12L)).thenReturn(Optional.of(booking));
+
+        assertThrows(ConflictException.class, () -> service.cancel(
+                12L, new BookingAppointmentCancelRequest("plan dəyişdi"), 54L, "az"));
+        assertEquals("completed", booking.getStatus());
     }
 
     private Range range(Long id, LocalDate day, String mode) {
