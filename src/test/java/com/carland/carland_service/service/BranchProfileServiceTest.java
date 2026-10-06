@@ -9,6 +9,7 @@ import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ForbiddenException;
+import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
 import com.carland.carland_service.repository.BranchGoodRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
@@ -48,6 +49,7 @@ class BranchProfileServiceTest {
     @Mock BranchPhotoRepository branchPhotoRepository;
     @Mock StaffPhotoRepository staffPhotoRepository;
     @Mock UserPhotoRepository userPhotoRepository;
+    @Mock BookingRepository bookingRepository;
     @Mock RedisCacheService redisCacheService;
 
     BranchProfileService profile;
@@ -75,6 +77,7 @@ class BranchProfileServiceTest {
                 branchPhotoRepository,
                 staffPhotoRepository,
                 userPhotoRepository,
+                bookingRepository,
                 redisCacheService);
         Partner partner = Partner.builder().id(3L).build();
         branch = Branch.builder().id(12L).partner(partner).name("Hyper").build();

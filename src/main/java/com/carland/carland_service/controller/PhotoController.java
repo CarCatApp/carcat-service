@@ -333,4 +333,19 @@ public class PhotoController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 acceptLanguage);
     }
+
+    /**
+     * tr: Booking satırındaki müşteri fotoğrafı. Staff token. Foto yoksa 404.
+     * en: Customer photo for a booking row. Staff token. 404 when there is no photo.
+     */
+    @GetMapping(value = "/for/customer/get/{userId}", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getCustomerPhoto(HttpServletRequest request,
+                                                   @PathVariable("userId") Long userId,
+                                                   @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.getCustomerPhoto(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                userId,
+                acceptLanguage);
+    }
 }

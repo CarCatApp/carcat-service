@@ -13,6 +13,7 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.StaffPhotoRepository;
@@ -42,6 +43,7 @@ public class StaffMediaService {
     private final BranchPhotoRepository branchPhotoRepository;
     private final StaffPhotoRepository staffPhotoRepository;
     private final UserPhotoRepository userPhotoRepository;
+    private final BookingRepository bookingRepository;
     private final RedisCacheService redisCacheService;
 
     /**
@@ -159,6 +161,41 @@ public class StaffMediaService {
         if (userPhoto == null || userPhoto.getImageData() == null) {
             userPhoto = userPhotoRepository.findFirstByUserIdOrderByImageIdDesc(staff.getUserId());
         }
+        if (userPhoto == null || userPhoto.getImageData() == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        MediaType mediaType = mediaType(userPhoto.getFileType());
+        redisCacheService.putUserPhoto(userKey, mediaType, userPhoto.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(userPhoto.getImageData());
+    }
+
+    /**
+     * tr: Müşteri profil fotoğrafı. Yalnız bu şubenin booking'i olan kullanıcı. Cache photo:user.
+     *     Silen: PhotoServiceImpl kullanıcı foto upload/delete.
+     * en: Customer profile photo, only when that user has a booking on this staff's branch. Cache photo:user.
+     *     Evict: PhotoServiceImpl user photo upload/delete.
+     */
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> getCustomerPhoto(Long userId, boolean mustChangePassword, Long customerUserId,
+                                                   String acceptLanguage) {
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
+        if (customerUserId == null) {
+            throw MissingFieldException.required("userId");
+        }
+        boolean allowed = BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())
+                ? staff.getBranch() != null && bookingRepository.existsByCustomerUserIdAndBranch_Id(
+                        customerUserId, staff.getBranch().getId())
+                : staff.getPartner() != null && bookingRepository.existsByCustomerUserIdAndBranch_Partner_Id(
+                        customerUserId, staff.getPartner().getId());
+        if (!allowed) {
+            throw new ForbiddenException("customer photo is not on your branch");
+        }
+        String userKey = String.valueOf(customerUserId);
+        ResponseEntity<byte[]> cached = redisCacheService.getUserPhoto(userKey);
+        if (cached != null) {
+            return cached;
+        }
+        UserPhoto userPhoto = userPhotoRepository.findFirstByUserIdOrderByImageIdDesc(customerUserId);
         if (userPhoto == null || userPhoto.getImageData() == null) {
             throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(acceptLanguage));
         }

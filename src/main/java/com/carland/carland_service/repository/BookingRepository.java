@@ -22,6 +22,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     boolean existsByRef(String ref);
 
+    boolean existsByCustomerUserIdAndBranch_Id(Long customerUserId, Long branchId);
+
+    boolean existsByCustomerUserIdAndBranch_Partner_Id(Long customerUserId, Long partnerId);
+
     @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
     Optional<Booking> findByRef(String ref);
 

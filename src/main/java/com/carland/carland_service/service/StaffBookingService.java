@@ -311,6 +311,7 @@ public class StaffBookingService {
                 .carId(booking.getCarId())
                 .customerName(customerName)
                 .phone(customer == null ? null : customer.getPhoneNumber())
+                .customerUserId(booking.getCustomerUserId())
                 .plateNumber(car == null ? null : car.getPlateNumber())
                 .carBrand(car == null ? null : car.getBrand())
                 .carModel(car == null ? null : car.getModel())

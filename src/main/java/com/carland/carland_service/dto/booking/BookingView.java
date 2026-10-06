@@ -27,6 +27,7 @@ public class BookingView {
     Long carId;
     String customerName;
     String phone;
+    Long customerUserId;
     String plateNumber;
     String carBrand;
     String carModel;
