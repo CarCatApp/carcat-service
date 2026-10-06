@@ -14,7 +14,10 @@ import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
+import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +50,9 @@ class StaffBookingServiceTest {
     @Mock BookingInspectionRepository inspectionRepository;
     @Mock RangeRepository rangeRepository;
     @Mock BookingCapacityService bookingCapacityService;
+    @Mock CustomerRepository customerRepository;
+    @Mock CarRepository carRepository;
+    @Mock BookingStaffNoteService bookingStaffNoteService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -57,7 +63,8 @@ class StaffBookingServiceTest {
     void setUp() {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
-                individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService);
+                individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
+                customerRepository, carRepository, bookingStaffNoteService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -141,5 +148,50 @@ class StaffBookingServiceTest {
 
         assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
         assertEquals("pending", booking.getStatus());
+    }
+
+    @Test
+    void rejectStoresTheManualReasonOnTheBooking() {
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingStaffNoteService.apply(eq("cancel"), any(), eq("az")))
+                .thenReturn(new BookingStaffNoteService.Applied(null, "ehtiyat yoxdur"));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        BookingView out = service.reject(9L, false, 1L, new BookingRejectRequest(), "Asia/Baku", "az");
+
+        assertEquals("rejected", out.getStatus());
+        assertEquals("ehtiyat yoxdur", booking.getCancelNote());
+    }
+
+    @Test
+    void completeMarksAConfirmedBooking() {
+        booking.setStatus("confirmed");
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        BookingView out = service.complete(9L, false, 1L, "Asia/Baku", "az");
+
+        assertEquals("completed", out.getStatus());
+    }
+
+    @Test
+    void noShowStoresTheReason() {
+        booking.setStatus("auto_accepted");
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingStaffNoteService.apply(eq("no_show"), any(), eq("az")))
+                .thenReturn(new BookingStaffNoteService.Applied("no_show_1", "gəlmədi"));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        service.noShow(9L, false, 1L, new BookingRejectRequest(), "Asia/Baku", "az");
+
+        assertEquals("no_show", booking.getStatus());
+        assertEquals("no_show_1", booking.getCancelReasonCode());
+        assertEquals("gəlmədi", booking.getCancelNote());
     }
 }

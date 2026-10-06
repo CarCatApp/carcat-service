@@ -1,14 +1,19 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
+import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
+import com.carland.carland_service.dto.booking.StaffNotesResponse;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingIndividualLine;
 import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
+import com.carland.carland_service.entity.BookingStaffNote;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStaffRole;
@@ -20,6 +25,8 @@ import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -45,7 +52,16 @@ import java.util.stream.Collectors;
 public class StaffBookingService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
+    static final String BOARD = "board";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
+    private static final List<String> BOARD_STATUSES = List.of(
+            BookingStatus.PENDING.apiValue(),
+            BookingStatus.CONFIRMED.apiValue(),
+            BookingStatus.AUTO_ACCEPTED.apiValue(),
+            BookingStatus.REJECTED.apiValue(),
+            BookingStatus.CANCELLED.apiValue(),
+            BookingStatus.COMPLETED.apiValue(),
+            BookingStatus.NO_SHOW.apiValue());
 
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingRepository bookingRepository;
@@ -54,6 +70,15 @@ public class StaffBookingService {
     private final BookingInspectionRepository inspectionRepository;
     private final RangeRepository rangeRepository;
     private final BookingCapacityService bookingCapacityService;
+    private final CustomerRepository customerRepository;
+    private final CarRepository carRepository;
+    private final BookingStaffNoteService bookingStaffNoteService;
+
+    @Transactional(readOnly = true)
+    public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
+        requireStaff(userId, mustChangePassword, acceptLanguage);
+        return bookingStaffNoteService.list(kind, acceptLanguage);
+    }
 
     @Transactional(readOnly = true)
     public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
@@ -61,21 +86,28 @@ public class StaffBookingService {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
         String wanted = status == null || status.isBlank() ? BookingStatus.PENDING.apiValue() : status.trim().toLowerCase();
         int safePage = page == null || page < 1 ? 1 : page;
-        int safeSize = pageSize == null || pageSize < 1 ? 20 : Math.min(pageSize, 50);
+        int safeSize = pageSize == null || pageSize < 1 ? 20 : Math.min(pageSize, 200);
         PageRequest pageable = PageRequest.of(safePage - 1, safeSize);
+        boolean board = BOARD.equals(wanted);
         Page<Booking> result;
         if (branchId != null) {
             bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
-            result = bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(branchId, wanted, pageable);
+            result = board
+                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(branchId, wanted, pageable);
         } else if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");
             }
-            result = bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(
-                    staff.getBranch().getId(), wanted, pageable);
+            Long ownBranch = staff.getBranch().getId();
+            result = board
+                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(ownBranch, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(ownBranch, wanted, pageable);
         } else {
-            result = bookingRepository.findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(
-                    staff.getPartner().getId(), wanted, pageable);
+            Long partnerId = staff.getPartner().getId();
+            result = board
+                    ? bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(partnerId, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(partnerId, wanted, pageable);
         }
         List<Booking> rows = result.getContent();
         Map<Long, List<String>> keys = keysByBooking(rows);
@@ -98,22 +130,60 @@ public class StaffBookingService {
     @Transactional
     public BookingView accept(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
                               String acceptLanguage) {
-        return decide(userId, mustChangePassword, bookingId, BookingStatus.CONFIRMED.apiValue(), timezone, acceptLanguage);
+        return decide(userId, mustChangePassword, bookingId, BookingStatus.CONFIRMED.apiValue(), null, timezone, acceptLanguage);
     }
 
     @Transactional
-    public BookingView reject(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
-                              String acceptLanguage) {
-        return decide(userId, mustChangePassword, bookingId, BookingStatus.REJECTED.apiValue(), timezone, acceptLanguage);
+    public BookingView reject(Long userId, boolean mustChangePassword, Long bookingId, BookingRejectRequest request,
+                              String timezone, String acceptLanguage) {
+        BookingStaffNoteService.Applied applied = bookingStaffNoteService.apply(
+                BookingStaffNote.CANCEL, request, acceptLanguage);
+        return decide(userId, mustChangePassword, bookingId, BookingStatus.REJECTED.apiValue(),
+                applied, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: Təsdiqlənmiş booku completed edir. Xidmət sətirləri webhookdan gəlir.
+     * en: Marks a confirmed booking completed. Service lines arrive from the webhook.
+     */
+    @Transactional
+    public BookingView complete(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
+                                String acceptLanguage) {
+        return decide(userId, mustChangePassword, bookingId, BookingStatus.COMPLETED.apiValue(),
+                null, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: Təsdiqlənmiş booku no_show edir və səbəbi yazır.
+     * en: Marks a confirmed booking no_show and stores the reason.
+     */
+    @Transactional
+    public BookingView noShow(Long userId, boolean mustChangePassword, Long bookingId, BookingRejectRequest request,
+                              String timezone, String acceptLanguage) {
+        BookingStaffNoteService.Applied applied = bookingStaffNoteService.apply(
+                BookingStaffNote.NO_SHOW, request, acceptLanguage);
+        return decide(userId, mustChangePassword, bookingId, BookingStatus.NO_SHOW.apiValue(),
+                applied, timezone, acceptLanguage);
     }
 
     private BookingView decide(Long userId, boolean mustChangePassword, Long bookingId, String nextStatus,
-                               String timezone, String acceptLanguage) {
+                               BookingStaffNoteService.Applied applied, String timezone, String acceptLanguage) {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
         bookingStaffAccess.requireWritableBranch(staff, booking.getBranch().getId(), acceptLanguage);
-        if (!BookingStatus.PENDING.apiValue().equals(booking.getStatus())) {
+        String current = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
+        if (BookingStatus.REJECTED.apiValue().equals(nextStatus)) {
+            if (!BookingStatus.PENDING.apiValue().equals(current)) {
+                throw new ConflictException("booking is not pending");
+            }
+        } else if (BookingStatus.COMPLETED.apiValue().equals(nextStatus)
+                || BookingStatus.NO_SHOW.apiValue().equals(nextStatus)) {
+            if (!BookingStatus.CONFIRMED.apiValue().equals(current)
+                    && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(current)) {
+                throw new ConflictException("booking is not confirmed");
+            }
+        } else if (!BookingStatus.PENDING.apiValue().equals(current)) {
             throw new ConflictException("booking is not pending");
         }
         if (BookingStatus.CONFIRMED.apiValue().equals(nextStatus)) {
@@ -134,6 +204,10 @@ public class StaffBookingService {
             bookingCapacityService.closePendingWhenFull(locked);
         } else {
             booking.setStatus(nextStatus);
+            if (applied != null) {
+                booking.setCancelReasonCode(applied.code());
+                booking.setCancelNote(applied.note());
+            }
         }
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
@@ -218,6 +292,10 @@ public class StaffBookingService {
                 individualServices.add(BookingSelectionViews.line(line, lang));
             }
         }
+        Customer customer = booking.getCustomerUserId() == null
+                ? null : customerRepository.findByUserId(booking.getCustomerUserId());
+        Car car = booking.getCarId() == null ? null : carRepository.findByCarId(booking.getCarId());
+        String customerName = customer == null ? null : joinName(customer.getName(), customer.getSurname());
         return BookingView.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())
@@ -231,6 +309,13 @@ public class StaffBookingService {
                 .timezone(timezone)
                 .vin(booking.getVin())
                 .carId(booking.getCarId())
+                .customerName(customerName)
+                .phone(customer == null ? null : customer.getPhoneNumber())
+                .plateNumber(car == null ? null : car.getPlateNumber())
+                .carBrand(car == null ? null : car.getBrand())
+                .carModel(car == null ? null : car.getModel())
+                .cancelReasonCode(booking.getCancelReasonCode())
+                .cancelNote(booking.getCancelNote())
                 .serviceKeys(keys)
                 .packageName(booking.getPackageName())
                 .packagePrice(booking.getPackagePrice())
@@ -247,6 +332,13 @@ public class StaffBookingService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .build();
+    }
+
+    private static String joinName(String name, String surname) {
+        String first = name == null ? "" : name.trim();
+        String last = surname == null ? "" : surname.trim();
+        String joined = (first + " " + last).trim();
+        return joined.isEmpty() ? null : joined;
     }
 
     private static String clock(OffsetDateTime utc, String timezone) {

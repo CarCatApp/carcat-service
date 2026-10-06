@@ -14,7 +14,9 @@ public enum BookingStatus {
     AUTO_ACCEPTED,
     REJECTED,
     CANCELLED,
-    COMPLETED;
+    COMPLETED,
+    /** Customer did not arrive. Does not occupy a place. */
+    NO_SHOW;
 
     public String apiValue() {
         return name().toLowerCase();

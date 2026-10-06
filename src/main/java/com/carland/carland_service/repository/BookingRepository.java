@@ -31,7 +31,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     Page<Booking> findByBranch_IdAndStatusOrderByCreatedAtDesc(Long branchId, String status, Pageable pageable);
 
+    Page<Booking> findByBranch_IdAndStatusInOrderByCreatedAtDesc(
+            Long branchId, Collection<String> statuses, Pageable pageable);
+
     Page<Booking> findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(Long partnerId, String status, Pageable pageable);
+
+    Page<Booking> findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(
+            Long partnerId, Collection<String> statuses, Pageable pageable);
 
     List<Booking> findByRange_RangeIdAndStatus(Long rangeId, String status);
 

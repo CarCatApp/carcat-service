@@ -25,6 +25,13 @@ public class BookingView {
     String timezone;
     String vin;
     Long carId;
+    String customerName;
+    String phone;
+    String plateNumber;
+    String carBrand;
+    String carModel;
+    String cancelReasonCode;
+    String cancelNote;
     String startsAt;
     String branchName;
     String branchAddress;

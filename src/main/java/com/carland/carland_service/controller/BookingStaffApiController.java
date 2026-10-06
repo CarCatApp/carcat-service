@@ -2,6 +2,7 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
 import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
+import com.carland.carland_service.dto.booking.StaffNotesResponse;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffAuditRequest;
@@ -83,7 +84,46 @@ public class BookingStaffApiController {
         return staffBookingService.reject(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, body, timezone, acceptLanguage);
+    }
+
+    @GetMapping("/api/v1/booking/staff/notes")
+    public StaffNotesResponse notes(
+            HttpServletRequest request,
+            @RequestParam String kind,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return staffBookingService.notes(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                kind, acceptLanguage);
+    }
+
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/complete")
+    public BookingView complete(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone
+    ) {
+        return staffBookingService.complete(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
                 bookingId, timezone, acceptLanguage);
+    }
+
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/no-show")
+    public BookingView noShow(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestBody(required = false) BookingRejectRequest body
+    ) {
+        return staffBookingService.noShow(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, body, timezone, acceptLanguage);
     }
 
     @PostMapping("/api/v1/internal/booking/staff/activate")
