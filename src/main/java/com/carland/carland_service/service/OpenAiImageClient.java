@@ -62,6 +62,7 @@ public class OpenAiImageClient {
         body.put("size", size);
         body.put("quality", quality);
         body.put("output_format", "webp");
+        body.put("background", "transparent");
         String jsonBody;
         try {
             jsonBody = objectMapper.writeValueAsString(body);
