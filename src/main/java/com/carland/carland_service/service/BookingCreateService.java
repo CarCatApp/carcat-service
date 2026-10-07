@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.StaffBookingArrival;
 import com.carland.carland_service.dto.booking.BookingQuoteResponse;
 import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
@@ -78,6 +79,7 @@ public class BookingCreateService {
     private final ObjectMapper objectMapper;
     private final BookingSelectionWriter selectionWriter;
     private final BookingCapacityService bookingCapacityService;
+    private final StaffBookingLiveService staffBookingLiveService;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
@@ -155,6 +157,16 @@ public class BookingCreateService {
                     .build());
         }
         attachOfferedServices(booking, request.getOfferedServiceIds());
+        staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
+                .bookingId(booking.getId())
+                .branchId(prepared.branch.getId())
+                .brand(car.getBrand())
+                .model(car.getModel())
+                .vin(vin)
+                .plateNumber(car.getPlateNumber())
+                .customerName(personName(customerRepository.findByUserId(customerUserId)))
+                .services(serviceNames(booking.getPackageName(), prepared.lines, priced, acceptLanguage))
+                .build());
         Calendar calendar = prepared.range.getCalendar();
         return BookingView.builder()
                 .bookingId(booking.getId())
@@ -508,6 +520,37 @@ public class BookingCreateService {
             return null;
         }
         return utc.atZoneSameInstant(ZoneId.of(timezone)).toLocalTime().format(CLOCK);
+    }
+
+    private String serviceNames(String packageName, List<Line> lines, BookingSelectionWriter.Priced priced,
+                                 String lang) {
+        LinkedHashSet<String> parts = new LinkedHashSet<>();
+        if (packageName != null && !packageName.isBlank()) {
+            parts.add(packageName.trim());
+        }
+        if (lines != null) {
+            for (Line line : lines) {
+                if (line.title != null && !line.title.isBlank()) {
+                    parts.add(line.title.trim());
+                }
+            }
+        }
+        for (BookingServiceLineView view : individualViews(priced, lang)) {
+            if (view.getName() != null && !view.getName().isBlank()) {
+                parts.add(view.getName().trim());
+            }
+        }
+        return String.join(", ", parts);
+    }
+
+    private static String personName(Customer customer) {
+        if (customer == null) {
+            return null;
+        }
+        String first = customer.getName() == null ? "" : customer.getName().trim();
+        String last = customer.getSurname() == null ? "" : customer.getSurname().trim();
+        String joined = (first + " " + last).trim();
+        return joined.isEmpty() ? null : joined;
     }
 
     private record Line(String key, String title, Integer priceMin, Integer priceMax, List<String> included) {}

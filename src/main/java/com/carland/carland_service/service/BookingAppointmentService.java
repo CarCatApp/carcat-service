@@ -1,5 +1,6 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.StaffBookingArrival;
 import com.carland.carland_service.dto.booking.BookingAppointmentCancelRequest;
 import com.carland.carland_service.dto.booking.BookingAppointmentCancelResponse;
 import com.carland.carland_service.dto.booking.BookingAppointmentRequest;
@@ -36,6 +37,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
@@ -63,6 +65,7 @@ public class BookingAppointmentService {
     private final BookingCalendarService calendarService;
     private final BookingSelectionWriter selectionWriter;
     private final BookingCapacityService bookingCapacityService;
+    private final StaffBookingLiveService staffBookingLiveService;
 
     /**
      * tr: Range kilitlenir, yeri varsa book ve alt satırları yazılır.
@@ -144,6 +147,17 @@ public class BookingAppointmentService {
         if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
             bookingCapacityService.closePendingWhenFull(range);
         }
+        List<BookingAppointmentServiceView> services = serviceViews(priced, lang);
+        staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
+                .bookingId(booking.getId())
+                .branchId(branch.getId())
+                .brand(car.getBrand())
+                .model(car.getModel())
+                .vin(car.getVin())
+                .plateNumber(car.getPlateNumber())
+                .customerName(personName(customer))
+                .services(serviceNames(booking.getPackageName(), services, priced == null ? null : priced.message()))
+                .build());
         return BookingAppointmentResponse.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())
@@ -163,7 +177,7 @@ public class BookingAppointmentService {
                 .packageId(booking.getCarePackageId())
                 .packageName(booking.getPackageName())
                 .packagePrice(booking.getPackagePrice())
-                .individualServices(serviceViews(priced, lang))
+                .individualServices(services)
                 .issue(priced == null ? null : priced.message())
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
@@ -236,6 +250,34 @@ public class BookingAppointmentService {
             return 0;
         }
         return Math.multiplyExact(pkg.getPrice(), 100);
+    }
+
+    private static String serviceNames(String packageName, List<BookingAppointmentServiceView> services, String issue) {
+        LinkedHashSet<String> parts = new LinkedHashSet<>();
+        if (packageName != null && !packageName.isBlank()) {
+            parts.add(packageName.trim());
+        }
+        if (services != null) {
+            for (BookingAppointmentServiceView view : services) {
+                if (view.getName() != null && !view.getName().isBlank()) {
+                    parts.add(view.getName().trim());
+                }
+            }
+        }
+        if (issue != null && !issue.isBlank()) {
+            parts.add(issue.trim());
+        }
+        return String.join(", ", parts);
+    }
+
+    private static String personName(Customer customer) {
+        if (customer == null) {
+            return null;
+        }
+        String first = customer.getName() == null ? "" : customer.getName().trim();
+        String last = customer.getSurname() == null ? "" : customer.getSurname().trim();
+        String joined = (first + " " + last).trim();
+        return joined.isEmpty() ? null : joined;
     }
 
     private String packageName(Long packageId) {

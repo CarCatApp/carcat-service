@@ -1,0 +1,248 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 335544320 bytes for G1 virtual space
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   The process is running with CompressedOops enabled, and the Java Heap may be blocking the growth of the native heap
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+#   JVM is running with Zero Based Compressed Oops mode in which the Java heap is
+#     placed in the first 32GB address space. The Java Heap base address is the
+#     maximum limit for the native heap growth. Please use -XX:HeapBaseMinAddress
+#     to set the Java Heap base and to place the Java Heap above 32GB virtual address.
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (os_windows.cpp:3600), pid=20100, tid=8080
+#
+# JRE version:  (21.0.3+7) (build )
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (21.0.3+7-LTS-152, mixed mode, sharing, tiered, compressed oops, compressed class ptrs, g1 gc, windows-amd64)
+# No core dump will be written. Minidumps are not enabled by default on client versions of Windows
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: -Dnet.bytebuddy.agent.attacher.dump= net.bytebuddy.agent.Attacher com.sun.tools.attach.VirtualMachine 9240 C:\Users\Aziz\AppData\Local\Temp\cursor-sandbox-cache\078af75dbbb76405a7bde1d63add9135\gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.15.11\a38b16385e867f59a641330f0362ebe742788ed8\byte-buddy-agent-1.15.11.jar false 
+
+Host: 11th Gen Intel(R) Core(TM) i5-1155G7 @ 2.50GHz, 8 cores, 19G,  Windows 11 , 64 bit Build 26100 (10.0.26100.9549)
+Time: Wed Oct  7 21:03:01 2026 Azerbaijan Standard Time elapsed time: 0.011371 seconds (0d 0h 0m 0s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x000001c81ba681a0):  JavaThread "Unknown thread" [_thread_in_vm, id=8080, stack(0x00000057dd400000,0x00000057dd500000) (1024K)]
+
+Stack: [0x00000057dd400000,0x00000057dd500000]
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [jvm.dll+0x6c63b9]
+V  [jvm.dll+0x84fa11]
+V  [jvm.dll+0x851f3e]
+V  [jvm.dll+0x852613]
+V  [jvm.dll+0x27cd46]
+V  [jvm.dll+0x6c2b55]
+V  [jvm.dll+0x6b76da]
+V  [jvm.dll+0x35051a]
+V  [jvm.dll+0x358176]
+V  [jvm.dll+0x3aa84e]
+V  [jvm.dll+0x3aaaf8]
+V  [jvm.dll+0x32491c]
+V  [jvm.dll+0x32547b]
+V  [jvm.dll+0x818f69]
+V  [jvm.dll+0x3b7771]
+V  [jvm.dll+0x802358]
+V  [jvm.dll+0x44c7ce]
+V  [jvm.dll+0x44e2a1]
+C  [jli.dll+0x52a3]
+C  [ucrtbase.dll+0x2cd30]
+C  [KERNEL32.DLL+0x2cdf7]
+C  [ntdll.dll+0x7ee4c]
+
+
+---------------  P R O C E S S  ---------------
+
+Threads class SMR info:
+_java_thread_list=0x00007ffcb75b1b88, length=0, elements={
+}
+
+Java Threads: ( => current thread )
+Total: 0
+
+Other Threads:
+  0x000001c81bf2efd0 WorkerThread "GC Thread#0"                     [id=7832, stack(0x00000057dd500000,0x00000057dd600000) (1024K)]
+  0x000001c81bf39d10 ConcurrentGCThread "G1 Main Marker"            [id=7700, stack(0x00000057dd600000,0x00000057dd700000) (1024K)]
+  0x000001c81bf3a720 WorkerThread "G1 Conc#0"                       [id=16756, stack(0x00000057dd700000,0x00000057dd800000) (1024K)]
+
+[error occurred during error reporting (printing all threads), id 0xc0000005, EXCEPTION_ACCESS_VIOLATION (0xc0000005) at pc=0x00007ffcb6d27077]
+VM state: not at safepoint (not fully initialized)
+
+VM Mutex/Monitor currently owned by a thread:  ([mutex/lock_event])
+[0x00007ffcb7622ea8] Heap_lock - owner thread: 0x000001c81ba681a0
+
+Heap address: 0x00000006c3400000, size: 5068 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+
+CDS archive(s) mapped at: [0x0000000000000000-0x0000000000000000-0x0000000000000000), size 0, SharedBaseAddress: 0x0000000800000000, ArchiveRelocationMode: 1.
+Narrow klass base: 0x0000000000000000, Narrow klass shift: 0, Narrow klass range: 0x0
+
+GC Precious Log:
+ CardTable entry size: 512
+ Card Set container configuration: InlinePtr #cards 4 size 8 Array Of Cards #cards 32 size 80 Howl #buckets 8 coarsen threshold 7372 Howl Bitmap #cards 1024 size 144 coarsen threshold 921 Card regions per heap region 1 cards per card region 8192
+
+Heap:
+ garbage-first heap   total 0K, used 0K [0x00000006c3400000, 0x0000000800000000)
+  region size 4096K, 0 young (0K), 0 survivors (0K)
+
+[error occurred during error reporting (printing heap information), id 0xc0000005, EXCEPTION_ACCESS_VIOLATION (0xc0000005) at pc=0x00007ffcb710e669]
+GC Heap History (0 events):
+No events
+
+Dll operation events (1 events):
+Event: 0.008 Loaded shared library C:\Program Files\Java\jdk-21\bin\java.dll
+
+Deoptimization events (0 events):
+No events
+
+Classes loaded (0 events):
+No events
+
+Classes unloaded (0 events):
+No events
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (0 events):
+No events
+
+ZGC Phase Switch (0 events):
+No events
+
+VM Operations (0 events):
+No events
+
+Events (0 events):
+No events
+
+
+Dynamic libraries:
+0x00007ff750330000 - 0x00007ff750340000 	C:\Program Files\Java\jdk-21\bin\java.exe
+0x00007ffd8fd60000 - 0x00007ffd8ffc7000 	C:\WINDOWS\SYSTEM32\ntdll.dll
+0x00007ffd8eed0000 - 0x00007ffd8ef9b000 	C:\WINDOWS\System32\KERNEL32.DLL
+0x00007ffd8d510000 - 0x00007ffd8d911000 	C:\WINDOWS\System32\KERNELBASE.dll
+0x00007ffd8d920000 - 0x00007ffd8da6c000 	C:\WINDOWS\System32\ucrtbase.dll
+0x00007ffd2e290000 - 0x00007ffd2e2ab000 	C:\Program Files\Java\jdk-21\bin\VCRUNTIME140.dll
+0x00007ffd46c10000 - 0x00007ffd46c29000 	C:\Program Files\Java\jdk-21\bin\jli.dll
+0x00007ffd8f930000 - 0x00007ffd8f9eb000 	C:\WINDOWS\System32\ADVAPI32.dll
+0x00007ffd8f6e0000 - 0x00007ffd8f789000 	C:\WINDOWS\System32\msvcrt.dll
+0x00007ffd8f300000 - 0x00007ffd8f3a8000 	C:\WINDOWS\System32\sechost.dll
+0x00007ffd8da80000 - 0x00007ffd8db98000 	C:\WINDOWS\System32\RPCRT4.dll
+0x00007ffd8f120000 - 0x00007ffd8f2f7000 	C:\WINDOWS\System32\USER32.dll
+0x00007ffd8cf60000 - 0x00007ffd8cf87000 	C:\WINDOWS\System32\win32u.dll
+0x00007ffd74930000 - 0x00007ffd74bc0000 	C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.9549_none_3e0a0396e3330090\COMCTL32.dll
+0x00007ffd8f6b0000 - 0x00007ffd8f6db000 	C:\WINDOWS\System32\GDI32.dll
+0x00007ffd8d120000 - 0x00007ffd8d248000 	C:\WINDOWS\System32\gdi32full.dll
+0x00007ffd8d310000 - 0x00007ffd8d3b3000 	C:\WINDOWS\System32\msvcp_win.dll
+0x00007ffd7cd60000 - 0x00007ffd7cd6b000 	C:\WINDOWS\SYSTEM32\VERSION.dll
+0x00007ffd8e650000 - 0x00007ffd8e681000 	C:\WINDOWS\System32\IMM32.DLL
+0x00007ffd6a9e0000 - 0x00007ffd6a9ec000 	C:\Program Files\Java\jdk-21\bin\vcruntime140_1.dll
+0x00007ffccf580000 - 0x00007ffccf60e000 	C:\Program Files\Java\jdk-21\bin\msvcp140.dll
+0x00007ffcb69f0000 - 0x00007ffcb76fd000 	C:\Program Files\Java\jdk-21\bin\server\jvm.dll
+0x00007ffd8e690000 - 0x00007ffd8e711000 	C:\WINDOWS\System32\WS2_32.dll
+0x00007ffd8cdb0000 - 0x00007ffd8ce0e000 	C:\WINDOWS\SYSTEM32\POWRPROF.dll
+0x00007ffd84390000 - 0x00007ffd843c7000 	C:\WINDOWS\SYSTEM32\WINMM.dll
+0x00007ffd8cd90000 - 0x00007ffd8cda5000 	C:\WINDOWS\SYSTEM32\UMPDC.dll
+0x00007ffd8bbc0000 - 0x00007ffd8bbdb000 	C:\WINDOWS\SYSTEM32\kernel.appcore.dll
+0x00007ffd6a620000 - 0x00007ffd6a62a000 	C:\Program Files\Java\jdk-21\bin\jimage.dll
+0x00007ffd89e80000 - 0x00007ffd8a0cc000 	C:\WINDOWS\SYSTEM32\DBGHELP.DLL
+0x00007ffd8e2c0000 - 0x00007ffd8e64a000 	C:\WINDOWS\System32\combase.dll
+0x00007ffd8f3b0000 - 0x00007ffd8f489000 	C:\WINDOWS\System32\OLEAUT32.dll
+0x00007ffd7aeb0000 - 0x00007ffd7aeeb000 	C:\WINDOWS\SYSTEM32\dbgcore.DLL
+0x00007ffd8d250000 - 0x00007ffd8d2fc000 	C:\WINDOWS\System32\bcryptPrimitives.dll
+0x00007ffd2ddc0000 - 0x00007ffd2dddf000 	C:\Program Files\Java\jdk-21\bin\java.dll
+
+dbghelp: loaded successfully - version: 4.0.5 - missing functions: none
+symbol engine: initialized successfully - sym options: 0x614 - pdb path: .;C:\Program Files\Java\jdk-21\bin;C:\WINDOWS\SYSTEM32;C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.9549_none_3e0a0396e3330090;C:\Program Files\Java\jdk-21\bin\server
+
+VM Arguments:
+jvm_args: -Dnet.bytebuddy.agent.attacher.dump= 
+java_command: net.bytebuddy.agent.Attacher com.sun.tools.attach.VirtualMachine 9240 C:\Users\Aziz\AppData\Local\Temp\cursor-sandbox-cache\078af75dbbb76405a7bde1d63add9135\gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.15.11\a38b16385e867f59a641330f0362ebe742788ed8\byte-buddy-agent-1.15.11.jar false 
+java_class_path (initial): C:\Users\Aziz\AppData\Local\Temp\cursor-sandbox-cache\078af75dbbb76405a7bde1d63add9135\gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.15.11\a38b16385e867f59a641330f0362ebe742788ed8\byte-buddy-agent-1.15.11.jar
+Launcher Type: SUN_STANDARD
+
+[Global flags]
+     intx CICompilerCount                          = 4                                         {product} {ergonomic}
+     uint ConcGCThreads                            = 2                                         {product} {ergonomic}
+     uint G1ConcRefinementThreads                  = 8                                         {product} {ergonomic}
+   size_t G1HeapRegionSize                         = 4194304                                   {product} {ergonomic}
+    uintx GCDrainStackTargetSize                   = 64                                        {product} {ergonomic}
+   size_t InitialHeapSize                          = 335544320                                 {product} {ergonomic}
+   size_t MarkStackSize                            = 4194304                                   {product} {ergonomic}
+   size_t MaxHeapSize                              = 5314183168                                {product} {ergonomic}
+   size_t MinHeapDeltaBytes                        = 4194304                                   {product} {ergonomic}
+   size_t MinHeapSize                              = 8388608                                   {product} {ergonomic}
+    uintx NonNMethodCodeHeapSize                   = 5839372                                {pd product} {ergonomic}
+    uintx NonProfiledCodeHeapSize                  = 122909434                              {pd product} {ergonomic}
+    uintx ProfiledCodeHeapSize                     = 122909434                              {pd product} {ergonomic}
+    uintx ReservedCodeCacheSize                    = 251658240                              {pd product} {ergonomic}
+     bool SegmentedCodeCache                       = true                                      {product} {ergonomic}
+   size_t SoftMaxHeapSize                          = 5314183168                             {manageable} {ergonomic}
+     bool UseCompressedOops                        = true                           {product lp64_product} {ergonomic}
+     bool UseG1GC                                  = true                                      {product} {ergonomic}
+     bool UseLargePagesIndividualAllocation        = false                                  {pd product} {ergonomic}
+
+Logging:
+Log output configuration:
+ #0: stdout all=warning uptime,level,tags foldmultilines=false
+ #1: stderr all=off uptime,level,tags foldmultilines=false
+
+Environment Variables:
+JAVA_HOME=C:\Program Files\Java\jdk-21
+PATH=c:\Users\Aziz\AppData\Local\Programs\cursor\resources\app\node_modules\@vscode\ripgrep\bin;C:\Python313\Scripts\;C:\Python313\;C:\Program Files\Common Files\Oracle\Java\javapath;C:\App\db_home\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\Git\cmd;C:\ProgramData\chocolatey\bin;C:\Program Files\Docker\Docker\resources\bin;C:\Program Files\nodejs\;C:\Program Files\WSL\;C:\Users\Aziz\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Java\jdk-21\bin;C:\Program Files\Gradle\gradle-8.10.2-bin\gradle-8.10.2\bin;C:\Program Files\JetBrains\IntelliJ IDEA 2022.2.5\bin;C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2023.1.2\bin;C:\Tools\Gradle\gradle-8.13-bin\gradle-8.13\bin;C:\Users\Aziz\AppData\Roaming\npm;C:\Users\Aziz\AppData\Local\Programs\cursor\resources\app\bin;C:\Users\Aziz\.local\bin
+USERNAME=Aziz
+TERM=dumb
+OS=Windows_NT
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 140 Stepping 2, GenuineIntel
+TMP=C:\Users\Aziz\AppData\Local\Temp
+TEMP=C:\Users\Aziz\AppData\Local\Temp
+
+
+
+
+Periodic native trim disabled
+
+---------------  S Y S T E M  ---------------
+
+OS:
+ Windows 11 , 64 bit Build 26100 (10.0.26100.9549)
+OS uptime: 0 days 5:49 hours
+Hyper-V role detected
+
+CPU: total 8 (initial active 8) (4 cores per cpu, 2 threads per core) family 6 model 140 stepping 2 microcode 0x26, cx8, cmov, fxsr, ht, mmx, 3dnowpref, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, lzcnt, tsc, tscinvbit, avx, avx2, aes, erms, clmul, bmi1, bmi2, adx, avx512f, avx512dq, avx512cd, avx512bw, avx512vl, sha, fma, vzeroupper, avx512_vpopcntdq, avx512_vpclmulqdq, avx512_vaes, avx512_vnni, clflush, clflushopt, clwb, avx512_vbmi2, avx512_vbmi, hv, rdtscp, rdpid, fsrm, gfni, avx512_bitalg, f16c, cet_ibt, cet_ss, avx512_ifma
+Processor Information for processor 0
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+Processor Information for processor 1
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+Processor Information for processor 2
+  Max Mhz: 2496, Current Mhz: 1198, Mhz Limit: 2496
+Processor Information for processor 3
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+Processor Information for processor 4
+  Max Mhz: 2496, Current Mhz: 1198, Mhz Limit: 2496
+Processor Information for processor 5
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+Processor Information for processor 6
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+Processor Information for processor 7
+  Max Mhz: 2496, Current Mhz: 2496, Mhz Limit: 2496
+
+Memory: 4k page, system-wide physical 20263M (3364M free)
+TotalPageFile size 57700M (AvailPageFile size 194M)
+current process WorkingSet (physical memory assigned to process): 12M, peak: 12M
+current process commit charge ("private bytes"): 60M, peak: 380M
+
+vm_info: Java HotSpot(TM) 64-Bit Server VM (21.0.3+7-LTS-152) for windows-amd64 JRE (21.0.3+7-LTS-152), built on 2024-03-11T17:42:26Z by "mach5one" with MS VC++ 17.6 (VS2022)
+
+END.

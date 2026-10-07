@@ -11,12 +11,16 @@ import com.carland.carland_service.security.InternalTokenValidator;
 import com.carland.carland_service.security.WebhookAuthFailure;
 import com.carland.carland_service.security.WebhookAuthValidationResult;
 import com.carland.carland_service.service.BookingOrgService;
+import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.BookingStaffAuditService;
+import com.carland.carland_service.service.StaffBookingLiveService;
 import com.carland.carland_service.service.StaffBookingService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -36,12 +41,33 @@ public class BookingStaffApiController {
     private final BookingStaffRequestAuth bookingStaffRequestAuth;
     private final InternalTokenValidator internalTokenValidator;
     private final StaffBookingService staffBookingService;
+    private final StaffBookingLiveService staffBookingLiveService;
+    private final BookingStaffAccess bookingStaffAccess;
 
     @GetMapping("/api/v1/booking/staff/branches")
     public BookingStaffOrgResponse myBranches(HttpServletRequest request) {
         Long userId = bookingStaffRequestAuth.userId(request);
         boolean mustChange = bookingStaffRequestAuth.mustChangePassword(request);
         return bookingOrgService.visiblePartner(userId, mustChange);
+    }
+
+    @GetMapping(value = "/api/v1/booking/staff/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter live(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @RequestParam Long branchId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        bookingStaffAccess.requireWritableBranch(
+                bookingStaffAccess.requireStaff(
+                        bookingStaffRequestAuth.userId(request),
+                        bookingStaffRequestAuth.mustChangePassword(request),
+                        acceptLanguage),
+                branchId,
+                acceptLanguage);
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
+        return staffBookingLiveService.listen(branchId);
     }
 
     @GetMapping("/api/v1/booking/staff/bookings")
