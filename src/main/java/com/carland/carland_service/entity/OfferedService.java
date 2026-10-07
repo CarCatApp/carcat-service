@@ -50,6 +50,7 @@ public class OfferedService {
 
 
 
+
     @Column(name = "sort_order", nullable = false)
     @Builder.Default
     Integer sortOrder = 0;
