@@ -64,6 +64,7 @@ public class BookingCreateService {
     static final String UNIT = "qepik";
     static final String DEFAULT_TZ = "Asia/Baku";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final List<String> LIVE = BookingStatus.occupyingCapacity();
 
     private final RangeRepository rangeRepository;
@@ -142,9 +143,9 @@ public class BookingCreateService {
         if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
             bookingCapacityService.closePendingWhenFull(prepared.range);
         }
+        Customer customer = customerRepository.findByUserId(customerUserId);
         BookingInspection inspection = null;
         if (priced != null) {
-            Customer customer = customerRepository.findByUserId(customerUserId);
             inspection = selectionWriter.save(booking, customer, car, priced);
         }
         for (Line line : prepared.lines) {
@@ -157,17 +158,31 @@ public class BookingCreateService {
                     .build());
         }
         attachOfferedServices(booking, request.getOfferedServiceIds());
+        Calendar calendar = prepared.range.getCalendar();
         staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
                 .bookingId(booking.getId())
                 .branchId(prepared.branch.getId())
+                .ref(booking.getRef())
+                .bookingMode(mode)
+                .status(status)
+                .day(calendar == null || calendar.getDay() == null ? null : calendar.getDay().format(DAY))
+                .start(clock(prepared.range.getStart(), DEFAULT_TZ))
+                .end(clock(prepared.range.getEnd(), DEFAULT_TZ))
                 .brand(car.getBrand())
                 .model(car.getModel())
                 .vin(vin)
                 .plateNumber(car.getPlateNumber())
-                .customerName(personName(customerRepository.findByUserId(customerUserId)))
-                .services(serviceNames(booking.getPackageName(), prepared.lines, priced, acceptLanguage))
+                .customerName(personName(customer))
+                .phone(customer == null ? null : customer.getPhoneNumber())
+                .packageName(booking.getPackageName())
+                .packagePrice(booking.getPackagePrice())
+                .serviceNames(arrivalServices(prepared.lines, priced, acceptLanguage))
+                .issue(priced == null ? null : priced.message())
+                .priceMin(booking.getPriceMin())
+                .priceMax(booking.getPriceMax())
+                .createdAt(StaffBookingArrival.stamp(booking.getCreatedAt()))
+                .pendingExpiresAt(StaffBookingArrival.stamp(booking.getPendingExpiresAt()))
                 .build());
-        Calendar calendar = prepared.range.getCalendar();
         return BookingView.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())
@@ -522,12 +537,8 @@ public class BookingCreateService {
         return utc.atZoneSameInstant(ZoneId.of(timezone)).toLocalTime().format(CLOCK);
     }
 
-    private String serviceNames(String packageName, List<Line> lines, BookingSelectionWriter.Priced priced,
-                                 String lang) {
+    private List<String> arrivalServices(List<Line> lines, BookingSelectionWriter.Priced priced, String lang) {
         LinkedHashSet<String> parts = new LinkedHashSet<>();
-        if (packageName != null && !packageName.isBlank()) {
-            parts.add(packageName.trim());
-        }
         if (lines != null) {
             for (Line line : lines) {
                 if (line.title != null && !line.title.isBlank()) {
@@ -540,7 +551,7 @@ public class BookingCreateService {
                 parts.add(view.getName().trim());
             }
         }
-        return String.join(", ", parts);
+        return List.copyOf(parts);
     }
 
     private static String personName(Customer customer) {

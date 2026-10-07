@@ -37,7 +37,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
@@ -151,12 +150,26 @@ public class BookingAppointmentService {
         staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
                 .bookingId(booking.getId())
                 .branchId(branch.getId())
+                .ref(booking.getRef())
+                .bookingMode(mode)
+                .status(status)
+                .day(day(calendar))
+                .start(clock(range.getStart()))
+                .end(clock(range.getEnd()))
                 .brand(car.getBrand())
                 .model(car.getModel())
                 .vin(car.getVin())
                 .plateNumber(car.getPlateNumber())
                 .customerName(personName(customer))
-                .services(serviceNames(booking.getPackageName(), services, priced == null ? null : priced.message()))
+                .phone(customer.getPhoneNumber())
+                .packageName(booking.getPackageName())
+                .packagePrice(booking.getPackagePrice())
+                .serviceNames(serviceNameList(services))
+                .issue(priced == null ? null : priced.message())
+                .priceMin(booking.getPriceMin())
+                .priceMax(booking.getPriceMax())
+                .createdAt(StaffBookingArrival.stamp(booking.getCreatedAt()))
+                .pendingExpiresAt(StaffBookingArrival.stamp(booking.getPendingExpiresAt()))
                 .build());
         return BookingAppointmentResponse.builder()
                 .bookingId(booking.getId())
@@ -252,22 +265,17 @@ public class BookingAppointmentService {
         return Math.multiplyExact(pkg.getPrice(), 100);
     }
 
-    private static String serviceNames(String packageName, List<BookingAppointmentServiceView> services, String issue) {
-        LinkedHashSet<String> parts = new LinkedHashSet<>();
-        if (packageName != null && !packageName.isBlank()) {
-            parts.add(packageName.trim());
+    private static List<String> serviceNameList(List<BookingAppointmentServiceView> services) {
+        if (services == null || services.isEmpty()) {
+            return List.of();
         }
-        if (services != null) {
-            for (BookingAppointmentServiceView view : services) {
-                if (view.getName() != null && !view.getName().isBlank()) {
-                    parts.add(view.getName().trim());
-                }
+        List<String> names = new ArrayList<>();
+        for (BookingAppointmentServiceView view : services) {
+            if (view.getName() != null && !view.getName().isBlank()) {
+                names.add(view.getName().trim());
             }
         }
-        if (issue != null && !issue.isBlank()) {
-            parts.add(issue.trim());
-        }
-        return String.join(", ", parts);
+        return names;
     }
 
     private static String personName(Customer customer) {
