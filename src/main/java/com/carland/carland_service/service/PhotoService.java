@@ -151,4 +151,16 @@ public interface PhotoService {
      */
     PhotoResponse uploadOfferedServicePhoto(MultipartFile file, Long offeredServiceId);
 
+    /**
+     * tr: Marka logosunu döner. Marka veya logo yoksa 404. Redis miss sonrası dolar.
+     * en: Returns the brand logo. 404 when the brand or the logo is missing. A Redis miss loads from the database.
+     */
+    ResponseEntity<byte[]> getBrandLogo(Long brandId);
+
+    /**
+     * tr: Marka logosunu yükler. Eski satır silinir, yeni satır yazılır. Redis commit sonrası silinir.
+     * en: Uploads a brand logo. The old row is deleted and a new row is written. Redis is deleted after commit.
+     */
+    PhotoResponse uploadBrandLogo(MultipartFile file, Long brandId);
+
 }

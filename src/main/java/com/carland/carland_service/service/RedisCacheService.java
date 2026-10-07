@@ -203,6 +203,42 @@ public class RedisCacheService {
         runAfterCommit(() -> deletePhoto("photo:staff:" + userId));
     }
 
+    /**
+     * tr: Partner logosu. Key photo:partner:{partnerId}. Yazan: PhotoServiceImpl.uploadPartnerPhoto → evict after commit.
+     *     Put yalnız GET miss sonrası.
+     * en: Partner logo. Key photo:partner:{partnerId}. Writer: PhotoServiceImpl.uploadPartnerPhoto evicts after commit.
+     *     Put only after a GET miss.
+     */
+    public ResponseEntity<byte[]> getPartnerPhoto(Long partnerId) {
+        return getPhoto("photo:partner:" + partnerId, "partner-photo partnerId=" + partnerId);
+    }
+
+    public void putPartnerPhoto(Long partnerId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:partner:" + partnerId, mediaType, bytes);
+    }
+
+    public void evictPartnerPhotoAfterCommit(Long partnerId) {
+        runAfterCommit(() -> deletePhoto("photo:partner:" + partnerId));
+    }
+
+    /**
+     * tr: Marka logosu. Key photo:brand:{brandId}. Yazan: PhotoServiceImpl.uploadBrandLogo → evict after commit.
+     *     Put yalnız GET miss sonrası.
+     * en: Brand logo. Key photo:brand:{brandId}. Writer: PhotoServiceImpl.uploadBrandLogo evicts after commit.
+     *     Put only after a GET miss.
+     */
+    public ResponseEntity<byte[]> getBrandLogo(Long brandId) {
+        return getPhoto("photo:brand:" + brandId, "brand-logo brandId=" + brandId);
+    }
+
+    public void putBrandLogo(Long brandId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:brand:" + brandId, mediaType, bytes);
+    }
+
+    public void evictBrandLogoAfterCommit(Long brandId) {
+        runAfterCommit(() -> deletePhoto("photo:brand:" + brandId));
+    }
+
     public VisitHistoryResponse getOrLoadHistoryV2(String vin, String lang, Supplier<VisitHistoryResponse> loader) {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);

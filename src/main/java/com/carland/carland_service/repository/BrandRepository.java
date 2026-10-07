@@ -15,6 +15,9 @@ public interface BrandRepository extends JpaRepository<Brand, Long> {
     /** tr: Marka adına göre markaları listeler. / en: Lists brands by brand name. */
     List<Brand> findAllByBrandName(String brand);
 
+    /** tr: Büyük/küçük harf duyarsız marka adı. / en: Brand name match, case-insensitive. */
+    List<Brand> findAllByBrandNameIgnoreCase(String brandName);
+
     /** tr: Marka adının kayıtlı olup olmadığını kontrol eder. / en: Checks whether a brand name exists. */
     boolean existsByBrandName(String brandName);
 

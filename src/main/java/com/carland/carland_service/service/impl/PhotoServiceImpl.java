@@ -55,6 +55,8 @@ public class PhotoServiceImpl implements PhotoService {
     private final OfferedServicePhotoRepository offeredServicePhotoRepository;
     private final OfferedServiceRepository offeredServiceRepository;
     private final RedisCacheService redisCacheService;
+    private final BrandRepository brandRepository;
+    private final BrandLogoRepository brandLogoRepository;
     private final CarAiPhotoWorker carAiPhotoWorker;
 
     /**
@@ -283,6 +285,7 @@ public class PhotoServiceImpl implements PhotoService {
                     .build();
 
             partnerPhotoRepository.save(partnerPhoto);
+            redisCacheService.evictPartnerPhotoAfterCommit(partner.getId());
 
             return PhotoResponse.builder()
                     .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
@@ -300,6 +303,11 @@ public class PhotoServiceImpl implements PhotoService {
     public ResponseEntity<byte[]> getPartnerPhotoById(Long partnerId) {
         if (partnerId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+
+        ResponseEntity<byte[]> cached = redisCacheService.getPartnerPhoto(partnerId);
+        if (cached != null) {
+            return cached;
         }
 
         PartnerPhoto partnerPhoto = partnerPhotoRepository.findByPartnerId(partnerId);
@@ -323,9 +331,13 @@ public class PhotoServiceImpl implements PhotoService {
         MediaType mediaType = MediaType.parseMediaType(fileType);
         log.info("media type file type ================= {}", mediaType.getType());
 
+        byte[] bytes = partnerPhoto.getImageData();
+        if (bytes != null && bytes.length > 0) {
+            redisCacheService.putPartnerPhoto(partnerId, mediaType, bytes);
+        }
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .body(partnerPhoto.getImageData());
+                .body(bytes);
     }
 
     /**
@@ -975,6 +987,66 @@ public class PhotoServiceImpl implements PhotoService {
             });
         } else {
             job.run();
+        }
+    }
+
+    /**
+     * tr: Marka logosu. Cache miss DB'den dolar. Logo yoksa 404.
+     * en: Brand logo. A cache miss loads from the database. 404 when the logo is missing.
+     */
+    @Override
+    public ResponseEntity<byte[]> getBrandLogo(Long brandId) {
+        if (brandId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        if (!brandRepository.existsById(brandId)) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+        }
+        ResponseEntity<byte[]> cached = redisCacheService.getBrandLogo(brandId);
+        if (cached != null) {
+            return cached;
+        }
+        BrandLogo photo = brandLogoRepository.findByBrandId(brandId);
+        if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+        }
+        MediaType mediaType = mediaTypeOf(photo.getFileType());
+        redisCacheService.putBrandLogo(brandId, mediaType, photo.getImageData());
+        return ResponseEntity.ok().contentType(mediaType).body(photo.getImageData());
+    }
+
+    /**
+     * tr: Marka logosu yükler. Eski satır silinir, yeni satır yazılır, Redis commit sonrası düşer.
+     * en: Uploads a brand logo. Deletes the old row, writes a new row, and evicts Redis after commit.
+     */
+    @Override
+    @Transactional
+    public PhotoResponse uploadBrandLogo(MultipartFile file, Long brandId) {
+        if (file == null || brandId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        Brand brand = brandRepository.findById(brandId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null)));
+        try {
+            DetectedImage image = detectImage(file);
+            BrandLogo existing = brandLogoRepository.findByBrandId(brandId);
+            if (existing != null) {
+                brandLogoRepository.delete(existing);
+                brandLogoRepository.flush();
+            }
+            brandLogoRepository.save(BrandLogo.builder()
+                    .brandId(brand.getBrandId())
+                    .brandName(brand.getBrandName())
+                    .fileName(brand.getBrandName())
+                    .fileType(image.fileType())
+                    .imageData(image.bytes())
+                    .build());
+            redisCacheService.evictBrandLogoAfterCommit(brandId);
+            return PhotoResponse.builder()
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .build();
+        } catch (IOException e) {
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
         }
     }
 

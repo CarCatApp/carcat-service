@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Car brand logos — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .icon-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 8px 16px;
+    }
+    .service-row {
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .service-row:first-of-type { border-top: 0; }
+    .icon-preview {
+      width: 72px;
+      height: 72px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: var(--primary-soft);
+      object-fit: contain;
+      display: block;
+    }
+    .icon-preview.is-missing { display: none; }
+    .icon-ph {
+      width: 72px;
+      height: 72px;
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      background: var(--primary-soft);
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .icon-ph.is-hidden { display: none; }
+    .drop {
+      min-width: 220px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: var(--bg);
+    }
+    .drop input[type=file] { width: 100%; margin: 8px 0; }
+    .file-name { font-size: 12px; color: var(--text-muted); min-height: 18px; }
+    .error-box[hidden], .ok-box[hidden] { display: none; }
+    @media (max-width: 720px) {
+      .service-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link active" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Offered services</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Car brand logos</h1>
+      <p class="muted">Partner panel <code>GET /api/v1/photo/for/brand/get/{brandId}</code>. Yeni dosya eski kaydı siler.</p>
+    </div>
+  </div>
+  <div class="ok-box" id="okBox" hidden></div>
+  <div class="error-box" id="errBox" hidden></div>
+
+  <section class="icon-card">
+    <div class="service-row" th:each="b : ${brands}" th:attr="data-brand-id=${b.brandId}">
+      <div>
+        <img class="icon-preview"
+             th:if="${withLogo.contains(b.brandId)}"
+             alt=""
+             th:src="@{/admin/brand-logos/get(brandId=${b.brandId})}"
+             onerror="markMissing(this)">
+        <div class="icon-ph" th:classappend="${withLogo.contains(b.brandId)} ? 'is-hidden' : ''">No logo</div>
+      </div>
+      <strong th:text="${b.brandName}">Brand</strong>
+      <form class="drop" th:attr="data-brand-id=${b.brandId}">
+        <input type="file" accept="image/*" name="file">
+        <div class="file-name">Choose file</div>
+        <button class="btn btn-filter" type="submit">Gönder</button>
+      </form>
+    </div>
+    <p class="icon-meta" th:if="${brands == null || brands.isEmpty()}">Marka yok.</p>
+  </section>
+</main>
+
+<script src="/admin/admin.js?v=premium8"></script>
+<script>
+  function markMissing(img) {
+    img.classList.add("is-missing");
+    const ph = img.parentElement && img.parentElement.querySelector(".icon-ph");
+    if (ph) ph.classList.remove("is-hidden");
+  }
+
+  function showOk(msg) {
+    const ok = document.getElementById("okBox");
+    const err = document.getElementById("errBox");
+    ok.hidden = false;
+    ok.textContent = msg;
+    err.hidden = true;
+  }
+  function showErr(msg) {
+    const ok = document.getElementById("okBox");
+    const err = document.getElementById("errBox");
+    err.hidden = false;
+    err.textContent = msg;
+    ok.hidden = true;
+  }
+
+  document.querySelectorAll("form.drop").forEach((form) => {
+    const input = form.querySelector('input[type=file]');
+    const label = form.querySelector(".file-name");
+    input.addEventListener("change", () => {
+      label.textContent = (input.files && input.files[0] && input.files[0].name) || "Choose file";
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = input.files && input.files[0];
+      if (!file) { showErr("Foto seçin."); return; }
+      const brandId = form.dataset.brandId;
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/admin/brand-logos/upload?brandId=" + encodeURIComponent(brandId), {
+        method: "POST",
+        body: fd,
+        credentials: "same-origin"
+      });
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/admin/";
+        return;
+      }
+      if (!res.ok) {
+        let msg = "Yükleme başarısız (" + res.status + ")";
+        try {
+          const body = await res.json();
+          if (body && body.message) msg = body.message;
+        } catch (_) {}
+        showErr(msg);
+        return;
+      }
+      const row = form.closest(".service-row");
+      const box = row && row.querySelector("div");
+      let img = row && row.querySelector(".icon-preview");
+      const ph = row && row.querySelector(".icon-ph");
+      if (!img && box) {
+        img = document.createElement("img");
+        img.className = "icon-preview";
+        img.alt = "";
+        img.addEventListener("error", () => markMissing(img));
+        box.insertBefore(img, ph);
+      }
+      if (img) {
+        img.classList.remove("is-missing");
+        img.src = "/admin/brand-logos/get?brandId=" + encodeURIComponent(brandId) + "&t=" + Date.now();
+        if (ph) ph.classList.add("is-hidden");
+      }
+      label.textContent = "Choose file";
+      input.value = "";
+      showOk("Kaydedildi.");
+    });
+  });
+</script>
+</body>
+</html>

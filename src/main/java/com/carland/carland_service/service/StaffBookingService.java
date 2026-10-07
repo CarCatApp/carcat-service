@@ -1,11 +1,13 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
+import com.carland.carland_service.dto.booking.CarResponseForSlotPanel;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffNotesResponse;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.BookingIndividualLine;
 import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
@@ -21,6 +23,7 @@ import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
@@ -40,6 +43,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -73,6 +77,7 @@ public class StaffBookingService {
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
     private final BookingStaffNoteService bookingStaffNoteService;
+    private final BrandRepository brandRepository;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -115,10 +120,11 @@ public class StaffBookingService {
         Map<Long, BookingInspection> inspections = inspectionsByBooking(rows);
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
+        Map<String, Long> brandIds = new HashMap<>();
         List<BookingView> items = new ArrayList<>();
         for (Booking booking : rows) {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), tz, lang,
-                    lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId())));
+                    lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds));
         }
         return BookingInboxResponse.builder()
                 .page(safePage)
@@ -217,7 +223,7 @@ public class StaffBookingService {
         List<BookingIndividualLine> lines = individualLineRepository.findByBooking_IdOrderByIdAsc(bookingId);
         java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(bookingId);
         BookingInspection inspection = found == null ? null : found.orElse(null);
-        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection);
+        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
     }
 
     private BookingStaff requireStaff(Long userId, boolean mustChangePassword, String acceptLanguage) {
@@ -281,7 +287,8 @@ public class StaffBookingService {
     }
 
     private BookingView toView(Booking booking, List<String> keys, String timezone, String lang,
-                               List<BookingIndividualLine> lines, BookingInspection inspection) {
+                               List<BookingIndividualLine> lines, BookingInspection inspection,
+                               Map<String, Long> brandIds) {
         Range range = booking.getRange();
         Calendar calendar = range == null ? null : range.getCalendar();
         String mode = range == null || range.getBookingMode() == null || range.getBookingMode().isBlank()
@@ -315,6 +322,7 @@ public class StaffBookingService {
                 .plateNumber(car == null ? null : car.getPlateNumber())
                 .carBrand(car == null ? null : car.getBrand())
                 .carModel(car == null ? null : car.getModel())
+                .car(carPanel(car, brandIds))
                 .cancelReasonCode(booking.getCancelReasonCode())
                 .cancelNote(booking.getCancelNote())
                 .serviceKeys(keys)
@@ -333,6 +341,56 @@ public class StaffBookingService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .build();
+    }
+
+    private CarResponseForSlotPanel carPanel(Car car, Map<String, Long> brandIds) {
+        if (car == null) {
+            return null;
+        }
+        return CarResponseForSlotPanel.builder()
+                .carId(car.getCarId())
+                .brandId(brandId(car.getBrand(), brandIds))
+                .brand(car.getBrand())
+                .model(car.getModel())
+                .plateNumber(car.getPlateNumber())
+                .vin(car.getVin())
+                .bodyType(car.getBodyType())
+                .engineType(car.getEngineType())
+                .modelYear(car.getModelYear())
+                .engineVolume(car.getEngineVolume())
+                .mileage(car.getMileage())
+                .build();
+    }
+
+    private Long brandId(String brandName, Map<String, Long> brandIds) {
+        if (brandName == null || brandName.isBlank()) {
+            return null;
+        }
+        String key = brandName.trim().toLowerCase(Locale.ROOT);
+        if (brandIds.containsKey(key)) {
+            return brandIds.get(key);
+        }
+        Long id = pickBrandId(brandRepository.findAllByBrandNameIgnoreCase(brandName.trim()));
+        brandIds.put(key, id);
+        return id;
+    }
+
+    private static Long pickBrandId(List<Brand> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return null;
+        }
+        for (Brand brand : rows) {
+            if (".".equals(brand.getIsnew()) && brand.getStatus() != null
+                    && "ACTIVE".equalsIgnoreCase(brand.getStatus())) {
+                return brand.getBrandId();
+            }
+        }
+        for (Brand brand : rows) {
+            if (brand.getStatus() != null && "ACTIVE".equalsIgnoreCase(brand.getStatus())) {
+                return brand.getBrandId();
+            }
+        }
+        return rows.get(0).getBrandId();
     }
 
     private static String joinName(String name, String surname) {

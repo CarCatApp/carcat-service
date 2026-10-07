@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.response.GeneratePhotoResponse;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
+import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.PhotoService;
 import com.carland.carland_service.service.StaffMediaService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +30,7 @@ public class PhotoController {
     private final PhotoService photoService;
     private final StaffMediaService staffMediaService;
     private final BookingStaffRequestAuth bookingStaffRequestAuth;
+    private final BookingStaffAccess bookingStaffAccess;
 
     /**
      * tr: Multipart "file" bölümündeki fotoğrafı verilen carId'ye ait araca yükler ve sonucu döner.
@@ -338,6 +340,20 @@ public class PhotoController {
      * tr: Booking satırındaki müşteri fotoğrafı. Staff token. Foto yoksa 404.
      * en: Customer photo for a booking row. Staff token. 404 when there is no photo.
      */
+    /**
+     * tr: Marka logosu. Staff token. Logo yoksa 404. Cache miss DB'den dolar.
+     * en: Brand logo. Staff token. 404 when there is no logo. A cache miss loads from the database.
+     */
+    @GetMapping(value = "/for/brand/get/{brandId}", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getBrandLogo(HttpServletRequest request,
+                                               @PathVariable("brandId") Long brandId) {
+        bookingStaffAccess.requireStaff(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                request.getHeader("Accept-Language"));
+        return photoService.getBrandLogo(brandId);
+    }
+
     @GetMapping(value = "/for/customer/get/{userId}", produces = MediaType.ALL_VALUE)
     public ResponseEntity<byte[]> getCustomerPhoto(HttpServletRequest request,
                                                    @PathVariable("userId") Long userId,

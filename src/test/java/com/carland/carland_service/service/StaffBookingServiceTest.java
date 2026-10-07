@@ -2,7 +2,9 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
 import com.carland.carland_service.dto.booking.BookingView;
+import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
@@ -11,6 +13,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,6 +57,7 @@ class StaffBookingServiceTest {
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
     @Mock BookingStaffNoteService bookingStaffNoteService;
+    @Mock BrandRepository brandRepository;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -64,7 +69,7 @@ class StaffBookingServiceTest {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
-                customerRepository, carRepository, bookingStaffNoteService);
+                customerRepository, carRepository, bookingStaffNoteService, brandRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -108,6 +113,41 @@ class StaffBookingServiceTest {
         assertEquals(1, out.getItems().size());
         assertEquals("CC-959345", out.getItems().get(0).getRef());
         assertEquals("pkg:hyper-extra", out.getItems().get(0).getServiceKeys().get(0));
+        assertNull(out.getItems().get(0).getCar());
+    }
+
+    @Test
+    void inboxCarIsTheStoredRow() {
+        booking.setCarId(15L);
+        Car car = Car.builder()
+                .carId(15L)
+                .brand("Mercedes")
+                .model("G 65 AMG")
+                .plateNumber("77 LL 999")
+                .vin("VIN1")
+                .bodyType("SUV")
+                .engineType("Petrol (Gasoline)")
+                .modelYear(2023)
+                .engineVolume(4500)
+                .mileage(230300L)
+                .build();
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(eq(7L), eq("pending"), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+        when(carRepository.findByCarId(15L)).thenReturn(car);
+        when(brandRepository.findAllByBrandNameIgnoreCase("Mercedes")).thenReturn(List.of(
+                Brand.builder().brandId(42L).brandName("Mercedes").status("ACTIVE").isnew(".").build()));
+
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+
+        assertEquals(42L, out.getItems().get(0).getCar().getBrandId());
+        assertEquals("SUV", out.getItems().get(0).getCar().getBodyType());
+        assertEquals("Petrol (Gasoline)", out.getItems().get(0).getCar().getEngineType());
+        assertEquals(2023, out.getItems().get(0).getCar().getModelYear());
+        assertEquals(4500, out.getItems().get(0).getCar().getEngineVolume());
+        assertEquals(230300L, out.getItems().get(0).getCar().getMileage());
     }
 
     @Test
