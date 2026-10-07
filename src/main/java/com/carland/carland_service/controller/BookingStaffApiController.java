@@ -65,8 +65,9 @@ public class BookingStaffApiController {
                         acceptLanguage),
                 branchId,
                 acceptLanguage);
-        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Cache-Control", "no-cache, no-store, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Content-Encoding", "identity");
         return staffBookingLiveService.listen(branchId);
     }
 

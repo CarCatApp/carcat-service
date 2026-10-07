@@ -10,6 +10,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -23,6 +24,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class StaffBookingLiveService {
 
+    /** Kong/nginx küçük satırı tamponda tutar. Bu dolgu tamponu doldurup satırı tarayıcıya iter. */
+    private static final String FLUSH = "x".repeat(32 * 1024);
+
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> open = new ConcurrentHashMap<>();
 
@@ -34,6 +38,7 @@ public class StaffBookingLiveService {
         emitter.onError(error -> remove(branchId, emitter));
         try {
             emitter.send(SseEmitter.event().comment("open"));
+            push(emitter);
         } catch (Exception ex) {
             remove(branchId, emitter);
         }
@@ -63,6 +68,7 @@ public class StaffBookingLiveService {
             for (SseEmitter emitter : emitters) {
                 try {
                     emitter.send(SseEmitter.event().comment("ping"));
+                    push(emitter);
                 } catch (Exception ex) {
                     remove(branchId, emitter);
                 }
@@ -85,10 +91,15 @@ public class StaffBookingLiveService {
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event().name("arrival").data(json));
+                push(emitter);
             } catch (Exception ex) {
                 remove(arrival.getBranchId(), emitter);
             }
         }
+    }
+
+    private static void push(SseEmitter emitter) throws IOException {
+        emitter.send(SseEmitter.event().comment(FLUSH));
     }
 
     private void remove(Long branchId, SseEmitter emitter) {
