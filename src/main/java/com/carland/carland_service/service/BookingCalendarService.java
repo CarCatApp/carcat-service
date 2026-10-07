@@ -226,7 +226,7 @@ public class BookingCalendarService {
         if (range == null || range.getStart() == null || range.getEnd() == null || !range.getStart().isAfter(now)) {
             return false;
         }
-        if (!RangeStatus.AVAILABLE.name().equals(range.getStatus())) {
+        if (SlotOffer.hidden(range) || !RangeStatus.AVAILABLE.name().equals(range.getStatus())) {
             return false;
         }
         return remaining(range) > 0;

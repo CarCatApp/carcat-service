@@ -15,5 +15,7 @@ public enum RangeStatus {
     PENDING,
     BREAK,
     PENDING_LOCAL,
-    FULL
+    FULL,
+    /** Staff hid this hour. The row stays; Flutter treats it as missing. */
+    HIDDEN
 }

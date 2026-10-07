@@ -229,6 +229,7 @@ public class StaffSlotGenerateService {
                     .bookedCount(booked)
                     .bookingMode(range.getBookingMode())
                     .status(range.getStatus())
+                    .dayHidden(Boolean.TRUE.equals(range.getDayHidden()))
                     .packageId(range.getCarePackage() == null ? null : range.getCarePackage().getId())
                     .individualServiceId(range.getIndividualService() == null ? null : range.getIndividualService().getId())
                     .repairInspection(StaffSlotTargets.REPAIR_INSPECTION.equals(range.getSlotTarget()))

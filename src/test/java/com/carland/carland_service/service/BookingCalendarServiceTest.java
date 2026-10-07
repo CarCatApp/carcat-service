@@ -223,6 +223,29 @@ class BookingCalendarServiceTest {
                 () -> service.day(7L, request(yesterday, null, null, "səs"), "az"));
     }
 
+    @Test
+    void hiddenDayAndHiddenHourStayOffTheCustomerCalendar() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        BranchCarePackage pkg = packageRow();
+        Range closedDay = slot(2L, start, 2, StaffSlotTargets.PACKAGE, pkg, null);
+        closedDay.setDayHidden(true);
+        Range closedHour = slot(3L, start.plusHours(1), 2, StaffSlotTargets.PACKAGE, pkg, null);
+        closedHour.setStatus(RangeStatus.HIDDEN.name());
+        Range open = slot(4L, start.plusHours(2), 2, StaffSlotTargets.PACKAGE, pkg, null);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), any(), any())).thenReturn(List.of(
+                day(day, closedDay, closedHour, open)));
+
+        BookingCalendarRequest monthBody = new BookingCalendarRequest();
+        monthBody.setPackageId(10L);
+        assertEquals(Boolean.TRUE, available(service.month(7L, monthBody, "az"), day));
+
+        BookingDayRangesResponse ranges = service.day(7L, request(day, 10L, null, null), "az");
+        assertEquals(1, ranges.getRanges().size());
+        assertEquals(4L, ranges.getRanges().get(0).getRangeId());
+    }
+
     private static Boolean available(BookingCalendarResponse response, LocalDate day) {
         String formatted = day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         return response.getDays().stream()

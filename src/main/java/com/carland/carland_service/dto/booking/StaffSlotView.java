@@ -18,6 +18,8 @@ public class StaffSlotView {
     Integer bookedCount;
     String bookingMode;
     String status;
+    /** True when Günlük tam bağla hid this service's day. Hour status is separate. */
+    Boolean dayHidden;
     Long packageId;
     Long individualServiceId;
     Boolean repairInspection;

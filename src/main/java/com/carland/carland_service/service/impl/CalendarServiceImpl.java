@@ -21,6 +21,7 @@ import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CalendarRepository;
 import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.CalendarService;
+import com.carland.carland_service.service.SlotOffer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -145,16 +146,23 @@ public class CalendarServiceImpl implements CalendarService {
 
         Calendar calendar = calendarRepository.findByDayAndServiceCategoryAndBranch(
                 request.getDay(), request.getServiceCategory(), branch);
-        if (calendar == null) {
+        if (calendar == null || CalendarStatus.HIDDEN.name().equals(calendar.getStatus())) {
+            throw new ResourceNotFoundException(MessagesLangValues.CALENDAR_NOT_FOUND.getMessageByLang(acceptLanguage));
+        }
+        List<Range> stored = calendar.getTimeRanges() == null ? List.of() : calendar.getTimeRanges();
+        List<Range> visible = stored.stream()
+                .filter(range -> !SlotOffer.hidden(range))
+                .toList();
+        if (!stored.isEmpty() && visible.isEmpty()) {
             throw new ResourceNotFoundException(MessagesLangValues.CALENDAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
         return CalendarResponse.builder()
                 .calendarId(calendar.getCalendarId())
                 .branchId(branch.getId())
-                .bookingMode(firstMode(calendar))
-                .serviceKey(firstServiceKey(calendar))
-                .timeRanges(mapToRangeResponseList(calendar.getTimeRanges(), timezone, acceptLanguage))
+                .bookingMode(firstMode(visible))
+                .serviceKey(firstServiceKey(visible))
+                .timeRanges(mapToRangeResponseList(visible, timezone, acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();
     }
@@ -226,19 +234,19 @@ public class CalendarServiceImpl implements CalendarService {
                 .build();
     }
 
-    private static String firstMode(Calendar calendar) {
-        if (calendar.getTimeRanges() == null || calendar.getTimeRanges().isEmpty()) {
+    private static String firstMode(List<Range> ranges) {
+        if (ranges == null || ranges.isEmpty()) {
             return BookingMode.INSTANT.apiValue();
         }
-        String mode = calendar.getTimeRanges().get(0).getBookingMode();
+        String mode = ranges.get(0).getBookingMode();
         return mode == null ? BookingMode.INSTANT.apiValue() : mode;
     }
 
-    private static String firstServiceKey(Calendar calendar) {
-        if (calendar.getTimeRanges() == null || calendar.getTimeRanges().isEmpty()) {
+    private static String firstServiceKey(List<Range> ranges) {
+        if (ranges == null || ranges.isEmpty()) {
             return "*";
         }
-        String key = calendar.getTimeRanges().get(0).getServiceKey();
+        String key = ranges.get(0).getServiceKey();
         return key == null || key.isBlank() ? "*" : key;
     }
 }

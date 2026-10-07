@@ -33,6 +33,10 @@ public class Range {
     String status;
     Integer workerCount;
 
+    /** Selected service's day was closed. The range row stays. */
+    @Column(name = "day_hidden")
+    Boolean dayHidden;
+
     /** instant | approval. Staff sets this when creating the day's ranges. */
     @Column(name = "booking_mode", length = 16)
     String bookingMode;

@@ -10,5 +10,7 @@ import lombok.Getter;
 
 public enum CalendarStatus {
     ACTIVE,
-    INACTIVE
+    INACTIVE,
+    /** Whole calendar is hidden. Staff lists still return it; Flutter treats the day as missing. */
+    HIDDEN
 }

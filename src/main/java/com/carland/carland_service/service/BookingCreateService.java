@@ -355,7 +355,8 @@ public class BookingCreateService {
                 || !Boolean.TRUE.equals(branch.getPartner().getActive())) {
             throw new ResourceNotFoundException("slot not found");
         }
-        if (!RangeStatus.AVAILABLE.name().equals(range.getStatus())
+        if (SlotOffer.hidden(range)
+                || !RangeStatus.AVAILABLE.name().equals(range.getStatus())
                 || range.getStart() == null
                 || !range.getStart().isAfter(OffsetDateTime.now())) {
             throw new ConflictException("slot_unavailable");

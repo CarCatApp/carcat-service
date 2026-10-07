@@ -81,7 +81,7 @@ public class BookingAvailabilityService {
             List<Range> ranges = new ArrayList<>(calendar.getTimeRanges());
             ranges.sort(Comparator.comparing(Range::getStart));
             for (Range range : ranges) {
-                if (!matchesOffer(range, wanted)) {
+                if (!matchesOffer(range, wanted) || SlotOffer.hidden(range)) {
                     continue;
                 }
                 BookingAvailabilitySlotView slot = toSlot(range, timezone, nowUtc);
