@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * tr: Şube fotoğrafı ve staff fotoğrafı. Partner logosu değildir.
@@ -62,7 +64,7 @@ public class StaffMediaService {
             throw new ForbiddenException("branch required");
         }
         byte[] bytes = imageBytes(file);
-        String fileType = fileType(bytes);
+        String fileType = fileType(bytes, acceptLanguage);
         BranchPhoto existing = branchPhotoRepository.findByBranchId(staff.getBranch().getId());
         if (existing != null) {
             branchPhotoRepository.delete(existing);
@@ -111,7 +113,7 @@ public class StaffMediaService {
                                            String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         byte[] bytes = imageBytes(file);
-        String fileType = fileType(bytes);
+        String fileType = fileType(bytes, acceptLanguage);
         StaffPhoto existing = staffPhotoRepository.findByUserId(staff.getUserId());
         if (existing != null) {
             staffPhotoRepository.delete(existing);
@@ -221,12 +223,37 @@ public class StaffMediaService {
         }
     }
 
-    private static String fileType(byte[] bytes) {
-        String detected = new Tika().detect(bytes);
-        if (detected == null || !detected.startsWith("image/")) {
-            throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
+    private static final Set<String> ALLOWED_PHOTOS = Set.of("jpeg", "png", "webp", "gif");
+
+    private static String fileType(byte[] bytes, String acceptLanguage) {
+        String kind = photoKind(new Tika().detect(bytes));
+        if (!ALLOWED_PHOTOS.contains(kind)) {
+            throw new InvalidStatusException(rejectedPhoto(kind, acceptLanguage));
         }
-        return detected.substring("image/".length());
+        return kind;
+    }
+
+    private static String photoKind(String detected) {
+        if (detected == null || detected.isBlank() || !detected.startsWith("image/")) {
+            return "file";
+        }
+        String sub = detected.substring("image/".length()).toLowerCase(Locale.ROOT);
+        int plus = sub.indexOf('+');
+        if (plus > 0) {
+            sub = sub.substring(0, plus);
+        }
+        return sub;
+    }
+
+    private static String rejectedPhoto(String kind, String acceptLanguage) {
+        String lang = acceptLanguage == null ? "az" : acceptLanguage.toLowerCase(Locale.ROOT);
+        if (lang.startsWith("en")) {
+            return kind + " format is not accepted, only JPEG, PNG, WebP, GIF";
+        }
+        if (lang.startsWith("ru")) {
+            return "Формат " + kind + " не принимается, только JPEG, PNG, WebP, GIF";
+        }
+        return kind + " formatı qəbul edilmir, yalnız JPEG, PNG, WebP, GIF";
     }
 
     private static MediaType mediaType(String fileType) {
