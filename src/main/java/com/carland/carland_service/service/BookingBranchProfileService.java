@@ -36,6 +36,13 @@ public class BookingBranchProfileService {
 
     static final String ROUTINE = "routine";
     static final ZoneId BAKU = ZoneId.of("Asia/Baku");
+    /** tr: Repair kartının altı boş kalmasın. Accept-Language cümlesi; yoksa az.
+     *  en: Subtitle under the repair card. Accept-Language sentence; missing header falls back to az. */
+    static final Map<String, String> REPAIR_INFO = Map.of(
+            "az", "Problemi servisdə öyrən",
+            "en", "Find out the problem at the service",
+            "ru", "Узнайте проблему в сервисе"
+    );
 
     private final BranchRepository branchRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
@@ -94,12 +101,14 @@ public class BookingBranchProfileService {
                 continue;
             }
             boolean routine = ROUTINE.equals(category.getCode());
+            boolean repair = StaffSlotTargets.REPAIR_INSPECTION.equals(category.getCode());
             items.add(BookingBranchProfileServiceView.builder()
                     .id(category.getId())
                     .code(category.getCode())
                     .name(BookingMineService.catalogText(json.read(category.getTitleJson()), lang))
                     .packageCount(routine ? packageCount : null)
                     .serviceCount(null)
+                    .info(repair ? BookingMineService.catalogText(REPAIR_INFO, lang) : null)
                     .build());
         }
         return items;

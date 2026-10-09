@@ -99,9 +99,14 @@ class BookingBranchProfileServiceTest {
         assertEquals("Routine care", routineView.getName());
         assertEquals(1, routineView.getPackageCount());
         assertNull(routineView.getServiceCount());
+        assertNull(routineView.getInfo());
         assertNull(out.getServices().get(1).getPackageCount());
         assertNull(out.getServices().get(1).getServiceCount());
+        assertEquals("Find out the problem at the service", out.getServices().get(1).getInfo());
         assertEquals("Inspection & repair", out.getServices().get(1).getName());
+        assertEquals("Problemi servisdə öyrən", service.profile(7L, null, null, "az").getServices().get(1).getInfo());
+        assertEquals("Узнайте проблему в сервисе", service.profile(7L, null, null, "ru").getServices().get(1).getInfo());
+        assertEquals("Problemi servisdə öyrən", service.profile(7L, null, null, null).getServices().get(1).getInfo());
         assertTrue(out.getProducts().isEmpty());
         assertEquals(0.1, out.getDistanceKm(), 0.05);
     }

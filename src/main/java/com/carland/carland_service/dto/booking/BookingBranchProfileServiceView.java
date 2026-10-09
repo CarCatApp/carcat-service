@@ -17,4 +17,6 @@ public class BookingBranchProfileServiceView {
     Integer packageCount;
     /** Partner-ui yazınca dolacak. Kaynak yokken boş. */
     Integer serviceCount;
+    /** Mobil kart alt yazısı. routine boş. repair_inspection Accept-Language. */
+    String info;
 }
