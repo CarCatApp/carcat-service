@@ -189,7 +189,7 @@ public class BookingMineService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .canceledBy(canceledBy(booking.getStatus()))
-                .canceledReason(canceledReasonOf(booking, BookingMineService.langOf(acceptLanguage)))
+                .canceledReason(canceledReasonOf(booking))
                 .build();
     }
 
@@ -437,6 +437,7 @@ public class BookingMineService {
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
+                .canceledReason(canceledReasonOf(booking))
                 .build();
     }
 
@@ -580,18 +581,41 @@ public class BookingMineService {
         return null;
     }
 
-    private BookingCanceledReasonView canceledReasonOf(Booking booking, String lang) {
-        String code = booking.getCancelReasonCode();
-        if (code == null || code.isBlank()) {
+    static final Map<String, String> CUSTOMER_CANCELLED = Map.of(
+            "az", "Mən ləğv etdim",
+            "en", "I cancelled",
+            "ru", "Я отменил"
+    );
+    static final Map<String, String> SERVICE_REJECTED = Map.of(
+            "az", "Avto servis ləğv etdi",
+            "en", "The auto service cancelled",
+            "ru", "Автосервис отменил"
+    );
+
+    /**
+     * tr: Siyahı və detal. note yazılan mətndir. code kimin ləğv etdiyini 3 dildə deyir.
+     * en: List and detail. note is the written text. code says who cancelled, in az/en/ru.
+     */
+    static BookingCanceledReasonView canceledReasonOf(Booking booking) {
+        if (booking == null || booking.getStatus() == null) {
             return null;
         }
-        BookingCancelReason row = cancelReasonRepository.findByCodeAndActiveTrue(code).orElse(null);
-        String note = BookingCapacityService.PLACES_FULL.equals(code)
-                ? BookingCapacityService.note(lang)
-                : booking.getCancelNote();
+        String status = booking.getStatus().toLowerCase(Locale.ROOT);
+        Map<String, String> label;
+        if (BookingStatus.CANCELLED.apiValue().equals(status)) {
+            label = CUSTOMER_CANCELLED;
+        } else if (BookingStatus.REJECTED.apiValue().equals(status)) {
+            label = SERVICE_REJECTED;
+        } else {
+            return null;
+        }
+        String note = booking.getCancelNote();
+        if (note != null && note.isBlank()) {
+            note = null;
+        }
         return BookingCanceledReasonView.builder()
-                .code(code)
-                .title(row == null ? Map.of() : titles(row.getTitleJson()))
+                .code(label)
+                .title(label)
                 .note(note)
                 .build();
     }

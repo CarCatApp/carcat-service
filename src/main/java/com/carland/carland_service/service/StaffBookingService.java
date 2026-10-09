@@ -211,7 +211,12 @@ public class StaffBookingService {
         } else {
             booking.setStatus(nextStatus);
             if (applied != null) {
-                booking.setCancelReasonCode(applied.code());
+                String code = applied.code();
+                if ((code == null || code.isBlank())
+                        && BookingStatus.REJECTED.apiValue().equals(nextStatus)) {
+                    code = BookingStatus.REJECTED.apiValue();
+                }
+                booking.setCancelReasonCode(code);
                 booking.setCancelNote(applied.note());
             }
         }

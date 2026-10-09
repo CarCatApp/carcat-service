@@ -118,6 +118,7 @@ class BookingMineServiceTest {
         assertEquals(55L, out.getItems().get(0).getCarId());
         assertEquals("Xeqani", out.getItems().get(0).getBranchName());
         assertEquals("Xeqani", out.getItems().get(0).getBranchAddress());
+        assertNull(out.getItems().get(0).getCanceledReason());
         assertEquals("Hyper", out.getItems().get(0).getPartnerName());
         assertEquals(1L, out.getItems().get(0).getPartnerId());
         assertEquals(7L, out.getItems().get(0).getBranchId());
@@ -129,6 +130,37 @@ class BookingMineServiceTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(bookingRepository).findByCustomerUserId(eq(54L), pageable.capture());
         assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    void mineReturnsTheWrittenCancelAndRejectNotes() {
+        booking.setStatus("cancelled");
+        booking.setCancelReasonCode("customer");
+        booking.setCancelNote("yol bağlı");
+        Booking rejected = Booking.builder()
+                .id(4L)
+                .ref("CC-147056")
+                .customerUserId(54L)
+                .status("rejected")
+                .branch(branch)
+                .range(booking.getRange())
+                .cancelNote("zamanımız yoxdur")
+                .build();
+        when(bookingRepository.findByCustomerUserId(eq(54L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(booking, rejected)));
+        when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        BookingMineResponse out = service.mine(54L, null, null, 1, 20, null, "Asia/Baku");
+
+        assertEquals("yol bağlı", out.getItems().get(0).getCanceledReason().getNote());
+        assertEquals("Mən ləğv etdim", out.getItems().get(0).getCanceledReason().getCode().get("az"));
+        assertEquals("I cancelled", out.getItems().get(0).getCanceledReason().getCode().get("en"));
+        assertEquals("Я отменил", out.getItems().get(0).getCanceledReason().getCode().get("ru"));
+        assertEquals("zamanımız yoxdur", out.getItems().get(1).getCanceledReason().getNote());
+        assertEquals("Avto servis ləğv etdi", out.getItems().get(1).getCanceledReason().getCode().get("az"));
+        assertEquals("The auto service cancelled", out.getItems().get(1).getCanceledReason().getCode().get("en"));
+        assertEquals("Автосервис отменил", out.getItems().get(1).getCanceledReason().getCode().get("ru"));
     }
 
     @Test
@@ -335,8 +367,10 @@ class BookingMineServiceTest {
         assertEquals("cancelled", out.getStatus());
         assertEquals("cancelled", booking.getStatus());
         assertEquals("change_of_plans", booking.getCancelReasonCode());
-        assertEquals("change_of_plans", out.getCanceledReason().getCode());
-        assertEquals("Change of plans", out.getCanceledReason().getTitle().get("en"));
+        assertEquals("Mən ləğv etdim", out.getCanceledReason().getCode().get("az"));
+        assertEquals("I cancelled", out.getCanceledReason().getCode().get("en"));
+        assertEquals("Я отменил", out.getCanceledReason().getCode().get("ru"));
+        assertNull(out.getCanceledReason().getNote());
     }
 
     @Test

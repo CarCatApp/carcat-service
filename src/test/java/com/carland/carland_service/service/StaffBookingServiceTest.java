@@ -202,6 +202,7 @@ class StaffBookingServiceTest {
         BookingView out = service.reject(9L, false, 1L, new BookingRejectRequest(), "Asia/Baku", "az");
 
         assertEquals("rejected", out.getStatus());
+        assertEquals("rejected", booking.getCancelReasonCode());
         assertEquals("ehtiyat yoxdur", booking.getCancelNote());
     }
 

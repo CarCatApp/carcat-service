@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,6 +36,12 @@ public class BookingView {
     CarResponseForSlotPanel car;
     String cancelReasonCode;
     String cancelNote;
+    BookingCanceledReasonView canceledReason;
+
+    @JsonProperty("cancelledReason")
+    public BookingCanceledReasonView getCancelledReason() {
+        return canceledReason;
+    }
     String startsAt;
     String branchName;
     String branchAddress;
