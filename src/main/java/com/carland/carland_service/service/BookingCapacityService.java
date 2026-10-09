@@ -6,6 +6,7 @@ import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,11 +18,13 @@ import java.util.Locale;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BookingCapacityService {
 
     public static final String PLACES_FULL = "places_full";
 
     private final BookingRepository bookingRepository;
+    private final BookingPushService bookingPushService;
 
     /**
      * tr: Qəbul sayı yerə çatıbsa yeni qəbul olmaz.
@@ -50,6 +53,19 @@ public class BookingCapacityService {
             row.setStatus(BookingStatus.REJECTED.apiValue());
             row.setCancelReasonCode(PLACES_FULL);
             row.setCancelNote(note("az"));
+            notifyRejected(row);
+        }
+    }
+
+    /**
+     * tr: Push xətası yer dolunca yazılan rəddi geri almır.
+     * en: A push failure does not undo the rejection written when the range is full.
+     */
+    private void notifyRejected(Booking row) {
+        try {
+            bookingPushService.rejected(row);
+        } catch (Exception ex) {
+            log.warn("booking full-slot push skipped id={}", row == null ? null : row.getId());
         }
     }
 

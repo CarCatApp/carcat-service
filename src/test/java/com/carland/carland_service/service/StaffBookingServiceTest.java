@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +59,7 @@ class StaffBookingServiceTest {
     @Mock CarRepository carRepository;
     @Mock BookingStaffNoteService bookingStaffNoteService;
     @Mock BrandRepository brandRepository;
+    @Mock BookingPushService bookingPushService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -69,7 +71,7 @@ class StaffBookingServiceTest {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
-                customerRepository, carRepository, bookingStaffNoteService, brandRepository);
+                customerRepository, carRepository, bookingStaffNoteService, brandRepository, bookingPushService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -165,6 +167,23 @@ class StaffBookingServiceTest {
         assertEquals("confirmed", booking.getStatus());
         verify(bookingStaffAccess).requireWritableBranch(staff, 7L, "az");
         verify(bookingCapacityService).closePendingWhenFull(booking.getRange());
+        verify(bookingPushService).accepted(booking);
+        verify(bookingPushService, never()).rejected(any());
+    }
+
+    @Test
+    void acceptKeepsConfirmedWhenPushFails() {
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(rangeRepository.lockByRangeId(105L)).thenReturn(Optional.of(booking.getRange()));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+        doThrow(new RuntimeException("fcm")).when(bookingPushService).accepted(booking);
+
+        BookingView out = service.accept(9L, false, 1L, "Asia/Baku", "az");
+
+        assertEquals("confirmed", out.getStatus());
+        assertEquals("confirmed", booking.getStatus());
     }
 
     @Test
@@ -175,6 +194,7 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
 
         assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
+        verify(bookingPushService, never()).accepted(any());
     }
 
     @Test
@@ -188,6 +208,7 @@ class StaffBookingServiceTest {
 
         assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
         assertEquals("pending", booking.getStatus());
+        verify(bookingPushService, never()).accepted(any());
     }
 
     @Test
@@ -204,6 +225,25 @@ class StaffBookingServiceTest {
         assertEquals("rejected", out.getStatus());
         assertEquals("rejected", booking.getCancelReasonCode());
         assertEquals("ehtiyat yoxdur", booking.getCancelNote());
+        verify(bookingPushService).rejected(booking);
+        verify(bookingPushService, never()).accepted(any());
+    }
+
+    @Test
+    void rejectKeepsRejectedWhenPushFails() {
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingStaffNoteService.apply(eq("cancel"), any(), eq("az")))
+                .thenReturn(new BookingStaffNoteService.Applied(null, "ehtiyat yoxdur"));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+        doThrow(new RuntimeException("fcm")).when(bookingPushService).rejected(booking);
+
+        BookingView out = service.reject(9L, false, 1L, new BookingRejectRequest(), "Asia/Baku", "az");
+
+        assertEquals("rejected", out.getStatus());
+        assertEquals("rejected", booking.getStatus());
+        assertEquals("ehtiyat yoxdur", booking.getCancelNote());
     }
 
     @Test
@@ -217,6 +257,8 @@ class StaffBookingServiceTest {
         BookingView out = service.complete(9L, false, 1L, "Asia/Baku", "az");
 
         assertEquals("completed", out.getStatus());
+        verify(bookingPushService, never()).accepted(any());
+        verify(bookingPushService, never()).rejected(any());
     }
 
     @Test
@@ -234,5 +276,7 @@ class StaffBookingServiceTest {
         assertEquals("no_show", booking.getStatus());
         assertEquals("no_show_1", booking.getCancelReasonCode());
         assertEquals("gəlmədi", booking.getCancelNote());
+        verify(bookingPushService, never()).accepted(any());
+        verify(bookingPushService, never()).rejected(any());
     }
 }

@@ -44,7 +44,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,7 +62,9 @@ import java.util.stream.Collectors;
 
 /**
  * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). unread=0 ta ki 286.
+ * Liste, müşterinin her şubesindeki son rezervasyondur; en yeni önce.
  * en: Owner booking list + detail + cancel (CRCT-285). unread=0 until 286.
+ * The list is the latest booking per branch, newest first.
  */
 @Service
 @RequiredArgsConstructor
@@ -107,14 +109,14 @@ public class BookingMineService {
             size = 20;
         }
         size = Math.min(size, 50);
-        PageRequest pageable = PageRequest.of(safePage - 1, size,
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        Pageable pageable = PageRequest.of(safePage - 1, size);
         List<String> statuses = parseStatuses(statusCsv);
-        Page<Booking> result = loadPage(customerUserId, carId, statuses, pageable);
-        Map<Long, List<String>> keys = keysByBooking(result.getContent());
-        Set<Long> withPhoto = partnerIdsWithPhoto(result.getContent());
+        Page<Long> ids = latestIds(customerUserId, carId, statuses, pageable);
+        List<Booking> rows = loadInIdOrder(ids.getContent());
+        Map<Long, List<String>> keys = keysByBooking(rows);
+        Set<Long> withPhoto = partnerIdsWithPhoto(rows);
         List<BookingView> items = new ArrayList<>();
-        for (Booking booking : result.getContent()) {
+        for (Booking booking : rows) {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone, withPhoto,
                     acceptLanguage));
         }
@@ -122,7 +124,7 @@ public class BookingMineService {
                 .counts(countsOf(customerUserId, carId))
                 .page(safePage)
                 .pageSize(size)
-                .total(result.getTotalElements())
+                .total(ids.getTotalElements())
                 .items(items)
                 .build();
     }
@@ -347,18 +349,94 @@ public class BookingMineService {
                 .build();
     }
 
-    private Page<Booking> loadPage(Long userId, Long carId, List<String> statuses, PageRequest pageable) {
+    private Page<Long> latestIds(Long userId, Long carId, List<String> statuses, Pageable pageable) {
         boolean filterStatus = !statuses.isEmpty();
         if (carId != null && filterStatus) {
-            return bookingRepository.findByCustomerUserIdAndCarIdAndStatusIn(userId, carId, statuses, pageable);
+            return bookingRepository.findLatestIdPerBranchByCarIdAndStatusIn(userId, carId, statuses, pageable);
         }
         if (carId != null) {
-            return bookingRepository.findByCustomerUserIdAndCarId(userId, carId, pageable);
+            return bookingRepository.findLatestIdPerBranchByCarId(userId, carId, pageable);
         }
         if (filterStatus) {
-            return bookingRepository.findByCustomerUserIdAndStatusIn(userId, statuses, pageable);
+            return bookingRepository.findLatestIdPerBranchByStatusIn(userId, statuses, pageable);
         }
-        return bookingRepository.findByCustomerUserId(userId, pageable);
+        return bookingRepository.findLatestIdPerBranch(userId, pageable);
+    }
+
+    private List<Booking> loadInIdOrder(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Booking> byId = new LinkedHashMap<>();
+        for (Booking booking : bookingRepository.findForMineByIdIn(ids)) {
+            if (booking != null && booking.getId() != null) {
+                byId.put(booking.getId(), booking);
+            }
+        }
+        List<Booking> ordered = new ArrayList<>();
+        for (Long id : ids) {
+            Booking booking = byId.get(id);
+            if (booking != null) {
+                ordered.add(booking);
+            }
+        }
+        return ordered;
+    }
+
+    /**
+     * tr: SQL findLatestIdPerBranch ile aynı kural. Şube başına createdAt en büyük, eşitlikte id en büyük.
+     * Sonuç createdAt azalan, eşitlikte id azalan.
+     * en: Same rule as findLatestIdPerBranch. Per branch, greatest createdAt, then greatest id.
+     * Result is createdAt descending, then id descending.
+     */
+    static List<Booking> latestPerBranch(List<Booking> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Booking> newest = new LinkedHashMap<>();
+        for (Booking row : rows) {
+            Long branchId = branchIdOf(row);
+            if (branchId == null) {
+                continue;
+            }
+            Booking current = newest.get(branchId);
+            if (current == null || compareNewestFirst(row, current) < 0) {
+                newest.put(branchId, row);
+            }
+        }
+        List<Booking> picked = new ArrayList<>(newest.values());
+        picked.sort(BookingMineService::compareNewestFirst);
+        return picked;
+    }
+
+    private static Long branchIdOf(Booking row) {
+        if (row == null || row.getBranch() == null) {
+            return null;
+        }
+        return row.getBranch().getId();
+    }
+
+    private static int compareNewestFirst(Booking left, Booking right) {
+        int byTime = compareTimeDesc(left.getCreatedAt(), right.getCreatedAt());
+        if (byTime != 0) {
+            return byTime;
+        }
+        long leftId = left.getId() == null ? 0L : left.getId();
+        long rightId = right.getId() == null ? 0L : right.getId();
+        return Long.compare(rightId, leftId);
+    }
+
+    private static int compareTimeDesc(OffsetDateTime left, OffsetDateTime right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return right.compareTo(left);
     }
 
     private Map<String, Long> countsOf(Long userId, Long carId) {

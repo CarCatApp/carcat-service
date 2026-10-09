@@ -34,9 +34,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -50,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -104,8 +105,12 @@ class BookingMineServiceTest {
 
     @Test
     void mineReturnsOwnerBookingsWithStartsAt() {
-        when(bookingRepository.findByCustomerUserId(eq(54L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        @SuppressWarnings("unchecked")
+        Page<Long> idPage = mock(Page.class);
+        when(idPage.getContent()).thenReturn(List.of(3L));
+        when(idPage.getTotalElements()).thenReturn(6L);
+        when(bookingRepository.findLatestIdPerBranch(eq(54L), any(Pageable.class))).thenReturn(idPage);
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
         when(bookingRepository.countGroupByStatus(54L))
                 .thenReturn(List.<Object[]>of(new Object[]{"auto_accepted", 1L}));
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
@@ -126,10 +131,12 @@ class BookingMineServiceTest {
         assertEquals("2026-10-27T09:00:00+04:00", out.getItems().get(0).getStartsAt());
         assertEquals(1L, out.getCounts().get("auto_accepted"));
         assertEquals(0L, out.getCounts().get("pending"));
-        assertEquals(1, out.getTotal());
+        assertEquals(6L, out.getTotal());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(bookingRepository).findByCustomerUserId(eq(54L), pageable.capture());
-        assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
+        verify(bookingRepository).findLatestIdPerBranch(eq(54L), pageable.capture());
+        assertTrue(pageable.getValue().getSort().isUnsorted());
+        assertEquals(0, pageable.getValue().getPageNumber());
+        assertEquals(20, pageable.getValue().getPageSize());
     }
 
     @Test
@@ -146,8 +153,9 @@ class BookingMineServiceTest {
                 .range(booking.getRange())
                 .cancelNote("zamanımız yoxdur")
                 .build();
-        when(bookingRepository.findByCustomerUserId(eq(54L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(booking, rejected)));
+        when(bookingRepository.findLatestIdPerBranch(eq(54L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L, 4L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(rejected, booking));
         when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
 
@@ -171,8 +179,9 @@ class BookingMineServiceTest {
 
     @Test
     void confirmedFilterAlsoLoadsAutoAccepted() {
-        when(bookingRepository.findByCustomerUserIdAndStatusIn(eq(54L), any(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingRepository.findLatestIdPerBranchByStatusIn(eq(54L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
         when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
 
@@ -180,7 +189,7 @@ class BookingMineServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.forClass(Collection.class);
-        verify(bookingRepository).findByCustomerUserIdAndStatusIn(eq(54L), captor.capture(), any(Pageable.class));
+        verify(bookingRepository).findLatestIdPerBranchByStatusIn(eq(54L), captor.capture(), any(Pageable.class));
         assertTrue(captor.getValue().contains("pending"));
         assertTrue(captor.getValue().contains("confirmed"));
         assertTrue(captor.getValue().contains("auto_accepted"));
@@ -189,15 +198,59 @@ class BookingMineServiceTest {
     @Test
     void carIdFiltersList() {
         stubOwnedCar(55L, 54L);
-        when(bookingRepository.findByCustomerUserIdAndCarId(eq(54L), eq(55L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingRepository.findLatestIdPerBranchByCarId(eq(54L), eq(55L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
         when(bookingRepository.countGroupByStatusAndCarId(54L, 55L)).thenReturn(List.of());
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
 
         BookingMineResponse out = service.mine(54L, null, 55L, 1, 20, null, "Asia/Baku");
 
         assertEquals(1, out.getItems().size());
-        verify(bookingRepository).findByCustomerUserIdAndCarId(eq(54L), eq(55L), any(Pageable.class));
+        verify(bookingRepository).findLatestIdPerBranchByCarId(eq(54L), eq(55L), any(Pageable.class));
+    }
+
+    @Test
+    void carAndStatusUseLatestPerBranchQuery() {
+        stubOwnedCar(55L, 54L);
+        when(bookingRepository.findLatestIdPerBranchByCarIdAndStatusIn(eq(54L), eq(55L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
+        when(bookingRepository.countGroupByStatusAndCarId(54L, 55L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        service.mine(54L, "pending", 55L, 1, 20, null, "Asia/Baku");
+
+        verify(bookingRepository).findLatestIdPerBranchByCarIdAndStatusIn(
+                eq(54L), eq(55L), any(), any(Pageable.class));
+    }
+
+    @Test
+    void latestPerBranchKeepsNewestOfEachBranchNewestFirst() {
+        Partner hyper = Partner.builder().id(1L).name("Hyper").build();
+        Partner asmotors = Partner.builder().id(2L).name("Asmotors").build();
+        Branch xaqani = Branch.builder().id(7L).name("Xaqani").partner(hyper).build();
+        Branch babek = Branch.builder().id(8L).name("Babek").partner(hyper).build();
+        Branch nizami = Branch.builder().id(9L).name("Nizami").partner(asmotors).build();
+        Branch neftciler = Branch.builder().id(10L).name("Neftciler").partner(asmotors).build();
+
+        Booking xaqaniOld = booked(11L, xaqani, "2026-10-01T10:00:00Z");
+        Booking xaqaniTie = booked(19L, xaqani, "2026-10-10T10:00:00Z");
+        Booking xaqaniNew = booked(20L, xaqani, "2026-10-10T10:00:00Z");
+        Booking babekBook = booked(30L, babek, "2026-10-12T10:00:00Z");
+        Booking nizamiBook = booked(31L, nizami, "2026-10-11T10:00:00Z");
+        Booking neftcilerBook = booked(32L, neftciler, "2026-10-09T10:00:00Z");
+
+        List<Booking> picked = BookingMineService.latestPerBranch(List.of(
+                xaqaniOld, neftcilerBook, xaqaniTie, nizamiBook, xaqaniNew, babekBook));
+
+        assertEquals(List.of(30L, 31L, 20L, 32L), picked.stream().map(Booking::getId).toList());
+        assertEquals(8L, picked.get(0).getBranch().getId());
+        assertEquals(7L, picked.get(2).getBranch().getId());
+        assertEquals(1L, picked.get(0).getBranch().getPartner().getId());
+        assertEquals(1L, picked.get(2).getBranch().getPartner().getId());
+        assertEquals(2L, picked.get(1).getBranch().getPartner().getId());
+        assertEquals(2L, picked.get(3).getBranch().getPartner().getId());
     }
 
     @Test
@@ -437,6 +490,17 @@ class BookingMineServiceTest {
                 .code(code)
                 .titleJson("{\"az\":\"Plan dəyişdi\",\"en\":\"Change of plans\",\"ru\":\"Планы изменились\"}")
                 .active(true)
+                .build();
+    }
+
+    private static Booking booked(Long id, Branch branch, String createdAt) {
+        return Booking.builder()
+                .id(id)
+                .ref("CC-" + id)
+                .customerUserId(54L)
+                .status("confirmed")
+                .branch(branch)
+                .createdAt(OffsetDateTime.parse(createdAt))
                 .build();
     }
 

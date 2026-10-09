@@ -32,6 +32,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StaffBookingService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
@@ -78,6 +80,7 @@ public class StaffBookingService {
     private final CarRepository carRepository;
     private final BookingStaffNoteService bookingStaffNoteService;
     private final BrandRepository brandRepository;
+    private final BookingPushService bookingPushService;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -208,6 +211,7 @@ public class StaffBookingService {
             booking.setStatus(nextStatus);
             bookingRepository.saveAndFlush(booking);
             bookingCapacityService.closePendingWhenFull(locked);
+            notifyCustomer(booking, true);
         } else {
             booking.setStatus(nextStatus);
             if (applied != null) {
@@ -219,6 +223,9 @@ public class StaffBookingService {
                 booking.setCancelReasonCode(code);
                 booking.setCancelNote(applied.note());
             }
+            if (BookingStatus.REJECTED.apiValue().equals(nextStatus)) {
+                notifyCustomer(booking, false);
+            }
         }
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
@@ -229,6 +236,22 @@ public class StaffBookingService {
         java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(bookingId);
         BookingInspection inspection = found == null ? null : found.orElse(null);
         return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
+    }
+
+    /**
+     * tr: Push xətası qəbul və ya rəddi geri almır.
+     * en: A push failure does not undo accept or reject.
+     */
+    private void notifyCustomer(Booking booking, boolean accepted) {
+        try {
+            if (accepted) {
+                bookingPushService.accepted(booking);
+            } else {
+                bookingPushService.rejected(booking);
+            }
+        } catch (Exception ex) {
+            log.warn("booking push skipped id={} accepted={}", booking == null ? null : booking.getId(), accepted);
+        }
     }
 
     private BookingStaff requireStaff(Long userId, boolean mustChangePassword, String acceptLanguage) {

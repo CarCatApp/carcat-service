@@ -58,6 +58,132 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByCustomerUserIdAndCarIdAndStatusIn(
             Long customerUserId, Long carId, Collection<String> statuses, Pageable pageable);
 
+    /**
+     * tr: Şube başına son kayıt: created_at en büyük, eşitlikte id en büyük. Sayfa bu küme üzerinde, created_at azalan.
+     * en: Latest row per branch: max created_at, then max id. Page that set, created_at descending.
+     */
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.createdAt = (
+                        select max(b2.createdAt) from Booking b2
+                        where b2.customerUserId = :userId
+                          and b2.branch.id = b.branch.id
+                      )
+                      and b.id = (
+                        select max(b3.id) from Booking b3
+                        where b3.customerUserId = :userId
+                          and b3.branch.id = b.branch.id
+                          and b3.createdAt = b.createdAt
+                      )
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(distinct b.branch.id) from Booking b
+                    where b.customerUserId = :userId
+                    """
+    )
+    Page<Long> findLatestIdPerBranch(@Param("userId") Long userId, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                      and b.createdAt = (
+                        select max(b2.createdAt) from Booking b2
+                        where b2.customerUserId = :userId
+                          and b2.branch.id = b.branch.id
+                          and b2.carId = :carId
+                      )
+                      and b.id = (
+                        select max(b3.id) from Booking b3
+                        where b3.customerUserId = :userId
+                          and b3.branch.id = b.branch.id
+                          and b3.carId = :carId
+                          and b3.createdAt = b.createdAt
+                      )
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(distinct b.branch.id) from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                    """
+    )
+    Page<Long> findLatestIdPerBranchByCarId(
+            @Param("userId") Long userId, @Param("carId") Long carId, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.status in :statuses
+                      and b.createdAt = (
+                        select max(b2.createdAt) from Booking b2
+                        where b2.customerUserId = :userId
+                          and b2.branch.id = b.branch.id
+                          and b2.status in :statuses
+                      )
+                      and b.id = (
+                        select max(b3.id) from Booking b3
+                        where b3.customerUserId = :userId
+                          and b3.branch.id = b.branch.id
+                          and b3.status in :statuses
+                          and b3.createdAt = b.createdAt
+                      )
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(distinct b.branch.id) from Booking b
+                    where b.customerUserId = :userId
+                      and b.status in :statuses
+                    """
+    )
+    Page<Long> findLatestIdPerBranchByStatusIn(
+            @Param("userId") Long userId, @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                      and b.status in :statuses
+                      and b.createdAt = (
+                        select max(b2.createdAt) from Booking b2
+                        where b2.customerUserId = :userId
+                          and b2.branch.id = b.branch.id
+                          and b2.carId = :carId
+                          and b2.status in :statuses
+                      )
+                      and b.id = (
+                        select max(b3.id) from Booking b3
+                        where b3.customerUserId = :userId
+                          and b3.branch.id = b.branch.id
+                          and b3.carId = :carId
+                          and b3.status in :statuses
+                          and b3.createdAt = b.createdAt
+                      )
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(distinct b.branch.id) from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                      and b.status in :statuses
+                    """
+    )
+    Page<Long> findLatestIdPerBranchByCarIdAndStatusIn(
+            @Param("userId") Long userId,
+            @Param("carId") Long carId,
+            @Param("statuses") Collection<String> statuses,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
+    @Query("select b from Booking b where b.id in :ids")
+    List<Booking> findForMineByIdIn(@Param("ids") Collection<Long> ids);
+
     @Query("select b.status, count(b) from Booking b where b.customerUserId = :userId group by b.status")
     List<Object[]> countGroupByStatus(@Param("userId") Long userId);
 

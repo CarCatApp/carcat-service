@@ -19,7 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). Flag: booking.
+ * Liste, her şubenin son rezervasyonu, en yeni önce.
  * en: Owner booking list + detail + cancel (CRCT-285). Flag: booking.
+ * The list is the latest booking per branch, newest first.
  */
 @RestController
 @RequiredArgsConstructor
