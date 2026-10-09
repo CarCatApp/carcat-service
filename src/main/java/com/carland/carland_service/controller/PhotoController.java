@@ -294,16 +294,17 @@ public class PhotoController {
     }
 
     /**
-     * tr: Şube fotoğrafını döner. Staff token gerekir.
-     * en: Returns the branch photo. A staff token is required.
+     * tr: Şube fotoğrafını döner. Müşteri (role USER) veya staff okuyabilir. Yükleme staff'ta kalır.
+     * en: Returns the branch photo. A customer (role USER) or staff may read it. Upload stays staff-only.
      */
     @GetMapping(value = "/for/branch/get/{branchId}", produces = MediaType.ALL_VALUE)
     public ResponseEntity<byte[]> getBranchPhoto(HttpServletRequest request,
                                                  @PathVariable("branchId") Long branchId,
+                                                 @RequestHeader(value = "role", required = false) String role,
                                                  @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return staffMediaService.getBranchPhoto(
                 bookingStaffRequestAuth.userId(request),
-                bookingStaffRequestAuth.mustChangePassword(request),
+                role,
                 branchId,
                 acceptLanguage);
     }

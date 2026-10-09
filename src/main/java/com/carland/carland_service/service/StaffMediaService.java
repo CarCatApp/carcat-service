@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.BranchPhoto;
 import com.carland.carland_service.entity.StaffPhoto;
 import com.carland.carland_service.entity.UserPhoto;
 import com.carland.carland_service.enums.BookingStaffRole;
+import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.FileStorageException;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -83,10 +84,11 @@ public class StaffMediaService {
     }
 
     @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> getBranchPhoto(Long userId, boolean mustChangePassword, Long branchId,
-                                                  String acceptLanguage) {
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
+    public ResponseEntity<byte[]> getBranchPhoto(Long userId, String role, Long branchId, String acceptLanguage) {
+        if (!bookingStaffAccess.isActiveStaff(userId)
+                && (userId == null || role == null || !UserRoles.USER.name().equalsIgnoreCase(role.trim()))) {
+            throw new InvalidStatusException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        }
         ResponseEntity<byte[]> cached = redisCacheService.getBranchPhoto(branchId);
         if (cached != null) {
             return cached;
