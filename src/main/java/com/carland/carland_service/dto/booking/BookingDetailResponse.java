@@ -44,9 +44,4 @@ public class BookingDetailResponse {
     Integer unreadCount;
     String canceledBy;
     BookingCanceledReasonView canceledReason;
-
-    @JsonProperty("cancelledReason")
-    public BookingCanceledReasonView getCancelledReason() {
-        return canceledReason;
-    }
 }

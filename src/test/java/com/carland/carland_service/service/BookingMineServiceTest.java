@@ -160,6 +160,8 @@ class BookingMineServiceTest {
 
         BookingMineResponse english = service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "en");
         assertEquals("I cancelled", english.getItems().get(0).getCanceledReason().getCode());
+        assertEquals("I cancelled", english.getItems().get(0).getCanceledReason().getTitle().get("en"));
+        assertEquals(1, english.getItems().get(0).getCanceledReason().getTitle().size());
         assertEquals("The auto service cancelled", english.getItems().get(1).getCanceledReason().getCode());
 
         BookingMineResponse russian = service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "ru");
@@ -372,7 +374,8 @@ class BookingMineServiceTest {
         assertEquals("cancelled", booking.getStatus());
         assertEquals("change_of_plans", booking.getCancelReasonCode());
         assertEquals("Mən ləğv etdim", out.getCanceledReason().getCode());
-        assertEquals("Mən ləğv etdim", out.getCanceledReason().getTitle());
+        assertEquals("Mən ləğv etdim", out.getCanceledReason().getTitle().get("az"));
+        assertEquals(1, out.getCanceledReason().getTitle().size());
         assertNull(out.getCanceledReason().getNote());
     }
 

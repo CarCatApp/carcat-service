@@ -622,10 +622,14 @@ public class BookingMineService {
         if (note != null && note.isBlank()) {
             note = null;
         }
-        String sentence = catalogText(label, langOf(acceptLanguage));
+        String lang = langOf(acceptLanguage);
+        if (label.get(lang) == null || label.get(lang).isBlank()) {
+            lang = "az";
+        }
+        String sentence = label.get(lang);
         return BookingCanceledReasonView.builder()
                 .code(sentence)
-                .title(sentence)
+                .title(Map.of(lang, sentence))
                 .note(note)
                 .build();
     }

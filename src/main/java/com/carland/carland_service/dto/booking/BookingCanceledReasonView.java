@@ -5,9 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 /**
- * tr: code Accept-Language cümləsidir. note yazılan mətndir.
- * en: code is the Accept-Language sentence. note is the written text.
+ * tr: code Accept-Language cümləsidir. title eyni cümləni tək dildə saxlayan xəritədir. note yazılan mətndir.
+ * en: code is the Accept-Language sentence. title is that same sentence under one language key. note is the written text.
  */
 @Data
 @Builder
@@ -15,6 +17,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BookingCanceledReasonView {
     String code;
-    String title;
+    Map<String, String> title;
     String note;
 }
