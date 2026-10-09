@@ -92,13 +92,12 @@ public class BookingOrgService {
 
     @Transactional
     public Branch addBranch(Long partnerId, String name, String address, Double lat, Double lng, boolean active,
-                            String contactPhone, String workingHoursWeekday, String workingHoursWeekend,
+                            String contactPhone, String weekday, String saturday, String sunday,
                             boolean verified, String photo) {
         Partner partner = getPartner(partnerId);
         if (name == null || name.isBlank()) {
             throw new MissingFieldException("Branch adı boş ola bilməz");
         }
-        String weekday = blankToNull(workingHoursWeekday);
         Branch branch = Branch.builder()
                 .partner(partner)
                 .name(name.trim())
@@ -107,32 +106,27 @@ public class BookingOrgService {
                 .lng(lng)
                 .active(active)
                 .contactPhone(blankToNull(contactPhone))
-                .workingHours(weekday)
-                .workingHoursWeekday(weekday)
-                .workingHoursWeekend(blankToNull(workingHoursWeekend))
                 .verified(verified)
                 .photo(blankToNull(photo))
                 .build();
+        BranchWorkingHours.apply(branch, blankToNull(weekday), blankToNull(saturday), blankToNull(sunday));
         return branchRepository.save(branch);
     }
 
     /**
-     * tr: Mövcud şöbənin verified və həftə içi / həftə sonu saatını yazır.
-     * en: Updates verified and weekday / weekend hours on an existing branch.
+     * tr: Mövcud şöbənin verified və həftə içi / şənbə / bazar saatını yazır.
+     * en: Updates verified and weekday / Saturday / Sunday hours on an existing branch.
      */
     @Transactional
     public Branch updateBranchHours(Long partnerId, Long branchId, boolean verified,
-                                    String workingHoursWeekday, String workingHoursWeekend) {
+                                    String weekday, String saturday, String sunday) {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("branch not found"));
         if (branch.getPartner() == null || !partnerId.equals(branch.getPartner().getId())) {
             throw new ResourceNotFoundException("branch not found");
         }
-        String weekday = blankToNull(workingHoursWeekday);
         branch.setVerified(verified);
-        branch.setWorkingHours(weekday);
-        branch.setWorkingHoursWeekday(weekday);
-        branch.setWorkingHoursWeekend(blankToNull(workingHoursWeekend));
+        BranchWorkingHours.apply(branch, blankToNull(weekday), blankToNull(saturday), blankToNull(sunday));
         return branchRepository.save(branch);
     }
 
@@ -343,7 +337,9 @@ public class BookingOrgService {
                 .contactEmail(branch.getContactEmail())
                 .instagram(branch.getInstagram())
                 .workingHours(branch.getWorkingHours())
-                .workingHoursWeekday(branch.getWorkingHoursWeekday())
+                .workingHoursWeekday(BranchWorkingHours.weekdayOf(branch))
+                .workingHoursSaturday(BranchWorkingHours.saturdayOf(branch))
+                .workingHoursSunday(BranchWorkingHours.sundayOf(branch))
                 .workingHoursWeekend(branch.getWorkingHoursWeekend())
                 .verified(Boolean.TRUE.equals(branch.getVerified()))
                 .photo(branch.getPhoto())

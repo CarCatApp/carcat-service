@@ -51,8 +51,15 @@ public class Branch {
     @Column(name = "working_hours_weekday", length = 32)
     String workingHoursWeekday;
 
+    /** Köhnə birləşmiş həftə sonu. Şənbə və bazar eyni olanda yenidən yazılır. */
     @Column(name = "working_hours_weekend", length = 32)
     String workingHoursWeekend;
+
+    @Column(name = "working_hours_saturday", length = 32)
+    String workingHoursSaturday;
+
+    @Column(name = "working_hours_sunday", length = 32)
+    String workingHoursSunday;
 
     @Builder.Default
     Boolean verified = false;

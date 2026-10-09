@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.request.StaffBranchGoodSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchProfileSaveRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelServiceSaveRequest;
+import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffNameSaveRequest;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.service.BranchProfileService;
@@ -46,6 +47,18 @@ public class BookingStaffBranchProfileController {
             @RequestBody StaffBranchProfileSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateProfile(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                body,
+                acceptLanguage);
+    }
+
+    @PatchMapping("/api/v1/booking/staff/branch/working-hours")
+    public StaffBranchProfileView updateWorkingHours(
+            HttpServletRequest request,
+            @RequestBody StaffBranchWorkingHoursRequest body,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return branchProfileService.updateWorkingHours(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,

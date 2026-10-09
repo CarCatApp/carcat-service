@@ -20,6 +20,9 @@ public class StaffBranchProfileView {
     String name;
     String instagram;
     String contactEmail;
+    String workingHoursWeekday;
+    String workingHoursSaturday;
+    String workingHoursSunday;
     Boolean hasPhoto;
     Boolean canUploadBranchPhoto;
     String staffName;

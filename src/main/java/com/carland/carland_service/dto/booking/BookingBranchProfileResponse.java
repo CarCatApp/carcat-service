@@ -23,6 +23,8 @@ public class BookingBranchProfileResponse {
     Double lng;
     Double distanceKm;
     String workingHoursWeekday;
+    String workingHoursSaturday;
+    String workingHoursSunday;
     String workingHoursWeekend;
     Boolean open;
     List<BookingBranchProfileServiceView> services;

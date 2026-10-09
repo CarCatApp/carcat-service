@@ -1387,7 +1387,7 @@ body.booking-page .card { margin-bottom: 4px; }
   grid-template-columns: minmax(160px, 1.2fr) minmax(140px, 1fr) minmax(170px, 1.2fr) minmax(180px, 1.4fr) auto;
 }
 .booking-form-grid-branch {
-  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1.4fr) 88px 88px minmax(130px, 1fr) 108px 108px minmax(150px, 1.2fr) auto;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
 }
 .booking-form-grid-staff {
   grid-template-columns: minmax(160px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) auto;

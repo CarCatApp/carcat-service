@@ -24,6 +24,8 @@ public class BookingBranchView {
     String instagram;
     String workingHours;
     String workingHoursWeekday;
+    String workingHoursSaturday;
+    String workingHoursSunday;
     String workingHoursWeekend;
     Boolean verified;
     String photo;

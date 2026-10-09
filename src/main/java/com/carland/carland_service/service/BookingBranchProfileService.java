@@ -67,9 +67,15 @@ public class BookingBranchProfileService {
                 .lat(branch.getLat())
                 .lng(branch.getLng())
                 .distanceKm(distanceKm(lat, lng, branch.getLat(), branch.getLng()))
-                .workingHoursWeekday(branch.getWorkingHoursWeekday())
+                .workingHoursWeekday(BranchWorkingHours.weekdayOf(branch))
+                .workingHoursSaturday(BranchWorkingHours.saturdayOf(branch))
+                .workingHoursSunday(BranchWorkingHours.sundayOf(branch))
                 .workingHoursWeekend(branch.getWorkingHoursWeekend())
-                .open(openNow(branch.getWorkingHoursWeekday(), branch.getWorkingHoursWeekend(), OffsetDateTime.now()))
+                .open(openNow(
+                        BranchWorkingHours.weekdayOf(branch),
+                        BranchWorkingHours.saturdayOf(branch),
+                        BranchWorkingHours.sundayOf(branch),
+                        OffsetDateTime.now()))
                 .services(servicesOf(branch.getId(), packages, lang))
                 .products(List.of())
                 .build();
@@ -121,14 +127,21 @@ public class BookingBranchProfileService {
         return Math.round(meters / 100d) / 10d;
     }
 
-    static Boolean openNow(String weekday, String weekend, OffsetDateTime now) {
+    static Boolean openNow(String weekday, String saturday, String sunday, OffsetDateTime now) {
         if (now == null) {
             return null;
         }
         ZonedDateTime zoned = now.atZoneSameInstant(BAKU);
         DayOfWeek day = zoned.getDayOfWeek();
-        boolean weekendDay = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
-        int[] range = parseRange(weekendDay ? weekend : weekday);
+        String raw = switch (day) {
+            case SATURDAY -> saturday;
+            case SUNDAY -> sunday;
+            default -> weekday;
+        };
+        if (raw == null || raw.isBlank()) {
+            return Boolean.FALSE;
+        }
+        int[] range = parseRange(raw);
         if (range == null) {
             return null;
         }

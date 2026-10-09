@@ -204,11 +204,13 @@ public class BookingIndividualCatalogService {
     private BookingIndividualServiceView toView(IndividualService catalog, BranchIndividualService row, String lang,
                                                 Integer percentage) {
         int[] qepik = BookingSelectionViews.qepik(row.getPriceSimple(), row.getPriceMedium(), row.getPriceComplex());
+        Integer medium = row.getPriceMedium();
         return BookingIndividualServiceView.builder()
                 .id(catalog.getId())
                 .code(catalog.getCode())
                 .name(BookingMineService.catalogText(titles(catalog.getTitleJson()), lang))
                 .priceMin(qepik == null ? null : qepik[0])
+                .priceMid(medium == null ? null : Math.multiplyExact(medium, 100))
                 .priceMax(qepik == null ? null : qepik[1])
                 .currency("AZN")
                 .unit(BookingCreateService.UNIT)

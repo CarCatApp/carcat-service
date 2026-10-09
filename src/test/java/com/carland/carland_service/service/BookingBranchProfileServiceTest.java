@@ -83,6 +83,17 @@ class BookingBranchProfileServiceTest {
         assertTrue(out.getVerified());
         assertEquals("/api/v1/photo/for/partner/get/1", out.getLogoUrl());
         assertEquals("09:00-18:00", out.getWorkingHoursWeekday());
+        assertEquals("10:00-16:00", out.getWorkingHoursSaturday());
+        assertEquals("10:00-16:00", out.getWorkingHoursSunday());
+        assertEquals("10:00-16:00", out.getWorkingHoursWeekend());
+
+        branch.setWorkingHoursSaturday("10:00-14:00");
+        branch.setWorkingHoursSunday("12:00-15:00");
+        branch.setWorkingHoursWeekend(null);
+        BookingBranchProfileResponse split = service.profile(7L, null, null, "en");
+        assertEquals("10:00-14:00", split.getWorkingHoursSaturday());
+        assertEquals("12:00-15:00", split.getWorkingHoursSunday());
+        assertNull(split.getWorkingHoursWeekend());
         assertEquals(2, out.getServices().size());
         BookingBranchProfileServiceView routineView = out.getServices().get(0);
         assertEquals("Routine care", routineView.getName());
@@ -121,11 +132,19 @@ class BookingBranchProfileServiceTest {
     }
 
     @Test
-    void openUsesWeekdayHoursInBaku() {
+    void openUsesTheHoursOfThatDayInBaku() {
         OffsetDateTime morning = OffsetDateTime.parse("2026-09-30T05:30:00Z");
         OffsetDateTime night = OffsetDateTime.parse("2026-09-30T16:30:00Z");
-        assertEquals(Boolean.TRUE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", morning));
-        assertEquals(Boolean.FALSE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", night));
-        assertNull(BookingBranchProfileService.openNow(null, null, morning));
+        OffsetDateTime saturdayEarly = OffsetDateTime.parse("2026-10-03T05:00:00Z");
+        OffsetDateTime saturdayOpen = OffsetDateTime.parse("2026-10-03T06:30:00Z");
+        OffsetDateTime sundayNoon = OffsetDateTime.parse("2026-10-04T08:00:00Z");
+        assertEquals(Boolean.TRUE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", "11:00-15:00", morning));
+        assertEquals(Boolean.FALSE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", "11:00-15:00", night));
+        assertEquals(Boolean.FALSE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", "11:00-15:00", saturdayEarly));
+        assertEquals(Boolean.TRUE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", "11:00-15:00", saturdayOpen));
+        assertEquals(Boolean.TRUE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", "11:00-15:00", sundayNoon));
+        assertEquals(Boolean.FALSE, BookingBranchProfileService.openNow("09:00-18:00", "10:00-16:00", null, sundayNoon));
+        assertEquals(Boolean.FALSE, BookingBranchProfileService.openNow(null, null, null, morning));
+        assertNull(BookingBranchProfileService.openNow("bad", "10:00-16:00", "11:00-15:00", morning));
     }
 }

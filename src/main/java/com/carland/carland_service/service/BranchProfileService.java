@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.booking.StaffBrandModelServiceView;
 import com.carland.carland_service.dto.booking.StaffBrandModelView;
 import com.carland.carland_service.dto.request.StaffBranchGoodSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchProfileSaveRequest;
+import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelServiceSaveRequest;
 import com.carland.carland_service.dto.request.StaffNameSaveRequest;
@@ -69,6 +70,24 @@ public class BranchProfileService {
         branch.setName(required(body.getName(), "name", 120));
         branch.setInstagram(optional(body.getInstagram(), 64));
         branch.setContactEmail(email(body.getContactEmail()));
+        branchRepository.save(branch);
+        return view(staff, branch);
+    }
+
+    /**
+     * tr: Həftə içi, şənbə və bazar saatını yazır. Boş cüt həmin günü bağlayır.
+     * en: Writes weekday, Saturday and Sunday hours. An empty pair closes that day.
+     */
+    @Transactional
+    public StaffBranchProfileView updateWorkingHours(Long userId, boolean mustChangePassword,
+                                                      StaffBranchWorkingHoursRequest body, String acceptLanguage) {
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
+        Branch branch = resolveBranch(staff, acceptLanguage);
+        StaffBranchWorkingHoursRequest hours = body == null ? new StaffBranchWorkingHoursRequest() : body;
+        BranchWorkingHours.write(branch,
+                hours.getWeekdayStart(), hours.getWeekdayEnd(),
+                hours.getSaturdayStart(), hours.getSaturdayEnd(),
+                hours.getSundayStart(), hours.getSundayEnd());
         branchRepository.save(branch);
         return view(staff, branch);
     }
@@ -261,6 +280,9 @@ public class BranchProfileService {
                 .name(branch.getName())
                 .instagram(branch.getInstagram())
                 .contactEmail(branch.getContactEmail())
+                .workingHoursWeekday(BranchWorkingHours.weekdayOf(branch))
+                .workingHoursSaturday(BranchWorkingHours.saturdayOf(branch))
+                .workingHoursSunday(BranchWorkingHours.sundayOf(branch))
                 .hasPhoto(branchPhotoRepository.existsByBranchId(branch.getId()))
                 .canUploadBranchPhoto(!partnerAdmin)
                 .staffName(named.getName())

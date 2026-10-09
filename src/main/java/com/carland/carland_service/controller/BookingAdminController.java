@@ -5,6 +5,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.BookingOrgService;
 import com.carland.carland_service.service.BookingStaffAuditService;
+import com.carland.carland_service.service.BranchWorkingHours;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -84,8 +85,10 @@ public class BookingAdminController {
             @RequestParam(required = false) String contactPhone,
             @RequestParam(required = false) String weekdayStart,
             @RequestParam(required = false) String weekdayEnd,
-            @RequestParam(required = false) String weekendStart,
-            @RequestParam(required = false) String weekendEnd,
+            @RequestParam(required = false) String saturdayStart,
+            @RequestParam(required = false) String saturdayEnd,
+            @RequestParam(required = false) String sundayStart,
+            @RequestParam(required = false) String sundayEnd,
             @RequestParam(required = false) String verified,
             @RequestParam(required = false) String photo,
             HttpServletRequest request,
@@ -96,8 +99,11 @@ public class BookingAdminController {
         }
         try {
             bookingOrgService.addBranch(id, name, address, parseDouble(lat), parseDouble(lng), true,
-                    contactPhone, joinWorkingHours(weekdayStart, weekdayEnd),
-                    joinWorkingHours(weekendStart, weekendEnd), "true".equals(verified), photo);
+                    contactPhone,
+                    BranchWorkingHours.range(weekdayStart, weekdayEnd, "weekday"),
+                    BranchWorkingHours.range(saturdayStart, saturdayEnd, "saturday"),
+                    BranchWorkingHours.range(sundayStart, sundayEnd, "sunday"),
+                    "true".equals(verified), photo);
             redirect.addFlashAttribute("detailMessage", "Branch əlavə olundu");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
@@ -111,8 +117,10 @@ public class BookingAdminController {
             @PathVariable Long branchId,
             @RequestParam(required = false) String weekdayStart,
             @RequestParam(required = false) String weekdayEnd,
-            @RequestParam(required = false) String weekendStart,
-            @RequestParam(required = false) String weekendEnd,
+            @RequestParam(required = false) String saturdayStart,
+            @RequestParam(required = false) String saturdayEnd,
+            @RequestParam(required = false) String sundayStart,
+            @RequestParam(required = false) String sundayEnd,
             @RequestParam(required = false) String verified,
             HttpServletRequest request,
             RedirectAttributes redirect
@@ -122,7 +130,9 @@ public class BookingAdminController {
         }
         try {
             bookingOrgService.updateBranchHours(id, branchId, "true".equals(verified),
-                    joinWorkingHours(weekdayStart, weekdayEnd), joinWorkingHours(weekendStart, weekendEnd));
+                    BranchWorkingHours.range(weekdayStart, weekdayEnd, "weekday"),
+                    BranchWorkingHours.range(saturdayStart, saturdayEnd, "saturday"),
+                    BranchWorkingHours.range(sundayStart, sundayEnd, "sunday"));
             redirect.addFlashAttribute("detailMessage", "Şöbə yeniləndi");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
@@ -159,31 +169,6 @@ public class BookingAdminController {
             redirect.addFlashAttribute("detailError", ex.getMessage());
         }
         return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
-    }
-
-    private static String joinWorkingHours(String start, String end) {
-        boolean hasStart = start != null && !start.isBlank();
-        boolean hasEnd = end != null && !end.isBlank();
-        if (!hasStart && !hasEnd) {
-            return null;
-        }
-        if (!hasStart || !hasEnd) {
-            return null;
-        }
-        String from = normalizeClock(start);
-        String to = normalizeClock(end);
-        if (from == null || to == null) {
-            return null;
-        }
-        return from + "-" + to;
-    }
-
-    private static String normalizeClock(String raw) {
-        String value = raw.trim();
-        if (value.length() >= 5) {
-            return value.substring(0, 5);
-        }
-        return null;
     }
 
     private static Double parseDouble(String raw) {

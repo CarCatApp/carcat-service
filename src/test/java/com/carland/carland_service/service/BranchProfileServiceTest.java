@@ -1,6 +1,7 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.StaffBranchProfileView;
+import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
@@ -9,6 +10,7 @@ import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ForbiddenException;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
 import com.carland.carland_service.repository.BranchGoodRepository;
@@ -156,5 +158,61 @@ class BranchProfileServiceTest {
         assertEquals("Top Tec", captor.getValue().getSeries());
         assertEquals("5W-30", captor.getValue().getViscosity());
         assertEquals(Boolean.TRUE, view.getCanUploadBranchPhoto());
+    }
+
+    @Test
+    void workingHoursWritesThreeRangesAndClearsWeekendWhenTheyDiffer() {
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
+        stubProfileReads();
+
+        StaffBranchProfileView view = profile.updateWorkingHours(8L, false, StaffBranchWorkingHoursRequest.builder()
+                .weekdayStart("09:00")
+                .weekdayEnd("19:00")
+                .saturdayStart("10:00")
+                .saturdayEnd("16:00")
+                .sundayStart("11:00")
+                .sundayEnd("15:00")
+                .build(), "az");
+
+        assertEquals("09:00-19:00", branch.getWorkingHours());
+        assertEquals("09:00-19:00", branch.getWorkingHoursWeekday());
+        assertEquals("10:00-16:00", branch.getWorkingHoursSaturday());
+        assertEquals("11:00-15:00", branch.getWorkingHoursSunday());
+        assertNull(branch.getWorkingHoursWeekend());
+        assertEquals("11:00-15:00", view.getWorkingHoursSunday());
+        verify(branchRepository).save(branch);
+    }
+
+    @Test
+    void matchingSaturdayAndSundayKeepTheLegacyWeekendString() {
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
+        stubProfileReads();
+
+        profile.updateWorkingHours(8L, false, StaffBranchWorkingHoursRequest.builder()
+                .weekdayStart("09:00")
+                .weekdayEnd("18:00")
+                .saturdayStart("10:00")
+                .saturdayEnd("16:00")
+                .sundayStart("10:00")
+                .sundayEnd("16:00")
+                .build(), "az");
+
+        assertEquals("10:00-16:00", branch.getWorkingHoursWeekend());
+    }
+
+    @Test
+    void partialDayRangeIsRejected() {
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
+
+        assertThrows(MissingFieldException.class, () -> profile.updateWorkingHours(8L, false,
+                StaffBranchWorkingHoursRequest.builder().saturdayStart("10:00").build(), "az"));
+        verify(branchRepository, never()).save(any());
+    }
+
+    private void stubProfileReads() {
+        when(branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
+        when(brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
+        when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
+        when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
     }
 }

@@ -89,7 +89,8 @@ class BookingIndividualCatalogServiceTest {
         when(branchIndividualServiceRepository.findByBranch_Id(12L)).thenReturn(List.of(
                 BranchIndividualService.builder().branch(branch).individualService(hidden).active(false).build(),
                 BranchIndividualService.builder()
-                        .branch(branch).individualService(oil).active(true).priceSimple(35).priceComplex(75).build()
+                        .branch(branch).individualService(oil).active(true)
+                        .priceSimple(35).priceMedium(45).priceComplex(75).build()
         ));
 
         BookingIndividualServicesResponse out = service.list(12L, "az", "all", null, null);
@@ -97,6 +98,7 @@ class BookingIndividualCatalogServiceTest {
         assertEquals(1, out.getServices().size());
         assertEquals("Yağ dəyişimi", out.getServices().get(0).getName());
         assertEquals(3500, out.getServices().get(0).getPriceMin());
+        assertEquals(4500, out.getServices().get(0).getPriceMid());
         assertEquals(7500, out.getServices().get(0).getPriceMax());
         assertNull(out.getServices().get(0).getIndividualServiceMappedPercentage());
     }
@@ -123,6 +125,7 @@ class BookingIndividualCatalogServiceTest {
         BookingIndividualServicesResponse one = service.list(12L, "az", "1", null, null);
         assertEquals(1, one.getServices().size());
         assertEquals("YNF", one.getServices().get(0).getCode());
+        assertNull(one.getServices().get(0).getPriceMid());
     }
 
     @Test

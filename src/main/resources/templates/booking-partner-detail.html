@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="'Partner ' + ${partner.name}">Partner</title>
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
-  <link rel="stylesheet" href="/admin/admin.css?v=booking2">
+  <link rel="stylesheet" href="/admin/admin.css?v=booking3">
   <style>
     .verified-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
     .verified-switch {
@@ -135,9 +135,9 @@
         </div>
       </div>
       <div class="filter-field">
-        <label>Həftə sonu açılış</label>
+        <label>Şənbə açılış</label>
         <div class="time-wheel" data-time data-default="10:00">
-          <input type="hidden" name="weekendStart" value="10:00">
+          <input type="hidden" name="saturdayStart" value="10:00">
           <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
             <span class="time-wheel-face">10:00</span>
             <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -152,9 +152,43 @@
         </div>
       </div>
       <div class="filter-field">
-        <label>Həftə sonu bağlanış</label>
+        <label>Şənbə bağlanış</label>
         <div class="time-wheel" data-time data-default="16:00">
-          <input type="hidden" name="weekendEnd" value="16:00">
+          <input type="hidden" name="saturdayEnd" value="16:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">16:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Bazar açılış</label>
+        <div class="time-wheel" data-time data-default="10:00">
+          <input type="hidden" name="sundayStart" value="10:00">
+          <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
+            <span class="time-wheel-face">10:00</span>
+            <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <div class="time-wheel-pop" hidden>
+            <div class="time-wheel-head"><span>Saat</span><span>Dəq</span></div>
+            <div class="time-wheel-body">
+              <div class="time-col" data-part="h" role="listbox" aria-label="Saat"></div>
+              <div class="time-col" data-part="m" role="listbox" aria-label="Dəqiqə"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Bazar bağlanış</label>
+        <div class="time-wheel" data-time data-default="16:00">
+          <input type="hidden" name="sundayEnd" value="16:00">
           <button type="button" class="time-wheel-toggle" aria-haspopup="listbox" aria-expanded="false">
             <span class="time-wheel-face">16:00</span>
             <svg class="time-wheel-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -189,12 +223,14 @@
         <thead>
         <tr>
           <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th>
-          <th>Həftə içi</th><th>Həftə sonu</th><th>Verified</th><th>Məkan</th><th></th>
+          <th>Həftə içi</th><th>Şənbə</th><th>Bazar</th><th>Verified</th><th>Məkan</th><th></th>
         </tr>
         </thead>
         <tbody>
         <tr th:each="b : ${branches}"
-            th:with="day=${b.workingHoursWeekday != null ? b.workingHoursWeekday : b.workingHours}">
+            th:with="day=${b.workingHoursWeekday != null ? b.workingHoursWeekday : b.workingHours},
+                     sat=${b.workingHoursSaturday != null ? b.workingHoursSaturday : b.workingHoursWeekend},
+                     sun=${b.workingHoursSunday != null ? b.workingHoursSunday : b.workingHoursWeekend}">
           <td th:text="${b.id}">1</td>
           <td th:text="${b.name}">Ad</td>
           <td th:text="${b.address}">—</td>
@@ -209,10 +245,16 @@
             </form>
           </td>
           <td>
-            <input type="time" name="weekendStart" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(b.workingHoursWeekend) ? '' : #strings.substring(b.workingHoursWeekend, 0, 5)}">
-            <input type="time" name="weekendEnd" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(b.workingHoursWeekend) or #strings.length(b.workingHoursWeekend) < 11 ? '' : #strings.substring(b.workingHoursWeekend, 6, 11)}">
+            <input type="time" name="saturdayStart" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(sat) ? '' : #strings.substring(sat, 0, 5)}">
+            <input type="time" name="saturdayEnd" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(sat) or #strings.length(sat) < 11 ? '' : #strings.substring(sat, 6, 11)}">
+          </td>
+          <td>
+            <input type="time" name="sundayStart" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(sun) ? '' : #strings.substring(sun, 0, 5)}">
+            <input type="time" name="sundayEnd" th:form="'branch-edit-' + ${b.id}"
+                   th:value="${#strings.isEmpty(sun) or #strings.length(sun) < 11 ? '' : #strings.substring(sun, 6, 11)}">
           </td>
           <td>
             <label class="verified-label">
@@ -223,7 +265,7 @@
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
           <td><button class="btn btn-filter" type="submit" th:form="'branch-edit-' + ${b.id}">Saxla</button></td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="9">Şöbə yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="10">Şöbə yoxdur</td></tr>
         </tbody>
       </table>
     </div>

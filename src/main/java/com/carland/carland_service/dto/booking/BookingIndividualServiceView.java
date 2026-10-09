@@ -14,6 +14,8 @@ public class BookingIndividualServiceView {
     String code;
     String name;
     Integer priceMin;
+    /** Nisbətən mürəkkəb (price_medium), qəpik. Səviyyə boşdursa null. */
+    Integer priceMid;
     Integer priceMax;
     String currency;
     String unit;

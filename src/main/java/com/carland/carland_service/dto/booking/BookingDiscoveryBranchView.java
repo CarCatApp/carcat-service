@@ -21,6 +21,8 @@ public class BookingDiscoveryBranchView {
     String contactPhone;
     String workingHours;
     String workingHoursWeekday;
+    String workingHoursSaturday;
+    String workingHoursSunday;
     String workingHoursWeekend;
     Boolean verified;
     String photo;
