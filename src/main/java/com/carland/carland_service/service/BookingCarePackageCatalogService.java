@@ -8,7 +8,7 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchCarePackageItem;
 import com.carland.carland_service.entity.OfferedService;
-import com.carland.carland_service.entity.OfferedServiceFilter;
+import com.carland.carland_service.entity.ServiceBehavior;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BranchCarePackageItemRepository;
 import com.carland.carland_service.repository.BranchCarePackageRepository;
@@ -91,25 +91,29 @@ public class BookingCarePackageCatalogService {
             if (!Boolean.TRUE.equals(item.getEnabled()) || service == null || service.getId() == null) {
                 continue;
             }
-            OfferedServiceFilter filter = service.getFilter();
-            if (filter == null || filter.getId() == null) {
+            ServiceBehavior behavior = service.getBehavior();
+            if (behavior == null || behavior.getId() == null) {
                 continue;
             }
-            lines.add(new Line(service, filter));
+            lines.add(new Line(service, behavior));
             ids.add(service.getId());
         }
         if (lines.isEmpty()) {
             return List.of();
         }
-        lines.sort(Comparator.comparing(line -> line.filter().getId()));
+        lines.sort(Comparator
+                .comparingInt((Line line) -> sortOf(line.behavior().getSortOrder()))
+                .thenComparing(line -> line.behavior().getId())
+                .thenComparingInt(line -> sortOf(line.service().getSortOrder()))
+                .thenComparing(line -> line.service().getId()));
         Set<Long> withIcon = new HashSet<>(idsWithImage(ids));
         Map<Long, BookingCarePackageGroupView> groups = new LinkedHashMap<>();
         for (Line line : lines) {
-            OfferedServiceFilter filter = line.filter();
-            BookingCarePackageGroupView group = groups.computeIfAbsent(filter.getId(), id ->
+            ServiceBehavior behavior = line.behavior();
+            BookingCarePackageGroupView group = groups.computeIfAbsent(behavior.getId(), id ->
                     BookingCarePackageGroupView.builder()
                             .id(id)
-                            .name(filterName(filter, lang))
+                            .name(BookingMineService.catalogText(titles(behavior.getTitleJson()), lang))
                             .services(new ArrayList<>())
                             .build());
             Long serviceId = line.service().getId();
@@ -130,21 +134,11 @@ public class BookingCarePackageCatalogService {
         return found == null ? List.of() : found;
     }
 
-    private static String filterName(OfferedServiceFilter filter, String lang) {
-        Map<String, String> names = new LinkedHashMap<>();
-        if (filter.getNameAz() != null) {
-            names.put("az", filter.getNameAz());
-        }
-        if (filter.getNameEn() != null) {
-            names.put("en", filter.getNameEn());
-        }
-        if (filter.getNameRu() != null) {
-            names.put("ru", filter.getNameRu());
-        }
-        return BookingMineService.catalogText(names, lang);
+    private static int sortOf(Integer sortOrder) {
+        return sortOrder == null ? 0 : sortOrder;
     }
 
-    private record Line(OfferedService service, OfferedServiceFilter filter) {
+    private record Line(OfferedService service, ServiceBehavior behavior) {
     }
 
     private Map<String, String> titles(String json) {

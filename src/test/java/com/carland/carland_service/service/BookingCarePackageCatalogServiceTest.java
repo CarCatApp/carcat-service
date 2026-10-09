@@ -7,8 +7,8 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchCarePackageItem;
 import com.carland.carland_service.entity.OfferedService;
-import com.carland.carland_service.entity.OfferedServiceFilter;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.entity.ServiceBehavior;
 import com.carland.carland_service.repository.BranchCarePackageItemRepository;
 import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.BranchRepository;
@@ -46,32 +46,40 @@ class BookingCarePackageCatalogServiceTest {
     }
 
     @Test
-    void groupsEnabledServicesByFilterAndAttachesIcon() {
+    void groupsEnabledServicesByBehaviorAndAttachesIcon() {
         Partner partner = Partner.builder().id(1L).active(true).build();
         Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
         BranchCarePackage extra = BranchCarePackage.builder()
                 .id(5L).branch(branch).name("Hyper extra").price(129).currency("AZN").active(true).build();
         BranchCarePackage closed = BranchCarePackage.builder()
                 .id(6L).branch(branch).name("Kapalı").price(50).active(false).build();
-        OfferedServiceFilter fluids = OfferedServiceFilter.builder()
-                .id(6L).nameAz("Mayelər").nameEn("Fluids").nameRu("Жидкости").build();
-        OfferedServiceFilter brakes = OfferedServiceFilter.builder()
-                .id(2L).nameAz("Əyləclər").nameEn("Brakes").nameRu("Тормоза").build();
+        ServiceBehavior replace = ServiceBehavior.builder()
+                .id(30L).code("replace").sortOrder(1)
+                .titleJson("{\"az\":\"DƏYİŞDİRMƏ\",\"en\":\"Replace\",\"ru\":\"\"}").build();
+        ServiceBehavior topUp = ServiceBehavior.builder()
+                .id(20L).code("extra").sortOrder(2)
+                .titleJson("{\"az\":\"ƏLAVƏ ETMƏ\",\"en\":\"Top up\",\"ru\":\"\"}").build();
         OfferedService oil = OfferedService.builder()
-                .id(3L).titleJson("{\"az\":\"Yağ dəyişimi\",\"en\":\"Oil change\"}").filter(fluids).build();
+                .id(3L).sortOrder(2).behavior(topUp)
+                .titleJson("{\"az\":\"Yağ dəyişimi\",\"en\":\"Oil change\"}").build();
+        OfferedService washer = OfferedService.builder()
+                .id(6L).sortOrder(1).behavior(topUp)
+                .titleJson("{\"az\":\"Şüşəyuyan mayesi\",\"en\":\"Washer fluid\"}").build();
         OfferedService pads = OfferedService.builder()
-                .id(8L).titleJson("{\"az\":\"Əyləc qəlibi\",\"en\":\"Brake pads\"}").filter(brakes).build();
+                .id(8L).sortOrder(1).behavior(replace)
+                .titleJson("{\"az\":\"Əyləc qəlibi\",\"en\":\"Brake pads\"}").build();
         OfferedService hidden = OfferedService.builder()
-                .id(9L).titleJson("{\"az\":\"Gizli\"}").filter(fluids).build();
+                .id(9L).behavior(topUp).titleJson("{\"az\":\"Gizli\"}").build();
         OfferedService ungrouped = OfferedService.builder()
-                .id(11L).titleJson("{\"az\":\"Filtresiz\"}").build();
+                .id(11L).titleJson("{\"az\":\"Davranışsız\"}").build();
         when(branchRepository.findById(12L)).thenReturn(Optional.of(branch));
         when(packageRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of(extra, closed));
         when(itemRepository.findByCarePackage_IdOrderByIdAsc(5L)).thenReturn(List.of(
                 BranchCarePackageItem.builder().carePackage(extra).offeredService(oil).enabled(true).build(),
                 BranchCarePackageItem.builder().carePackage(extra).offeredService(hidden).enabled(false).build(),
                 BranchCarePackageItem.builder().carePackage(extra).offeredService(ungrouped).enabled(true).build(),
-                BranchCarePackageItem.builder().carePackage(extra).offeredService(pads).enabled(true).build()
+                BranchCarePackageItem.builder().carePackage(extra).offeredService(pads).enabled(true).build(),
+                BranchCarePackageItem.builder().carePackage(extra).offeredService(washer).enabled(true).build()
         ));
         when(photoRepository.findOfferedServiceIdsWithImage(anyCollection())).thenReturn(List.of(8L));
 
@@ -81,16 +89,18 @@ class BookingCarePackageCatalogServiceTest {
         assertEquals(1, az.getPackages().size());
         assertEquals("Hyper extra", az.getPackages().get(0).getName());
         assertEquals(129, az.getPackages().get(0).getPrice());
-        assertEquals(2, az.getPackages().get(0).getCount());
+        assertEquals(3, az.getPackages().get(0).getCount());
         assertTrue(az.getPackages().stream().noneMatch(pkg -> pkg.getId().equals(6L)));
         List<BookingCarePackageGroupView> groups = az.getPackages().get(0).getGroups();
-        assertEquals(List.of(2L, 6L), groups.stream().map(BookingCarePackageGroupView::getId).toList());
-        assertEquals("Əyləclər", groups.get(0).getName());
-        assertEquals("Mayelər", groups.get(1).getName());
+        assertEquals(List.of(30L, 20L), groups.stream().map(BookingCarePackageGroupView::getId).toList());
+        assertEquals("DƏYİŞDİRMƏ", groups.get(0).getName());
+        assertEquals("ƏLAVƏ ETMƏ", groups.get(1).getName());
         BookingCarePackageServiceView padsView = groups.get(0).getServices().get(0);
         assertEquals("Əyləc qəlibi", padsView.getName());
         assertEquals(BookingCarePackageCatalogService.ICON_PATH + "8", padsView.getIconUrl());
-        assertEquals("Yağ dəyişimi", groups.get(1).getServices().get(0).getName());
+        assertEquals(List.of(6L, 3L), groups.get(1).getServices().stream()
+                .map(BookingCarePackageServiceView::getId).toList());
+        assertEquals("Şüşəyuyan mayesi", groups.get(1).getServices().get(0).getName());
         assertNull(groups.get(1).getServices().get(0).getIconUrl());
 
         when(itemRepository.findByCarePackage_IdOrderByIdAsc(5L)).thenReturn(List.of(
@@ -98,7 +108,7 @@ class BookingCarePackageCatalogServiceTest {
         ));
         when(photoRepository.findOfferedServiceIdsWithImage(anyCollection())).thenReturn(List.of());
         BookingCarePackagesResponse en = service.list(12L, "en");
-        assertEquals("Fluids", en.getPackages().get(0).getGroups().get(0).getName());
+        assertEquals("Top up", en.getPackages().get(0).getGroups().get(0).getName());
         assertEquals("Oil change", en.getPackages().get(0).getGroups().get(0).getServices().get(0).getName());
     }
 }
