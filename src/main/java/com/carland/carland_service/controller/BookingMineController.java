@@ -32,13 +32,15 @@ public class BookingMineController {
             @RequestHeader("Authorization") String token,
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long carId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize,
             @RequestParam(required = false) Integer limit
     ) {
-        return bookingMineService.mine(parseUserId(userIdHeader), status, carId, page, pageSize, limit, timezone);
+        return bookingMineService.mine(
+                parseUserId(userIdHeader), status, carId, page, pageSize, limit, timezone, acceptLanguage);
     }
 
     @GetMapping({"/api/v1/booking/cancel-reasons", "/api/v1/booking/bookings/cancel-reasons"})

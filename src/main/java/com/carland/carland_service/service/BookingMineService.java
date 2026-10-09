@@ -89,6 +89,13 @@ public class BookingMineService {
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
                                     Integer page, Integer pageSize, Integer limit, String timezoneHeader) {
+        return mine(customerUserId, statusCsv, carId, page, pageSize, limit, timezoneHeader, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
+                                    Integer page, Integer pageSize, Integer limit, String timezoneHeader,
+                                    String acceptLanguage) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
@@ -108,7 +115,8 @@ public class BookingMineService {
         Set<Long> withPhoto = partnerIdsWithPhoto(result.getContent());
         List<BookingView> items = new ArrayList<>();
         for (Booking booking : result.getContent()) {
-            items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone, withPhoto));
+            items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone, withPhoto,
+                    acceptLanguage));
         }
         return BookingMineResponse.builder()
                 .counts(countsOf(customerUserId, carId))
@@ -189,7 +197,7 @@ public class BookingMineService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .canceledBy(canceledBy(booking.getStatus()))
-                .canceledReason(canceledReasonOf(booking))
+                .canceledReason(canceledReasonOf(booking, acceptLanguage))
                 .build();
     }
 
@@ -405,7 +413,8 @@ public class BookingMineService {
                 ));
     }
 
-    private BookingView toView(Booking booking, List<String> keys, String timezone, Set<Long> withPhoto) {
+    private BookingView toView(Booking booking, List<String> keys, String timezone, Set<Long> withPhoto,
+                               String acceptLanguage) {
         Range range = booking.getRange();
         Calendar calendar = range == null ? null : range.getCalendar();
         Branch branch = booking.getBranch();
@@ -437,7 +446,7 @@ public class BookingMineService {
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
-                .canceledReason(canceledReasonOf(booking))
+                .canceledReason(canceledReasonOf(booking, acceptLanguage))
                 .build();
     }
 
@@ -593,10 +602,10 @@ public class BookingMineService {
     );
 
     /**
-     * tr: Siyahı və detal. note yazılan mətndir. code kimin ləğv etdiyini 3 dildə deyir.
-     * en: List and detail. note is the written text. code says who cancelled, in az/en/ru.
+     * tr: code Accept-Language cümləsidir. Başlıq yoxdursa az.
+     * en: code is the Accept-Language sentence. Missing header falls back to az.
      */
-    static BookingCanceledReasonView canceledReasonOf(Booking booking) {
+    static BookingCanceledReasonView canceledReasonOf(Booking booking, String acceptLanguage) {
         if (booking == null || booking.getStatus() == null) {
             return null;
         }
@@ -613,9 +622,10 @@ public class BookingMineService {
         if (note != null && note.isBlank()) {
             note = null;
         }
+        String sentence = catalogText(label, langOf(acceptLanguage));
         return BookingCanceledReasonView.builder()
-                .code(label)
-                .title(label)
+                .code(sentence)
+                .title(sentence)
                 .note(note)
                 .build();
     }

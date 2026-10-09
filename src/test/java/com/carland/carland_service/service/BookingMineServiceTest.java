@@ -154,13 +154,17 @@ class BookingMineServiceTest {
         BookingMineResponse out = service.mine(54L, null, null, 1, 20, null, "Asia/Baku");
 
         assertEquals("yol bağlı", out.getItems().get(0).getCanceledReason().getNote());
-        assertEquals("Mən ləğv etdim", out.getItems().get(0).getCanceledReason().getCode().get("az"));
-        assertEquals("I cancelled", out.getItems().get(0).getCanceledReason().getCode().get("en"));
-        assertEquals("Я отменил", out.getItems().get(0).getCanceledReason().getCode().get("ru"));
+        assertEquals("Mən ləğv etdim", out.getItems().get(0).getCanceledReason().getCode());
         assertEquals("zamanımız yoxdur", out.getItems().get(1).getCanceledReason().getNote());
-        assertEquals("Avto servis ləğv etdi", out.getItems().get(1).getCanceledReason().getCode().get("az"));
-        assertEquals("The auto service cancelled", out.getItems().get(1).getCanceledReason().getCode().get("en"));
-        assertEquals("Автосервис отменил", out.getItems().get(1).getCanceledReason().getCode().get("ru"));
+        assertEquals("Avto servis ləğv etdi", out.getItems().get(1).getCanceledReason().getCode());
+
+        BookingMineResponse english = service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "en");
+        assertEquals("I cancelled", english.getItems().get(0).getCanceledReason().getCode());
+        assertEquals("The auto service cancelled", english.getItems().get(1).getCanceledReason().getCode());
+
+        BookingMineResponse russian = service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "ru");
+        assertEquals("Я отменил", russian.getItems().get(0).getCanceledReason().getCode());
+        assertEquals("Автосервис отменил", russian.getItems().get(1).getCanceledReason().getCode());
     }
 
     @Test
@@ -367,9 +371,8 @@ class BookingMineServiceTest {
         assertEquals("cancelled", out.getStatus());
         assertEquals("cancelled", booking.getStatus());
         assertEquals("change_of_plans", booking.getCancelReasonCode());
-        assertEquals("Mən ləğv etdim", out.getCanceledReason().getCode().get("az"));
-        assertEquals("I cancelled", out.getCanceledReason().getCode().get("en"));
-        assertEquals("Я отменил", out.getCanceledReason().getCode().get("ru"));
+        assertEquals("Mən ləğv etdim", out.getCanceledReason().getCode());
+        assertEquals("Mən ləğv etdim", out.getCanceledReason().getTitle());
         assertNull(out.getCanceledReason().getNote());
     }
 
