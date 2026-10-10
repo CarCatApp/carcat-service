@@ -5,6 +5,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 /**
  * tr: "notifications" tablosunu modelleyen entity; müşteriye gönderilen bildirimi (tip, metin, okunma durumu) saklar.
@@ -19,14 +21,40 @@ import java.time.LocalDate;
 @Table(name = "notifications")
 public class Notification {
 
+    static final ZoneId BAKU = ZoneId.of("Asia/Baku");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
     LocalDate created;
+    /**
+     * tr: Push'un yazıldığı an, Bakü yerel saati. Liste saati buradan okunur.
+     * en: Instant the push was stored, in Baku local time. The list clock reads this.
+     */
+    @Column(name = "created_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    OffsetDateTime createdAt;
     String type;
     String notificationText;
     String title;
     Long customerId;
     String status;
     boolean isRead;
+
+    /**
+     * tr: Bildirim anı. Sunucu UTC olsa da duvar saati Bakü'dür.
+     * en: Notification instant. The wall clock is Baku even when the server is UTC.
+     */
+    public static OffsetDateTime nowLocal() {
+        return OffsetDateTime.now(BAKU);
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = nowLocal();
+        }
+        if (created == null) {
+            created = createdAt.atZoneSameInstant(BAKU).toLocalDate();
+        }
+    }
 }

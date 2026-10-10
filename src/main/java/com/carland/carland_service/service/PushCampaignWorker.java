@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -88,8 +88,10 @@ public class PushCampaignWorker {
                 boolean ok = i < results.size() && Boolean.TRUE.equals(results.get(i));
                 if (ok) {
                     success++;
+                    OffsetDateTime createdAt = Notification.nowLocal();
                     inbox.add(Notification.builder()
-                            .created(LocalDate.now())
+                            .created(createdAt.toLocalDate())
+                            .createdAt(createdAt)
                             .customerId(slice.get(i).getUserId())
                             .notificationText(body)
                             .title(title)

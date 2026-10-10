@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -117,8 +117,10 @@ public class DeviceTokenServiceImpl implements DeviceTokenService {
 
         for (DeviceToken deviceToken : deviceTokens) {
             try {
+                OffsetDateTime createdAt = Notification.nowLocal();
                 Notification notification = Notification.builder()
-                        .created(LocalDate.now())
+                        .created(createdAt.toLocalDate())
+                        .createdAt(createdAt)
                         .customerId(deviceToken.getUserId())
                         .notificationText(bulkRequest.getBody())
                         .title(bulkRequest.getTitle())

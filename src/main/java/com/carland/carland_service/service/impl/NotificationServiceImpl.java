@@ -53,34 +53,6 @@ private final NotificationRepository notificationRepository;
     @Override
     public List<Notification> getNotificationListByCustomerId(String userIdHeader, String acceptLanguage) {
         List<Notification> notifications= notificationRepository.findAllByCustomerIdAndStatus(Long.valueOf(userIdHeader), "ACTIVE");
-        // #region agent log
-        int bookingCount = 0;
-        StringBuilder ids = new StringBuilder("[");
-        for (Notification row : notifications) {
-            if (row.getType() != null && row.getType().startsWith("BOOKING")) {
-                bookingCount++;
-            }
-            if (ids.length() < 300) {
-                if (ids.length() > 1) {
-                    ids.append(',');
-                }
-                ids.append(row.getId());
-            }
-        }
-        ids.append(']');
-        try {
-            String line = "{\"sessionId\":\"f25d4f\",\"hypothesisId\":\"D\",\"location\":\"NotificationServiceImpl.getNotificationListByCustomerId\",\"message\":\"list\",\"data\":{\"userId\":"
-                    + userIdHeader + ",\"count\":" + notifications.size() + ",\"bookingCount\":" + bookingCount
-                    + ",\"ids\":" + ids + "},\"timestamp\":" + System.currentTimeMillis() + "}\n";
-            java.nio.file.Files.write(
-                    java.nio.file.Path.of("c:/Users/Aziz/IdeaProjects/debug-f25d4f.log"),
-                    line.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                    java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.APPEND);
-        } catch (Exception ignored) {
-            // debug log must not affect the list
-        }
-        // #endregion
         if (notifications.isEmpty()){
             throw new ResourceNotFoundException(MessagesLangValues.NOTIFICATION_NOT_FOUND.getMessageByLang(acceptLanguage));
         }

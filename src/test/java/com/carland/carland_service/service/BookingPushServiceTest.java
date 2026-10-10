@@ -21,13 +21,16 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.LocalDate;
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -219,7 +222,10 @@ class BookingPushServiceTest {
     }
 
     private static void assertInbox(Notification row, String type, String title, String text) {
-        assertEquals(LocalDate.now(), row.getCreated());
+        assertNotNull(row.getCreatedAt());
+        assertEquals(ZoneOffset.ofHours(4), row.getCreatedAt().getOffset());
+        assertEquals(row.getCreatedAt().toLocalDate(), row.getCreated());
+        assertTrue(Math.abs(Duration.between(row.getCreatedAt(), Notification.nowLocal()).toSeconds()) < 10);
         assertEquals(5L, row.getCustomerId());
         assertEquals(text, row.getNotificationText());
         assertEquals(title, row.getTitle());
