@@ -12,8 +12,11 @@ import com.carland.carland_service.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -45,6 +48,7 @@ public class BookingPushService {
     private final CustomerRepository customerRepository;
     private final PushNotificationService pushNotificationService;
     private final NotificationRepository notificationRepository;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * tr: Təsdiqlənmiş rezervasiya üçün push planlayır.
@@ -89,21 +93,102 @@ public class BookingPushService {
     }
 
     private void saveInbox(Notice notice, String heading, String text) {
+        boolean txActive = false;
+        boolean syncActive = false;
         try {
-            notificationRepository.save(Notification.builder()
+            txActive = TransactionSynchronizationManager.isActualTransactionActive();
+            syncActive = TransactionSynchronizationManager.isSynchronizationActive();
+        } catch (Exception ignored) {
+            // transaction flags are diagnostic only
+        }
+        String type = notice.accepted() ? TYPE_ACCEPTED : TYPE_REJECTED;
+        // #region agent log
+        agentLog("A", "BookingPushService.saveInbox", "before save",
+                "{\"customerId\":" + notice.customerUserId()
+                        + ",\"type\":\"" + type + "\""
+                        + ",\"textLen\":" + (text == null ? 0 : text.length())
+                        + ",\"titleLen\":" + (heading == null ? 0 : heading.length())
+                        + ",\"txActive\":" + txActive
+                        + ",\"syncActive\":" + syncActive + "}");
+        // #endregion
+        try {
+            TransactionTemplate write = new TransactionTemplate(transactionManager);
+            write.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            Notification saved = write.execute(status -> notificationRepository.save(Notification.builder()
                     .created(LocalDate.now())
                     .customerId(notice.customerUserId())
                     .notificationText(text)
                     .title(heading)
                     .status("ACTIVE")
                     .isRead(false)
-                    .type(notice.accepted() ? TYPE_ACCEPTED : TYPE_REJECTED)
-                    .build());
+                    .type(type)
+                    .build()));
+            Long id = saved == null ? null : saved.getId();
+            Boolean visible = visibleInNewTransaction(id);
+            // #region agent log
+            agentLog("B", "BookingPushService.saveInbox", "after save",
+                    "{\"id\":" + id + ",\"visibleInNewTx\":" + visible
+                            + ",\"txActive\":" + txActive + ",\"syncActive\":" + syncActive + "}");
+            // #endregion
         } catch (Exception ex) {
+            Throwable root = ex;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            // #region agent log
+            agentLog("A", "BookingPushService.saveInbox", "save failed",
+                    "{\"error\":\"" + ex.getClass().getSimpleName()
+                            + "\",\"root\":\"" + root.getClass().getSimpleName()
+                            + "\",\"rootMessage\":\"" + agentEscape(root.getMessage()) + "\"}");
+            // #endregion
             log.warn("booking inbox save failed userId={} ref={} error={}",
                     notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());
         }
     }
+
+    private Boolean visibleInNewTransaction(Long id) {
+        if (id == null || transactionManager == null) {
+            return null;
+        }
+        try {
+            TransactionTemplate read = new TransactionTemplate(transactionManager);
+            read.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            read.setReadOnly(true);
+            return read.execute(status -> notificationRepository.findById(id).isPresent());
+        } catch (Exception ex) {
+            // #region agent log
+            agentLog("B", "BookingPushService.visibleInNewTransaction", "probe failed",
+                    "{\"id\":" + id + ",\"error\":\"" + ex.getClass().getSimpleName()
+                            + "\",\"rootMessage\":\"" + agentEscape(ex.getMessage()) + "\"}");
+            // #endregion
+            return null;
+        }
+    }
+
+    // #region agent log
+    private static void agentLog(String hypothesisId, String location, String message, String dataJson) {
+        try {
+            String line = "{\"sessionId\":\"f25d4f\",\"hypothesisId\":\"" + hypothesisId
+                    + "\",\"location\":\"" + location + "\",\"message\":\"" + message
+                    + "\",\"data\":" + dataJson + ",\"timestamp\":" + System.currentTimeMillis() + "}\n";
+            java.nio.file.Files.write(
+                    java.nio.file.Path.of("c:/Users/Aziz/IdeaProjects/debug-f25d4f.log"),
+                    line.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
+        } catch (Exception ignored) {
+            // debug log must not affect booking
+        }
+    }
+
+    private static String agentEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        String cleaned = value.replace("\\", "/").replace("\"", "'").replace("\n", " ").replace("\r", " ");
+        return cleaned.length() > 180 ? cleaned.substring(0, 180) : cleaned;
+    }
+    // #endregion
 
     private void sendPush(Notice notice, String heading, String text) {
         try {
