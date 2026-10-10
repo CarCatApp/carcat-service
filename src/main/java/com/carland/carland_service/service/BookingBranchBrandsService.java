@@ -20,8 +20,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * tr: Müşteri şube marka çipleri. Boş başlık dönmez.
- * en: Owner branch brand chips. Empty headings are omitted.
+ * tr: Müşteri şube markaları. Boş başlık dönmez. Başlık adı Accept-Language ilə seçilir.
+ * en: Owner branch brands. Empty headings are omitted. The heading name follows Accept-Language.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,9 +30,10 @@ public class BookingBranchBrandsService {
     private final BranchRepository branchRepository;
     private final BrandModelServiceRepository brandModelServiceRepository;
     private final BrandModelRepository brandModelRepository;
+    private final ServiceCategoryJson serviceCategoryJson;
 
     @Transactional(readOnly = true)
-    public BookingBrandModelsResponse list(Long branchId) {
+    public BookingBrandModelsResponse list(Long branchId, String acceptLanguage) {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
         if (!Boolean.TRUE.equals(branch.getActive())
@@ -41,15 +42,13 @@ public class BookingBranchBrandsService {
             throw new ResourceNotFoundException("Branch not found");
         }
 
-        List<BrandModelService> headings =
-                brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(branchId);
+        List<BrandModelService> headings = brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc();
         if (headings.isEmpty()) {
             return BookingBrandModelsResponse.builder().branchId(branchId).groups(List.of()).build();
         }
 
-        List<Long> headingIds = headings.stream().map(BrandModelService::getId).toList();
         Map<Long, List<BookingBrandChipView>> brandsByHeading = new LinkedHashMap<>();
-        for (BrandModel model : brandModelRepository.findByBrandModelService_IdInOrderByIdAsc(headingIds)) {
+        for (BrandModel model : brandModelRepository.findByBranch_IdOrderByIdAsc(branchId)) {
             if (model.getBrandModelService() == null || model.getBrandModelService().getId() == null) {
                 continue;
             }
@@ -58,15 +57,17 @@ public class BookingBranchBrandsService {
                     .add(BookingBrandChipView.builder().id(model.getId()).name(model.getName()).build());
         }
 
+        String lang = BookingMineService.langOf(acceptLanguage);
         List<BookingBrandModelGroupView> groups = new ArrayList<>();
         for (BrandModelService heading : headings) {
             List<BookingBrandChipView> brands = brandsByHeading.get(heading.getId());
             if (brands == null || brands.isEmpty()) {
                 continue;
             }
+            String title = BookingMineService.catalogText(serviceCategoryJson.read(heading.getTitleJson()), lang);
             groups.add(BookingBrandModelGroupView.builder()
                     .id(heading.getId())
-                    .title(heading.getTitle())
+                    .title(title == null ? "" : title)
                     .brands(brands)
                     .build());
         }

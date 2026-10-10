@@ -1,10 +1,8 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.StaffBranchProfileView;
-import com.carland.carland_service.dto.request.StaffBranchGoodSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchProfileSaveRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
-import com.carland.carland_service.dto.request.StaffBrandModelServiceSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffNameSaveRequest;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
@@ -21,8 +19,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * tr: Partner paneli şube profili. Mallar və marka siyahısı fərdi xidmət deyil.
- * en: Partner-panel branch profile. Goods and brand lists are not individual services.
+ * tr: Partner paneli şube profili. Marka satırları ortaq başlığın altındadır.
+ * en: Partner-panel branch profile. Brand rows sit under a shared heading.
  */
 @RestController
 @RequiredArgsConstructor
@@ -86,54 +84,6 @@ public class BookingStaffBranchProfileController {
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
-                acceptLanguage);
-    }
-
-    @PostMapping("/api/v1/booking/staff/branch/goods")
-    public StaffBranchProfileView addGood(
-            HttpServletRequest request,
-            @RequestBody StaffBranchGoodSaveRequest body,
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return branchProfileService.addGood(
-                bookingStaffRequestAuth.userId(request),
-                bookingStaffRequestAuth.mustChangePassword(request),
-                body,
-                acceptLanguage);
-    }
-
-    @DeleteMapping("/api/v1/booking/staff/branch/goods/{goodId}")
-    public StaffBranchProfileView deleteGood(
-            HttpServletRequest request,
-            @PathVariable Long goodId,
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return branchProfileService.deleteGood(
-                bookingStaffRequestAuth.userId(request),
-                bookingStaffRequestAuth.mustChangePassword(request),
-                goodId,
-                acceptLanguage);
-    }
-
-    @PostMapping("/api/v1/booking/staff/branch/brand-model-services")
-    public StaffBranchProfileView addBrandService(
-            HttpServletRequest request,
-            @RequestBody StaffBrandModelServiceSaveRequest body,
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return branchProfileService.addBrandService(
-                bookingStaffRequestAuth.userId(request),
-                bookingStaffRequestAuth.mustChangePassword(request),
-                body,
-                acceptLanguage);
-    }
-
-    @DeleteMapping("/api/v1/booking/staff/branch/brand-model-services/{serviceId}")
-    public StaffBranchProfileView deleteBrandService(
-            HttpServletRequest request,
-            @PathVariable Long serviceId,
-            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        return branchProfileService.deleteBrandService(
-                bookingStaffRequestAuth.userId(request),
-                bookingStaffRequestAuth.mustChangePassword(request),
-                serviceId,
                 acceptLanguage);
     }
 

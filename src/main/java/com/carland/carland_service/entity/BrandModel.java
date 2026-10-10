@@ -21,8 +21,8 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
 /**
- * tr: Bir başlığın altındaki marka. Seriya her satırda durur; özüllük yalnız yağ listesinde dolar.
- * en: A brand under one heading. Series is always stored; viscosity is filled only on oil lists.
+ * tr: Bir başlığın altında, bir şubenin markası. Seriya her satırda durur; özüllük yalnız yağ başlığında dolar.
+ * en: A branch brand under one shared heading. Series is always stored; viscosity is filled only on oil headings.
  */
 @Entity
 @Data
@@ -43,6 +43,16 @@ public class BrandModel {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     BrandModelService brandModelService;
+
+    /**
+     * Nullable so an existing table can gain the column before old rows are removed.
+     * Writers always set the branch.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    Branch branch;
 
     @Column(nullable = false, length = 80)
     String name;

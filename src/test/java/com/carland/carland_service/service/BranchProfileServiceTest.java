@@ -11,9 +11,9 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
-import com.carland.carland_service.repository.BranchGoodRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
@@ -45,7 +46,6 @@ class BranchProfileServiceTest {
     @Mock BookingStaffAccess bookingStaffAccess;
     @Mock BookingStaffRepository bookingStaffRepository;
     @Mock BranchRepository branchRepository;
-    @Mock BranchGoodRepository branchGoodRepository;
     @Mock BrandModelServiceRepository brandModelServiceRepository;
     @Mock BrandModelRepository brandModelRepository;
     @Mock BranchPhotoRepository branchPhotoRepository;
@@ -68,9 +68,9 @@ class BranchProfileServiceTest {
                 bookingStaffAccess,
                 bookingStaffRepository,
                 branchRepository,
-                branchGoodRepository,
                 brandModelServiceRepository,
                 brandModelRepository,
+                new ServiceCategoryJson(new ObjectMapper()),
                 branchPhotoRepository,
                 staffPhotoRepository);
         media = new StaffMediaService(
@@ -98,8 +98,10 @@ class BranchProfileServiceTest {
                 .name("Nemat")
                 .surname("Mirzayev")
                 .build();
-        oilHeading = BrandModelService.builder().id(1L).branch(branch).title("Yağ").oil(true).sortOrder(0).build();
-        filterHeading = BrandModelService.builder().id(2L).branch(branch).title("Filter").oil(false).sortOrder(1).build();
+        oilHeading = BrandModelService.builder()
+                .id(1L).titleJson("{\"az\":\"Yağlar\",\"en\":\"Oils\",\"ru\":\"Масла\"}").oil(true).sortOrder(1).build();
+        filterHeading = BrandModelService.builder()
+                .id(2L).titleJson("{\"az\":\"Filtrlər\",\"en\":\"Filters\",\"ru\":\"Фильтры\"}").oil(false).sortOrder(2).build();
     }
 
     @Test
@@ -116,10 +118,7 @@ class BranchProfileServiceTest {
     void nonOilModelKeepsSeriesAndDropsViscosity() {
         when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
         when(brandModelServiceRepository.findById(2L)).thenReturn(Optional.of(filterHeading));
-        when(branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
-        when(brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
-        when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
-        when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
+        stubProfileReads();
 
         profile.addBrandModel(8L, false, 2L, StaffBrandModelSaveRequest.builder()
                 .name("Mann")
@@ -131,6 +130,7 @@ class BranchProfileServiceTest {
         ArgumentCaptor<BrandModel> captor = ArgumentCaptor.forClass(BrandModel.class);
         verify(brandModelRepository).save(captor.capture());
         assertEquals("Mann", captor.getValue().getName());
+        assertEquals(12L, captor.getValue().getBranch().getId());
         assertEquals("eded", captor.getValue().getUnit());
         assertEquals("should drop", captor.getValue().getSeries());
         assertNull(captor.getValue().getViscosity());
@@ -140,10 +140,7 @@ class BranchProfileServiceTest {
     void oilModelForcesLiterAndKeepsViscosity() {
         when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
         when(brandModelServiceRepository.findById(1L)).thenReturn(Optional.of(oilHeading));
-        when(branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
-        when(brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
-        when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
-        when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
+        stubProfileReads();
 
         StaffBranchProfileView view = profile.addBrandModel(8L, false, 1L, StaffBrandModelSaveRequest.builder()
                 .name("Liqui Moly")
@@ -209,9 +206,43 @@ class BranchProfileServiceTest {
         verify(branchRepository, never()).save(any());
     }
 
+    @Test
+    void profileKeepsEmptyHeadingsAndUsesAcceptLanguage() {
+        when(bookingStaffAccess.requireStaff(8L, false, "en")).thenReturn(branchAdmin);
+        when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(oilHeading));
+        when(brandModelRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of());
+        when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
+        when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
+
+        StaffBranchProfileView view = profile.get(8L, false, "en");
+
+        assertEquals(1, view.getBrandModelServices().size());
+        assertEquals("Oils", view.getBrandModelServices().get(0).getTitle());
+        assertEquals(0, view.getBrandModelServices().get(0).getModels().size());
+    }
+
+    @Test
+    void branchCannotEditAnotherBranchProduct() {
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
+        when(brandModelServiceRepository.findById(2L)).thenReturn(Optional.of(filterHeading));
+        Branch other = Branch.builder().id(99L).build();
+        when(brandModelRepository.findById(5L)).thenReturn(Optional.of(BrandModel.builder()
+                .id(5L)
+                .brandModelService(filterHeading)
+                .branch(other)
+                .name("Mann")
+                .series("HU")
+                .unit("eded")
+                .build()));
+
+        assertThrows(ResourceNotFoundException.class, () -> profile.updateBrandModel(8L, false, 2L, 5L,
+                StaffBrandModelSaveRequest.builder().name("Bosch").series("OX").unit("eded").build(), "az"));
+        verify(brandModelRepository, never()).save(any());
+    }
+
     private void stubProfileReads() {
-        when(branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
-        when(brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(12L)).thenReturn(List.of());
+        when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(brandModelRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of());
         when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
         when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
     }

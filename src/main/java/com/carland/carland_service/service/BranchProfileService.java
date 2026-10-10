@@ -1,18 +1,14 @@
 package com.carland.carland_service.service;
 
-import com.carland.carland_service.dto.booking.StaffBranchGoodView;
 import com.carland.carland_service.dto.booking.StaffBranchProfileView;
 import com.carland.carland_service.dto.booking.StaffBrandModelServiceView;
 import com.carland.carland_service.dto.booking.StaffBrandModelView;
-import com.carland.carland_service.dto.request.StaffBranchGoodSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchProfileSaveRequest;
 import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
-import com.carland.carland_service.dto.request.StaffBrandModelServiceSaveRequest;
 import com.carland.carland_service.dto.request.StaffNameSaveRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
-import com.carland.carland_service.entity.BranchGood;
 import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.enums.BookingStaffRole;
@@ -20,7 +16,6 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingStaffRepository;
-import com.carland.carland_service.repository.BranchGoodRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
@@ -31,12 +26,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * tr: Şube profili, mallar və marka siyahısı. Fərdi xidmət kataloğuna bağlı deyil.
- * en: Branch profile, goods, and brand lists. Not linked to the individual-service catalog.
+ * tr: Şube profili və ortaq başlıqların altındaki marka siyahısı. Başlıq əlavə etmək yoxdur.
+ * en: Branch profile and brands under the shared headings. Branches cannot add headings.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,16 +44,16 @@ public class BranchProfileService {
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingStaffRepository bookingStaffRepository;
     private final BranchRepository branchRepository;
-    private final BranchGoodRepository branchGoodRepository;
     private final BrandModelServiceRepository brandModelServiceRepository;
     private final BrandModelRepository brandModelRepository;
+    private final ServiceCategoryJson serviceCategoryJson;
     private final BranchPhotoRepository branchPhotoRepository;
     private final StaffPhotoRepository staffPhotoRepository;
 
     @Transactional(readOnly = true)
     public StaffBranchProfileView get(Long userId, boolean mustChangePassword, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        return view(staff, resolveBranch(staff, acceptLanguage));
+        return view(staff, resolveBranch(staff, acceptLanguage), acceptLanguage);
     }
 
     @Transactional
@@ -71,7 +68,7 @@ public class BranchProfileService {
         branch.setInstagram(optional(body.getInstagram(), 64));
         branch.setContactEmail(email(body.getContactEmail()));
         branchRepository.save(branch);
-        return view(staff, branch);
+        return view(staff, branch, acceptLanguage);
     }
 
     /**
@@ -89,7 +86,7 @@ public class BranchProfileService {
                 hours.getSaturdayStart(), hours.getSaturdayEnd(),
                 hours.getSundayStart(), hours.getSundayEnd());
         branchRepository.save(branch);
-        return view(staff, branch);
+        return view(staff, branch, acceptLanguage);
     }
 
     /**
@@ -103,7 +100,7 @@ public class BranchProfileService {
         Branch branch = resolveBranch(staff, acceptLanguage);
         branch.setContactEmail(email(body == null ? null : body.getContactEmail()));
         branchRepository.save(branch);
-        return view(staff, branch);
+        return view(staff, branch, acceptLanguage);
     }
 
     @Transactional
@@ -121,65 +118,7 @@ public class BranchProfileService {
         }
         staff.setName(name);
         staff.setSurname(surname);
-        return view(staff, resolveBranch(staff, acceptLanguage));
-    }
-
-    @Transactional
-    public StaffBranchProfileView addGood(Long userId, boolean mustChangePassword,
-                                           StaffBranchGoodSaveRequest body, String acceptLanguage) {
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
-        String name = required(body == null ? null : body.getName(), "name", 80);
-        int sort = branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(branch.getId()).size();
-        branchGoodRepository.save(BranchGood.builder()
-                .branch(branch)
-                .name(name)
-                .sortOrder(sort)
-                .build());
-        return view(staff, branch);
-    }
-
-    @Transactional
-    public StaffBranchProfileView deleteGood(Long userId, boolean mustChangePassword,
-                                              Long goodId, String acceptLanguage) {
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
-        BranchGood good = branchGoodRepository.findById(goodId)
-                .orElseThrow(() -> new ResourceNotFoundException("good not found"));
-        if (good.getBranch() == null || !branch.getId().equals(good.getBranch().getId())) {
-            throw new ResourceNotFoundException("good not found");
-        }
-        branchGoodRepository.delete(good);
-        return view(staff, branch);
-    }
-
-    @Transactional
-    public StaffBranchProfileView addBrandService(Long userId, boolean mustChangePassword,
-                                                   StaffBrandModelServiceSaveRequest body, String acceptLanguage) {
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
-        if (body == null) {
-            throw MissingFieldException.required("title");
-        }
-        int sort = brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(branch.getId()).size();
-        brandModelServiceRepository.save(BrandModelService.builder()
-                .branch(branch)
-                .title(required(body.getTitle(), "title", 120))
-                .oil(Boolean.TRUE.equals(body.getOil()))
-                .sortOrder(sort)
-                .build());
-        return view(staff, branch);
-    }
-
-    @Transactional
-    public StaffBranchProfileView deleteBrandService(Long userId, boolean mustChangePassword,
-                                                      Long serviceId, String acceptLanguage) {
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
-        BrandModelService heading = ownedHeading(branch, serviceId);
-        brandModelRepository.deleteByBrandModelService_Id(heading.getId());
-        brandModelServiceRepository.delete(heading);
-        return view(staff, branch);
+        return view(staff, resolveBranch(staff, acceptLanguage), acceptLanguage);
     }
 
     @Transactional
@@ -187,7 +126,7 @@ public class BranchProfileService {
                                                  StaffBrandModelSaveRequest body, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         Branch branch = resolveBranch(staff, acceptLanguage);
-        BrandModelService heading = ownedHeading(branch, serviceId);
+        BrandModelService heading = heading(serviceId);
         if (body == null) {
             throw MissingFieldException.required("name");
         }
@@ -199,12 +138,13 @@ public class BranchProfileService {
         String unit = unit(body.getUnit());
         brandModelRepository.save(BrandModel.builder()
                 .brandModelService(heading)
+                .branch(branch)
                 .name(required(body.getName(), "name", 80))
                 .series(series)
                 .viscosity(viscosity)
                 .unit(unit)
                 .build());
-        return view(staff, branch);
+        return view(staff, branch, acceptLanguage);
     }
 
     @Transactional
@@ -213,12 +153,8 @@ public class BranchProfileService {
                                                     String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         Branch branch = resolveBranch(staff, acceptLanguage);
-        BrandModelService heading = ownedHeading(branch, serviceId);
-        BrandModel model = brandModelRepository.findById(modelId)
-                .orElseThrow(() -> new ResourceNotFoundException("brand model not found"));
-        if (model.getBrandModelService() == null || !heading.getId().equals(model.getBrandModelService().getId())) {
-            throw new ResourceNotFoundException("brand model not found");
-        }
+        BrandModelService heading = heading(serviceId);
+        BrandModel model = ownedModel(branch, heading, modelId);
         if (body == null) {
             throw MissingFieldException.required("name");
         }
@@ -231,7 +167,7 @@ public class BranchProfileService {
         }
         model.setUnit(unit(body.getUnit()));
         brandModelRepository.save(model);
-        return view(staff, branch);
+        return view(staff, branch, acceptLanguage);
     }
 
     @Transactional
@@ -239,36 +175,35 @@ public class BranchProfileService {
                                                     Long modelId, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         Branch branch = resolveBranch(staff, acceptLanguage);
-        BrandModelService heading = ownedHeading(branch, serviceId);
-        BrandModel model = brandModelRepository.findById(modelId)
-                .orElseThrow(() -> new ResourceNotFoundException("brand model not found"));
-        if (model.getBrandModelService() == null || !heading.getId().equals(model.getBrandModelService().getId())) {
-            throw new ResourceNotFoundException("brand model not found");
-        }
-        brandModelRepository.delete(model);
-        return view(staff, branch);
+        BrandModelService heading = heading(serviceId);
+        brandModelRepository.delete(ownedModel(branch, heading, modelId));
+        return view(staff, branch, acceptLanguage);
     }
 
-    private StaffBranchProfileView view(BookingStaff staff, Branch branch) {
-        List<StaffBranchGoodView> goods = new ArrayList<>();
-        for (BranchGood good : branchGoodRepository.findByBranch_IdOrderBySortOrderAscIdAsc(branch.getId())) {
-            goods.add(StaffBranchGoodView.builder().id(good.getId()).name(good.getName()).build());
-        }
-        List<StaffBrandModelServiceView> headings = new ArrayList<>();
-        for (BrandModelService heading : brandModelServiceRepository.findByBranch_IdOrderBySortOrderAscIdAsc(branch.getId())) {
-            List<StaffBrandModelView> models = new ArrayList<>();
-            for (BrandModel model : brandModelRepository.findByBrandModelService_IdOrderByIdAsc(heading.getId())) {
-                models.add(StaffBrandModelView.builder()
-                        .id(model.getId())
-                        .name(model.getName())
-                        .series(model.getSeries())
-                        .viscosity(model.getViscosity())
-                        .unit(model.getUnit())
-                        .build());
+    private StaffBranchProfileView view(BookingStaff staff, Branch branch, String acceptLanguage) {
+        Map<Long, List<StaffBrandModelView>> modelsByHeading = new LinkedHashMap<>();
+        for (BrandModel model : brandModelRepository.findByBranch_IdOrderByIdAsc(branch.getId())) {
+            if (model.getBrandModelService() == null || model.getBrandModelService().getId() == null) {
+                continue;
             }
+            modelsByHeading
+                    .computeIfAbsent(model.getBrandModelService().getId(), id -> new ArrayList<>())
+                    .add(StaffBrandModelView.builder()
+                            .id(model.getId())
+                            .name(model.getName())
+                            .series(model.getSeries())
+                            .viscosity(model.getViscosity())
+                            .unit(model.getUnit())
+                            .build());
+        }
+        String lang = BookingMineService.langOf(acceptLanguage);
+        List<StaffBrandModelServiceView> headings = new ArrayList<>();
+        for (BrandModelService heading : brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()) {
+            List<StaffBrandModelView> models = modelsByHeading.getOrDefault(heading.getId(), List.of());
+            String title = BookingMineService.catalogText(serviceCategoryJson.read(heading.getTitleJson()), lang);
             headings.add(StaffBrandModelServiceView.builder()
                     .id(heading.getId())
-                    .title(heading.getTitle())
+                    .title(title == null ? "" : title)
                     .oil(Boolean.TRUE.equals(heading.getOil()))
                     .models(models)
                     .build());
@@ -289,7 +224,6 @@ public class BranchProfileService {
                 .staffSurname(named.getSurname())
                 .staffRole(named.getRole())
                 .hasStaffPhoto(staff.getUserId() != null && staffPhotoRepository.existsByUserId(staff.getUserId()))
-                .goods(goods)
                 .brandModelServices(headings)
                 .build();
     }
@@ -304,13 +238,21 @@ public class BranchProfileService {
                 .orElse(fallback);
     }
 
-    private BrandModelService ownedHeading(Branch branch, Long serviceId) {
-        BrandModelService heading = brandModelServiceRepository.findById(serviceId)
+    private BrandModelService heading(Long serviceId) {
+        return brandModelServiceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("brand model service not found"));
-        if (heading.getBranch() == null || !branch.getId().equals(heading.getBranch().getId())) {
-            throw new ResourceNotFoundException("brand model service not found");
+    }
+
+    private BrandModel ownedModel(Branch branch, BrandModelService heading, Long modelId) {
+        BrandModel model = brandModelRepository.findById(modelId)
+                .orElseThrow(() -> new ResourceNotFoundException("brand model not found"));
+        if (model.getBrandModelService() == null || !heading.getId().equals(model.getBrandModelService().getId())) {
+            throw new ResourceNotFoundException("brand model not found");
         }
-        return heading;
+        if (model.getBranch() == null || branch.getId() == null || !branch.getId().equals(model.getBranch().getId())) {
+            throw new ResourceNotFoundException("brand model not found");
+        }
+        return model;
     }
 
     private Branch resolveBranch(BookingStaff staff, String acceptLanguage) {

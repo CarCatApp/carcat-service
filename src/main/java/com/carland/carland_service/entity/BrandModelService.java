@@ -1,29 +1,22 @@
 package com.carland.carland_service.entity;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import org.hibernate.annotations.ColumnDefault;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
- * tr: Şubenin marka listesi başlığı. oil true ise satırlarda özüllük de dolu olur.
- * en: A branch brand-list heading. When oil is true, rows also carry viscosity.
+ * tr: Ortak marka başlığı. Şubeye bağlı değil. oil true ise satırlarda özüllük zorunlu.
+ * en: Shared brand heading. Not tied to a branch. When oil is true, rows require viscosity.
  */
 @Entity
 @Data
@@ -38,15 +31,9 @@ public class BrandModelService {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "branch_id", nullable = false,
-            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    Branch branch;
-
-    @Column(nullable = false, length = 120)
-    String title;
+    /** {"az":"...","en":"...","ru":"..."}. Nullable so an existing table can gain the column before old rows are removed. */
+    @Column(name = "title_json", length = 1024)
+    String titleJson;
 
     @Column(name = "oil", nullable = false)
     @ColumnDefault("false")

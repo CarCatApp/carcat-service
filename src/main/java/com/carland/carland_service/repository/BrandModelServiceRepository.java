@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface BrandModelServiceRepository extends JpaRepository<BrandModelService, Long> {
 
-    List<BrandModelService> findByBranch_IdOrderBySortOrderAscIdAsc(Long branchId);
+    List<BrandModelService> findAllByOrderBySortOrderAscIdAsc();
 }

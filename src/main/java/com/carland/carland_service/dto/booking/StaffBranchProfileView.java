@@ -29,6 +29,5 @@ public class StaffBranchProfileView {
     String staffSurname;
     String staffRole;
     Boolean hasStaffPhoto;
-    List<StaffBranchGoodView> goods;
     List<StaffBrandModelServiceView> brandModelServices;
 }

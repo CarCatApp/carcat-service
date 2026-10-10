@@ -87,9 +87,10 @@ public class BookingDiscoveryController {
     @GetMapping("/api/v1/booking/branches/{branchId}/brand-models")
     public BookingBrandModelsResponse brandModels(
             @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable Long branchId
     ) {
-        return bookingBranchBrandsService.list(branchId);
+        return bookingBranchBrandsService.list(branchId, acceptLanguage);
     }
 
     @GetMapping("/api/v1/booking/care-packages/{packageId}/price-info")
