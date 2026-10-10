@@ -32,7 +32,7 @@ public class Notification {
      * tr: Push anı Bakü yerel saatiyle durur. Cevapta yalnızca saat gider: 23:34.
      * en: The push instant is stored in Baku local time. The response sends only the clock: 23:34.
      */
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm", timezone = "Asia/Baku")
     @Column(name = "created_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime createdAt;
     String type;
