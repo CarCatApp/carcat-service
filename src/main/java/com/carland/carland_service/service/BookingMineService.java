@@ -578,6 +578,7 @@ public class BookingMineService {
         }
         Integer price = booking.getPackagePrice();
         return BookingPackageView.builder()
+                .id(booking.getCarePackageId())
                 .name(booking.getPackageName())
                 .priceMin(price)
                 .priceMax(price)

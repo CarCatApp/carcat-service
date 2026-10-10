@@ -373,6 +373,7 @@ class BookingMineServiceTest {
 
     @Test
     void detailReturnsPackageAndOfferedServiceNameWithoutPrice() {
+        booking.setCarePackageId(8L);
         booking.setPackageName("Hyper Xaqani Extra");
         booking.setPackagePrice(28500);
         booking.setStatus("cancelled");
@@ -389,6 +390,7 @@ class BookingMineServiceTest {
 
         BookingDetailResponse out = service.detail(54L, "3", "Asia/Baku", "ru");
 
+        assertEquals(8L, out.getBookedPackage().getId());
         assertEquals("Hyper Xaqani Extra", out.getBookedPackage().getName());
         assertEquals(28500, out.getBookedPackage().getPriceMin());
         assertEquals(28500, out.getBookedPackage().getPriceMax());
