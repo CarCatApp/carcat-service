@@ -1,5 +1,6 @@
 package com.carland.carland_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -28,9 +29,10 @@ public class Notification {
     Long id;
     LocalDate created;
     /**
-     * tr: Push'un yazıldığı an, Bakü yerel saati. Liste saati buradan okunur.
-     * en: Instant the push was stored, in Baku local time. The list clock reads this.
+     * tr: Push anı Bakü yerel saatiyle durur. Cevapta yalnızca saat gider: 23:34.
+     * en: The push instant is stored in Baku local time. The response sends only the clock: 23:34.
      */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm")
     @Column(name = "created_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime createdAt;
     String type;
