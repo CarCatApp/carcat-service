@@ -49,7 +49,21 @@ public class StaffBookingLiveService {
         if (arrival == null || arrival.getBranchId() == null || arrival.getBookingId() == null) {
             return;
         }
-        Runnable send = () -> deliver(arrival);
+        afterCommit(() -> deliver(arrival));
+    }
+
+    /**
+     * tr: İptal sonrası açık panele sessiz yenileme. Kart ve ses yok.
+     * en: Silent refresh for open panels after a cancel. No card and no sound.
+     */
+    public void refreshAfterCommit(Long branchId) {
+        if (branchId == null) {
+            return;
+        }
+        afterCommit(() -> deliverRefresh(branchId));
+    }
+
+    private static void afterCommit(Runnable send) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -94,6 +108,21 @@ public class StaffBookingLiveService {
                 push(emitter);
             } catch (Exception ex) {
                 remove(arrival.getBranchId(), emitter);
+            }
+        }
+    }
+
+    private void deliverRefresh(Long branchId) {
+        List<SseEmitter> emitters = open.get(branchId);
+        if (emitters == null || emitters.isEmpty()) {
+            return;
+        }
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("refresh").data("{}"));
+                push(emitter);
+            } catch (Exception ex) {
+                remove(branchId, emitter);
             }
         }
     }

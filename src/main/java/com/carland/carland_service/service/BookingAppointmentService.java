@@ -237,6 +237,8 @@ public class BookingAppointmentService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(CUSTOMER_REASON);
         booking.setCancelNote(reason);
+        Branch ownerBranch = booking.getBranch();
+        staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return BookingAppointmentCancelResponse.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())

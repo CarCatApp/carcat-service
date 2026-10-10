@@ -67,6 +67,7 @@ class BookingMineServiceTest {
     @Mock BookingCreateService bookingCreateService;
     @Mock BookingCancelReasonRepository cancelReasonRepository;
     @Mock PartnerPhotoRepository partnerPhotoRepository;
+    @Mock StaffBookingLiveService staffBookingLiveService;
 
     BookingMineService service;
     Booking booking;
@@ -77,7 +78,8 @@ class BookingMineServiceTest {
         service = new BookingMineService(
                 bookingRepository, bookingItemRepository, bookingSelectedServiceRepository,
                 individualLineRepository, inspectionRepository, carRepository,
-                bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper());
+                bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper(),
+                staffBookingLiveService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
@@ -430,6 +432,7 @@ class BookingMineServiceTest {
         assertEquals("Mən ləğv etdim", out.getCanceledReason().getTitle().get("az"));
         assertEquals(1, out.getCanceledReason().getTitle().size());
         assertNull(out.getCanceledReason().getNote());
+        verify(staffBookingLiveService).refreshAfterCommit(7L);
     }
 
     @Test

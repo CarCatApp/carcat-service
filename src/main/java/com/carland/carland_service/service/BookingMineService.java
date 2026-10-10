@@ -87,6 +87,7 @@ public class BookingMineService {
     private final BookingCancelReasonRepository cancelReasonRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final ObjectMapper objectMapper;
+    private final StaffBookingLiveService staffBookingLiveService;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -294,6 +295,8 @@ public class BookingMineService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(reason.getCode());
         booking.setCancelNote(note);
+        Branch ownerBranch = booking.getBranch();
+        staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader, acceptLanguage);
     }
 

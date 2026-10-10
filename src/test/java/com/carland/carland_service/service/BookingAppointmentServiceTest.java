@@ -157,6 +157,7 @@ class BookingAppointmentServiceTest {
                 .ref("CC-091214")
                 .customerUserId(54L)
                 .status("auto_accepted")
+                .branch(branch)
                 .build();
         when(bookingRepository.findById(12L)).thenReturn(Optional.of(booking));
 
@@ -168,6 +169,7 @@ class BookingAppointmentServiceTest {
         assertEquals("cancelled", booking.getStatus());
         assertEquals("plan dəyişdi", booking.getCancelNote());
         assertEquals(BookingAppointmentService.CUSTOMER_REASON, booking.getCancelReasonCode());
+        verify(live).refreshAfterCommit(7L);
     }
 
     @Test
@@ -178,6 +180,7 @@ class BookingAppointmentServiceTest {
         assertThrows(ForbiddenException.class, () -> service.cancel(
                 12L, new BookingAppointmentCancelRequest("plan dəyişdi"), 9L, "az"));
         assertEquals("pending", booking.getStatus());
+        verify(live, never()).refreshAfterCommit(any());
     }
 
     @Test
