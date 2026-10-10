@@ -390,7 +390,7 @@ class BookingMineServiceTest {
 
         BookingDetailResponse out = service.detail(54L, "3", "Asia/Baku", "ru");
 
-        assertEquals(8L, out.getBookedPackage().getId());
+        assertEquals(8L, out.getBookedPackage().getPackageId());
         assertEquals("Hyper Xaqani Extra", out.getBookedPackage().getName());
         assertEquals(28500, out.getBookedPackage().getPriceMin());
         assertEquals(28500, out.getBookedPackage().getPriceMax());

@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingPackageView {
-    Long id;
+    Long packageId;
     String name;
     Integer priceMin;
     Integer priceMax;
