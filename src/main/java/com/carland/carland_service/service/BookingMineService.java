@@ -62,15 +62,17 @@ import java.util.stream.Collectors;
 
 /**
  * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). unread=0 ta ki 286.
- * Liste, müşterinin her şubesindeki son rezervasyondur; en yeni önce.
+ * purpose boş veya recently: her şubenin son rezervasyonu. all: bütün kayıtlar, en yeni önce.
  * en: Owner booking list + detail + cancel (CRCT-285). unread=0 until 286.
- * The list is the latest booking per branch, newest first.
+ * purpose blank or recently: latest booking per branch. all: every booking, newest first.
  */
 @Service
 @RequiredArgsConstructor
 public class BookingMineService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
+    static final String PURPOSE_RECENTLY = "recently";
+    static final String PURPOSE_ALL = "all";
     static final String PAST_OR_COMPLETED = "Cannot cancel a completed or past booking";
     static final String OTHER_CODE = "other";
     static final String LOGO_PATH = "/api/v1/photo/for/partner/get/";
@@ -99,9 +101,17 @@ public class BookingMineService {
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
                                     Integer page, Integer pageSize, Integer limit, String timezoneHeader,
                                     String acceptLanguage) {
+        return mine(customerUserId, statusCsv, carId, page, pageSize, limit, timezoneHeader, acceptLanguage, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
+                                    Integer page, Integer pageSize, Integer limit, String timezoneHeader,
+                                    String acceptLanguage, String purpose) {
         if (customerUserId == null) {
             throw MissingFieldException.required("X-User-Id");
         }
+        String wanted = purposeOf(purpose);
         requireOwnedCar(customerUserId, carId);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         int safePage = page == null || page < 1 ? 1 : page;
@@ -112,7 +122,9 @@ public class BookingMineService {
         size = Math.min(size, 50);
         Pageable pageable = PageRequest.of(safePage - 1, size);
         List<String> statuses = parseStatuses(statusCsv);
-        Page<Long> ids = latestIds(customerUserId, carId, statuses, pageable);
+        Page<Long> ids = PURPOSE_ALL.equals(wanted)
+                ? allIds(customerUserId, carId, statuses, pageable)
+                : latestIds(customerUserId, carId, statuses, pageable);
         List<Booking> rows = loadInIdOrder(ids.getContent());
         Map<Long, List<String>> keys = keysByBooking(rows);
         Set<Long> withPhoto = partnerIdsWithPhoto(rows);
@@ -364,6 +376,35 @@ public class BookingMineService {
             return bookingRepository.findLatestIdPerBranchByStatusIn(userId, statuses, pageable);
         }
         return bookingRepository.findLatestIdPerBranch(userId, pageable);
+    }
+
+    /**
+     * tr: Boş ve recently bugünkü liste. all bütün kayıtlar. Başka değer 400.
+     * en: Blank and recently keep today's list. all is every row. Anything else is 400.
+     */
+    static String purposeOf(String purpose) {
+        if (purpose == null || purpose.isBlank()) {
+            return PURPOSE_RECENTLY;
+        }
+        String value = purpose.trim().toLowerCase(Locale.ROOT);
+        if (PURPOSE_RECENTLY.equals(value) || PURPOSE_ALL.equals(value)) {
+            return value;
+        }
+        throw new MissingFieldException("purpose is invalid");
+    }
+
+    private Page<Long> allIds(Long userId, Long carId, List<String> statuses, Pageable pageable) {
+        boolean filterStatus = !statuses.isEmpty();
+        if (carId != null && filterStatus) {
+            return bookingRepository.findAllIdsByCarIdAndStatusIn(userId, carId, statuses, pageable);
+        }
+        if (carId != null) {
+            return bookingRepository.findAllIdsByCarId(userId, carId, pageable);
+        }
+        if (filterStatus) {
+            return bookingRepository.findAllIdsByStatusIn(userId, statuses, pageable);
+        }
+        return bookingRepository.findAllIds(userId, pageable);
     }
 
     private List<Booking> loadInIdOrder(List<Long> ids) {

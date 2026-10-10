@@ -180,6 +180,76 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("statuses") Collection<String> statuses,
             Pageable pageable);
 
+    /**
+     * tr: purpose=all. Bütün kayıtlar, created_at azalan, eşitlikte id azalan.
+     * en: purpose=all. Every row, created_at descending, then id descending.
+     */
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.customerUserId = :userId
+                    """
+    )
+    Page<Long> findAllIds(@Param("userId") Long userId, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                    """
+    )
+    Page<Long> findAllIdsByCarId(
+            @Param("userId") Long userId, @Param("carId") Long carId, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.status in :statuses
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.customerUserId = :userId
+                      and b.status in :statuses
+                    """
+    )
+    Page<Long> findAllIdsByStatusIn(
+            @Param("userId") Long userId, @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b.id from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                      and b.status in :statuses
+                    order by b.createdAt desc, b.id desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.customerUserId = :userId
+                      and b.carId = :carId
+                      and b.status in :statuses
+                    """
+    )
+    Page<Long> findAllIdsByCarIdAndStatusIn(
+            @Param("userId") Long userId,
+            @Param("carId") Long carId,
+            @Param("statuses") Collection<String> statuses,
+            Pageable pageable);
+
     @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
     @Query("select b from Booking b where b.id in :ids")
     List<Booking> findForMineByIdIn(@Param("ids") Collection<Long> ids);

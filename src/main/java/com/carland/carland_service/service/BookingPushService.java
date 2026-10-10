@@ -4,23 +4,26 @@ import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.DeviceToken;
+import com.carland.carland_service.entity.Notification;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.DeviceTokenRepository;
+import com.carland.carland_service.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Map;
 
 /**
- * tr: Qəbul və rədddən sonra müştərinin tək cihaz tokeninə FCM title/body göndərir. Commitdən sonra işləyir; xəta statusu geri almır.
- * en: Sends an FCM title/body to the customer's single device token after accept or reject. Runs after commit; a failure does not undo the status.
+ * tr: Qəbul və rədddən sonra eyni title/body-ni bildiriş siyahısına yazır və müştərinin cihaz tokeninə FCM göndərir. Commitdən sonra işləyir; xəta statusu geri almır.
+ * en: After accept or reject, writes the same title/body into the notification list and sends FCM to the customer's device token. Runs after commit; a failure does not undo the status.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,9 +38,13 @@ public class BookingPushService {
             "ru", new String[] {"янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"}
     );
 
+    static final String TYPE_ACCEPTED = "BOOKING_ACCEPTED";
+    static final String TYPE_REJECTED = "BOOKING_REJECTED";
+
     private final DeviceTokenRepository deviceTokenRepository;
     private final CustomerRepository customerRepository;
     private final PushNotificationService pushNotificationService;
+    private final NotificationRepository notificationRepository;
 
     /**
      * tr: Təsdiqlənmiş rezervasiya üçün push planlayır.
@@ -68,6 +75,37 @@ public class BookingPushService {
     }
 
     private void deliver(Notice notice) {
+        String lang = "az";
+        try {
+            lang = languageOf(notice.customerUserId());
+        } catch (Exception ex) {
+            log.warn("booking language lookup failed userId={} ref={} error={}",
+                    notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());
+        }
+        String heading = title(lang, notice.accepted());
+        String text = body(lang, notice);
+        saveInbox(notice, heading, text);
+        sendPush(notice, heading, text);
+    }
+
+    private void saveInbox(Notice notice, String heading, String text) {
+        try {
+            notificationRepository.save(Notification.builder()
+                    .created(LocalDate.now())
+                    .customerId(notice.customerUserId())
+                    .notificationText(text)
+                    .title(heading)
+                    .status("ACTIVE")
+                    .isRead(false)
+                    .type(notice.accepted() ? TYPE_ACCEPTED : TYPE_REJECTED)
+                    .build());
+        } catch (Exception ex) {
+            log.warn("booking inbox save failed userId={} ref={} error={}",
+                    notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());
+        }
+    }
+
+    private void sendPush(Notice notice, String heading, String text) {
         try {
             DeviceToken row = deviceTokenRepository.findByUserId(notice.customerUserId());
             if (row == null || row.getDeviceToken() == null || row.getDeviceToken().isBlank()) {
@@ -75,8 +113,7 @@ public class BookingPushService {
                         notice.customerUserId(), notice.ref());
                 return;
             }
-            String lang = languageOf(notice.customerUserId());
-            pushNotificationService.send(title(lang, notice.accepted()), body(lang, notice), row.getDeviceToken().trim());
+            pushNotificationService.send(heading, text, row.getDeviceToken().trim());
         } catch (Exception ex) {
             log.warn("booking push failed userId={} ref={} error={}",
                     notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());

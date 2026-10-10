@@ -228,6 +228,64 @@ class BookingMineServiceTest {
     }
 
     @Test
+    void recentlyPurposeKeepsLatestPerBranch() {
+        when(bookingRepository.findLatestIdPerBranch(eq(54L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
+        when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "az", " recently ");
+
+        verify(bookingRepository).findLatestIdPerBranch(eq(54L), any(Pageable.class));
+    }
+
+    @Test
+    void allPurposeReturnsEveryBookingNewestFirst() {
+        Booking older = Booking.builder()
+                .id(2L)
+                .ref("CC-100")
+                .customerUserId(54L)
+                .status("pending")
+                .branch(branch)
+                .range(booking.getRange())
+                .build();
+        when(bookingRepository.findAllIds(eq(54L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L, 2L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(older, booking));
+        when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        BookingMineResponse out = service.mine(54L, null, null, 1, 20, null, "Asia/Baku", "az", "all");
+
+        assertEquals(List.of("CC-147055", "CC-100"), out.getItems().stream().map(item -> item.getRef()).toList());
+        assertEquals(2L, out.getTotal());
+        verify(bookingRepository).findAllIds(eq(54L), any(Pageable.class));
+        verify(bookingRepository, never()).findLatestIdPerBranch(any(), any());
+    }
+
+    @Test
+    void allPurposeKeepsStatusAndCarFilters() {
+        stubOwnedCar(55L, 54L);
+        when(bookingRepository.findAllIdsByCarIdAndStatusIn(eq(54L), eq(55L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(3L)));
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
+        when(bookingRepository.countGroupByStatusAndCarId(54L, 55L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        service.mine(54L, "pending", 55L, 1, 20, null, "Asia/Baku", "az", "ALL");
+
+        verify(bookingRepository).findAllIdsByCarIdAndStatusIn(eq(54L), eq(55L), any(), any(Pageable.class));
+    }
+
+    @Test
+    void unknownPurposeIsRejected() {
+        MissingFieldException ex = assertThrows(MissingFieldException.class, () -> service.mine(
+                54L, null, null, 1, 20, null, "Asia/Baku", "az", "latest"));
+        assertEquals("purpose is invalid", ex.getMessage());
+    }
+
+    @Test
     void latestPerBranchKeepsNewestOfEachBranchNewestFirst() {
         Partner hyper = Partner.builder().id(1L).name("Hyper").build();
         Partner asmotors = Partner.builder().id(2L).name("Asmotors").build();

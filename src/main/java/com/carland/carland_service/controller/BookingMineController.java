@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). Flag: booking.
- * Liste, her şubenin son rezervasyonu, en yeni önce.
+ * purpose boş veya recently: her şubenin son rezervasyonu. all: bütün kayıtlar, en yeni önce.
  * en: Owner booking list + detail + cancel (CRCT-285). Flag: booking.
- * The list is the latest booking per branch, newest first.
+ * purpose blank or recently: latest booking per branch. all: every booking, newest first.
  */
 @RestController
 @RequiredArgsConstructor
@@ -39,10 +39,11 @@ public class BookingMineController {
             @RequestParam(required = false) Long carId,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize,
-            @RequestParam(required = false) Integer limit
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String purpose
     ) {
         return bookingMineService.mine(
-                parseUserId(userIdHeader), status, carId, page, pageSize, limit, timezone, acceptLanguage);
+                parseUserId(userIdHeader), status, carId, page, pageSize, limit, timezone, acceptLanguage, purpose);
     }
 
     @GetMapping({"/api/v1/booking/cancel-reasons", "/api/v1/booking/bookings/cancel-reasons"})

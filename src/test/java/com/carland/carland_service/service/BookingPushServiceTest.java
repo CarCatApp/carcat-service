@@ -4,9 +4,11 @@ import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.DeviceToken;
+import com.carland.carland_service.entity.Notification;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.DeviceTokenRepository;
+import com.carland.carland_service.repository.NotificationRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -16,11 +18,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -36,6 +40,7 @@ class BookingPushServiceTest {
     @Mock DeviceTokenRepository deviceTokenRepository;
     @Mock CustomerRepository customerRepository;
     @Mock PushNotificationService pushNotificationService;
+    @Mock NotificationRepository notificationRepository;
     @InjectMocks BookingPushService service;
 
     @Test
@@ -59,6 +64,13 @@ class BookingPushServiceTest {
                 "Nərimanov filialı 12 okt, 14:30 üçün rezervasiyanızı qəbul etdi. CC-104821",
                 "Nərimanov branch accepted your booking for 12 Oct, 14:30. CC-104821",
                 "Филиал Nərimanov принял вашу запись на 12 окт, 14:30. CC-104821"), body.getAllValues());
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(3)).save(saved.capture());
+        List<Notification> rows = saved.getAllValues();
+        for (int i = 0; i < rows.size(); i++) {
+            assertInbox(rows.get(i), BookingPushService.TYPE_ACCEPTED, title.getAllValues().get(i), body.getAllValues().get(i));
+        }
     }
 
     @Test
@@ -82,6 +94,13 @@ class BookingPushServiceTest {
                 "Nərimanov filialı 12 okt, 14:30 rezervasiyanızı rədd etdi. Səbəb: Bu gün yer yoxdur",
                 "Nərimanov branch declined your booking for 12 Oct, 14:30. Reason: Bu gün yer yoxdur",
                 "Филиал Nərimanov отклонил вашу запись на 12 окт, 14:30."), body.getAllValues());
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(3)).save(saved.capture());
+        List<Notification> rows = saved.getAllValues();
+        for (int i = 0; i < rows.size(); i++) {
+            assertInbox(rows.get(i), BookingPushService.TYPE_REJECTED, title.getAllValues().get(i), body.getAllValues().get(i));
+        }
     }
 
     @Test
@@ -98,13 +117,18 @@ class BookingPushServiceTest {
     }
 
     @Test
-    void missingTokenSkipsSend() {
+    void missingTokenSkipsSendButKeepsInboxRow() {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(null);
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
 
         assertDoesNotThrow(() -> service.accepted(sample(null)));
 
         verify(pushNotificationService, never()).send(any(), any(), any());
-        verify(customerRepository, never()).findByUserId(any());
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(saved.capture());
+        assertInbox(saved.getValue(), BookingPushService.TYPE_ACCEPTED,
+                "Rezervasiya təsdiqləndi",
+                "Nərimanov filialı 12 okt, 14:30 üçün rezervasiyanızı qəbul etdi. CC-104821");
     }
 
     @Test
@@ -114,7 +138,7 @@ class BookingPushServiceTest {
 
         service.rejected(booking);
 
-        verifyNoInteractions(pushNotificationService, deviceTokenRepository);
+        verifyNoInteractions(pushNotificationService, deviceTokenRepository, notificationRepository);
     }
 
     @Test
@@ -125,6 +149,13 @@ class BookingPushServiceTest {
 
         assertDoesNotThrow(() -> service.accepted(sample(null)));
         assertDoesNotThrow(() -> service.rejected(sample("yer yoxdur")));
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(2)).save(saved.capture());
+        assertEquals(BookingPushService.TYPE_ACCEPTED, saved.getAllValues().get(0).getType());
+        assertEquals(BookingPushService.TYPE_REJECTED, saved.getAllValues().get(1).getType());
+        assertEquals("ACTIVE", saved.getAllValues().get(0).getStatus());
+        assertEquals("ACTIVE", saved.getAllValues().get(1).getStatus());
     }
 
     @Test
@@ -135,11 +166,13 @@ class BookingPushServiceTest {
         try {
             service.accepted(sample(null));
             verify(pushNotificationService, never()).send(any(), any(), any());
+            verify(notificationRepository, never()).save(any());
 
             doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any());
             for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
                 assertDoesNotThrow(sync::afterCommit);
             }
+            verify(notificationRepository).save(any(Notification.class));
             verify(pushNotificationService).send(
                     eq("Booking confirmed"),
                     eq("Nərimanov branch accepted your booking for 12 Oct, 14:30. CC-104821"),
@@ -172,5 +205,15 @@ class BookingPushServiceTest {
 
     private static DeviceToken token() {
         return DeviceToken.builder().userId(5L).deviceToken("tok-1").platform("android").build();
+    }
+
+    private static void assertInbox(Notification row, String type, String title, String text) {
+        assertEquals(LocalDate.now(), row.getCreated());
+        assertEquals(5L, row.getCustomerId());
+        assertEquals(text, row.getNotificationText());
+        assertEquals(title, row.getTitle());
+        assertEquals("ACTIVE", row.getStatus());
+        assertFalse(row.isRead());
+        assertEquals(type, row.getType());
     }
 }
