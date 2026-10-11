@@ -350,9 +350,9 @@
           </td>
           <td>
             <form method="post" th:action="@{/admin/booking-partners/{id}/staff/{staffId}/manual(id=${partner.id}, staffId=${s.id})}">
-              <input type="hidden" name="disabled" th:value="${!s.manuallyDisabled}">
+              <input type="hidden" name="disabled" th:value="${s.manuallyDisabled != true}">
               <button class="btn btn-filter" type="submit"
-                      th:text="${s.manuallyDisabled} ? 'Aktiv et' : 'Deaktiv et'">Deaktiv et</button>
+                      th:text="${s.manuallyDisabled == true} ? 'Aktiv et' : 'Deaktiv et'">Deaktiv et</button>
             </form>
           </td>
         </tr>
