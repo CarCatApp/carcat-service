@@ -2,6 +2,7 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.ServiceEntity;
+import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
@@ -46,12 +47,13 @@ public class IndividualCatalogSync {
     private final ServiceEntityRepository serviceEntityRepository;
     private final IndividualServiceRepository individualServiceRepository;
     private final BranchIndividualServiceRepository branchServiceRepository;
+    private final BookingIndividualLineRepository bookingLineRepository;
     private final ServiceCategoryJson json;
 
     @Transactional
     public void sync() {
-        List<Desired> desired = collect(serviceEntityRepository.findAll());
         int removedMocks = dropMocks();
+        List<Desired> desired = collapseDuplicateAz(collect(serviceEntityRepository.findAll()));
         Set<String> codes = desired.stream().map(Desired::code).collect(Collectors.toSet());
         int added = 0;
         int updated = 0;
@@ -87,6 +89,82 @@ public class IndividualCatalogSync {
         }
         log.info("INDIVIDUAL_CATALOG_SYNC added={} updated={} deactivated={} mocks={}",
                 added, updated, deactivated, removedMocks);
+    }
+
+    /**
+     * Same Azerbaijani name is one catalog row. The copy with fewer branch prices
+     * and booking lines is deleted. A tie keeps the older source row.
+     */
+    private List<Desired> collapseDuplicateAz(List<Desired> desired) {
+        Map<String, List<Desired>> byAz = new LinkedHashMap<>();
+        List<Desired> passthrough = new ArrayList<>();
+        for (Desired item : desired) {
+            String az = normalize(item.az());
+            if (az.isEmpty()) {
+                passthrough.add(item);
+                continue;
+            }
+            byAz.computeIfAbsent(az, ignored -> new ArrayList<>()).add(item);
+        }
+        List<Desired> kept = new ArrayList<>();
+        for (List<Desired> group : byAz.values()) {
+            if (group.size() == 1) {
+                kept.add(group.get(0));
+                continue;
+            }
+            Desired winner = pick(group);
+            int winnerScore = usage(winner.code());
+            kept.add(winner);
+            for (Desired loser : group) {
+                if (loser == winner) {
+                    continue;
+                }
+                int loserScore = usage(loser.code());
+                if (loserScore < winnerScore || (loserScore == 0 && winnerScore == 0)) {
+                    dropCatalog(loser.code());
+                    continue;
+                }
+                kept.add(loser);
+            }
+        }
+        kept.addAll(passthrough);
+        return kept;
+    }
+
+    private Desired pick(List<Desired> group) {
+        Desired winner = group.get(0);
+        int best = usage(winner.code());
+        for (int i = 1; i < group.size(); i++) {
+            Desired candidate = group.get(i);
+            int score = usage(candidate.code());
+            boolean unusedTie = score == 0 && best == 0 && candidate.sourceId() < winner.sourceId();
+            if (score > best || unusedTie) {
+                winner = candidate;
+                best = score;
+            }
+        }
+        return winner;
+    }
+
+    private int usage(String code) {
+        IndividualService row = individualServiceRepository.findByCode(code).orElse(null);
+        if (row == null || row.getId() == null) {
+            return 0;
+        }
+        long prices = branchServiceRepository.countByIndividualService_Id(row.getId());
+        long bookings = bookingLineRepository.countByIndividualServiceId(row.getId());
+        long total = prices + bookings;
+        return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+    }
+
+    private void dropCatalog(String code) {
+        IndividualService row = individualServiceRepository.findByCode(code).orElse(null);
+        if (row == null || row.getId() == null) {
+            return;
+        }
+        branchServiceRepository.deleteByIndividualService_Id(row.getId());
+        individualServiceRepository.delete(row);
+        log.info("INDIVIDUAL_CATALOG_DROP_DUPLICATE code={}", code);
     }
 
     private int dropMocks() {

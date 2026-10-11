@@ -41,6 +41,7 @@ public class BranchCarePackageService {
 
     private static final int NAME_MAX = 80;
     private static final int PRICE_MAX = 1_000_000;
+    private static final int MAX_ACTIVE_PACKAGES = 3;
 
     private final BranchCarePackageRepository packageRepository;
     private final BranchCarePackageItemRepository itemRepository;
@@ -83,11 +84,15 @@ public class BranchCarePackageService {
         String name = requireName(body.getName());
         int price = requirePrice(body.getPrice());
         Set<Long> serviceIds = requireServiceIds(body.getServiceIds());
+        boolean active = body.getActive() == null || body.getActive();
+        if (active) {
+            requireActiveRoom(branch.getId());
+        }
         BranchCarePackage row = packageRepository.save(BranchCarePackage.builder()
                 .branch(branch)
                 .name(name)
                 .price(price)
-                .active(body.getActive() == null || body.getActive())
+                .active(active)
                 .build());
         applyServices(row, serviceIds, false);
         return toView(row);
@@ -109,6 +114,9 @@ public class BranchCarePackageService {
         row.setName(requireName(body.getName()));
         row.setPrice(requirePrice(body.getPrice()));
         if (body.getActive() != null) {
+            if (Boolean.TRUE.equals(body.getActive()) && !Boolean.TRUE.equals(row.getActive())) {
+                requireActiveRoom(branch.getId());
+            }
             row.setActive(body.getActive());
         }
         packageRepository.save(row);
@@ -129,9 +137,18 @@ public class BranchCarePackageService {
         }
         Branch branch = resolveBranch(staff, null, acceptLanguage);
         BranchCarePackage row = requirePackage(packageId, branch.getId());
+        if (Boolean.TRUE.equals(active) && !Boolean.TRUE.equals(row.getActive())) {
+            requireActiveRoom(branch.getId());
+        }
         row.setActive(active);
         packageRepository.save(row);
         return toView(row);
+    }
+
+    private void requireActiveRoom(Long branchId) {
+        if (packageRepository.countByBranch_IdAndActiveTrue(branchId) >= MAX_ACTIVE_PACKAGES) {
+            throw new ConflictException("Bu şöbədə artıq 3 aktiv paket var");
+        }
     }
 
     private void applyServices(BranchCarePackage row, Set<Long> serviceIds, boolean keepMissingDisabled) {

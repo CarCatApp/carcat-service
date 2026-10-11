@@ -13,4 +13,6 @@ public interface BookingIndividualLineRepository extends JpaRepository<BookingIn
     List<BookingIndividualLine> findByBooking_IdOrderByIdAsc(Long bookingId);
 
     List<BookingIndividualLine> findByBooking_IdIn(Collection<Long> bookingIds);
+
+    long countByIndividualServiceId(Long individualServiceId);
 }

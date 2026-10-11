@@ -2,6 +2,7 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.ServiceEntity;
+import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
@@ -30,6 +31,7 @@ class IndividualCatalogSyncTest {
     @Mock ServiceEntityRepository serviceEntityRepository;
     @Mock IndividualServiceRepository individualServiceRepository;
     @Mock BranchIndividualServiceRepository branchServiceRepository;
+    @Mock BookingIndividualLineRepository bookingLineRepository;
 
     IndividualCatalogSync sync;
 
@@ -39,6 +41,7 @@ class IndividualCatalogSyncTest {
                 serviceEntityRepository,
                 individualServiceRepository,
                 branchServiceRepository,
+                bookingLineRepository,
                 new ServiceCategoryJson(new ObjectMapper()));
     }
 
@@ -84,6 +87,31 @@ class IndividualCatalogSyncTest {
         assertTrue(saved.getAllValues().stream().anyMatch(row ->
                 "ABCD1234".equals(row.getCode()) && Boolean.FALSE.equals(row.getActive())));
         verify(branchServiceRepository, never()).deleteByIndividualService_Id(8L);
+    }
+
+    @Test
+    void duplicateAzDropsTheCopyWithFewerPricesAndBookings() {
+        ServiceEntity bare = service(1L, "Transmissiya yağı", "", "", 10000L, 12);
+        ServiceEntity named = service(2L, "Transmissiya yağı", "Gear oil", "Масло", 10000L, 12);
+        String bareCode = IndividualCatalogSync.codeOf("Transmissiya yağı", "", "");
+        String namedCode = IndividualCatalogSync.codeOf("Transmissiya yağı", "Gear oil", "Масло");
+        IndividualService bareRow = IndividualService.builder().id(20L).code(bareCode).active(true).build();
+        IndividualService namedRow = IndividualService.builder().id(21L).code(namedCode).active(true).build();
+        when(serviceEntityRepository.findAll()).thenReturn(List.of(bare, named));
+        when(individualServiceRepository.findByCode(any())).thenReturn(Optional.empty());
+        when(individualServiceRepository.findByCode(bareCode)).thenReturn(Optional.of(bareRow));
+        when(individualServiceRepository.findByCode(namedCode)).thenReturn(Optional.of(namedRow));
+        when(branchServiceRepository.countByIndividualService_Id(20L)).thenReturn(0L);
+        when(branchServiceRepository.countByIndividualService_Id(21L)).thenReturn(3L);
+        when(bookingLineRepository.countByIndividualServiceId(20L)).thenReturn(0L);
+        when(bookingLineRepository.countByIndividualServiceId(21L)).thenReturn(1L);
+        when(individualServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(namedRow));
+
+        sync.sync();
+
+        verify(branchServiceRepository).deleteByIndividualService_Id(20L);
+        verify(individualServiceRepository).delete(bareRow);
+        verify(individualServiceRepository, never()).delete(namedRow);
     }
 
     @Test
