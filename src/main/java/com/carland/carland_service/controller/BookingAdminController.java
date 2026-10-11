@@ -140,6 +140,65 @@ public class BookingAdminController {
         return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
     }
 
+    @PostMapping("/admin/booking-partners/{id}/active")
+    public String setPartnerActive(
+            @PathVariable Long id,
+            @RequestParam boolean active,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            bookingOrgService.setPartnerActive(id, active);
+            redirect.addFlashAttribute("detailMessage", active ? "Partner aktiv edildi" : "Partner deaktiv edildi");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
+    @PostMapping("/admin/booking-partners/{id}/branches/{branchId}/active")
+    public String setBranchActive(
+            @PathVariable Long id,
+            @PathVariable Long branchId,
+            @RequestParam boolean active,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            bookingOrgService.setBranchActive(id, branchId, active);
+            redirect.addFlashAttribute("detailMessage", active ? "Şöbə aktiv edildi" : "Şöbə deaktiv edildi");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
+    @PostMapping("/admin/booking-partners/{id}/staff/{staffId}/manual")
+    public String setStaffManual(
+            @PathVariable Long id,
+            @PathVariable Long staffId,
+            @RequestParam boolean disabled,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            bookingOrgService.setStaffManual(id, staffId, disabled);
+            redirect.addFlashAttribute("detailMessage", disabled ? "Staff deaktiv edildi" : "Staff aktiv edildi");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
     @PostMapping("/admin/booking-partners/{id}/staff")
     public String addStaff(
             @PathVariable Long id,

@@ -4,6 +4,8 @@ import com.carland.carland_service.dto.booking.BookingBranchView;
 import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
 import com.carland.carland_service.dto.booking.BookingStaffPartnerView;
 import com.carland.carland_service.dto.booking.StaffDisableRequest;
+import com.carland.carland_service.dto.booking.StaffLoginGateResponse;
+import com.carland.carland_service.dto.booking.StaffManualRequest;
 import com.carland.carland_service.dto.booking.StaffNotifySmsRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
@@ -12,6 +14,7 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
@@ -231,11 +234,74 @@ public class BookingOrgService {
         return provisioned;
     }
 
+    @Transactional(readOnly = true)
+    public StaffLoginGateResponse loginGate(Long userId) {
+        List<BookingStaff> rows = userId == null ? List.of() : staffRepository.findByUserId(userId);
+        if (rows.isEmpty()) {
+            return StaffLoginGateResponse.builder().result(StaffCooperation.ABSENT).build();
+        }
+        String result = rows.stream().anyMatch(StaffCooperation::placeOpen)
+                ? StaffCooperation.ALLOWED
+                : StaffCooperation.SUSPENDED;
+        return StaffLoginGateResponse.builder().result(result).build();
+    }
+
+    /** Place flag only. Does not hire back a hand-closed person. */
+    @Transactional
+    public void setPartnerActive(Long partnerId, boolean active) {
+        Partner partner = getPartner(partnerId);
+        partner.setActive(active);
+        partnerRepository.save(partner);
+        for (Branch branch : branchRepository.findByPartnerIdOrderByIdAsc(partnerId)) {
+            branch.setActive(active);
+            branchRepository.save(branch);
+        }
+        log.info("BOOKING_PARTNER_ACTIVE partnerId={} active={}", partnerId, active);
+    }
+
+    @Transactional
+    public void setBranchActive(Long partnerId, Long branchId, boolean active) {
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Şöbə tapılmadı"));
+        if (branch.getPartner() == null || !partnerId.equals(branch.getPartner().getId())) {
+            throw new ResourceNotFoundException("Şöbə tapılmadı");
+        }
+        branch.setActive(active);
+        branchRepository.save(branch);
+        log.info("BOOKING_BRANCH_ACTIVE partnerId={} branchId={} active={}", partnerId, branchId, active);
+    }
+
+    /**
+     * Hand-close or reopen one person. Leaves INVITED / ACTIVE as they are.
+     * Auth is updated first; the local flag follows so a failed auth call does not mark them closed.
+     */
+    @Transactional
+    public void setStaffManual(Long partnerId, Long staffId, boolean disabled) {
+        BookingStaff staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff tapılmadı"));
+        if (staff.getPartner() == null || !partnerId.equals(staff.getPartner().getId())) {
+            throw new ResourceNotFoundException("Staff tapılmadı");
+        }
+        try {
+            authStaffFeign.setManual(StaffManualRequest.builder()
+                    .userId(staff.getUserId())
+                    .disabled(disabled)
+                    .build());
+        } catch (FeignException ex) {
+            log.warn("STAFF_MANUAL_FEIGN_FAIL staffId={} status={}", staff.getUserId(), ex.status());
+            throw new ConflictException("Auth-da staff vəziyyəti yenilənmədi");
+        }
+        staff.setManuallyDisabled(disabled);
+        staffRepository.save(staff);
+        log.info("BOOKING_STAFF_MANUAL partnerId={} userId={} disabled={}", partnerId, staff.getUserId(), disabled);
+    }
+
     @Transactional
     public void activateStaff(Long userId) {
         List<BookingStaff> rows = staffRepository.findByUserId(userId);
         for (BookingStaff row : rows) {
-            if (BookingStaffStatus.DISABLED.name().equals(row.getStatus())) {
+            if (BookingStaffStatus.DISABLED.name().equals(row.getStatus())
+                    || Boolean.TRUE.equals(row.getManuallyDisabled())) {
                 continue;
             }
             row.setStatus(BookingStaffStatus.ACTIVE.name());
@@ -245,6 +311,11 @@ public class BookingOrgService {
 
     @Transactional
     public BookingStaffOrgResponse visiblePartner(Long userId, boolean mustChangePassword) {
+        return visiblePartner(userId, mustChangePassword, "az");
+    }
+
+    @Transactional
+    public BookingStaffOrgResponse visiblePartner(Long userId, boolean mustChangePassword, String acceptLanguage) {
         if (userId == null) {
             throw new ForbiddenException("Staff token required");
         }
@@ -257,6 +328,9 @@ public class BookingOrgService {
         if (rows.isEmpty()) {
             throw new ForbiddenException("Booking staff tapılmadı");
         }
+        if (rows.stream().noneMatch(StaffCooperation::placeOpen)) {
+            throw new ForbiddenException(MessagesLangValues.COOPERATION_SUSPENDED.getMessageByLang(acceptLanguage));
+        }
         boolean lazyActivate = rows.stream().anyMatch(row ->
                 BookingStaffStatus.INVITED.name().equals(row.getStatus()));
         if (lazyActivate) {
@@ -265,13 +339,7 @@ public class BookingOrgService {
                     .filter(row -> !BookingStaffStatus.DISABLED.name().equals(row.getStatus()))
                     .toList();
         }
-
         Partner partner = rows.get(0).getPartner();
-        if (Boolean.FALSE.equals(partner.getActive())) {
-            return BookingStaffOrgResponse.builder()
-                    .partner(toPartnerView(partner, List.of()))
-                    .build();
-        }
         boolean hq = rows.stream().anyMatch(row ->
                 BookingStaffRole.PARTNER_ADMIN.name().equals(row.getRole()) && row.getBranch() == null);
         List<Branch> branches;

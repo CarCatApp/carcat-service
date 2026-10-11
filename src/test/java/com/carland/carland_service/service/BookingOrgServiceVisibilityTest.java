@@ -18,11 +18,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -96,6 +98,62 @@ class BookingOrgServiceVisibilityTest {
                 .phoneNumber("+994701111111")
                 .build();
         when(staffRepository.findByUserId(9L)).thenReturn(List.of(hq));
-        assertTrue(service.visiblePartner(9L, false).getPartner().getBranches().isEmpty());
+        ForbiddenException ex = assertThrows(ForbiddenException.class, () -> service.visiblePartner(9L, false));
+        assertEquals("Əməkdaşlıq dayandırılıb", ex.getMessage());
+    }
+
+    @Test
+    void partnerReopenDoesNotCallStaffHireBack() {
+        Partner partner = Partner.builder().id(1L).active(false).source("hyper").build();
+        Branch branch = Branch.builder().id(10L).active(false).partner(partner).build();
+        when(partnerRepository.findById(1L)).thenReturn(Optional.of(partner));
+        when(branchRepository.findByPartnerIdOrderByIdAsc(1L)).thenReturn(List.of(branch));
+
+        service.setPartnerActive(1L, true);
+
+        assertEquals(true, partner.getActive());
+        assertEquals(true, branch.getActive());
+        verify(authStaffFeign, never()).setManual(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void loginGateKeepsHandClosedStaffOut() {
+        Partner partner = Partner.builder().id(1L).active(true).source("hyper").build();
+        BookingStaff fired = BookingStaff.builder()
+                .userId(9L)
+                .partner(partner)
+                .manuallyDisabled(true)
+                .status(BookingStaffStatus.ACTIVE.name())
+                .build();
+        when(staffRepository.findByUserId(9L)).thenReturn(List.of(fired));
+        assertEquals("SUSPENDED", service.loginGate(9L).getResult());
+    }
+
+    @Test
+    void loginGateSuspendsBranchStaffWhenBranchClosed() {
+        Partner partner = Partner.builder().id(1L).active(true).source("hyper").build();
+        Branch branch = Branch.builder().id(4L).active(false).partner(partner).build();
+        BookingStaff row = BookingStaff.builder()
+                .userId(8L)
+                .partner(partner)
+                .branch(branch)
+                .status(BookingStaffStatus.ACTIVE.name())
+                .role(BookingStaffRole.BRANCH_ADMIN.name())
+                .build();
+        when(staffRepository.findByUserId(8L)).thenReturn(List.of(row));
+        assertEquals("SUSPENDED", service.loginGate(8L).getResult());
+    }
+
+    @Test
+    void loginGateAllowsInvitedStaffWhenPlaceIsOpen() {
+        Partner partner = Partner.builder().id(1L).active(true).source("hyper").build();
+        BookingStaff row = BookingStaff.builder()
+                .userId(9L)
+                .partner(partner)
+                .status(BookingStaffStatus.INVITED.name())
+                .role(BookingStaffRole.PARTNER_ADMIN.name())
+                .build();
+        when(staffRepository.findByUserId(9L)).thenReturn(List.of(row));
+        assertEquals("ALLOWED", service.loginGate(9L).getResult());
     }
 }

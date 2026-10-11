@@ -56,6 +56,14 @@ public class BookingStaff {
     @Column(nullable = false, length = 32)
     String status;
 
+    /**
+     * Hand-closed by admin. Partner or branch reopen does not clear this.
+     * Null means not hand-closed.
+     */
+    @Column(name = "manually_disabled")
+    @Builder.Default
+    Boolean manuallyDisabled = false;
+
     @Column(nullable = false)
     String phoneNumber;
 

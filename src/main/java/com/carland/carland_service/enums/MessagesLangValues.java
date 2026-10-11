@@ -585,6 +585,12 @@ public enum MessagesLangValues {
             "Bu avtomobil üçün AI foto 2 dəqiqədə bir dəfə yaradıla bilər",
             "AI photo can be generated once every 2 minutes for this car",
             "AI-фото для этого автомобиля можно создать раз в 2 минуты"
+    ),
+
+    COOPERATION_SUSPENDED(
+            "Əməkdaşlıq dayandırılıb",
+            "Cooperation has been suspended",
+            "Сотрудничество приостановлено"
     );
 
     private final String azMessage;

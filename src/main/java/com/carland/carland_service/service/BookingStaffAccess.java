@@ -15,6 +15,8 @@ import com.carland.carland_service.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * tr: Takvim/geçmiş yazımı için aktif BookingStaff + şube yetkisi.
  * en: Active BookingStaff + branch permission for calendar/history writes.
@@ -42,11 +44,20 @@ public class BookingStaffAccess {
     }
 
     public BookingStaff requireActive(Long userId, String acceptLanguage) {
-        return staffRepository.findByUserId(userId).stream()
+        String lang = acceptLanguage == null ? "az" : acceptLanguage;
+        List<BookingStaff> rows = staffRepository.findByUserId(userId);
+        return rows.stream()
                 .filter(row -> BookingStaffStatus.ACTIVE.name().equals(row.getStatus()))
+                .filter(StaffCooperation::placeOpen)
                 .findFirst()
-                .orElseThrow(() -> new InvalidStatusException(
-                        MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage)));
+                .orElseThrow(() -> {
+                    if (rows.stream().anyMatch(row -> !StaffCooperation.placeOpen(row))) {
+                        return new ForbiddenException(
+                                MessagesLangValues.COOPERATION_SUSPENDED.getMessageByLang(lang));
+                    }
+                    return new InvalidStatusException(
+                            MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(lang));
+                });
     }
 
     public boolean isActiveStaff(Long userId) {
@@ -54,7 +65,8 @@ public class BookingStaffAccess {
             return false;
         }
         return staffRepository.findByUserId(userId).stream()
-                .anyMatch(row -> BookingStaffStatus.ACTIVE.name().equals(row.getStatus()));
+                .anyMatch(row -> BookingStaffStatus.ACTIVE.name().equals(row.getStatus())
+                        && StaffCooperation.placeOpen(row));
     }
 
     public Branch requireWritableBranch(BookingStaff staff, Long branchId, String acceptLanguage) {
@@ -66,6 +78,9 @@ public class BookingStaffAccess {
                         MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
         if (!branch.getPartner().getId().equals(staff.getPartner().getId())) {
             throw new ConflictException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
+        }
+        if (Boolean.FALSE.equals(branch.getActive()) || Boolean.FALSE.equals(branch.getPartner().getActive())) {
+            throw new ForbiddenException(MessagesLangValues.COOPERATION_SUSPENDED.getMessageByLang(acceptLanguage));
         }
         String role = staff.getRole();
         if (BookingStaffRole.PARTNER_ADMIN.name().equals(role)) {

@@ -62,6 +62,11 @@
   <div class="meta-line">
     <span class="badge" th:classappend="${partner.active} ? ' badge-success' : ' badge-neutral'"
           th:text="${partner.active} ? 'Aktiv' : 'Passiv'">Aktiv</span>
+    <form method="post" th:action="@{/admin/booking-partners/{id}/active(id=${partner.id})}" style="display:inline">
+      <input type="hidden" name="active" th:value="${!partner.active}">
+      <button class="btn btn-filter" type="submit"
+              th:text="${partner.active} ? 'Deaktiv et' : 'Aktiv et'">Deaktiv et</button>
+    </form>
     <span class="badge badge-neutral" th:text="${partner.contactPhone != null} ? ${partner.contactPhone} : 'Telefon yoxdur'">—</span>
     <span class="badge badge-neutral" th:text="${partner.contactEmail != null} ? ${partner.contactEmail} : 'Email yoxdur'">—</span>
   </div>
@@ -224,7 +229,7 @@
         <thead>
         <tr>
           <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th>
-          <th>Həftə içi</th><th>Şənbə</th><th>Bazar</th><th>Verified</th><th>Məkan</th><th></th>
+          <th>Həftə içi</th><th>Şənbə</th><th>Bazar</th><th>Verified</th><th>Məkan</th><th>Vəziyyət</th><th></th>
         </tr>
         </thead>
         <tbody>
@@ -264,9 +269,16 @@
             </label>
           </td>
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
+          <td>
+            <form method="post" th:action="@{/admin/booking-partners/{id}/branches/{branchId}/active(id=${partner.id}, branchId=${b.id})}">
+              <input type="hidden" name="active" th:value="${!b.active}">
+              <button class="btn btn-filter" type="submit"
+                      th:text="${b.active} ? 'Deaktiv et' : 'Aktiv et'">Deaktiv et</button>
+            </form>
+          </td>
           <td><button class="btn btn-filter" type="submit" th:form="'branch-edit-' + ${b.id}">Saxla</button></td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="10">Şöbə yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="11">Şöbə yoxdur</td></tr>
         </tbody>
       </table>
     </div>
@@ -321,7 +333,7 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>User</th><th>Ad</th><th>Soyad</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Email</th><th>Status</th></tr>
+          <tr><th>User</th><th>Ad</th><th>Soyad</th><th>Rol</th><th>Kapsam</th><th>Telefon</th><th>Email</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
         <tr th:each="s : ${staff}">
@@ -332,9 +344,19 @@
           <td th:text="${s.role == 'PARTNER_ADMIN'} ? 'Tüm partner şubeleri' : (${s.branch != null} ? ${s.branch.name} : '—')">—</td>
           <td th:text="${s.phoneNumber}">+994</td>
           <td th:text="${#strings.isEmpty(s.email) ? '—' : s.email}">—</td>
-          <td th:text="${s.status}">INVITED</td>
+          <td>
+            <span th:if="${s.manuallyDisabled}">Əl ilə bağlı</span>
+            <span th:unless="${s.manuallyDisabled}" th:text="${s.status}">INVITED</span>
+          </td>
+          <td>
+            <form method="post" th:action="@{/admin/booking-partners/{id}/staff/{staffId}/manual(id=${partner.id}, staffId=${s.id})}">
+              <input type="hidden" name="disabled" th:value="${!s.manuallyDisabled}">
+              <button class="btn btn-filter" type="submit"
+                      th:text="${s.manuallyDisabled} ? 'Aktiv et' : 'Deaktiv et'">Deaktiv et</button>
+            </form>
+          </td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="8">Staff yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(staff)}"><td colspan="9">Staff yoxdur</td></tr>
         </tbody>
       </table>
     </div>

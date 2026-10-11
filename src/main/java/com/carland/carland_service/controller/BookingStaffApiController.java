@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.booking.StaffNotesResponse;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffAuditRequest;
+import com.carland.carland_service.dto.booking.StaffLoginGateResponse;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.security.InternalTokenValidator;
 import com.carland.carland_service.security.WebhookAuthFailure;
@@ -45,10 +46,13 @@ public class BookingStaffApiController {
     private final BookingStaffAccess bookingStaffAccess;
 
     @GetMapping("/api/v1/booking/staff/branches")
-    public BookingStaffOrgResponse myBranches(HttpServletRequest request) {
+    public BookingStaffOrgResponse myBranches(
+            HttpServletRequest request,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
         Long userId = bookingStaffRequestAuth.userId(request);
         boolean mustChange = bookingStaffRequestAuth.mustChangePassword(request);
-        return bookingOrgService.visiblePartner(userId, mustChange);
+        return bookingOrgService.visiblePartner(userId, mustChange, acceptLanguage);
     }
 
     @GetMapping(value = "/api/v1/booking/staff/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -151,6 +155,19 @@ public class BookingStaffApiController {
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 bookingId, body, timezone, acceptLanguage);
+    }
+
+    @GetMapping("/api/v1/internal/booking/staff/login-gate")
+    public ResponseEntity<?> loginGate(@RequestParam Long userId, HttpServletRequest request) {
+        WebhookAuthValidationResult result = internalTokenValidator.validate(request);
+        if (!result.isValid()) {
+            HttpStatus status = result.getFailure() == WebhookAuthFailure.INTERNAL_TOKEN_NOT_CONFIGURED
+                    ? HttpStatus.SERVICE_UNAVAILABLE
+                    : HttpStatus.UNAUTHORIZED;
+            return ResponseEntity.status(status).body(Map.of("error", result.getFailure().name()));
+        }
+        StaffLoginGateResponse gate = bookingOrgService.loginGate(userId);
+        return ResponseEntity.ok(gate);
     }
 
     @PostMapping("/api/v1/internal/booking/staff/activate")
