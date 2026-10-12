@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.booking.BookingBranchProfileProductView;
 import com.carland.carland_service.dto.booking.BookingBranchProfileResponse;
 import com.carland.carland_service.dto.booking.BookingBranchProfileServiceView;
+import com.carland.carland_service.dto.booking.BookingBranchSocialLinkView;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchServiceCategory;
 import com.carland.carland_service.entity.Partner;
@@ -85,7 +86,19 @@ public class BookingBranchProfileService {
                         OffsetDateTime.now()))
                 .services(servicesOf(branch.getId(), packages, lang))
                 .products(List.of())
+                .socialMediaLinks(socialLinks(branch))
                 .build();
+    }
+
+    /** branches.instagram doluysa tek satır. Boşsa liste boş. */
+    private static List<BookingBranchSocialLinkView> socialLinks(Branch branch) {
+        String handle = branch.getInstagram();
+        if (handle == null || handle.isBlank()) {
+            return List.of();
+        }
+        return List.of(BookingBranchSocialLinkView.builder()
+                .socialMediaLink("instagram: " + handle.trim())
+                .build());
     }
 
     private List<BookingBranchProfileServiceView> servicesOf(Long branchId, int packageCount, String lang) {

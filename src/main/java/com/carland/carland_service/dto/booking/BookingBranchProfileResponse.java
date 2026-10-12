@@ -29,4 +29,5 @@ public class BookingBranchProfileResponse {
     Boolean open;
     List<BookingBranchProfileServiceView> services;
     List<BookingBranchProfileProductView> products;
+    List<BookingBranchSocialLinkView> socialMediaLinks;
 }

@@ -108,6 +108,10 @@ class BookingBranchProfileServiceTest {
         assertEquals("Узнайте проблему в сервисе", service.profile(7L, null, null, "ru").getServices().get(1).getInfo());
         assertEquals("Problemi servisdə öyrən", service.profile(7L, null, null, null).getServices().get(1).getInfo());
         assertTrue(out.getProducts().isEmpty());
+        assertTrue(out.getSocialMediaLinks().isEmpty());
+        branch.setInstagram("jdjdjdjd");
+        assertEquals("instagram: jdjdjdjd",
+                service.profile(7L, null, null, "en").getSocialMediaLinks().get(0).getSocialMediaLink());
         assertEquals(0.1, out.getDistanceKm(), 0.05);
     }
 
