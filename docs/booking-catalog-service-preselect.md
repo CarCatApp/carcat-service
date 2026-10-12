@@ -96,7 +96,7 @@ Eşleşme yok. Liste, fiyat ve yüzde bugünkü gibidir. `preselectedServiceId` 
 
 Alan yoksa istemci `preselected` için `false` okur. Diğer satırlara `false` yazılmaz.
 
-`carId` varsa her satırda `remainingKm` ve `remainingMonth` durur. Değer, yüzde için seçilen percentages satırındandır. `remainingKm` kalan kilometredir (`nextServiceKm` − araç km, 0’ın altına inmez). `remainingMonth` sonraki servise kalan gündür; percentages yanıtındaki `remainingMonths` ile aynı sayıdır, tipi sayıdır. Araç yoksa, eşleşen percentages satırı yoksa veya km/tarih eksikse alan `null`dır. `individualServiceMappedPercentage` ve `percentageNote` hesabı değişmez. Ön seçim ad okumaz.
+`carId` varsa her satırda `remainingKm` ve `remainingMonth` durur. Sayılar `GET /service/percentages` ile aynı yoldan gelir: elle düzenlenmiş satır kayıtlı son/sonrakini, CREATED satır Hyper ziyaretini, o da yoksa son servis artı şablon aralığını kullanır. Eşleşme, bu aracın şablonundaki `services.id` ile fərdi xidmətin `individual_service_sources` bağıdır. `remainingKm` o satırın `remainingKm` değeridir. `remainingMonth` o satırın `remainingMonths` gün sayısıdır, tipi sayıdır. Araç yoksa, bağlı şablon satırı yoksa veya km/tarih eksikse alan `null`dır. `individualServiceMappedPercentage` ve `percentageNote` hesabı değişmez. Ön seçim ad okumaz.
 
 ## Şube listesi
 

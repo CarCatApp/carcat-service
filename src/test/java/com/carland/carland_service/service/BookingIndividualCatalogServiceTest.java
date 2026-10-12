@@ -10,6 +10,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.entity.Percentage;
 import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -32,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +57,7 @@ class BookingIndividualCatalogServiceTest {
     @Mock PercentageRepository percentageRepository;
     @Mock ServiceEntityRepository serviceEntityRepository;
     @Mock IndividualServiceSourceRepository individualServiceSourceRepository;
+    @Mock PercentageLifeService percentageLifeService;
 
     BookingIndividualCatalogService service;
     ObjectMapper json = JsonMapper.builder().addModule(new Jdk8Module()).build();
@@ -69,6 +73,7 @@ class BookingIndividualCatalogServiceTest {
                 percentageRepository,
                 serviceEntityRepository,
                 individualServiceSourceRepository,
+                percentageLifeService,
                 new ObjectMapper());
     }
 
@@ -178,6 +183,10 @@ class BookingIndividualCatalogServiceTest {
                         .lastServiceDate(LocalDate.of(2024, 1, 1)).nextServiceDate(LocalDate.of(2025, 1, 1))
                         .build()
         ));
+        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(100L, new PercentageLifeService.Snapshot(0, 0)));
+        when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
+                IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
+        ));
 
         BookingIndividualServicesResponse out = service.list(12L, "en", null, 5L, 9L, null, null);
 
@@ -243,6 +252,10 @@ class BookingIndividualCatalogServiceTest {
                         .lastServiceKm(10000).nextServiceKm(20000)
                         .lastServiceDate(LocalDate.now().minusDays(10)).nextServiceDate(next)
                         .build()
+        ));
+        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(100L, new PercentageLifeService.Snapshot(5000, 40)));
+        when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
+                IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
         ));
 
         BookingIndividualServicesResponse out = service.list(12L, "en", "all", 5L, 9L, null, null);

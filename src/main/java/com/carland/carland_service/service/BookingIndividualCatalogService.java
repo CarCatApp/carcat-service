@@ -11,6 +11,7 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
+import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.entity.Percentage;
 import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -58,6 +59,7 @@ public class BookingIndividualCatalogService {
     private final PercentageRepository percentageRepository;
     private final ServiceEntityRepository serviceEntityRepository;
     private final IndividualServiceSourceRepository individualServiceSourceRepository;
+    private final PercentageLifeService percentageLifeService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -89,6 +91,8 @@ public class BookingIndividualCatalogService {
         String missingNote = missingNote(lang);
         List<BranchIndividualService> found = branchIndividualServiceRepository.findByBranch_Id(branchId);
         List<BranchIndividualService> rows = new ArrayList<>(found == null ? List.of() : found);
+        Map<Long, PercentageLifeService.Snapshot> lives = carId == null ? Map.of() : livesOf(carId);
+        Map<Long, List<Long>> serviceIdsByIndividual = lives.isEmpty() ? Map.of() : linksOf(rows);
         rows.sort(Comparator
                 .comparing((BranchIndividualService row) -> sortOf(row.getIndividualService()))
                 .thenComparing(row -> row.getIndividualService() == null ? 0L : row.getIndividualService().getId()));
@@ -115,10 +119,11 @@ public class BookingIndividualCatalogService {
                 } else {
                     note = missingNote;
                 }
-                if (fact != null) {
-                    remainingKm = fact.remainingKm();
-                    remainingMonth = fact.remainingMonth();
-                }
+            }
+            PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), serviceIdsByIndividual, lives);
+            if (life != null) {
+                remainingKm = life.remainingKm();
+                remainingMonth = life.remainingDays();
             }
             services.add(toView(catalog, row, lang, percentage, note, remainingKm, remainingMonth));
         }
@@ -172,6 +177,63 @@ public class BookingIndividualCatalogService {
             return false;
         }
         return "CAR_SERVICE".equals(bookingEntry.trim().toUpperCase(Locale.ROOT));
+    }
+
+    /** Same remaining numbers as GET /service/percentages, keyed by services.id. */
+    private Map<Long, PercentageLifeService.Snapshot> livesOf(Long carId) {
+        Car car = carRepository.findByCarId(carId);
+        if (car == null) {
+            return Map.of();
+        }
+        Map<Long, PercentageLifeService.Snapshot> lives = percentageLifeService.byServiceId(car);
+        return lives == null ? Map.of() : lives;
+    }
+
+    private Map<Long, List<Long>> linksOf(List<BranchIndividualService> rows) {
+        List<Long> individualIds = new ArrayList<>();
+        for (BranchIndividualService row : rows) {
+            IndividualService catalog = row.getIndividualService();
+            if (catalog != null && catalog.getId() != null) {
+                individualIds.add(catalog.getId());
+            }
+        }
+        if (individualIds.isEmpty()) {
+            return Map.of();
+        }
+        List<IndividualServiceSource> links = individualServiceSourceRepository.findByIndividualServiceIdIn(individualIds);
+        Map<Long, List<Long>> byIndividual = new HashMap<>();
+        if (links != null) {
+            for (IndividualServiceSource link : links) {
+                if (link.getIndividualServiceId() == null || link.getServiceId() == null) {
+                    continue;
+                }
+                byIndividual.computeIfAbsent(link.getIndividualServiceId(), ignored -> new ArrayList<>())
+                        .add(link.getServiceId());
+            }
+        }
+        return byIndividual;
+    }
+
+    /** The car's template service linked to this individual service. Smallest id if several match. */
+    private static PercentageLifeService.Snapshot lifeOf(Long individualServiceId, Map<Long, List<Long>> serviceIdsByIndividual,
+                                                          Map<Long, PercentageLifeService.Snapshot> lives) {
+        if (individualServiceId == null || lives == null || lives.isEmpty()) {
+            return null;
+        }
+        List<Long> serviceIds = serviceIdsByIndividual.get(individualServiceId);
+        if (serviceIds == null || serviceIds.isEmpty()) {
+            return null;
+        }
+        Long chosen = null;
+        for (Long serviceId : serviceIds) {
+            if (!lives.containsKey(serviceId)) {
+                continue;
+            }
+            if (chosen == null || serviceId < chosen) {
+                chosen = serviceId;
+            }
+        }
+        return chosen == null ? null : lives.get(chosen);
     }
 
     /**

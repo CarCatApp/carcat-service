@@ -16,6 +16,7 @@ import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.CarAiPhotoGenerateLock;
 import com.carland.carland_service.service.HyperPercentageSyncService;
+import com.carland.carland_service.service.PercentageLifeService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.PushNotificationService;
 import com.carland.carland_service.service.RedisCacheService;
@@ -2016,7 +2017,7 @@ public class CarServiceImpl implements CarService {
         if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
             return null;
         }
-        return (int) Math.max(nextServiceKm - carMileage, 0);
+        return PercentageLifeService.remainingKm(lastServiceKm, nextServiceKm, carMileage);
     }
 
     /**
@@ -2024,11 +2025,8 @@ public class CarServiceImpl implements CarService {
      * en: Returns the remaining days to the next service as a string (clamped at 0); null when either date is null.
      */
     private String computeRemainingDaysValue(LocalDate lastServiceDate, LocalDate nextServiceDate) {
-        if (lastServiceDate == null || nextServiceDate == null) {
-            return null;
-        }
-        long remainingDays = Math.max(nextServiceDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
-        return String.valueOf(remainingDays);
+        Integer days = PercentageLifeService.remainingDays(lastServiceDate, nextServiceDate);
+        return days == null ? null : String.valueOf(days);
     }
 
     /**
