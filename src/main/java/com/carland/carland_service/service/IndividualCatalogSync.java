@@ -1,10 +1,12 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.entity.IndividualService;
+import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,9 +32,13 @@ import java.util.stream.Collectors;
  * tr: Fərdi kataloq, percentage'nin kopyalandığı services satırlarından gelir.
  *     Üç dil adı (boşluk və böyük hərf sayılmaz) aynıysa tek satır. Mock MYF…TKD silinir.
  *     Şablondan düşen ad pasif kalır, satır və şube fiyatı silinmez.
+ *     individual_service_sources hər açılışda yenidən yazılır: eyni ada düşən bütün services.id
+ *     bir kataloq satırına bağlanır. İstək anında ad oxunmur.
  * en: The individual catalog is the distinct services rows percentages are copied from.
  *     One row when the three names match ignoring space and case. Mock MYF…TKD codes are removed.
  *     A name that leaves the templates stays inactive; the row and branch prices stay.
+ *     individual_service_sources is rewritten on every startup: every services.id that shares a name
+ *     points at one catalog row. The request path does not read names.
  */
 @Slf4j
 @Service
@@ -48,6 +55,7 @@ public class IndividualCatalogSync {
     private final IndividualServiceRepository individualServiceRepository;
     private final BranchIndividualServiceRepository branchServiceRepository;
     private final BookingIndividualLineRepository bookingLineRepository;
+    private final IndividualServiceSourceRepository sourceRepository;
     private final ServiceCategoryJson json;
 
     @Transactional
@@ -87,8 +95,50 @@ public class IndividualCatalogSync {
             individualServiceRepository.save(row);
             deactivated++;
         }
-        log.info("INDIVIDUAL_CATALOG_SYNC added={} updated={} deactivated={} mocks={}",
-                added, updated, deactivated, removedMocks);
+        individualServiceRepository.flush();
+        int links = replaceSources(desired);
+        log.info("INDIVIDUAL_CATALOG_SYNC added={} updated={} deactivated={} mocks={} links={}",
+                added, updated, deactivated, removedMocks, links);
+    }
+
+    /**
+     * tr: Cədvəli başdan yazır. Pasif kataloqun köhnə service_id-ləri qalmaz.
+     * en: Rewrites the table. A deactivated catalog row does not keep old service ids.
+     */
+    private int replaceSources(List<Desired> desired) {
+        sourceRepository.deleteAllInBatch();
+        List<IndividualServiceSource> links = new ArrayList<>();
+        if (desired != null) {
+            for (Desired item : desired) {
+                IndividualService row = individualServiceRepository.findByCode(item.code()).orElse(null);
+                if (row == null || row.getId() == null || !Boolean.TRUE.equals(row.getActive())) {
+                    continue;
+                }
+                for (Long serviceId : distinctIds(item.serviceIds())) {
+                    links.add(IndividualServiceSource.builder()
+                            .serviceId(serviceId)
+                            .individualServiceId(row.getId())
+                            .build());
+                }
+            }
+        }
+        if (!links.isEmpty()) {
+            sourceRepository.saveAll(links);
+        }
+        return links.size();
+    }
+
+    private static List<Long> distinctIds(List<Long> serviceIds) {
+        if (serviceIds == null || serviceIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> seen = new LinkedHashSet<>();
+        for (Long serviceId : serviceIds) {
+            if (serviceId != null) {
+                seen.add(serviceId);
+            }
+        }
+        return List.copyOf(seen);
     }
 
     /**
@@ -121,6 +171,7 @@ public class IndividualCatalogSync {
                 }
                 int loserScore = usage(loser.code());
                 if (loserScore < winnerScore || (loserScore == 0 && winnerScore == 0)) {
+                    takeIds(winner, loser.serviceIds());
                     dropCatalog(loser.code());
                     continue;
                 }
@@ -198,8 +249,17 @@ public class IndividualCatalogSync {
                     continue;
                 }
                 Desired current = grouped.get(key);
-                if (current == null || row.getId() < current.sourceId()) {
-                    grouped.put(key, new Desired(null, 0, az, en, ru, row.getId(), key));
+                if (current == null) {
+                    grouped.put(key, new Desired(null, 0, az, en, ru, row.getId(), key, idsOf(row.getId())));
+                    continue;
+                }
+                List<Long> merged = new ArrayList<>(current.serviceIds());
+                merged.add(row.getId());
+                if (row.getId() < current.sourceId()) {
+                    grouped.put(key, new Desired(null, 0, az, en, ru, row.getId(), key, merged));
+                } else {
+                    grouped.put(key, new Desired(null, 0, current.az(), current.en(), current.ru(),
+                            current.sourceId(), key, merged));
                 }
             }
         }
@@ -214,7 +274,8 @@ public class IndividualCatalogSync {
         int sort = 1;
         for (Desired item : sorted) {
             String code = codeFor(item.key(), used);
-            out.add(new Desired(code, sort, item.az(), item.en(), item.ru(), item.sourceId(), item.key()));
+            out.add(new Desired(code, sort, item.az(), item.en(), item.ru(), item.sourceId(), item.key(),
+                    new ArrayList<>(item.serviceIds())));
             sort++;
         }
         return out;
@@ -271,5 +332,24 @@ public class IndividualCatalogSync {
         }
     }
 
-    record Desired(String code, int sortOrder, String az, String en, String ru, long sourceId, String key) {}
+    private static void takeIds(Desired winner, List<Long> extra) {
+        if (extra == null || extra.isEmpty()) {
+            return;
+        }
+        List<Long> ids = winner.serviceIds();
+        for (Long id : extra) {
+            if (id != null && !ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+    }
+
+    private static List<Long> idsOf(Long serviceId) {
+        List<Long> ids = new ArrayList<>();
+        ids.add(serviceId);
+        return ids;
+    }
+
+    record Desired(String code, int sortOrder, String az, String en, String ru, long sourceId, String key,
+                   List<Long> serviceIds) {}
 }

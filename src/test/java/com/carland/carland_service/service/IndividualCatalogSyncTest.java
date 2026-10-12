@@ -1,10 +1,12 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.entity.IndividualService;
+import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +36,7 @@ class IndividualCatalogSyncTest {
     @Mock IndividualServiceRepository individualServiceRepository;
     @Mock BranchIndividualServiceRepository branchServiceRepository;
     @Mock BookingIndividualLineRepository bookingLineRepository;
+    @Mock IndividualServiceSourceRepository sourceRepository;
 
     IndividualCatalogSync sync;
 
@@ -42,6 +47,7 @@ class IndividualCatalogSyncTest {
                 individualServiceRepository,
                 branchServiceRepository,
                 bookingLineRepository,
+                sourceRepository,
                 new ServiceCategoryJson(new ObjectMapper()));
     }
 
@@ -57,6 +63,8 @@ class IndividualCatalogSyncTest {
         assertEquals("Hava filtri", rows.get(0).az());
         assertEquals("Mühərrik yağı", rows.get(1).az());
         assertEquals(2L, rows.get(1).sourceId());
+        assertEquals(Set.of(3L), Set.copyOf(rows.get(0).serviceIds()));
+        assertEquals(Set.of(2L, 9L), Set.copyOf(rows.get(1).serviceIds()));
         assertTrue(rows.get(0).code().matches("[A-Z0-9]{8}"));
         assertEquals(rows.get(0).code(), IndividualCatalogSync.codeFor(rows.get(0).key(), new java.util.HashSet<>()));
     }
@@ -87,6 +95,7 @@ class IndividualCatalogSyncTest {
         assertTrue(saved.getAllValues().stream().anyMatch(row ->
                 "ABCD1234".equals(row.getCode()) && Boolean.FALSE.equals(row.getActive())));
         verify(branchServiceRepository, never()).deleteByIndividualService_Id(8L);
+        verify(sourceRepository).deleteAllInBatch();
     }
 
     @Test
@@ -112,12 +121,43 @@ class IndividualCatalogSyncTest {
         verify(branchServiceRepository).deleteByIndividualService_Id(20L);
         verify(individualServiceRepository).delete(bareRow);
         verify(individualServiceRepository, never()).delete(namedRow);
+        assertEquals(Set.of(1L, 2L), savedServiceIds());
+        assertTrue(savedLinks().stream().allMatch(link -> Long.valueOf(21L).equals(link.getIndividualServiceId())));
+    }
+
+    @Test
+    void sameNameTemplateIdsShareOneCatalogRow() {
+        ServiceEntity first = service(2L, "Mühərrik yağı", "Engine oil", "Масло", 10000L, 12);
+        ServiceEntity second = service(9L, "mühərrik   yağı", "ENGINE OIL", "масло", 15000L, 6);
+        String code = IndividualCatalogSync.codeOf("Mühərrik yağı", "Engine oil", "Масло");
+        IndividualService row = IndividualService.builder().id(50L).code(code).active(true).build();
+        when(serviceEntityRepository.findAll()).thenReturn(List.of(first, second));
+        when(individualServiceRepository.findByCode(any())).thenReturn(Optional.empty());
+        when(individualServiceRepository.findByCode(code)).thenReturn(Optional.of(row));
+        when(individualServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(row));
+
+        sync.sync();
+
+        assertEquals(Set.of(2L, 9L), savedServiceIds());
+        assertTrue(savedLinks().stream().allMatch(link -> Long.valueOf(50L).equals(link.getIndividualServiceId())));
+        verify(sourceRepository).deleteAllInBatch();
     }
 
     @Test
     void normalizeDropsSpaceAndCase() {
         assertEquals(IndividualCatalogSync.normalize("Engine  OIL"), IndividualCatalogSync.normalize("engine oil"));
         assertFalse(IndividualCatalogSync.normalize("Air").equals(IndividualCatalogSync.normalize("Oil")));
+    }
+
+    private Set<Long> savedServiceIds() {
+        return savedLinks().stream().map(IndividualServiceSource::getServiceId).collect(Collectors.toSet());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<IndividualServiceSource> savedLinks() {
+        ArgumentCaptor<List<IndividualServiceSource>> saved = ArgumentCaptor.forClass(List.class);
+        verify(sourceRepository).saveAll(saved.capture());
+        return saved.getValue();
     }
 
     private static String titleAz(IndividualService row) {

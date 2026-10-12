@@ -432,7 +432,11 @@ public class BookingOrgService {
                         .build());
             }
         } catch (Exception ex) {
-            log.warn("STAFF_NOTIFY_FAIL channel={} phone={}", channel, phone);
+            Throwable cause = ex;
+            while (cause.getCause() != null && cause.getCause() != cause) {
+                cause = cause.getCause();
+            }
+            log.warn("STAFF_NOTIFY_FAIL channel={} phone={} cause={}", channel, phone, cause.getClass().getSimpleName());
         }
     }
 

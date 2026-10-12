@@ -20,6 +20,7 @@ import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.carland.carland_service.repository.PercentageRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -32,8 +33,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * tr: Müşteriye şubenin açık fərdi xidmət listesi.
@@ -52,6 +57,7 @@ public class BookingIndividualCatalogService {
     private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final PercentageRepository percentageRepository;
     private final ServiceEntityRepository serviceEntityRepository;
+    private final IndividualServiceSourceRepository individualServiceSourceRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -69,7 +75,8 @@ public class BookingIndividualCatalogService {
 
     @Transactional(readOnly = true)
     public BookingIndividualServicesResponse list(Long branchId, String acceptLanguage, String filter,
-                                                   Long carId, Long userId) {
+                                                   Long carId, Long userId, String bookingEntry,
+                                                   Long catalogServiceId) {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
         if (!Boolean.TRUE.equals(branch.getActive())
@@ -99,6 +106,8 @@ public class BookingIndividualCatalogService {
             }
             Integer percentage = null;
             String note = null;
+            Integer remainingKm = null;
+            Integer remainingMonth = null;
             if (byCode != null) {
                 ServiceFact fact = byCode.get(catalog.getCode());
                 if (fact != null && fact.known()) {
@@ -106,10 +115,63 @@ public class BookingIndividualCatalogService {
                 } else {
                     note = missingNote;
                 }
+                if (fact != null) {
+                    remainingKm = fact.remainingKm();
+                    remainingMonth = fact.remainingMonth();
+                }
             }
-            services.add(toView(catalog, row, lang, percentage, note));
+            services.add(toView(catalog, row, lang, percentage, note, remainingKm, remainingMonth));
         }
-        return BookingIndividualServicesResponse.builder().branchId(branchId).services(services).build();
+        return BookingIndividualServicesResponse.builder()
+                .branchId(branchId)
+                .services(services)
+                .preselectedServiceId(applyPreselect(services, bookingEntry, catalogServiceId))
+                .build();
+    }
+
+    /**
+     * tr: CAR_SERVICE deyilsə null (alan JSON-da yoxdur). Eşleşme yoxdursa boş Optional (JSON null).
+     *     Ad oxunmur. Siyahı daralmaz. Bir neçə sətir varsa ən kiçik individual_services.id işarələnir.
+     * en: Null when this is not CAR_SERVICE (the field is absent). Empty Optional when nothing matches (JSON null).
+     *     Names are not read. The list is not narrowed. Several rows mark the smallest individual_services.id.
+     */
+    private Optional<Long> applyPreselect(List<BookingIndividualServiceView> services, String bookingEntry,
+                                           Long catalogServiceId) {
+        if (!carServiceEntry(bookingEntry)) {
+            return null;
+        }
+        Long winner = null;
+        if (catalogServiceId != null) {
+            List<Long> linked = individualServiceSourceRepository.findIndividualServiceIdsByServiceId(catalogServiceId);
+            Set<Long> ids = linked == null ? Set.of() : new HashSet<>(linked);
+            for (BookingIndividualServiceView view : services) {
+                Long id = view.getId();
+                if (id == null || !ids.contains(id)) {
+                    continue;
+                }
+                if (winner == null || id < winner) {
+                    winner = id;
+                }
+            }
+        }
+        if (winner != null) {
+            for (BookingIndividualServiceView view : services) {
+                if (winner.equals(view.getId())) {
+                    view.setPreselected(true);
+                    view.setCatalogServiceId(catalogServiceId);
+                    break;
+                }
+            }
+        }
+        return winner == null ? Optional.empty() : Optional.of(winner);
+    }
+
+    /** Trim and upper case. Anything other than CAR_SERVICE is the standard list. */
+    private static boolean carServiceEntry(String bookingEntry) {
+        if (bookingEntry == null) {
+            return false;
+        }
+        return "CAR_SERVICE".equals(bookingEntry.trim().toUpperCase(Locale.ROOT));
     }
 
     /**
@@ -173,7 +235,11 @@ public class BookingIndividualCatalogService {
             Integer current = score.get(code);
             if (current == null || rowScore < current || (rowScore == current && rowNext < nextDay.getOrDefault(code, Long.MAX_VALUE))) {
                 boolean known = knownServicedStatus(statusByService.get(row.getServiceId()));
-                best.put(code, new ServiceFact(known ? nearer : null, known));
+                best.put(code, new ServiceFact(
+                        known ? nearer : null,
+                        known,
+                        remainingKmOf(row.getLastServiceKm(), row.getNextServiceKm(), car.getMileage()),
+                        remainingMonthOf(row.getLastServiceDate(), row.getNextServiceDate())));
                 score.put(code, rowScore);
                 nextDay.put(code, rowNext);
             }
@@ -200,7 +266,31 @@ public class BookingIndividualCatalogService {
         return "Bu servis üzrə məlumat daxil edilməyib";
     }
 
-    private record ServiceFact(Integer percentage, boolean known) {
+    private record ServiceFact(Integer percentage, boolean known, Integer remainingKm, Integer remainingMonth) {
+    }
+
+    /** Same remaining km as GET /service/percentages. */
+    private static Integer remainingKmOf(Integer lastKm, Integer nextKm, Long mileage) {
+        if (lastKm == null || nextKm == null || mileage == null) {
+            return null;
+        }
+        long remaining = nextKm - mileage;
+        if (remaining > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.max(remaining, 0);
+    }
+
+    /** Same remaining-day count percentages returns as remainingMonths. */
+    private static Integer remainingMonthOf(LocalDate lastDate, LocalDate nextDate) {
+        if (lastDate == null || nextDate == null) {
+            return null;
+        }
+        long days = Math.max(nextDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
+        if (days > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) days;
     }
 
     private static Integer nearerPercent(Integer km, Integer month) {
@@ -241,7 +331,8 @@ public class BookingIndividualCatalogService {
     }
 
     private BookingIndividualServiceView toView(IndividualService catalog, BranchIndividualService row, String lang,
-                                                Integer percentage, String percentageNote) {
+                                                Integer percentage, String percentageNote,
+                                                Integer remainingKm, Integer remainingMonth) {
         int[] qepik = BookingSelectionViews.qepik(row.getPriceSimple(), row.getPriceMedium(), row.getPriceComplex());
         Integer medium = row.getPriceMedium();
         return BookingIndividualServiceView.builder()
@@ -255,6 +346,8 @@ public class BookingIndividualCatalogService {
                 .unit(BookingCreateService.UNIT)
                 .individualServiceMappedPercentage(percentage)
                 .percentageNote(percentageNote)
+                .remainingKm(remainingKm)
+                .remainingMonth(remainingMonth)
                 .build();
     }
 

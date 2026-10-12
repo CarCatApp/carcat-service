@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +24,14 @@ public class BookingIndividualServiceView {
     Integer individualServiceMappedPercentage;
     /** servicedStatus boşken yüzde yerine gösterilen cümle. */
     String percentageNote;
+    /** Kalan km. Percentages ile aynı: nextServiceKm − araç km, 0’ın altına inmez. Araç veya kayıt yoksa null. */
+    Integer remainingKm;
+    /** Sonraki servise kalan gün. Percentages remainingMonths ile aynı sayı. Araç veya tarih yoksa null. */
+    Integer remainingMonth;
+    /** CAR_SERVICE eşleşmesinde true. Alan yoksa istemci false okur. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    Boolean preselected;
+    /** Gönderilen percentages serviceId. Yalnız işaretli satırda durur. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    Long catalogServiceId;
 }

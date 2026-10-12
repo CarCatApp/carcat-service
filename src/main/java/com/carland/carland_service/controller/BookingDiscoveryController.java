@@ -126,10 +126,13 @@ public class BookingDiscoveryController {
             @PathVariable Long branchId,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) Long carId,
+            @RequestParam(required = false) String bookingEntry,
+            @RequestParam(required = false) Long catalogServiceId,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
         Long userId = carId == null ? null : parseUserId(userIdHeader);
-        return bookingIndividualCatalogService.list(branchId, acceptLanguage, filter, carId, userId);
+        return bookingIndividualCatalogService.list(
+                branchId, acceptLanguage, filter, carId, userId, bookingEntry, catalogServiceId);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}/catalog")
