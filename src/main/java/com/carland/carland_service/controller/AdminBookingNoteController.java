@@ -37,7 +37,8 @@ public class AdminBookingNoteController {
         if (!adminAccessService.isPanelAdmin(request)) {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
-        model.addAttribute("cancelNotes", bookingStaffNoteService.rows(BookingStaffNote.CANCEL));
+        model.addAttribute("rejectNotes", bookingStaffNoteService.rows(BookingStaffNote.REJECT));
+        model.addAttribute("cancelNotes", bookingStaffNoteService.cancelReasonRows());
         model.addAttribute("noShowNotes", bookingStaffNoteService.rows(BookingStaffNote.NO_SHOW));
         return "booking-notes";
     }
@@ -59,7 +60,9 @@ public class AdminBookingNoteController {
         if (!adminAccessService.isPanelAdmin(request)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        bookingStaffNoteService.delete(body == null ? null : body.getId());
+        bookingStaffNoteService.delete(
+                body == null ? null : body.getId(),
+                body == null ? null : body.getKind());
         return ResponseEntity.noContent().build();
     }
 }

@@ -5,10 +5,12 @@ import com.carland.carland_service.dto.booking.StaffNoteView;
 import com.carland.carland_service.dto.booking.StaffNotesResponse;
 import com.carland.carland_service.dto.request.AdminBookingNoteSaveRequest;
 import com.carland.carland_service.dto.response.AdminBookingNoteRow;
+import com.carland.carland_service.entity.BookingCancelReason;
 import com.carland.carland_service.entity.BookingStaffNote;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingStaffNoteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class BookingStaffNoteService {
     private static final int NOTE_MAX = 500;
 
     private final BookingStaffNoteRepository noteRepository;
+    private final BookingCancelReasonRepository cancelReasonRepository;
     private final ServiceCategoryJson json;
 
     public record Applied(String code, String note) {}
@@ -36,8 +39,30 @@ public class BookingStaffNoteService {
     @Transactional(readOnly = true)
     public List<AdminBookingNoteRow> rows(String kind) {
         List<AdminBookingNoteRow> rows = new ArrayList<>();
-        for (BookingStaffNote note : noteRepository.findByKindOrderBySortOrderAscIdAsc(requireKind(kind))) {
+        for (BookingStaffNote note : notesOf(requireKind(kind))) {
             rows.add(toRow(note));
+        }
+        return rows;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminBookingNoteRow> cancelReasonRows() {
+        List<AdminBookingNoteRow> rows = new ArrayList<>();
+        List<BookingCancelReason> found = cancelReasonRepository.findAllByOrderBySortOrderAscIdAsc();
+        if (found == null) {
+            return rows;
+        }
+        for (BookingCancelReason reason : found) {
+            Map<String, String> titles = json.read(reason.getTitleJson());
+            rows.add(AdminBookingNoteRow.builder()
+                    .id(reason.getId())
+                    .kind("customer_cancel")
+                    .code(reason.getCode())
+                    .titleAz(titles.getOrDefault("az", ""))
+                    .titleEn(titles.getOrDefault("en", ""))
+                    .titleRu(titles.getOrDefault("ru", ""))
+                    .sortOrder(reason.getSortOrder())
+                    .build());
         }
         return rows;
     }
@@ -45,6 +70,9 @@ public class BookingStaffNoteService {
     @Transactional
     public AdminBookingNoteRow save(AdminBookingNoteSaveRequest request) {
         AdminBookingNoteSaveRequest body = request == null ? new AdminBookingNoteSaveRequest() : request;
+        if ("customer_cancel".equals(body.getKind() == null ? "" : body.getKind().trim().toLowerCase())) {
+            return saveCancelReason(body);
+        }
         String kind = requireKind(body.getKind());
         String az = text(body.getTitleAz());
         if (az.isEmpty()) {
@@ -67,9 +95,16 @@ public class BookingStaffNoteService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, String kind) {
         if (id == null) {
             throw MissingFieldException.required("id");
+        }
+        if ("customer_cancel".equals(kind == null ? "" : kind.trim().toLowerCase())) {
+            if (!cancelReasonRepository.existsById(id)) {
+                throw new ResourceNotFoundException("note not found");
+            }
+            cancelReasonRepository.deleteById(id);
+            return;
         }
         if (!noteRepository.existsById(id)) {
             throw new ResourceNotFoundException("note not found");
@@ -82,7 +117,7 @@ public class BookingStaffNoteService {
         String wanted = requireKind(kind);
         String lang = BookingMineService.langOf(acceptLanguage);
         List<StaffNoteView> items = new ArrayList<>();
-        for (BookingStaffNote note : noteRepository.findByKindOrderBySortOrderAscIdAsc(wanted)) {
+        for (BookingStaffNote note : notesOf(wanted)) {
             items.add(StaffNoteView.builder().id(note.getId()).title(sentence(note, lang)).build());
         }
         return StaffNotesResponse.builder().kind(wanted).items(items).build();
@@ -99,7 +134,7 @@ public class BookingStaffNoteService {
         if (body.getNoteId() != null) {
             BookingStaffNote note = noteRepository.findById(body.getNoteId())
                     .orElseThrow(() -> new ResourceNotFoundException("note not found"));
-            if (!requireKind(kind).equals(note.getKind())) {
+            if (!sameKind(requireKind(kind), note.getKind())) {
                 throw new ResourceNotFoundException("note not found");
             }
             return new Applied(note.getCode(), sentence(note, lang));
@@ -142,9 +177,68 @@ public class BookingStaffNoteService {
         return "";
     }
 
+    private List<BookingStaffNote> notesOf(String kind) {
+        if (BookingStaffNote.REJECT.equals(kind) || BookingStaffNote.CANCEL.equals(kind)) {
+            List<BookingStaffNote> rows = new ArrayList<>();
+            List<BookingStaffNote> reject = noteRepository.findByKindOrderBySortOrderAscIdAsc(BookingStaffNote.REJECT);
+            List<BookingStaffNote> legacy = noteRepository.findByKindOrderBySortOrderAscIdAsc(BookingStaffNote.CANCEL);
+            if (reject != null) {
+                rows.addAll(reject);
+            }
+            if (legacy != null) {
+                rows.addAll(legacy);
+            }
+            rows.sort(java.util.Comparator
+                    .comparing((BookingStaffNote note) -> note.getSortOrder() == null ? 0 : note.getSortOrder())
+                    .thenComparing(note -> note.getId() == null ? 0L : note.getId()));
+            return rows;
+        }
+        List<BookingStaffNote> found = noteRepository.findByKindOrderBySortOrderAscIdAsc(kind);
+        return found == null ? List.of() : found;
+    }
+
+    private AdminBookingNoteRow saveCancelReason(AdminBookingNoteSaveRequest body) {
+        String az = text(body.getTitleAz());
+        if (az.isEmpty()) {
+            throw MissingFieldException.required("titleAz");
+        }
+        BookingCancelReason reason = body.getId() == null
+                ? new BookingCancelReason()
+                : cancelReasonRepository.findById(body.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("note not found"));
+        reason.setTitleJson(json.write(az, text(body.getTitleEn()), text(body.getTitleRu())));
+        reason.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
+        if (reason.getActive() == null) {
+            reason.setActive(true);
+        }
+        if (reason.getCode() == null || reason.getCode().isBlank()) {
+            reason.setCode("cancel_" + System.nanoTime());
+        }
+        BookingCancelReason saved = cancelReasonRepository.save(reason);
+        Map<String, String> titles = json.read(saved.getTitleJson());
+        return AdminBookingNoteRow.builder()
+                .id(saved.getId())
+                .kind("customer_cancel")
+                .code(saved.getCode())
+                .titleAz(titles.getOrDefault("az", ""))
+                .titleEn(titles.getOrDefault("en", ""))
+                .titleRu(titles.getOrDefault("ru", ""))
+                .sortOrder(saved.getSortOrder())
+                .build();
+    }
+
+    private static boolean sameKind(String wanted, String stored) {
+        if (wanted.equals(stored)) {
+            return true;
+        }
+        return BookingStaffNote.REJECT.equals(wanted) && BookingStaffNote.CANCEL.equals(stored);
+    }
+
     static String requireKind(String kind) {
         String value = kind == null ? "" : kind.trim().toLowerCase();
-        if (BookingStaffNote.CANCEL.equals(value) || BookingStaffNote.NO_SHOW.equals(value)) {
+        if (BookingStaffNote.REJECT.equals(value)
+                || BookingStaffNote.CANCEL.equals(value)
+                || BookingStaffNote.NO_SHOW.equals(value)) {
             return value;
         }
         throw MissingFieldException.required("kind");

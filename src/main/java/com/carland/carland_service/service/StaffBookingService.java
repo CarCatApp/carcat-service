@@ -146,7 +146,7 @@ public class StaffBookingService {
     public BookingView reject(Long userId, boolean mustChangePassword, Long bookingId, BookingRejectRequest request,
                               String timezone, String acceptLanguage) {
         BookingStaffNoteService.Applied applied = bookingStaffNoteService.apply(
-                BookingStaffNote.CANCEL, request, acceptLanguage);
+                BookingStaffNote.REJECT, request, acceptLanguage);
         return decide(userId, mustChangePassword, bookingId, BookingStatus.REJECTED.apiValue(),
                 applied, timezone, acceptLanguage);
     }

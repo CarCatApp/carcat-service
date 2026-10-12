@@ -30,6 +30,9 @@ import lombok.experimental.FieldDefaults;
 )
 public class BookingStaffNote {
 
+    /** Partner filial admininin rədd siyahısı. */
+    public static final String REJECT = "reject";
+    /** Köhnə rədd sətirləri. Yeni yazılar reject olur. */
     public static final String CANCEL = "cancel";
     public static final String NO_SHOW = "no_show";
 

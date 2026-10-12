@@ -14,5 +14,7 @@ public interface BookingCancelReasonRepository extends JpaRepository<BookingCanc
 
     List<BookingCancelReason> findByActiveTrueOrderBySortOrderAscIdAsc();
 
+    List<BookingCancelReason> findAllByOrderBySortOrderAscIdAsc();
+
     Optional<BookingCancelReason> findByCodeAndActiveTrue(String code);
 }

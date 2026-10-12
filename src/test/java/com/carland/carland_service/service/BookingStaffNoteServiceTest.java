@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.entity.BookingStaffNote;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingStaffNoteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,13 +22,14 @@ import static org.mockito.Mockito.when;
 class BookingStaffNoteServiceTest {
 
     @Mock BookingStaffNoteRepository noteRepository;
+    @Mock BookingCancelReasonRepository cancelReasonRepository;
     @Mock ServiceCategoryJson json;
 
     BookingStaffNoteService service;
 
     @BeforeEach
     void setUp() {
-        service = new BookingStaffNoteService(noteRepository, json);
+        service = new BookingStaffNoteService(noteRepository, cancelReasonRepository, json);
     }
 
     @Test

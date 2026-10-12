@@ -735,6 +735,11 @@ public class BookingMineService {
             "en", "The auto service cancelled",
             "ru", "Автосервис отменил"
     );
+    static final Map<String, String> NO_SHOW_TITLE = Map.of(
+            "az", "Təyin edilmiş vaxtda yaxınlaşmadığınız üçün növbəniz ləğv edildi.",
+            "en", "Your appointment was cancelled because you did not arrive at the scheduled time.",
+            "ru", "Ваша запись отменена, так как вы не пришли в назначенное время."
+    );
 
     /**
      * tr: code Accept-Language cümləsidir. Başlıq yoxdursa az.
@@ -746,6 +751,21 @@ public class BookingMineService {
         }
         String status = booking.getStatus().toLowerCase(Locale.ROOT);
         Map<String, String> label;
+        if (BookingStatus.NO_SHOW.apiValue().equals(status)) {
+            String note = booking.getCancelNote();
+            if (note != null && note.isBlank()) {
+                note = null;
+            }
+            String lang = langOf(acceptLanguage);
+            if (NO_SHOW_TITLE.get(lang) == null || NO_SHOW_TITLE.get(lang).isBlank()) {
+                lang = "az";
+            }
+            return BookingCanceledReasonView.builder()
+                    .code(NO_SHOW_TITLE.get(lang))
+                    .title(NO_SHOW_TITLE)
+                    .note(note)
+                    .build();
+        }
         if (BookingStatus.CANCELLED.apiValue().equals(status)) {
             label = CUSTOMER_CANCELLED;
         } else if (BookingStatus.REJECTED.apiValue().equals(status)) {

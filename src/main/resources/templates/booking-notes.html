@@ -50,14 +50,47 @@
   <div class="page-head">
     <div>
       <h1>Notes</h1>
-      <p class="muted">Partner rədd və gəlmədi siyahıları. Əl ilə yazılan mətn bura düşmür.</p>
+      <p class="muted">Üç ayrı siyahı. Müştəri ləğvi Cancel, filial rəddi Reject, gəlmədi No show.</p>
     </div>
   </div>
   <div class="error-box" id="errBox" hidden></div>
 
   <section class="note-block">
     <div class="page-head">
-      <h2>Cancel</h2>
+      <div>
+        <h2>Reject</h2>
+        <p class="muted">Partner filial admini rədd edəndə bu siyahı açılır.</p>
+      </div>
+      <button class="btn btn-primary" type="button" id="newReject">Əlavə et</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="row : ${rejectNotes}">
+          <td th:text="${row.titleAz}">AZ</td>
+          <td th:text="${row.titleEn}">EN</td>
+          <td th:text="${row.titleRu}">RU</td>
+          <td th:text="${row.sortOrder}">0</td>
+          <td>
+            <button type="button" class="btn btn-ghost js-edit"
+                    th:data-id="${row.id}" th:data-kind="${row.kind}"
+                    th:data-title-az="${row.titleAz}" th:data-title-en="${row.titleEn}"
+                    th:data-title-ru="${row.titleRu}" th:data-sort-order="${row.sortOrder}">Düzəlt</button>
+            <button type="button" class="btn btn-ghost js-delete" th:data-id="${row.id}" th:data-kind="${row.kind}">Sil</button>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="note-block">
+    <div class="page-head">
+      <div>
+        <h2>Cancel</h2>
+        <p class="muted">Müştəri öz növbəsini ləğv edəndə bu səbəb siyahısı açılır.</p>
+      </div>
       <button class="btn btn-primary" type="button" id="newCancel">Əlavə et</button>
     </div>
     <div class="table-wrap">
@@ -71,10 +104,10 @@
           <td th:text="${row.sortOrder}">0</td>
           <td>
             <button type="button" class="btn btn-ghost js-edit"
-                    th:data-id="${row.id}" th:data-kind="cancel"
+                    th:data-id="${row.id}" th:data-kind="customer_cancel"
                     th:data-title-az="${row.titleAz}" th:data-title-en="${row.titleEn}"
                     th:data-title-ru="${row.titleRu}" th:data-sort-order="${row.sortOrder}">Düzəlt</button>
-            <button type="button" class="btn btn-ghost js-delete" th:data-id="${row.id}">Sil</button>
+            <button type="button" class="btn btn-ghost js-delete" th:data-id="${row.id}" data-kind="customer_cancel">Sil</button>
           </td>
         </tr>
         </tbody>
@@ -84,7 +117,10 @@
 
   <section class="note-block">
     <div class="page-head">
-      <h2>No show</h2>
+      <div>
+        <h2>No show</h2>
+        <p class="muted">Partner gəlmədi işarələyəndə bu siyahı açılır.</p>
+      </div>
       <button class="btn btn-primary" type="button" id="newNoShow">Əlavə et</button>
     </div>
     <div class="table-wrap">
@@ -101,7 +137,7 @@
                     th:data-id="${row.id}" th:data-kind="no_show"
                     th:data-title-az="${row.titleAz}" th:data-title-en="${row.titleEn}"
                     th:data-title-ru="${row.titleRu}" th:data-sort-order="${row.sortOrder}">Düzəlt</button>
-            <button type="button" class="btn btn-ghost js-delete" th:data-id="${row.id}">Sil</button>
+            <button type="button" class="btn btn-ghost js-delete" th:data-id="${row.id}" th:data-kind="no_show">Sil</button>
           </td>
         </tr>
         </tbody>
@@ -144,7 +180,8 @@
     document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni not";
     editor.hidden = false;
   }
-  document.getElementById("newCancel").addEventListener("click", () => fill({ kind: "cancel" }));
+  document.getElementById("newReject").addEventListener("click", () => fill({ kind: "reject" }));
+  document.getElementById("newCancel").addEventListener("click", () => fill({ kind: "customer_cancel" }));
   document.getElementById("newNoShow").addEventListener("click", () => fill({ kind: "no_show" }));
   document.getElementById("cancelBtn").addEventListener("click", () => { editor.hidden = true; });
   document.querySelectorAll(".js-edit").forEach((btn) => {
@@ -156,7 +193,7 @@
       const res = await fetch("/admin/booking-notes/delete", {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: Number(btn.dataset.id) })
+        body: JSON.stringify({ id: Number(btn.dataset.id), kind: btn.dataset.kind || "" })
       });
       if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return; }
       if (!res.ok) { showErr("Silinmədi (" + res.status + ")"); return; }
