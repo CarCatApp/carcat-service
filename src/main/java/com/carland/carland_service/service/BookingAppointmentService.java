@@ -30,6 +30,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * tr: Seçilen range'e paket, fərdi xidmət və şikayəti tek book olarak yazar.
  * en: Writes the package, individual services and complaint onto one booking for the chosen range.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingAppointmentService {
@@ -65,6 +67,7 @@ public class BookingAppointmentService {
     private final BookingSelectionWriter selectionWriter;
     private final BookingCapacityService bookingCapacityService;
     private final StaffBookingLiveService staffBookingLiveService;
+    private final BookingPushService bookingPushService;
 
     /**
      * tr: Range kilitlenir, yeri varsa book ve alt satırları yazılır.
@@ -237,6 +240,7 @@ public class BookingAppointmentService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(CUSTOMER_REASON);
         booking.setCancelNote(reason);
+        notifyCancelled(booking);
         Branch ownerBranch = booking.getBranch();
         staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return BookingAppointmentCancelResponse.builder()
@@ -254,6 +258,14 @@ public class BookingAppointmentService {
             return null;
         }
         return selectionWriter.price(branch, body.getIndividualServiceIds(), body.getIssue());
+    }
+
+    private void notifyCancelled(Booking booking) {
+        try {
+            bookingPushService.cancelled(booking);
+        } catch (Exception ex) {
+            log.warn("booking cancel push skipped id={}", booking == null ? null : booking.getId());
+        }
     }
 
     private int packageQepik(Long packageId) {

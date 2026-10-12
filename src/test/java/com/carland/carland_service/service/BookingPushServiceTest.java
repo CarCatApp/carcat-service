@@ -101,13 +101,13 @@ class BookingPushServiceTest {
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
         verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"));
         assertEquals(List.of(
-                "Rezervasiya rədd edildi",
-                "Booking declined",
-                "Запись отклонена"), title.getAllValues());
+                "Növbə sorğusu ləğv edildi",
+                "Appointment request cancelled",
+                "Запрос на запись отменён"), title.getAllValues());
         assertEquals(List.of(
-                "Nərimanov filialı 12 okt, 14:30 rezervasiyanızı rədd etdi. Səbəb: Bu gün yer yoxdur",
-                "Nərimanov branch declined your booking for 12 Oct, 14:30. Reason: Bu gün yer yoxdur",
-                "Филиал Nərimanov отклонил вашу запись на 12 окт, 14:30."), body.getAllValues());
+                "Nərimanov: Növbə sorğunuz ləğv edildi. Səbəb: Bu gün yer yoxdur.",
+                "Nərimanov: Your appointment request was cancelled. Reason: Bu gün yer yoxdur.",
+                "Nərimanov: Ваш запрос на запись отменён."), body.getAllValues());
 
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(3)).save(saved.capture());
@@ -115,6 +115,24 @@ class BookingPushServiceTest {
         for (int i = 0; i < rows.size(); i++) {
             assertInbox(rows.get(i), BookingPushService.TYPE_REJECTED, title.getAllValues().get(i), body.getAllValues().get(i));
         }
+    }
+
+    @Test
+    void noShowAndCancelCopyFollowCustomerLanguage() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"), customer("en"), customer("ru"));
+
+        service.noShow(sample(null));
+        service.cancelled(sample(null));
+        service.noShow(sample("ignored"));
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(pushNotificationService, times(3)).send(any(), body.capture(), eq("tok-1"));
+        assertEquals(List.of(
+                "Nərimanov: Təyin edilmiş vaxtda yaxınlaşmadığınız üçün növbəniz ləğv edildi (No-show).",
+                "Nərimanov: Your appointment was cancelled. You can book again whenever you like.",
+                "Nərimanov: Ваша запись отменена, так как вы не пришли в назначенное время (No-show)."
+        ), body.getAllValues());
     }
 
     @Test

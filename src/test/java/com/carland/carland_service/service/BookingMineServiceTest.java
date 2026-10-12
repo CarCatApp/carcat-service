@@ -68,6 +68,7 @@ class BookingMineServiceTest {
     @Mock BookingCancelReasonRepository cancelReasonRepository;
     @Mock PartnerPhotoRepository partnerPhotoRepository;
     @Mock StaffBookingLiveService staffBookingLiveService;
+    @Mock BookingPushService bookingPushService;
 
     BookingMineService service;
     Booking booking;
@@ -79,7 +80,7 @@ class BookingMineServiceTest {
                 bookingRepository, bookingItemRepository, bookingSelectedServiceRepository,
                 individualLineRepository, inspectionRepository, carRepository,
                 bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper(),
-                staffBookingLiveService);
+                staffBookingLiveService, bookingPushService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();

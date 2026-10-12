@@ -278,5 +278,6 @@ class StaffBookingServiceTest {
         assertEquals("gəlmədi", booking.getCancelNote());
         verify(bookingPushService, never()).accepted(any());
         verify(bookingPushService, never()).rejected(any());
+        verify(bookingPushService).noShow(booking);
     }
 }

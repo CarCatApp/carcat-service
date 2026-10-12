@@ -42,6 +42,8 @@ public class BookingPushService {
 
     static final String TYPE_ACCEPTED = "BOOKING_ACCEPTED";
     static final String TYPE_REJECTED = "BOOKING_REJECTED";
+    static final String TYPE_NO_SHOW = "BOOKING_NO_SHOW";
+    static final String TYPE_CANCELLED = "BOOKING_CANCELLED";
 
     private final DeviceTokenRepository deviceTokenRepository;
     private final CustomerRepository customerRepository;
@@ -54,7 +56,7 @@ public class BookingPushService {
      * en: Schedules the push for a confirmed booking.
      */
     public void accepted(Booking booking) {
-        schedule(booking, true);
+        schedule(booking, Kind.ACCEPTED);
     }
 
     /**
@@ -62,12 +64,22 @@ public class BookingPushService {
      * en: Schedules the push for a rejected booking. A branch note is appended to the body when present.
      */
     public void rejected(Booking booking) {
-        schedule(booking, false);
+        schedule(booking, Kind.REJECTED);
     }
 
-    private void schedule(Booking booking, boolean accepted) {
+    /** Staff marked the customer as not arrived. */
+    public void noShow(Booking booking) {
+        schedule(booking, Kind.NO_SHOW);
+    }
+
+    /** Customer cancelled their own booking. */
+    public void cancelled(Booking booking) {
+        schedule(booking, Kind.CANCELLED);
+    }
+
+    private void schedule(Booking booking, Kind kind) {
         try {
-            Notice notice = noticeOf(booking, accepted);
+            Notice notice = noticeOf(booking, kind);
             if (notice == null) {
                 return;
             }
@@ -85,14 +97,19 @@ public class BookingPushService {
             log.warn("booking language lookup failed userId={} ref={} error={}",
                     notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());
         }
-        String heading = title(lang, notice.accepted());
+        String heading = title(lang, notice.kind());
         String text = body(lang, notice);
         saveInbox(notice, heading, text);
         sendPush(notice, heading, text);
     }
 
     private void saveInbox(Notice notice, String heading, String text) {
-        String type = notice.accepted() ? TYPE_ACCEPTED : TYPE_REJECTED;
+        String type = switch (notice.kind()) {
+            case ACCEPTED -> TYPE_ACCEPTED;
+            case REJECTED -> TYPE_REJECTED;
+            case NO_SHOW -> TYPE_NO_SHOW;
+            case CANCELLED -> TYPE_CANCELLED;
+        };
         OffsetDateTime createdAt = Notification.nowLocal();
         try {
             TransactionTemplate write = new TransactionTemplate(transactionManager);
@@ -140,7 +157,7 @@ public class BookingPushService {
         return "az";
     }
 
-    private static Notice noticeOf(Booking booking, boolean accepted) {
+    private static Notice noticeOf(Booking booking, Kind kind) {
         if (booking == null || booking.getCustomerUserId() == null) {
             return null;
         }
@@ -149,34 +166,38 @@ public class BookingPushService {
         Range range = booking.getRange();
         OffsetDateTime start = range == null ? null : range.getStart();
         String ref = booking.getRef() == null ? "" : booking.getRef().trim();
-        String note = accepted ? null : booking.getCancelNote();
-        return new Notice(booking.getCustomerUserId(), branchName, start, ref, note, accepted);
+        String note = kind == Kind.REJECTED ? booking.getCancelNote() : null;
+        return new Notice(booking.getCustomerUserId(), branchName, start, ref, note, kind);
     }
 
-    private static String title(String lang, boolean accepted) {
-        if (accepted) {
-            return switch (lang) {
+    private static String title(String lang, Kind kind) {
+        return switch (kind) {
+            case ACCEPTED -> switch (lang) {
                 case "en" -> "Booking confirmed";
                 case "ru" -> "Запись подтверждена";
                 default -> "Rezervasiya təsdiqləndi";
             };
-        }
-        return switch (lang) {
-            case "en" -> "Booking declined";
-            case "ru" -> "Запись отклонена";
-            default -> "Rezervasiya rədd edildi";
+            case REJECTED -> switch (lang) {
+                case "en" -> "Appointment request cancelled";
+                case "ru" -> "Запрос на запись отменён";
+                default -> "Növbə sorğusu ləğv edildi";
+            };
+            case NO_SHOW, CANCELLED -> switch (lang) {
+                case "en" -> "Appointment cancelled";
+                case "ru" -> "Запись отменена";
+                default -> "Növbə ləğv edildi";
+            };
         };
     }
 
     private static String body(String lang, Notice notice) {
         String when = whenText(notice.startUtc(), lang);
-        String text = notice.accepted()
-                ? acceptBody(lang, notice.branchName(), when, notice.ref())
-                : rejectBody(lang, notice.branchName(), when);
-        if (!notice.accepted()) {
-            text = withReason(lang, text, notice.note());
-        }
-        return text;
+        return switch (notice.kind()) {
+            case ACCEPTED -> acceptBody(lang, notice.branchName(), when, notice.ref());
+            case REJECTED -> rejectBody(lang, notice.branchName(), notice.note());
+            case NO_SHOW -> noShowBody(lang, notice.branchName());
+            case CANCELLED -> cancelBody(lang, notice.branchName());
+        };
     }
 
     private static String acceptBody(String lang, String branch, String when, String ref) {
@@ -197,22 +218,14 @@ public class BookingPushService {
         return sentence + " " + ref;
     }
 
-    private static String rejectBody(String lang, String branch, String when) {
-        return switch (lang) {
-            case "en" -> when == null
-                    ? branch + " branch declined your booking."
-                    : branch + " branch declined your booking for " + when + ".";
-            case "ru" -> when == null
-                    ? "Филиал " + branch + " отклонил вашу запись."
-                    : "Филиал " + branch + " отклонил вашу запись на " + when + ".";
-            default -> when == null
-                    ? branch + " filialı rezervasiyanızı rədd etdi."
-                    : branch + " filialı " + when + " rezervasiyanızı rədd etdi.";
+    /** {service_name}: Növbə sorğunuz ləğv edildi. Səbəb: {reason}. */
+    private static String rejectBody(String lang, String serviceName, String reason) {
+        String sentence = switch (lang) {
+            case "en" -> serviceName + ": Your appointment request was cancelled.";
+            case "ru" -> serviceName + ": Ваш запрос на запись отменён.";
+            default -> serviceName + ": Növbə sorğunuz ləğv edildi.";
         };
-    }
-
-    private static String withReason(String lang, String sentence, String note) {
-        if (note == null || note.isBlank()) {
+        if (reason == null || reason.isBlank()) {
             return sentence;
         }
         String label = switch (lang) {
@@ -220,7 +233,25 @@ public class BookingPushService {
             case "ru" -> "Причина";
             default -> "Səbəb";
         };
-        return sentence + " " + label + ": " + note.trim();
+        return sentence + " " + label + ": " + reason.trim() + ".";
+    }
+
+    /** {service_name}: Təyin edilmiş vaxtda yaxınlaşmadığınız üçün növbəniz ləğv edildi (No-show). */
+    private static String noShowBody(String lang, String serviceName) {
+        return switch (lang) {
+            case "en" -> serviceName + ": Your appointment was cancelled because you did not arrive at the scheduled time (No-show).";
+            case "ru" -> serviceName + ": Ваша запись отменена, так как вы не пришли в назначенное время (No-show).";
+            default -> serviceName + ": Təyin edilmiş vaxtda yaxınlaşmadığınız üçün növbəniz ləğv edildi (No-show).";
+        };
+    }
+
+    /** {service_name}: Növbəniz uğurla ləğv edildi. İstədiyiniz vaxt yenidən növbə götürə bilərsiniz. */
+    private static String cancelBody(String lang, String serviceName) {
+        return switch (lang) {
+            case "en" -> serviceName + ": Your appointment was cancelled. You can book again whenever you like.";
+            case "ru" -> serviceName + ": Ваша запись успешно отменена. Вы можете записаться снова в любое удобное время.";
+            default -> serviceName + ": Növbəniz uğurla ləğv edildi. İstədiyiniz vaxt yenidən növbə götürə bilərsiniz.";
+        };
     }
 
     private static String whenText(OffsetDateTime utc, String lang) {
@@ -247,12 +278,16 @@ public class BookingPushService {
         }
     }
 
+    private enum Kind {
+        ACCEPTED, REJECTED, NO_SHOW, CANCELLED
+    }
+
     private record Notice(
             Long customerUserId,
             String branchName,
             OffsetDateTime startUtc,
             String ref,
             String note,
-            boolean accepted
+            Kind kind
     ) {}
 }

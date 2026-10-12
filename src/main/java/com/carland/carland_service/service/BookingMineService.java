@@ -42,6 +42,7 @@ import com.carland.carland_service.repository.PartnerPhotoRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -66,6 +67,7 @@ import java.util.stream.Collectors;
  * en: Owner booking list + detail + cancel (CRCT-285). unread=0 until 286.
  * purpose blank or recently: latest booking per branch. all: every booking, newest first.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingMineService {
@@ -90,6 +92,7 @@ public class BookingMineService {
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final ObjectMapper objectMapper;
     private final StaffBookingLiveService staffBookingLiveService;
+    private final BookingPushService bookingPushService;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -307,9 +310,18 @@ public class BookingMineService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(reason.getCode());
         booking.setCancelNote(note);
+        notifyCancelled(booking);
         Branch ownerBranch = booking.getBranch();
         staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader, acceptLanguage);
+    }
+
+    private void notifyCancelled(Booking booking) {
+        try {
+            bookingPushService.cancelled(booking);
+        } catch (Exception ex) {
+            log.warn("booking cancel push skipped id={}", booking == null ? null : booking.getId());
+        }
     }
 
     private void requireOwnedCar(Long customerUserId, Long carId) {
