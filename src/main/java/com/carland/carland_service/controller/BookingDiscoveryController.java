@@ -68,9 +68,10 @@ public class BookingDiscoveryController {
 
     @GetMapping("/api/v1/booking/branches")
     public BookingBranchListResponse branches(
-            @RequestHeader("Authorization") String token
+            @RequestHeader("Authorization") String token,
+            @RequestParam(required = false) Long findService
     ) {
-        return bookingDiscoveryService.listActive();
+        return bookingDiscoveryService.listActive(findService);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}")

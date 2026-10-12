@@ -6,17 +6,26 @@ import com.carland.carland_service.dto.booking.BookingDiscoveryPartnerView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.enums.BookingStatus;
+import com.carland.carland_service.enums.CalendarStatus;
+import com.carland.carland_service.enums.RangeStatus;
+import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
+import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * tr: Müşteri uygulaması şube keşfi. Sadece aktif partner + aktif şube.
@@ -32,6 +41,9 @@ public class BookingDiscoveryService {
     private static final double EARTH_M = 6_371_000d;
 
     private final BranchRepository branchRepository;
+    private final IndividualServiceSourceRepository individualServiceSourceRepository;
+    private final BranchIndividualServiceRepository branchIndividualServiceRepository;
+    private final RangeRepository rangeRepository;
 
     @Transactional(readOnly = true)
     public BookingDiscoveryResponse discover(Long partnerId, String q, Double lat, Double lng, Integer radiusMeters,
@@ -91,14 +103,53 @@ public class BookingDiscoveryService {
                 .build();
     }
 
-    /** Aktif şube + aktif partner. Sayfa yok, hepsi. */
+    /**
+     * tr: findService yoksa aktif şubelerin hepsi. Varsa services.id bağlı fərdi xidməti
+     *     açık, fiyatı yazılmış ve bugünden sonra yazılabilir saati olan şubeler.
+     * en: Without findService, every active branch. With it, branches that have the linked
+     *     individual service on, a price set, and a bookable hour from now on.
+     */
     @Transactional(readOnly = true)
-    public BookingBranchListResponse listActive() {
+    public BookingBranchListResponse listActive(Long findService) {
+        List<Branch> loaded = branchRepository.findActiveWithActivePartner();
+        if (findService != null) {
+            Set<Long> ready = readyBranchIds(findService);
+            loaded = loaded.stream().filter(branch -> ready.contains(branch.getId())).toList();
+        }
         List<BookingDiscoveryBranchView> branches = new ArrayList<>();
-        for (Branch branch : branchRepository.findActiveWithActivePartner()) {
+        for (Branch branch : loaded) {
             branches.add(toBranch(branch));
         }
         return BookingBranchListResponse.builder().branches(branches).build();
+    }
+
+    /** services.id is the source key, so the list is empty or one individual-service id. */
+    private Set<Long> readyBranchIds(Long catalogServiceId) {
+        List<Long> linked = individualServiceSourceRepository.findIndividualServiceIdsByServiceId(catalogServiceId);
+        if (linked == null || linked.isEmpty()) {
+            return Set.of();
+        }
+        OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
+        Set<Long> ready = new HashSet<>();
+        for (Long individualServiceId : linked) {
+            if (individualServiceId == null) {
+                continue;
+            }
+            Set<Long> priced = new HashSet<>(
+                    branchIndividualServiceRepository.findActivePricedBranchIds(individualServiceId));
+            if (priced.isEmpty()) {
+                continue;
+            }
+            priced.retainAll(rangeRepository.findBranchIdsWithBookableIndividualSlot(
+                    individualServiceId,
+                    StaffSlotTargets.INDIVIDUAL,
+                    RangeStatus.AVAILABLE.name(),
+                    now,
+                    CalendarStatus.HIDDEN.name(),
+                    BookingStatus.occupyingCapacity()));
+            ready.addAll(priced);
+        }
+        return ready;
     }
 
     private static BookingDiscoveryBranchView toBranch(Branch branch) {

@@ -98,11 +98,16 @@ Alan yoksa istemci `preselected` için `false` okur. Diğer satırlara `false` y
 
 `carId` varsa her satırda `remainingKm` ve `remainingMonth` durur. Değer, yüzde için seçilen percentages satırındandır. `remainingKm` kalan kilometredir (`nextServiceKm` − araç km, 0’ın altına inmez). `remainingMonth` sonraki servise kalan gündür; percentages yanıtındaki `remainingMonths` ile aynı sayıdır, tipi sayıdır. Araç yoksa, eşleşen percentages satırı yoksa veya km/tarih eksikse alan `null`dır. `individualServiceMappedPercentage` ve `percentageNote` hesabı değişmez. Ön seçim ad okumaz.
 
+## Şube listesi
+
+`GET /api/v1/booking/branches` gövdesi aynıdır. `page`, `pageSize`, `lat` ve `lng` bugünkü gibi okunmaz.
+
+`findService` yoksa liste bugünkü gibidir. Varsa değer `services.id` dir (`catalogServiceId` ile aynı sayı). Şube listede kalırsa bağlı fərdi xidmət şubede açıktır, katalog satırı aktiftir, üç fiyattan en az biri yazılmıştır ve o hizmet için bugünden sonra yazılabilir en az bir saat vardır. Üst süre yoktur; sonraki aylar sayılır. Yazılabilir saat, ay takvimindeki kuraldır: başlangıç şimdiden sonra, gizli değil, durum `AVAILABLE`, kalan yer en az bir. Eşleşme yoksa `200` ve boş `branches`. Sayı değilse Spring `400` verir.
+
 ## Değişmeyen endpointler
 
-Bu query’ler eklenmez. Şube listesi bu eşleşmeyle filtrelenmez. Randevu gövdesi aynı kalır: `rangeId`, `packageId`, `individualServiceIds`, `issue`, `carId`. Seçilen hizmet, mobilin mevcut `individualServiceIds` alanına koyduğu `preselectedServiceId` değeridir.
+Randevu gövdesi aynı kalır: `rangeId`, `packageId`, `individualServiceIds`, `issue`, `carId`. Seçilen hizmet, mobilin mevcut `individualServiceIds` alanına koyduğu `preselectedServiceId` değeridir.
 
-- `GET /api/v1/booking/branches`
 - `GET /api/v1/booking/branches/{branchId}`
 - `GET /api/v1/booking/individual-service-filters`
 - `GET /api/v1/booking/branches/{branchId}/care-packages`
