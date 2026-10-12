@@ -1,14 +1,14 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.BookingBrandModelsResponse;
-import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchServicedGood;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
-import com.carland.carland_service.repository.BrandModelRepository;
 import com.carland.carland_service.repository.BrandModelServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.BranchServicedGoodRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class BookingBranchBrandsServiceTest {
 
     @Mock BranchRepository branchRepository;
     @Mock BrandModelServiceRepository brandModelServiceRepository;
-    @Mock BrandModelRepository brandModelRepository;
+    @Mock BranchServicedGoodRepository servicedGoodRepository;
 
     BookingBranchBrandsService service;
     Partner partner;
@@ -40,7 +40,7 @@ class BookingBranchBrandsServiceTest {
         service = new BookingBranchBrandsService(
                 branchRepository,
                 brandModelServiceRepository,
-                brandModelRepository,
+                servicedGoodRepository,
                 new ServiceCategoryJson(new ObjectMapper()));
         partner = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(12L).name("Xeqani").active(true).partner(partner).build();
@@ -56,10 +56,10 @@ class BookingBranchBrandsServiceTest {
                 .id(4L).titleJson("{\"az\":\"Yağlar\",\"en\":\"Oils\",\"ru\":\"Масла\"}").oil(true).sortOrder(1).build();
         when(branchRepository.findById(12L)).thenReturn(Optional.of(branch));
         when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(oil, air, empty));
-        when(brandModelRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of(
-                BrandModel.builder().id(11L).brandModelService(air).branch(branch).name("Bosch").unit("eded").build(),
-                BrandModel.builder().id(10L).brandModelService(air).branch(branch).name("Mann-Filter").unit("eded").build(),
-                BrandModel.builder().id(40L).brandModelService(oil).branch(branch).name("Castrol Edge").series("5W-30").viscosity("15W-30").unit("litr").build()
+        when(servicedGoodRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of(
+                BranchServicedGood.builder().id(11L).brandModelService(air).branch(branch).name("Bosch").build(),
+                BranchServicedGood.builder().id(10L).brandModelService(air).branch(branch).name("Mann").build(),
+                BranchServicedGood.builder().id(40L).brandModelService(oil).branch(branch).name("Castrol").build()
         ));
 
         BookingBrandModelsResponse out = service.list(12L, "en");
@@ -67,7 +67,7 @@ class BookingBranchBrandsServiceTest {
         assertEquals(12L, out.getBranchId());
         assertEquals(2, out.getGroups().size());
         assertEquals("Oils", out.getGroups().get(0).getTitle());
-        assertEquals("Castrol Edge", out.getGroups().get(0).getBrands().get(0).getName());
+        assertEquals("Castrol", out.getGroups().get(0).getBrands().get(0).getName());
         assertEquals(40L, out.getGroups().get(0).getBrands().get(0).getId());
         assertEquals("Filters", out.getGroups().get(1).getTitle());
         assertEquals(List.of(11L, 10L), out.getGroups().get(1).getBrands().stream().map(b -> b.getId()).toList());
@@ -80,7 +80,7 @@ class BookingBranchBrandsServiceTest {
         when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of(
                 BrandModelService.builder().id(1L).titleJson("{\"az\":\"Yağlar\"}").oil(true).sortOrder(1).build()
         ));
-        when(brandModelRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of());
+        when(servicedGoodRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of());
 
         BookingBrandModelsResponse out = service.list(12L, "az");
 
