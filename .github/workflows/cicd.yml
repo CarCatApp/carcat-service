@@ -104,6 +104,12 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /root
-            docker-compose --env-file /root/carland.env pull carland-service
-            docker-compose --env-file /root/carland.env up -d --no-deps carland-service
+            ref=$(docker inspect --format '{{.Config.Image}}' carland-service)
+            docker pull "$ref"
+            docker-compose --env-file /root/carland.env up -d --force-recreate --no-deps carland-service
+            running=$(docker inspect --format '{{.Image}}' carland-service)
+            want=$(docker image inspect --format '{{.Id}}' "$ref")
+            started=$(docker inspect --format '{{.State.StartedAt}}' carland-service)
+            echo "ref=$ref running=$running want=$want started=$started"
+            test "$running" = "$want"
             
