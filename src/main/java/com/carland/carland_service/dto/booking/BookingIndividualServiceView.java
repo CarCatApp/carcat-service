@@ -19,6 +19,8 @@ public class BookingIndividualServiceView {
     Integer priceMax;
     String currency;
     String unit;
-    /** Kalan ömür yüzdesi. 0 süresi dolmuş, 100 yeni yapılmış. Kayıt yoksa null. */
+    /** Kalan ömür yüzdesi. 0 süresi dolmuş, 100 yeni yapılmış. Bilgi yoksa null. */
     Integer individualServiceMappedPercentage;
+    /** servicedStatus boşken yüzde yerine gösterilen cümle. */
+    String percentageNote;
 }

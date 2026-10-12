@@ -8,6 +8,7 @@ import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Percentage;
 import com.carland.carland_service.entity.ServiceEntity;
@@ -15,6 +16,7 @@ import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.PercentageRepository;
 import com.carland.carland_service.repository.ServiceEntityRepository;
@@ -41,6 +43,7 @@ class BookingIndividualCatalogServiceTest {
     @Mock BranchIndividualServiceRepository branchIndividualServiceRepository;
     @Mock IndividualServiceFilterRepository individualServiceFilterRepository;
     @Mock CarRepository carRepository;
+    @Mock CustomerServiceRecordRepository customerServiceRecordRepository;
     @Mock PercentageRepository percentageRepository;
     @Mock ServiceEntityRepository serviceEntityRepository;
 
@@ -53,6 +56,7 @@ class BookingIndividualCatalogServiceTest {
                 branchIndividualServiceRepository,
                 individualServiceFilterRepository,
                 carRepository,
+                customerServiceRecordRepository,
                 percentageRepository,
                 serviceEntityRepository,
                 new ObjectMapper());
@@ -144,7 +148,11 @@ class BookingIndividualCatalogServiceTest {
                 BranchIndividualService.builder().branch(branch).individualService(air).active(true).priceSimple(15).priceComplex(30).build()
         ));
         Customer owner = Customer.builder().userId(9L).build();
-        when(carRepository.findByCarId(5L)).thenReturn(Car.builder().carId(5L).customer(owner).mileage(15000L).build());
+        Car car = Car.builder().carId(5L).customer(owner).mileage(15000L).build();
+        when(carRepository.findByCarId(5L)).thenReturn(car);
+        when(customerServiceRecordRepository.findAllByCar(car)).thenReturn(List.of(
+                CustomerServiceRecord.builder().serviceId(100L).car(car).servicedStatus("serviced").build()
+        ));
         ServiceEntity airService = ServiceEntity.builder().id(100L).nameAz("Hava filtri").nameEn("Air filter").nameRu("Фильтр").build();
         when(serviceEntityRepository.findAllById(List.of(100L))).thenReturn(List.of(airService));
         when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(
@@ -160,9 +168,13 @@ class BookingIndividualCatalogServiceTest {
 
         BookingIndividualServicesResponse out = service.list(12L, "en", null, 5L, 9L);
 
-        assertEquals(1, out.getServices().size());
+        assertEquals(2, out.getServices().size());
         assertEquals(airCode, out.getServices().get(0).getCode());
         assertEquals(0, out.getServices().get(0).getIndividualServiceMappedPercentage());
+        assertNull(out.getServices().get(0).getPercentageNote());
+        assertEquals(sparkCode, out.getServices().get(1).getCode());
+        assertNull(out.getServices().get(1).getIndividualServiceMappedPercentage());
+        assertEquals("No information has been entered for this service", out.getServices().get(1).getPercentageNote());
     }
 
     @Test
@@ -175,14 +187,16 @@ class BookingIndividualCatalogServiceTest {
         when(branchIndividualServiceRepository.findByBranch_Id(12L)).thenReturn(List.of(
                 BranchIndividualService.builder().branch(branch).individualService(oil).active(true).priceSimple(10).build()
         ));
-        when(carRepository.findByCarId(5L)).thenReturn(
-                Car.builder().carId(5L).customer(Customer.builder().userId(9L).build()).mileage(1000L).build());
+        Car car = Car.builder().carId(5L).customer(Customer.builder().userId(9L).build()).mileage(1000L).build();
+        when(carRepository.findByCarId(5L)).thenReturn(car);
+        when(customerServiceRecordRepository.findAllByCar(car)).thenReturn(List.of());
         when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of());
 
         BookingIndividualServicesResponse out = service.list(12L, "az", null, 5L, 9L);
 
         assertEquals(1, out.getServices().size());
         assertNull(out.getServices().get(0).getIndividualServiceMappedPercentage());
+        assertEquals("Bu servis üzrə məlumat daxil edilməyib", out.getServices().get(0).getPercentageNote());
     }
 
     @Test
