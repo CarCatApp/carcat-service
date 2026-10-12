@@ -76,7 +76,7 @@ public class BookingMineService {
     static final String PURPOSE_RECENTLY = "recently";
     static final String PURPOSE_ALL = "all";
     static final String PAST_OR_COMPLETED = "Cannot cancel a completed or past booking";
-    static final String OTHER_CODE = "other";
+    static final int CANCEL_TEXT_MAX = 500;
     static final String LOGO_PATH = "/api/v1/photo/for/partner/get/";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter STARTS = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
@@ -221,11 +221,17 @@ public class BookingMineService {
 
     @Transactional(readOnly = true)
     public BookingCancelReasonsResponse cancelReasons() {
+        return cancelReasons(null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingCancelReasonsResponse cancelReasons(String acceptLanguage) {
+        String lang = langOf(acceptLanguage);
         List<BookingCancelReasonView> items = new ArrayList<>();
         for (BookingCancelReason row : cancelReasonRepository.findByActiveTrueOrderBySortOrderAscIdAsc()) {
             items.add(BookingCancelReasonView.builder()
-                    .code(row.getCode())
-                    .title(titles(row.getTitleJson()))
+                    .id(row.getId())
+                    .title(catalogText(titles(row.getTitleJson()), lang))
                     .build());
         }
         return BookingCancelReasonsResponse.builder().items(items).build();
@@ -294,21 +300,32 @@ public class BookingMineService {
         if (start == null || !start.isAfter(OffsetDateTime.now())) {
             throw new ConflictException(PAST_OR_COMPLETED);
         }
-        String code = request == null || request.getReason() == null ? "" : request.getReason().trim();
-        if (code.isEmpty()) {
-            throw MissingFieldException.required("reason");
+        Long reasonId = request == null ? null : request.getReasonId();
+        String typed = request == null || request.getReason() == null ? "" : request.getReason().trim();
+        boolean picked = reasonId != null;
+        boolean written = !typed.isEmpty();
+        if (picked && written) {
+            throw new ConflictException("Send either reasonId or reason");
         }
-        BookingCancelReason reason = cancelReasonRepository.findByCodeAndActiveTrue(code)
-                .orElseThrow(() -> new ResourceNotFoundException("cancel reason not found"));
-        String note = request.getNote() == null ? null : request.getNote().trim();
-        if (note != null && note.isEmpty()) {
-            note = null;
+        if (!picked && !written) {
+            throw MissingFieldException.required("reasonId or reason");
         }
-        if (OTHER_CODE.equals(reason.getCode()) && note == null) {
-            throw MissingFieldException.required("note");
+        String code = null;
+        String note;
+        if (picked) {
+            BookingCancelReason reason = cancelReasonRepository.findById(reasonId)
+                    .filter(row -> Boolean.TRUE.equals(row.getActive()))
+                    .orElseThrow(() -> new ResourceNotFoundException("cancel reason not found"));
+            code = reason.getCode();
+            note = catalogText(titles(reason.getTitleJson()), langOf(acceptLanguage));
+        } else {
+            if (typed.length() > CANCEL_TEXT_MAX) {
+                throw new ConflictException("reason is too long");
+            }
+            note = typed;
         }
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
-        booking.setCancelReasonCode(reason.getCode());
+        booking.setCancelReasonCode(code);
         booking.setCancelNote(note);
         notifyCancelled(booking);
         Branch ownerBranch = booking.getBranch();
@@ -752,21 +769,8 @@ public class BookingMineService {
         String status = booking.getStatus().toLowerCase(Locale.ROOT);
         Map<String, String> label;
         if (BookingStatus.NO_SHOW.apiValue().equals(status)) {
-            String note = booking.getCancelNote();
-            if (note != null && note.isBlank()) {
-                note = null;
-            }
-            String lang = langOf(acceptLanguage);
-            if (NO_SHOW_TITLE.get(lang) == null || NO_SHOW_TITLE.get(lang).isBlank()) {
-                lang = "az";
-            }
-            return BookingCanceledReasonView.builder()
-                    .code(NO_SHOW_TITLE.get(lang))
-                    .title(NO_SHOW_TITLE)
-                    .note(note)
-                    .build();
-        }
-        if (BookingStatus.CANCELLED.apiValue().equals(status)) {
+            label = NO_SHOW_TITLE;
+        } else if (BookingStatus.CANCELLED.apiValue().equals(status)) {
             label = CUSTOMER_CANCELLED;
         } else if (BookingStatus.REJECTED.apiValue().equals(status)) {
             label = SERVICE_REJECTED;

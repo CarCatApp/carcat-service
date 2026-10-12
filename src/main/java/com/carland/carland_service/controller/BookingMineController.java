@@ -48,9 +48,10 @@ public class BookingMineController {
 
     @GetMapping({"/api/v1/booking/cancel-reasons", "/api/v1/booking/bookings/cancel-reasons"})
     public BookingCancelReasonsResponse cancelReasons(
-            @RequestHeader("Authorization") String token
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
     ) {
-        return bookingMineService.cancelReasons();
+        return bookingMineService.cancelReasons(acceptLanguage);
     }
 
     @GetMapping("/api/v1/booking/bookings/{bookingId}")

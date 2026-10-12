@@ -463,6 +463,7 @@ class BookingMineServiceTest {
     void cancelReasonsListsActive() {
         when(cancelReasonRepository.findByActiveTrueOrderBySortOrderAscIdAsc()).thenReturn(List.of(
                 BookingCancelReason.builder()
+                        .id(5L)
                         .code("change_of_plans")
                         .titleJson("{\"az\":\"Plan dəyişdi\",\"en\":\"Change of plans\",\"ru\":\"Планы изменились\"}")
                         .sortOrder(1)
@@ -470,40 +471,52 @@ class BookingMineServiceTest {
                         .build()
         ));
 
-        BookingCancelReasonsResponse out = service.cancelReasons();
+        BookingCancelReasonsResponse out = service.cancelReasons("en");
 
         assertEquals(1, out.getItems().size());
-        assertEquals("change_of_plans", out.getItems().get(0).getCode());
-        assertEquals("Change of plans", out.getItems().get(0).getTitle().get("en"));
+        assertEquals(5L, out.getItems().get(0).getId());
+        assertEquals("Change of plans", out.getItems().get(0).getTitle());
     }
 
     @Test
     void cancelPendingBooking() {
         stubCancelLookups();
-        when(cancelReasonRepository.findByCodeAndActiveTrue("change_of_plans"))
-                .thenReturn(Optional.of(reason("change_of_plans")));
+        when(cancelReasonRepository.findById(5L)).thenReturn(Optional.of(reason("change_of_plans")));
 
         BookingDetailResponse out = service.cancel(
-                54L, "3", BookingCancelRequest.builder().reason("change_of_plans").build(), "Asia/Baku");
+                54L, "3", BookingCancelRequest.builder().reasonId(5L).build(), "Asia/Baku");
 
         assertEquals("cancelled", out.getStatus());
         assertEquals("cancelled", booking.getStatus());
         assertEquals("change_of_plans", booking.getCancelReasonCode());
+        assertEquals("Plan dəyişdi", booking.getCancelNote());
         assertEquals("Mən ləğv etdim", out.getCanceledReason().getCode());
         assertEquals("Mən ləğv etdim", out.getCanceledReason().getTitle().get("az"));
         assertEquals(1, out.getCanceledReason().getTitle().size());
-        assertNull(out.getCanceledReason().getNote());
+        assertEquals("Plan dəyişdi", out.getCanceledReason().getNote());
         verify(staffBookingLiveService).refreshAfterCommit(7L);
     }
 
     @Test
-    void cancelOtherRequiresNote() {
+    void cancelRejectsListAndTextTogether() {
         when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
-        when(cancelReasonRepository.findByCodeAndActiveTrue("other"))
-                .thenReturn(Optional.of(reason("other")));
 
-        assertThrows(MissingFieldException.class, () -> service.cancel(
-                54L, "3", BookingCancelRequest.builder().reason("other").build(), "Asia/Baku"));
+        assertThrows(ConflictException.class, () -> service.cancel(
+                54L, "3", BookingCancelRequest.builder().reasonId(5L).reason("əl mətni").build(), "Asia/Baku"));
+    }
+
+    @Test
+    void cancelManualTextDoesNotUseTheCatalogue() {
+        stubCancelLookups();
+
+        BookingDetailResponse out = service.cancel(
+                54L, "3", BookingCancelRequest.builder().reason("yol bağlı").build(), "Asia/Baku");
+
+        assertEquals("cancelled", booking.getStatus());
+        assertNull(booking.getCancelReasonCode());
+        assertEquals("yol bağlı", booking.getCancelNote());
+        assertEquals("yol bağlı", out.getCanceledReason().getNote());
+        verify(cancelReasonRepository, never()).findById(any());
     }
 
     @Test
@@ -538,9 +551,9 @@ class BookingMineServiceTest {
     @Test
     void cancelUnknownReasonIsNotFound() {
         when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
-        when(cancelReasonRepository.findByCodeAndActiveTrue("nope")).thenReturn(Optional.empty());
+        when(cancelReasonRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.cancel(
-                54L, "3", BookingCancelRequest.builder().reason("nope").build(), "Asia/Baku"));
+                54L, "3", BookingCancelRequest.builder().reasonId(99L).build(), "Asia/Baku"));
     }
 
     private void stubCancelLookups() {
@@ -551,6 +564,7 @@ class BookingMineServiceTest {
 
     private static BookingCancelReason reason(String code) {
         return BookingCancelReason.builder()
+                .id(5L)
                 .code(code)
                 .titleJson("{\"az\":\"Plan dəyişdi\",\"en\":\"Change of plans\",\"ru\":\"Планы изменились\"}")
                 .active(true)

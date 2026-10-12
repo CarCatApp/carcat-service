@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingCancelRequest {
+    /** Siyahıdan seçilən şablon. reason ilə birlikdə göndərilməz. */
+    Long reasonId;
+    /** Əl ilə yazılan mətn. reasonId ilə birlikdə göndərilməz. */
     String reason;
-    String note;
 }
