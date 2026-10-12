@@ -4,18 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * tr: Eski şube başlıklarını bir kez siler ve boş kataloğa 10 ortak başlık yazar.
- * en: Drops the old per-branch headings once and writes 10 shared headings when the catalog is empty.
+ * tr: Boot'ta çalışmaz. Bean değildir. Başlıklar ve kolon düşürme bir kez bitti.
+ * en: Does not run on boot. Not a bean. Headings and the column drop already ran once.
  */
 @Slf4j
-@Component
-@Order(40)
 @RequiredArgsConstructor
 public class BrandModelHeadingSeeder implements ApplicationRunner {
 

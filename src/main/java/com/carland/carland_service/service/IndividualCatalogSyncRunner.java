@@ -4,16 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 /**
- * tr: Açılışta fərdi kataloğu services tablosundan doldurur. Mock seeder çalışmaz.
- * en: Fills the individual catalog from the services table on startup. The mock seeder does not run.
+ * tr: Boot'ta çalışmaz. Bean değildir. individual_service_sources bir kez doldu;
+ *     her deploy'da silip yeniden INSERT edilmez.
+ * en: Does not run on boot. Not a bean. individual_service_sources was filled once;
+ *     it is not deleted and inserted again on every deploy.
  */
 @Slf4j
-@Component
-@Order(50)
 @RequiredArgsConstructor
 public class IndividualCatalogSyncRunner implements ApplicationRunner {
 
