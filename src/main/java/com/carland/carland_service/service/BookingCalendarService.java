@@ -87,8 +87,9 @@ public class BookingCalendarService {
 
         List<BookingCalendarDayView> days = new ArrayList<>();
         for (LocalDate day = today; !day.isAfter(end); day = day.plusDays(1)) {
+            List<Range> dayRanges = byDay.getOrDefault(day, List.of());
             boolean open = false;
-            for (Range range : byDay.getOrDefault(day, List.of())) {
+            for (Range range : dayRanges) {
                 if (bookable(range, now) && matches(range, selection) && !held.contains(range.getRangeId())) {
                     open = true;
                     break;
@@ -105,8 +106,10 @@ public class BookingCalendarService {
     }
 
     /**
-     * tr: Seçilen günün boş yerli saatleri. Aynı başlangıçta yeri çok olan, eşitse paket → hizmet → təmir.
-     * en: Free hours of the chosen day. Same start keeps the fullest range, then package, service, repair.
+     * tr: Seçilen günün boş yerli saatleri. Aynı arabanın tuttuğu range elenir.
+     * Tek hizmetse o saat düşer. Paket veya individual hâlâ yazılabiliyorsa o range 09:00 olarak kalır.
+     * en: Free hours of the chosen day. A range this car already holds is skipped.
+     * A single offering loses that hour. A usable package or individual keeps 09:00.
      */
     @Transactional(readOnly = true)
     public BookingDayRangesResponse day(Long branchId, BookingDayRangesRequest request, String acceptLanguage) {
@@ -233,7 +236,13 @@ public class BookingCalendarService {
         if (ids == null || ids.isEmpty()) {
             return Set.of();
         }
-        return new HashSet<>(ids);
+        Set<Long> held = new HashSet<>();
+        for (Number id : ids) {
+            if (id != null) {
+                held.add(id.longValue());
+            }
+        }
+        return held;
     }
 
     private boolean bookable(Range range, OffsetDateTime now) {

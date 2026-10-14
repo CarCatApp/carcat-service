@@ -266,6 +266,56 @@ class BookingCalendarServiceTest {
     }
 
     @Test
+    void heldRepairYieldsToAUsablePackageAtTheSameHour() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        OffsetDateTime later = start.plusHours(2);
+        BranchCarePackage pkg = packageRow();
+        IndividualService oil = oil();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.findRangeIdsByCarIdAndStatusIn(eq(11L), eq(BookingStatus.holdingCarOnRange())))
+                .thenReturn(List.of(70L));
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(70L, start, 4, StaffSlotTargets.REPAIR_INSPECTION, null, null),
+                        slot(40L, start, 2, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(55L, start, 1, StaffSlotTargets.INDIVIDUAL, null, oil),
+                        slot(61L, later, 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesRequest body = request(day, 10L, List.of(20L), "səs");
+        body.setCarId(11L);
+        BookingDayRangesResponse response = service.day(7L, body, "az");
+
+        assertEquals(2, response.getRanges().size());
+        assertEquals(40L, response.getRanges().get(0).getRangeId());
+        assertEquals(2, response.getRanges().get(0).getRemaining());
+        assertEquals(61L, response.getRanges().get(1).getRangeId());
+    }
+
+    @Test
+    void singleRepairBookingHidesThatHour() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 11, 0);
+        OffsetDateTime later = start.plusHours(1);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.findRangeIdsByCarIdAndStatusIn(eq(11L), eq(BookingStatus.holdingCarOnRange())))
+                .thenReturn(List.of(70L));
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(70L, start, 4, StaffSlotTargets.REPAIR_INSPECTION, null, null),
+                        slot(71L, later, 4, StaffSlotTargets.REPAIR_INSPECTION, null, null))
+        ));
+
+        BookingDayRangesRequest body = request(day, null, null, "səs");
+        body.setCarId(11L);
+        BookingDayRangesResponse response = service.day(7L, body, "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(71L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
     void heldRangeDoesNotKeepTheDayOpen() {
         LocalDate day = openDay();
         BranchCarePackage pkg = packageRow();

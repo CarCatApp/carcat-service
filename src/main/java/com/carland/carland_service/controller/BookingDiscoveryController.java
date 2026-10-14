@@ -165,8 +165,12 @@ public class BookingDiscoveryController {
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable Long branchId,
+            @RequestParam(required = false) Long carId,
             @RequestBody BookingCalendarRequest request
     ) {
+        if (request != null && request.getCarId() == null) {
+            request.setCarId(carId);
+        }
         return bookingCalendarService.month(branchId, request, acceptLanguage);
     }
 
@@ -179,14 +183,19 @@ public class BookingDiscoveryController {
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @PathVariable Long branchId,
+            @RequestParam(required = false) Long carId,
             @RequestBody BookingDayRangesRequest request
     ) {
-        log.info("RANGES_GET body branchId={} date={} packageId={} individualServiceIds={} issuePresent={}",
+        if (request != null && request.getCarId() == null) {
+            request.setCarId(carId);
+        }
+        log.info("RANGES_GET body branchId={} date={} packageId={} individualServiceIds={} issuePresent={} carId={}",
                 branchId,
                 request == null ? null : request.getDate(),
                 request == null ? null : request.getPackageId(),
                 request == null ? null : request.getIndividualServiceIds(),
-                request != null && request.getIssue() != null && !request.getIssue().isBlank());
+                request != null && request.getIssue() != null && !request.getIssue().isBlank(),
+                request == null ? null : request.getCarId());
         return bookingCalendarService.day(branchId, request, acceptLanguage);
     }
 
