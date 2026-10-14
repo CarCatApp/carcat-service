@@ -103,8 +103,8 @@ public class BookingCalendarService {
     }
 
     /**
-     * tr: Seçilen günün boş yerli saatleri. Aynı pencerede yeri çok olan, eşitse paket → hizmet → təmir.
-     * en: Free hours of the chosen day. Same window keeps the fullest range, then package, service, repair.
+     * tr: Seçilen günün boş yerli saatleri. Aynı başlangıçta yeri çok olan, eşitse paket → hizmet → təmir.
+     * en: Free hours of the chosen day. Same start keeps the fullest range, then package, service, repair.
      */
     @Transactional(readOnly = true)
     public BookingDayRangesResponse day(Long branchId, BookingDayRangesRequest request, String acceptLanguage) {
@@ -125,27 +125,26 @@ public class BookingCalendarService {
         List<Range> ranges = rangesByDay(calendarRepository.findByBranchIdAndDayBetween(branch.getId(), day, day))
                 .getOrDefault(day, List.of());
 
-        Map<Window, Range> winners = new HashMap<>();
-        Map<Window, Integer> seats = new HashMap<>();
+        Map<LocalTime, Range> winners = new HashMap<>();
+        Map<LocalTime, Integer> seats = new HashMap<>();
         for (Range range : ranges) {
             if (range.getEnd() == null || !bookable(range, now) || !matches(range, selection)) {
                 continue;
             }
-            Window window = window(range);
+            LocalTime start = clock(range.getStart());
             int left = remaining(range);
-            Range current = winners.get(window);
-            if (current == null || better(range, left, current, seats.get(window))) {
-                winners.put(window, range);
-                seats.put(window, left);
+            Range current = winners.get(start);
+            if (current == null || better(range, left, current, seats.get(start))) {
+                winners.put(start, range);
+                seats.put(start, left);
             }
         }
         List<BookingDayRangeView> views = winners.entrySet().stream()
-                .sorted(Comparator.comparing((Map.Entry<Window, Range> entry) -> entry.getKey().start())
-                        .thenComparing(entry -> entry.getKey().end()))
+                .sorted(Comparator.comparing(Map.Entry::getKey))
                 .map(entry -> BookingDayRangeView.builder()
                         .rangeId(entry.getValue().getRangeId())
-                        .start(entry.getKey().start().format(CLOCK))
-                        .end(entry.getKey().end().format(CLOCK))
+                        .start(entry.getKey().format(CLOCK))
+                        .end(clock(entry.getValue().getEnd()).format(CLOCK))
                         .remaining(seats.get(entry.getKey()))
                         .build())
                 .toList();
@@ -241,10 +240,8 @@ public class BookingCalendarService {
         return capacity - appointments - (int) booked;
     }
 
-    private static Window window(Range range) {
-        return new Window(
-                range.getStart().atZoneSameInstant(StaffSlotWindows.ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES),
-                range.getEnd().atZoneSameInstant(StaffSlotWindows.ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES));
+    private static LocalTime clock(OffsetDateTime time) {
+        return time.atZoneSameInstant(StaffSlotWindows.ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES);
     }
 
     private static boolean better(Range candidate, int candidateLeft, Range current, int currentLeft) {
@@ -336,9 +333,6 @@ public class BookingCalendarService {
             return ru;
         }
         return az;
-    }
-
-    private record Window(LocalTime start, LocalTime end) {
     }
 
     record Selection(Long packageId, Set<Long> serviceIds, boolean repair) {

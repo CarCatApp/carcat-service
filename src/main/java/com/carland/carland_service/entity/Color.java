@@ -30,6 +30,28 @@ public class Color {
     String ru;
     String hex;
 
+    /** tr: Azerbaycanca liste sırası. / en: Azerbaijani list position. */
+    @JsonIgnore
+    @Column(name = "sort_order_az")
+    Integer sortOrderAz;
+
+    /** tr: İngilizce liste sırası. / en: English list position. */
+    @JsonIgnore
+    @Column(name = "sort_order_en")
+    Integer sortOrderEn;
+
+    /** tr: Rusça liste sırası. / en: Russian list position. */
+    @JsonIgnore
+    @Column(name = "sort_order_ru")
+    Integer sortOrderRu;
+
+    /**
+     * tr: İstek dilinin sıra numarası. Kolon değil; GET /get/color/list cevabına yazılır.
+     * en: Sort number for the requested language. Not a column; set on GET /get/color/list.
+     */
+    @Transient
+    Integer sortOrder;
+
     /**
      * tr: Accept-Language'e göre gösterilecek isim (az/ru kolon, yoksa İngilizce color).
      * en: Display name for Accept-Language (az/ru columns, otherwise English color).

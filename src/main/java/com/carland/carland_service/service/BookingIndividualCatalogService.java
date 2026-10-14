@@ -8,29 +8,22 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
-import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.entity.IndividualServiceSource;
-import com.carland.carland_service.entity.Percentage;
-import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
-import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
-import com.carland.carland_service.repository.PercentageRepository;
-import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -55,9 +48,6 @@ public class BookingIndividualCatalogService {
     private final BranchIndividualServiceRepository branchIndividualServiceRepository;
     private final IndividualServiceFilterRepository individualServiceFilterRepository;
     private final CarRepository carRepository;
-    private final CustomerServiceRecordRepository customerServiceRecordRepository;
-    private final PercentageRepository percentageRepository;
-    private final ServiceEntityRepository serviceEntityRepository;
     private final IndividualServiceSourceRepository individualServiceSourceRepository;
     private final PercentageLifeService percentageLifeService;
     private final ObjectMapper objectMapper;
@@ -86,12 +76,13 @@ public class BookingIndividualCatalogService {
                 || !Boolean.TRUE.equals(branch.getPartner().getActive())) {
             throw new ResourceNotFoundException("Branch not found");
         }
-        Map<String, ServiceFact> byCode = carId == null ? null : percentagesOf(carId, userId);
+        Car car = carId == null ? null : ownedCar(carId, userId);
         String lang = BookingMineService.langOf(acceptLanguage);
         String missingNote = missingNote(lang);
         List<BranchIndividualService> found = branchIndividualServiceRepository.findByBranch_Id(branchId);
         List<BranchIndividualService> rows = new ArrayList<>(found == null ? List.of() : found);
-        Map<Long, PercentageLifeService.Snapshot> lives = carId == null ? Map.of() : livesOf(carId);
+        Map<Long, PercentageLifeService.Snapshot> loaded = car == null ? Map.of() : percentageLifeService.byServiceId(car);
+        Map<Long, PercentageLifeService.Snapshot> lives = loaded == null ? Map.of() : loaded;
         Map<Long, List<Long>> serviceIdsByIndividual = lives.isEmpty() ? Map.of() : linksOf(rows);
         rows.sort(Comparator
                 .comparing((BranchIndividualService row) -> sortOf(row.getIndividualService()))
@@ -112,18 +103,16 @@ public class BookingIndividualCatalogService {
             String note = null;
             Integer remainingKm = null;
             Integer remainingMonth = null;
-            if (byCode != null) {
-                ServiceFact fact = byCode.get(catalog.getCode());
-                if (fact != null && fact.known()) {
-                    percentage = fact.percentage();
-                } else {
+            if (car != null) {
+                PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), serviceIdsByIndividual, lives);
+                if (life != null) {
+                    remainingKm = life.remainingKm();
+                    remainingMonth = life.remainingDays();
+                    percentage = life.shownPercentage();
+                }
+                if (percentage == null) {
                     note = missingNote;
                 }
-            }
-            PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), serviceIdsByIndividual, lives);
-            if (life != null) {
-                remainingKm = life.remainingKm();
-                remainingMonth = life.remainingDays();
             }
             services.add(toView(catalog, row, lang, percentage, note, remainingKm, remainingMonth));
         }
@@ -179,14 +168,17 @@ public class BookingIndividualCatalogService {
         return "CAR_SERVICE".equals(bookingEntry.trim().toUpperCase(Locale.ROOT));
     }
 
-    /** Same remaining numbers as GET /service/percentages, keyed by services.id. */
-    private Map<Long, PercentageLifeService.Snapshot> livesOf(Long carId) {
+    /** The percentage screen's car. Another user's car is rejected. */
+    private Car ownedCar(Long carId, Long userId) {
         Car car = carRepository.findByCarId(carId);
         if (car == null) {
-            return Map.of();
+            throw new ResourceNotFoundException("car not found");
         }
-        Map<Long, PercentageLifeService.Snapshot> lives = percentageLifeService.byServiceId(car);
-        return lives == null ? Map.of() : lives;
+        Customer owner = car.getCustomer();
+        if (owner == null || owner.getUserId() == null || !owner.getUserId().equals(userId)) {
+            throw new ForbiddenException("car is not yours");
+        }
+        return car;
     }
 
     private Map<Long, List<Long>> linksOf(List<BranchIndividualService> rows) {
@@ -236,88 +228,6 @@ public class BookingIndividualCatalogService {
         return chosen == null ? null : lives.get(chosen);
     }
 
-    /**
-     * tr: Katalog kodu → kalan ömür yüzdesi. Km ve ay yüzdesinden küçük olanı yazılır.
-     *     Kayıt yoksa null: liste daralmaz. Aynı koda birkaç satır düşerse daha küçük yüzde kalır.
-     * en: Catalog code to remaining-life percent. The smaller of the km and month percents is stored.
-     *     No rows means null: the list stays wide. When several rows share a code, the smaller percent stays.
-     */
-    private Map<String, ServiceFact> percentagesOf(Long carId, Long userId) {
-        Car car = carRepository.findByCarId(carId);
-        if (car == null) {
-            throw new ResourceNotFoundException("car not found");
-        }
-        Customer owner = car.getCustomer();
-        if (owner == null || owner.getUserId() == null || !owner.getUserId().equals(userId)) {
-            throw new ForbiddenException("car is not yours");
-        }
-        List<Percentage> found = percentageRepository.findAllByCarId(carId);
-        Map<Long, String> statusByService = new HashMap<>();
-        List<CustomerServiceRecord> records = customerServiceRecordRepository.findAllByCar(car);
-        if (records != null) {
-            for (CustomerServiceRecord record : records) {
-                if (record.getServiceId() != null && !statusByService.containsKey(record.getServiceId())) {
-                    statusByService.put(record.getServiceId(), record.getServicedStatus());
-                }
-            }
-        }
-        if (found == null || found.isEmpty()) {
-            return Map.of();
-        }
-        List<Long> serviceIds = found.stream().map(Percentage::getServiceId).filter(id -> id != null).distinct().toList();
-        Map<Long, ServiceEntity> services = new HashMap<>();
-        if (!serviceIds.isEmpty()) {
-            for (ServiceEntity entity : serviceEntityRepository.findAllById(serviceIds)) {
-                services.put(entity.getId(), entity);
-            }
-        }
-        Map<String, ServiceFact> best = new HashMap<>();
-        Map<String, Integer> score = new HashMap<>();
-        Map<String, Long> nextDay = new HashMap<>();
-        for (Percentage row : found) {
-            ServiceEntity entity = row.getServiceId() == null ? null : services.get(row.getServiceId());
-            String az = entity != null ? entity.getNameAz() : row.getServiceNameAz();
-            String en = entity != null ? entity.getNameEn() : row.getServiceNameEn();
-            String ru = entity != null ? entity.getNameRu() : row.getServiceNameRu();
-            String code = IndividualCatalogSync.codeOf(az, en, ru);
-            if (code.isEmpty()) {
-                continue;
-            }
-            Integer km = kmRemaining(row.getLastServiceKm(), row.getNextServiceKm(), car.getMileage());
-            if (km == null) {
-                km = row.getKmPercentage();
-            }
-            Integer month = monthRemaining(row.getLastServiceDate(), row.getNextServiceDate());
-            if (month == null) {
-                month = row.getMonthPercentage();
-            }
-            Integer nearer = nearerPercent(km, month);
-            int rowScore = nearer == null ? Integer.MAX_VALUE : nearer;
-            long rowNext = row.getNextServiceDate() == null ? Long.MAX_VALUE : row.getNextServiceDate().toEpochDay();
-            Integer current = score.get(code);
-            if (current == null || rowScore < current || (rowScore == current && rowNext < nextDay.getOrDefault(code, Long.MAX_VALUE))) {
-                boolean known = knownServicedStatus(statusByService.get(row.getServiceId()));
-                best.put(code, new ServiceFact(
-                        known ? nearer : null,
-                        known,
-                        remainingKmOf(row.getLastServiceKm(), row.getNextServiceKm(), car.getMileage()),
-                        remainingMonthOf(row.getLastServiceDate(), row.getNextServiceDate())));
-                score.put(code, rowScore);
-                nextDay.put(code, rowNext);
-            }
-        }
-        return best;
-    }
-
-    /** serviced and neverServiced (also never_serviced) mean the customer answered. */
-    private static boolean knownServicedStatus(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return false;
-        }
-        String value = raw.trim().replace("_", "").toLowerCase();
-        return "serviced".equals(value) || "neverserviced".equals(value);
-    }
-
     private static String missingNote(String lang) {
         if ("en".equals(lang)) {
             return "No information has been entered for this service";
@@ -325,71 +235,7 @@ public class BookingIndividualCatalogService {
         if ("ru".equals(lang)) {
             return "По этой услуге данные не введены";
         }
-        return "Bu servis üzrə məlumat daxil edilməyib";
-    }
-
-    private record ServiceFact(Integer percentage, boolean known, Integer remainingKm, Integer remainingMonth) {
-    }
-
-    /** Same remaining km as GET /service/percentages. */
-    private static Integer remainingKmOf(Integer lastKm, Integer nextKm, Long mileage) {
-        if (lastKm == null || nextKm == null || mileage == null) {
-            return null;
-        }
-        long remaining = nextKm - mileage;
-        if (remaining > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        return (int) Math.max(remaining, 0);
-    }
-
-    /** Same remaining-day count percentages returns as remainingMonths. */
-    private static Integer remainingMonthOf(LocalDate lastDate, LocalDate nextDate) {
-        if (lastDate == null || nextDate == null) {
-            return null;
-        }
-        long days = Math.max(nextDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
-        if (days > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        return (int) days;
-    }
-
-    private static Integer nearerPercent(Integer km, Integer month) {
-        if (km == null) {
-            return month;
-        }
-        if (month == null) {
-            return km;
-        }
-        return Math.min(km, month);
-    }
-
-    /** Same remaining-life percent as the percentage screen. 0 means due. */
-    private static Integer kmRemaining(Integer lastKm, Integer nextKm, Long mileage) {
-        if (lastKm == null || nextKm == null || mileage == null) {
-            return null;
-        }
-        long totalKm = nextKm - lastKm;
-        long remaining = nextKm - mileage;
-        if (totalKm > 0) {
-            int pct = (int) Math.round((remaining * 100.0) / totalKm);
-            return Math.max(0, Math.min(100, pct));
-        }
-        return 0;
-    }
-
-    private static Integer monthRemaining(LocalDate lastDate, LocalDate nextDate) {
-        if (lastDate == null || nextDate == null) {
-            return null;
-        }
-        long totalDays = nextDate.toEpochDay() - lastDate.toEpochDay();
-        long remainingDays = Math.max(nextDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
-        if (totalDays > 0) {
-            int pct = (int) Math.round((remainingDays * 100.0) / totalDays);
-            return Math.max(0, Math.min(100, pct));
-        }
-        return 0;
+        return "Məlumat daxil etməmisiniz";
     }
 
     private BookingIndividualServiceView toView(IndividualService catalog, BranchIndividualService row, String lang,

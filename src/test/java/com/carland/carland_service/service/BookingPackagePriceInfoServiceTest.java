@@ -39,19 +39,25 @@ class BookingPackagePriceInfoServiceTest {
 
         BookingPackagePriceInfoResponse en = service.info(5L, "en");
         assertEquals(129, en.getPrice());
-        assertEquals("About the package price", en.getTitle());
-        assertEquals("129 ₼ is the service fee only.", en.getSubtitle());
+        assertEquals("Price terms", en.getTitle());
+        assertEquals("The price includes the service fee only.", en.getSubtitle());
         assertEquals(
-                "Parts, fluids and other required materials are not included and may be charged separately",
+                "Spare parts and consumables (oil, filters, etc.) are not included in the total and will be calculated separately.",
                 en.getDescription());
 
         BookingPackagePriceInfoResponse az = service.info(5L, "az");
-        assertEquals("Paket qiyməti haqqında", az.getTitle());
-        assertEquals("129 ₼ yalnız xidmət haqqıdır.", az.getSubtitle());
+        assertEquals("Qiymət şərtləri", az.getTitle());
+        assertEquals("Qiymətə yalnız xidmət haqqı daxildir.", az.getSubtitle());
+        assertEquals(
+                "Ehtiyat hissələri və sərfiyyat materialları (yağ, filtr və s.) ümumi məbləğə daxil deyil, onlar ayrıca hesablanacaq.",
+                az.getDescription());
 
         BookingPackagePriceInfoResponse ru = service.info(5L, "ru");
-        assertEquals("О цене пакета", ru.getTitle());
-        assertEquals("129 ₼ — это только стоимость услуги.", ru.getSubtitle());
+        assertEquals("Условия цены", ru.getTitle());
+        assertEquals("В цену включена только стоимость услуги.", ru.getSubtitle());
+        assertEquals(
+                "Запчасти и расходные материалы (масло, фильтры и т. д.) не входят в общую сумму и будут рассчитаны отдельно.",
+                ru.getDescription());
     }
 
     @Test

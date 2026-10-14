@@ -36,7 +36,7 @@ INSERT INTO service_categories (
     code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys
 ) VALUES (
     'routine',
-    '{"az":"Dövri Qulluq","en":"Routine Care","ru":"Плановое обслуживание"}',
+    '{"az":"Dövri qulluq","en":"Routine Care","ru":"Плановое обслуживание"}',
     '{"az":"Paketlər və fərdi dövri qulluq xidmətləri","en":"Packages and individual routine care services","ru":"Пакеты и отдельные услуги планового обслуживания"}',
     1, true, false, true, NULL
 ) ON CONFLICT (code) DO NOTHING;

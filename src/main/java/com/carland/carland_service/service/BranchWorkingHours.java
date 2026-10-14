@@ -4,10 +4,12 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.exceptions.MissingFieldException;
 
 /**
- * tr: Həftə içi, şənbə və bazar aralığı {@code HH:mm-HH:mm}. Köhnə həftə sonu sütunu şənbə və bazar eyni olanda dolu qalır.
- * en: Weekday, Saturday and Sunday ranges as {@code HH:mm-HH:mm}. The legacy weekend column stays set only when Saturday and Sunday match.
+ * tr: Saxlama {@code HH:mm-HH:mm}. Cavab {@code HH:mm — HH:mm}. Köhnə həftə sonu sütunu şənbə və bazar eyni olanda dolu qalır.
+ * en: Storage is {@code HH:mm-HH:mm}. Responses use {@code HH:mm — HH:mm}. The legacy weekend column stays set only when Saturday and Sunday match.
  */
 public final class BranchWorkingHours {
+
+    private static final String DISPLAY_DASH = " \u2014 ";
 
     private BranchWorkingHours() {
     }
@@ -28,6 +30,24 @@ public final class BranchWorkingHours {
         branch.setWorkingHoursSaturday(saturday);
         branch.setWorkingHoursSunday(sunday);
         branch.setWorkingHoursWeekend(same(saturday, sunday) ? saturday : null);
+    }
+
+    /** Response form. Storage and open/closed parsing stay {@code HH:mm-HH:mm}. */
+    public static String display(String stored) {
+        if (stored == null || stored.isBlank()) {
+            return null;
+        }
+        String trimmed = stored.trim();
+        int dash = trimmed.indexOf('-');
+        if (dash < 0) {
+            return trimmed;
+        }
+        Integer from = minutes(trimmed.substring(0, dash));
+        Integer to = minutes(trimmed.substring(dash + 1));
+        if (from == null || to == null) {
+            return trimmed;
+        }
+        return clock(from) + DISPLAY_DASH + clock(to);
     }
 
     public static String weekdayOf(Branch branch) {

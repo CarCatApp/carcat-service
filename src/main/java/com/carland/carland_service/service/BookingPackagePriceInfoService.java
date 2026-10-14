@@ -32,24 +32,23 @@ public class BookingPackagePriceInfoService {
             throw new ResourceNotFoundException("care package not found");
         }
         int price = pkg.getPrice() == null ? 0 : pkg.getPrice();
-        String fee = price + " ₼";
         String lang = BookingMineService.langOf(acceptLanguage);
         return BookingPackagePriceInfoResponse.builder()
                 .packageId(pkg.getId())
                 .price(price)
                 .currency(pkg.getCurrency() == null ? "AZN" : pkg.getCurrency())
                 .title(text(lang,
-                        "Paket qiyməti haqqında",
-                        "About the package price",
-                        "О цене пакета"))
+                        "Qiymət şərtləri",
+                        "Price terms",
+                        "Условия цены"))
                 .subtitle(text(lang,
-                        fee + " yalnız xidmət haqqıdır.",
-                        fee + " is the service fee only.",
-                        fee + " — это только стоимость услуги."))
+                        "Qiymətə yalnız xidmət haqqı daxildir.",
+                        "The price includes the service fee only.",
+                        "В цену включена только стоимость услуги."))
                 .description(text(lang,
-                        "Ehtiyat hissələri, mayelər və digər tələb olunan materiallar qiymətə daxil deyil və ayrıca ödənilə bilər",
-                        "Parts, fluids and other required materials are not included and may be charged separately",
-                        "Запчасти, жидкости и другие необходимые материалы не включены и могут оплачиваться отдельно"))
+                        "Ehtiyat hissələri və sərfiyyat materialları (yağ, filtr və s.) ümumi məbləğə daxil deyil, onlar ayrıca hesablanacaq.",
+                        "Spare parts and consumables (oil, filters, etc.) are not included in the total and will be calculated separately.",
+                        "Запчасти и расходные материалы (масло, фильтры и т. д.) не входят в общую сумму и будут рассчитаны отдельно."))
                 .build();
     }
 

@@ -179,6 +179,33 @@ class BookingCalendarServiceTest {
     }
 
     @Test
+    void sameStartDifferentLengthKeepsTheFullerRangeAndOtherStartsStay() {
+        LocalDate day = openDay();
+        OffsetDateTime noon = at(day, 12, 0);
+        OffsetDateTime halfPast = at(day, 12, 30);
+        BranchCarePackage pkg = packageRow();
+        IndividualService oil = oil();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        wide(40L, noon, noon.plusMinutes(30), 2, pkg),
+                        slot(55L, noon, 5, StaffSlotTargets.INDIVIDUAL, null, oil),
+                        wide(80L, noon, noon.plusHours(1), 8, pkg),
+                        wide(90L, halfPast, halfPast.plusHours(1), 1, pkg))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(day, 10L, List.of(20L), "səs"), "az");
+
+        assertEquals(2, response.getRanges().size());
+        assertEquals(80L, response.getRanges().get(0).getRangeId());
+        assertEquals("12:00", response.getRanges().get(0).getStart());
+        assertEquals("13:00", response.getRanges().get(0).getEnd());
+        assertEquals(8, response.getRanges().get(0).getRemaining());
+        assertEquals(90L, response.getRanges().get(1).getRangeId());
+        assertEquals("12:30", response.getRanges().get(1).getStart());
+    }
+
+    @Test
     void blankIssueIgnoresRepairRange() {
         LocalDate day = openDay();
         OffsetDateTime start = at(day, 11, 0);

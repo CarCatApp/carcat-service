@@ -71,6 +71,9 @@ class PercentageLifeServiceTest {
 
         assertEquals(5000, life.remainingKm());
         assertEquals(40, life.remainingDays());
+        assertEquals(50, life.kmPercentage());
+        assertEquals(80, life.monthPercentage());
+        assertEquals(50, life.shownPercentage());
     }
 
     @Test
@@ -92,6 +95,8 @@ class PercentageLifeServiceTest {
 
         assertEquals(7000, life.remainingKm());
         assertEquals(15, life.remainingDays());
+        assertEquals(70, life.kmPercentage());
+        assertEquals(75, life.monthPercentage());
     }
 
     @Test
@@ -111,8 +116,20 @@ class PercentageLifeServiceTest {
         PercentageLifeService.Snapshot life = service.byServiceId(car).get(152L);
 
         assertEquals(5000, life.remainingKm());
-        assertEquals((int) (LocalDate.now().minusMonths(1).plusMonths(12).toEpochDay() - LocalDate.now().toEpochDay()),
-                life.remainingDays());
+        LocalDate last = LocalDate.now().minusMonths(1);
+        LocalDate next = last.plusMonths(12);
+        assertEquals((int) (next.toEpochDay() - LocalDate.now().toEpochDay()), life.remainingDays());
+        assertEquals(50, life.kmPercentage());
+        long totalDays = next.toEpochDay() - last.toEpochDay();
+        long remainingDays = next.toEpochDay() - LocalDate.now().toEpochDay();
+        assertEquals((int) Math.round((remainingDays * 100.0) / totalDays), life.monthPercentage());
+    }
+
+    @Test
+    void kmPercentageMatchesThePercentageScreen() {
+        assertEquals(62, PercentageLifeService.kmPercentage(0, 50000, 19020L));
+        assertEquals(0, PercentageLifeService.kmPercentage(10, 10, 10L));
+        assertNull(PercentageLifeService.kmPercentage(null, 10, 10L));
     }
 
     @Test

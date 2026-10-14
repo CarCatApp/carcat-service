@@ -39,7 +39,7 @@ SET offered_service_filter_id = 1
 WHERE o.title_json::jsonb ->> 'az' IN (
     'Mühərrikin yağ filtri',
     'Hava filtri',
-    'Yanacaq Filtri',
+    'Yanacaq filtri',
     'Salon (kabin) filtri'
 );
 
@@ -57,7 +57,7 @@ WHERE o.title_json::jsonb ->> 'az' IN (
 UPDATE offered_services o
 SET offered_service_filter_id = 3
 WHERE o.title_json::jsonb ->> 'az' IN (
-    'Soyutma mayesi (Antifriz)',
+    'Soyutma mayesi (antifriz)',
     'Radiator və antifriz şlanqları'
 );
 
@@ -75,7 +75,7 @@ SET offered_service_filter_id = 6
 WHERE o.title_json::jsonb ->> 'az' IN (
     'Mühərrik yağı',
     'Şüşəyuyan mayesi',
-    'Sükan gücləndirici mayesi',
+    'Sükan gücləndiricisi mayesi',
     'Əyləc mayesi',
     'Akkumulyator mayesi',
     'AdBlue',

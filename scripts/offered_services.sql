@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS offered_services (
 );
 
 INSERT INTO service_behaviors (code, title_json, sort_order, active) VALUES
-    ('replace', '{"az":"DƏYİŞDİRMƏ","en":"Replace","ru":""}', 1, true),
-    ('extra',   '{"az":"ƏLAVƏ ETMƏ","en":"Top up","ru":""}', 2, true),
+    ('replace', '{"az":"Dəyişdirmə","en":"Replace","ru":""}', 1, true),
+    ('extra',   '{"az":"Əlavə etmə","en":"Top up","ru":""}', 2, true),
     ('inspect', '{"az":"YOXLANIŞ VƏ DİAQNOZ","en":"Check & diagnose","ru":""}', 3, true),
     ('service', '{"az":"Servis göstəricisi","en":"Service indicator","ru":""}', 4, true)
 ON CONFLICT (code) DO NOTHING;
@@ -33,11 +33,11 @@ JOIN (VALUES
     ('replace', 1,  '{"az":"Mühərrik yağı","en":"","ru":""}'),
     ('replace', 2,  '{"az":"Mühərrikin yağ filtri","en":"","ru":""}'),
     ('replace', 3,  '{"az":"Hava filtri","en":"","ru":""}'),
-    ('replace', 4,  '{"az":"Yanacaq Filtri","en":"","ru":""}'),
+    ('replace', 4,  '{"az":"Yanacaq filtri","en":"","ru":""}'),
     ('replace', 5,  '{"az":"Salon (kabin) filtri","en":"","ru":""}'),
     ('extra', 1,    '{"az":"Şüşəyuyan mayesi","en":"","ru":""}'),
-    ('extra', 2,    '{"az":"Sükan gücləndirici mayesi","en":"","ru":""}'),
-    ('extra', 3,    '{"az":"Soyutma mayesi (Antifriz)","en":"","ru":""}'),
+    ('extra', 2,    '{"az":"Sükan gücləndiricisi mayesi","en":"","ru":""}'),
+    ('extra', 3,    '{"az":"Soyutma mayesi (antifriz)","en":"","ru":""}'),
     ('extra', 4,    '{"az":"Əyləc mayesi","en":"","ru":""}'),
     ('extra', 5,    '{"az":"Akkumulyator mayesi","en":"","ru":""}'),
     ('inspect', 1,  '{"az":"AdBlue","en":"","ru":""}'),

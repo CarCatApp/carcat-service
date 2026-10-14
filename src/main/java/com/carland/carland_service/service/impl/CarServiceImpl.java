@@ -19,6 +19,7 @@ import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PercentageLifeService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.PushNotificationService;
+import com.carland.carland_service.service.ColorSortService;
 import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,7 @@ public class CarServiceImpl implements CarService {
     private final ServiceEntityRepository serviceEntityRepository;
     private final VinService vinService;
     private final ColorRepository colorRepository;
+    private final ColorSortService colorSortService;
     private final PercentageRepository percentageRepository;
     private final DeviceTokenRepository deviceTokenRepository;
     private final PushNotificationService pushNotificationService;
@@ -196,71 +198,16 @@ public class CarServiceImpl implements CarService {
     }
 
     /**
-     * tr: Renk listesini dile göre çevirip dile özgü sıralamayla (az için sabit sıra, diğer dillerde
-     *     alfabetik ve "Other" en sonda) döner; liste boşsa ResourceNotFoundException fırlatır.
-     * en: Returns the color list translated per language with language-specific ordering (a fixed order
-     *     for az, alphabetical with "Other" last for other languages); throws ResourceNotFoundException
-     *     when the list is empty.
+     * tr: Renk listesini Accept-Language sırasıyla döner (sort_order_az / en / ru).
+     *     Boş sıra numarası, ilk admin açılışına kadar eski sabit listeye düşer.
+     *     Cache catalog:colors:{lang}; yazan ColorSortService evictCatalogColorsAfterCommit çağırır.
+     * en: Returns colors ordered by the Accept-Language sort column. A missing number falls back
+     *     to the old fixed list until the admin page assigns one. Cache key catalog:colors:{lang};
+     *     ColorSortService evicts it after commit.
      */
     @Override
     public List<Color> getColors(String acceptLanguage) {
-        return redisCacheService.getOrLoadColors(acceptLanguage, () -> loadColors(acceptLanguage));
-    }
-
-    private List<Color> loadColors(String acceptLanguage) {
-
-        List<Color> colors = colorRepository.findAll();
-
-        if (colors.isEmpty()) {
-            throw new ResourceNotFoundException(
-                    MessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage)
-            );
-        }
-
-        List<String> azOrder = List.of(
-                "Qara", "Yaş asfalt", "Boz", "Gümüşü", "Ağ", "Bej", "Tünd qırmızı", "Qırmızı",
-                "Çəhrayı", "Narıncı", "Qızılı", "Sarı", "Xaki", "Tünd yaşıl", "Yaşıl", "Açıq yaşıl",
-                "Mavi", "Göy", "Bənövşəyi", "Qəhvəyi", "Bordo", "Mat qara", "Metalik gümüş",
-                "Tünd mavi", "İncə ağ", "Digər"
-        );
-        List<String> enOrder = List.of(
-                "Black", "Wet Asphalt", "Gray / Grey", "Gray", "Silver", "White", "Beige", "Dark Red",
-                "Red", "Pink", "Orange", "Gold", "Yellow", "Khaki", "Dark Green", "Green", "Light Green",
-                "Light Blue", "Blue", "Purple", "Brown", "Maroon", "Matte Black", "Metallic silver",
-                "Navy blue", "Pearl white", "Other"
-        );
-        List<String> ruOrder = List.of(
-                "Чёрный", "Мокрый асфальт", "Серый", "Серебристый", "Белый", "Бежевый", "Тёмно-красный",
-                "Красный", "Розовый", "Оранжевый", "Золотой", "Жёлтый", "Хаки", "Тёмно-зелёный", "Зелёный",
-                "Светло-зелёный", "Голубой", "Синий", "Фиолетовый", "Коричневый", "Тёмно-бордовый",
-                "Матовый чёрный", "Серебристый металлик", "Тёмно-синий", "Жемчужно-белый", "Другой"
-        );
-        String lang = acceptLanguage == null ? "az" : acceptLanguage.toLowerCase();
-        List<String> order = lang.startsWith("en") ? enOrder : lang.startsWith("ru") ? ruOrder : azOrder;
-
-        return colors.stream()
-                .map(src -> Color.builder()
-                        .colorId(src.getColorId())
-                        .color(src.nameForLang(acceptLanguage))
-                        .hex(src.getHex())
-                        .build())
-                .sorted((c1, c2) -> {
-                    int i1 = order.indexOf(c1.getColor());
-                    int i2 = order.indexOf(c2.getColor());
-                    if (i1 < 0 && i2 < 0) {
-                        String n1 = c1.getColor() == null ? "" : c1.getColor();
-                        String n2 = c2.getColor() == null ? "" : c2.getColor();
-                        return n1.compareToIgnoreCase(n2);
-                    }
-                    if (i1 < 0) {
-                        return 1;
-                    }
-                    if (i2 < 0) {
-                        return -1;
-                    }
-                    return Integer.compare(i1, i2);
-                })
-                .toList();
+        return redisCacheService.getOrLoadColors(acceptLanguage, () -> colorSortService.listForApi(acceptLanguage));
     }
 
 
@@ -671,16 +618,9 @@ public class CarServiceImpl implements CarService {
             Integer nextServiceKm = null;
 
             if (serviceEntity.getIntervalKm() != null && car.getMileage() != null) {
-
-                long intervalKm = serviceEntity.getIntervalKm();
-                long usedKm = car.getMileage() - lastServiceKm;
-
-                remainingKm = (int) Math.max(intervalKm - usedKm, 0);
-                nextServiceKm = Math.toIntExact(lastServiceKm + intervalKm);
-
-                kmPercentage = (int) Math.round((remainingKm * 100.0) / intervalKm);
-
-                kmPercentage = Math.max(0, Math.min(100, kmPercentage));
+                nextServiceKm = Math.toIntExact(lastServiceKm + serviceEntity.getIntervalKm());
+                remainingKm = computeRemainingKm(lastServiceKm, nextServiceKm, car.getMileage());
+                kmPercentage = computeKmPercentage(lastServiceKm, nextServiceKm, car.getMileage());
             }
 
 // ================= MONTH CALC (GÜN BAZLI) =================
@@ -2132,16 +2072,7 @@ public class CarServiceImpl implements CarService {
      *     clamped to 0-100; returns null when any input is null.
      */
     private Integer computeKmPercentage(Integer lastServiceKm, Integer nextServiceKm, Long carMileage) {
-        if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
-            return null;
-        }
-        long totalKm = nextServiceKm - lastServiceKm;
-        long remainingKmRaw = nextServiceKm - carMileage;
-        if (totalKm > 0) {
-            int kmPct = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
-            return Math.max(0, Math.min(100, kmPct));
-        }
-        return 0;
+        return PercentageLifeService.kmPercentage(lastServiceKm, nextServiceKm, carMileage);
     }
 
     /**
@@ -2151,19 +2082,7 @@ public class CarServiceImpl implements CarService {
      *     clamped to 0-100); returns null when either date is null.
      */
     private Integer computeMonthPercentage(LocalDate lastServiceDate, LocalDate nextServiceDate) {
-        if (lastServiceDate == null || nextServiceDate == null) {
-            return null;
-        }
-        long lastDay = lastServiceDate.toEpochDay();
-        long nextDay = nextServiceDate.toEpochDay();
-        long nowDay = LocalDate.now().toEpochDay();
-        long totalDays = nextDay - lastDay;
-        long remainingDays = Math.max(nextDay - nowDay, 0);
-        if (totalDays > 0) {
-            int monthPct = (int) Math.round((remainingDays * 100.0) / totalDays);
-            return Math.max(0, Math.min(100, monthPct));
-        }
-        return 0;
+        return PercentageLifeService.monthPercentage(lastServiceDate, nextServiceDate);
     }
 
     /**

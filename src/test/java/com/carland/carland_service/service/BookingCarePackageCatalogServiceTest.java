@@ -55,10 +55,10 @@ class BookingCarePackageCatalogServiceTest {
                 .id(6L).branch(branch).name("Kapalı").price(50).active(false).build();
         ServiceBehavior replace = ServiceBehavior.builder()
                 .id(30L).code("replace").sortOrder(1)
-                .titleJson("{\"az\":\"DƏYİŞDİRMƏ\",\"en\":\"Replace\",\"ru\":\"\"}").build();
+                .titleJson("{\"az\":\"Dəyişdirmə\",\"en\":\"Replace\",\"ru\":\"\"}").build();
         ServiceBehavior topUp = ServiceBehavior.builder()
                 .id(20L).code("extra").sortOrder(2)
-                .titleJson("{\"az\":\"ƏLAVƏ ETMƏ\",\"en\":\"Top up\",\"ru\":\"\"}").build();
+                .titleJson("{\"az\":\"Əlavə etmə\",\"en\":\"Top up\",\"ru\":\"\"}").build();
         OfferedService oil = OfferedService.builder()
                 .id(3L).sortOrder(2).behavior(topUp)
                 .titleJson("{\"az\":\"Yağ dəyişimi\",\"en\":\"Oil change\"}").build();
@@ -93,8 +93,8 @@ class BookingCarePackageCatalogServiceTest {
         assertTrue(az.getPackages().stream().noneMatch(pkg -> pkg.getId().equals(6L)));
         List<BookingCarePackageGroupView> groups = az.getPackages().get(0).getGroups();
         assertEquals(List.of(30L, 20L), groups.stream().map(BookingCarePackageGroupView::getId).toList());
-        assertEquals("DƏYİŞDİRMƏ", groups.get(0).getName());
-        assertEquals("ƏLAVƏ ETMƏ", groups.get(1).getName());
+        assertEquals("Dəyişdirmə", groups.get(0).getName());
+        assertEquals("Əlavə etmə", groups.get(1).getName());
         BookingCarePackageServiceView padsView = groups.get(0).getServices().get(0);
         assertEquals("Əyləc qəlibi", padsView.getName());
         assertEquals(BookingCarePackageCatalogService.ICON_PATH + "8", padsView.getIconUrl());

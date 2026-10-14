@@ -82,17 +82,17 @@ class BookingBranchProfileServiceTest {
         assertEquals("Hyper", out.getPartnerName());
         assertTrue(out.getVerified());
         assertEquals("/api/v1/photo/for/partner/get/1", out.getLogoUrl());
-        assertEquals("09:00-18:00", out.getWorkingHoursWeekday());
-        assertEquals("10:00-16:00", out.getWorkingHoursSaturday());
-        assertEquals("10:00-16:00", out.getWorkingHoursSunday());
-        assertEquals("10:00-16:00", out.getWorkingHoursWeekend());
+        assertEquals("09:00 \u2014 18:00", out.getWorkingHoursWeekday());
+        assertEquals("10:00 \u2014 16:00", out.getWorkingHoursSaturday());
+        assertEquals("10:00 \u2014 16:00", out.getWorkingHoursSunday());
+        assertEquals("10:00 \u2014 16:00", out.getWorkingHoursWeekend());
 
         branch.setWorkingHoursSaturday("10:00-14:00");
         branch.setWorkingHoursSunday("12:00-15:00");
         branch.setWorkingHoursWeekend(null);
         BookingBranchProfileResponse split = service.profile(7L, null, null, "en");
-        assertEquals("10:00-14:00", split.getWorkingHoursSaturday());
-        assertEquals("12:00-15:00", split.getWorkingHoursSunday());
+        assertEquals("10:00 \u2014 14:00", split.getWorkingHoursSaturday());
+        assertEquals("12:00 \u2014 15:00", split.getWorkingHoursSunday());
         assertNull(split.getWorkingHoursWeekend());
         assertEquals(2, out.getServices().size());
         BookingBranchProfileServiceView routineView = out.getServices().get(0);

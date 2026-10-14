@@ -20,9 +20,12 @@ public class BookingIndividualServiceView {
     Integer priceMax;
     String currency;
     String unit;
-    /** Kalan ömür yüzdesi. 0 süresi dolmuş, 100 yeni yapılmış. Bilgi yoksa null. */
+    /**
+     * GET /service/percentages ile aynı hesap. Km ve ay yüzdesi ikisi de varsa erken biten.
+     * Biri yoksa olan. İkisi de yoksa null.
+     */
     Integer individualServiceMappedPercentage;
-    /** servicedStatus boşken yüzde yerine gösterilen cümle. */
+    /** Yüzde hesaplanamadığında gösterilen cümle. */
     String percentageNote;
     /** Kalan km. Percentages ile aynı: nextServiceKm − araç km, 0’ın altına inmez. Araç veya kayıt yoksa null. */
     Integer remainingKm;

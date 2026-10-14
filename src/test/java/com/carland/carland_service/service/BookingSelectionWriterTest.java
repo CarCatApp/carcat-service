@@ -100,7 +100,7 @@ class BookingSelectionWriterTest {
         verify(lineRepository).save(line.capture());
         assertEquals(3L, line.getValue().getIndividualServiceId());
         assertEquals("MYF", line.getValue().getCode());
-        assertEquals("Dövri Qulluq + Təmir Xidməti və Yoxlanış",
+        assertEquals("Dövri qulluq + Təmir Xidməti və Yoxlanış",
                 BookingKindLabel.of(true, true));
     }
 

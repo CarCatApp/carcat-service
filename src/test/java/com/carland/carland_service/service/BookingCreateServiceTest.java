@@ -248,7 +248,7 @@ class BookingCreateServiceTest {
         assertEquals(12900, out.getPackagePrice());
         assertEquals("Yağ dəyişimi", out.getIndividualServices().get(0).getName());
         assertEquals("Generator akkumulyatoru doldurmur", out.getInspection().getMessage());
-        assertEquals("Dövri Qulluq + Təmir Xidməti və Yoxlanış", out.getServiceLabel());
+        assertEquals("Dövri qulluq + Təmir Xidməti və Yoxlanış", out.getServiceLabel());
         assertEquals(16400, out.getPriceMin());
     }
 

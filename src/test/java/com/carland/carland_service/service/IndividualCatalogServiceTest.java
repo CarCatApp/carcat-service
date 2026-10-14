@@ -66,7 +66,7 @@ class IndividualCatalogServiceTest {
         catalog = IndividualService.builder()
                 .id(4L)
                 .code("RZV")
-                .titleJson("{\"az\":\"Razval\",\"en\":\"Wheel alignment\",\"ru\":\"Развал-схождение\"}")
+                .titleJson("{\"az\":\"Təkərlərin düzlənməsi (razval)\",\"en\":\"Wheel alignment\",\"ru\":\"Развал-схождение\"}")
                 .sortOrder(5)
                 .active(true)
                 .build();

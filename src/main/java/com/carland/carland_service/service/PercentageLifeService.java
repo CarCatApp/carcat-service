@@ -36,7 +36,22 @@ public class PercentageLifeService {
     private final ServiceHistoryRepository serviceHistoryRepository;
     private final HyperPercentageSyncService hyperPercentageSyncService;
 
-    public record Snapshot(Integer remainingKm, Integer remainingDays) {
+    /**
+     * tr: GET /service/percentages ile aynı kalan km, kalan gün, km yüzdesi ve ay yüzdesi.
+     * en: Same remaining km, remaining days, km percent and month percent as GET /service/percentages.
+     */
+    public record Snapshot(Integer remainingKm, Integer remainingDays, Integer kmPercentage, Integer monthPercentage) {
+
+        /** The sooner of the two percents the percentage screen already calculated. One side only: that side. */
+        public Integer shownPercentage() {
+            if (kmPercentage == null) {
+                return monthPercentage;
+            }
+            if (monthPercentage == null) {
+                return kmPercentage;
+            }
+            return Math.min(kmPercentage, monthPercentage);
+        }
     }
 
     public java.util.Map<Long, Snapshot> byServiceId(Car car) {
@@ -84,7 +99,11 @@ public class PercentageLifeService {
     }
 
     private static Snapshot fromStored(LocalDate lastDate, Integer lastKm, Integer nextKm, LocalDate nextDate, Long mileage) {
-        return new Snapshot(remainingKm(lastKm, nextKm, mileage), remainingDays(lastDate, nextDate));
+        return new Snapshot(
+                remainingKm(lastKm, nextKm, mileage),
+                remainingDays(lastDate, nextDate),
+                kmPercentage(lastKm, nextKm, mileage),
+                monthPercentage(lastDate, nextDate));
     }
 
     private static Snapshot fromInterval(Car car, ServiceEntity service, List<CustomerServiceRecord> records,
@@ -112,21 +131,16 @@ public class PercentageLifeService {
                 .max(Integer::compareTo)
                 .orElse(0);
 
-        Integer kmLeft = null;
         Integer nextKm = null;
         if (service.getIntervalKm() != null && car.getMileage() != null) {
-            long intervalKm = service.getIntervalKm();
-            long usedKm = car.getMileage() - lastKm;
-            kmLeft = (int) Math.max(intervalKm - usedKm, 0);
-            nextKm = Math.toIntExact(lastKm + intervalKm);
+            nextKm = Math.toIntExact(lastKm + service.getIntervalKm());
         }
 
-        Integer daysLeft = null;
+        LocalDate nextDate = null;
         if (service.getIntervalMonth() != null) {
-            LocalDate nextDate = lastDate.plusMonths(service.getIntervalMonth());
-            daysLeft = remainingDays(lastDate, nextDate);
+            nextDate = lastDate.plusMonths(service.getIntervalMonth());
         }
-        return new Snapshot(kmLeft, daysLeft);
+        return fromStored(lastDate, lastKm, nextKm, nextDate, car.getMileage());
     }
 
     public static Integer remainingKm(Integer lastKm, Integer nextKm, Long mileage) {
@@ -134,6 +148,34 @@ public class PercentageLifeService {
             return null;
         }
         return (int) Math.max(nextKm - mileage, 0);
+    }
+
+    /** Same km percent as GET /service/percentages. 0 means the interval is already used up. */
+    public static Integer kmPercentage(Integer lastKm, Integer nextKm, Long mileage) {
+        if (lastKm == null || nextKm == null || mileage == null) {
+            return null;
+        }
+        long totalKm = nextKm - lastKm;
+        long remainingKmRaw = nextKm - mileage;
+        if (totalKm > 0) {
+            int pct = (int) Math.round((remainingKmRaw * 100.0) / totalKm);
+            return Math.max(0, Math.min(100, pct));
+        }
+        return 0;
+    }
+
+    /** Same day-based month percent as GET /service/percentages. */
+    public static Integer monthPercentage(LocalDate lastDate, LocalDate nextDate) {
+        if (lastDate == null || nextDate == null) {
+            return null;
+        }
+        long totalDays = nextDate.toEpochDay() - lastDate.toEpochDay();
+        long remainingDays = Math.max(nextDate.toEpochDay() - LocalDate.now().toEpochDay(), 0);
+        if (totalDays > 0) {
+            int pct = (int) Math.round((remainingDays * 100.0) / totalDays);
+            return Math.max(0, Math.min(100, pct));
+        }
+        return 0;
     }
 
     public static Integer remainingDays(LocalDate lastDate, LocalDate nextDate) {

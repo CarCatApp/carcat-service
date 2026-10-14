@@ -8,20 +8,14 @@ import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
-import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.IndividualServiceSource;
-import com.carland.carland_service.entity.Percentage;
-import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
-import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
-import com.carland.carland_service.repository.PercentageRepository;
-import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -31,7 +25,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,9 +46,6 @@ class BookingIndividualCatalogServiceTest {
     @Mock BranchIndividualServiceRepository branchIndividualServiceRepository;
     @Mock IndividualServiceFilterRepository individualServiceFilterRepository;
     @Mock CarRepository carRepository;
-    @Mock CustomerServiceRecordRepository customerServiceRecordRepository;
-    @Mock PercentageRepository percentageRepository;
-    @Mock ServiceEntityRepository serviceEntityRepository;
     @Mock IndividualServiceSourceRepository individualServiceSourceRepository;
     @Mock PercentageLifeService percentageLifeService;
 
@@ -69,9 +59,6 @@ class BookingIndividualCatalogServiceTest {
                 branchIndividualServiceRepository,
                 individualServiceFilterRepository,
                 carRepository,
-                customerServiceRecordRepository,
-                percentageRepository,
-                serviceEntityRepository,
                 individualServiceSourceRepository,
                 percentageLifeService,
                 new ObjectMapper());
@@ -151,7 +138,7 @@ class BookingIndividualCatalogServiceTest {
     }
 
     @Test
-    void carIdKeepsOnlyServicesThatCarHasAndPicksTheSoonerPercentage() {
+    void copiesThePercentageScreenAndLeavesAnUnlinkedServiceBlank() {
         Partner partner = Partner.builder().id(1L).active(true).build();
         Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
         String airCode = IndividualCatalogSync.codeOf("Hava filtri", "Air filter", "Фильтр");
@@ -168,22 +155,9 @@ class BookingIndividualCatalogServiceTest {
         Customer owner = Customer.builder().userId(9L).build();
         Car car = Car.builder().carId(5L).customer(owner).mileage(15000L).build();
         when(carRepository.findByCarId(5L)).thenReturn(car);
-        when(customerServiceRecordRepository.findAllByCar(car)).thenReturn(List.of(
-                CustomerServiceRecord.builder().serviceId(100L).car(car).servicedStatus("serviced").build()
+        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(
+                100L, new PercentageLifeService.Snapshot(30980, 40, 62, 80)
         ));
-        ServiceEntity airService = ServiceEntity.builder().id(100L).nameAz("Hava filtri").nameEn("Air filter").nameRu("Фильтр").build();
-        when(serviceEntityRepository.findAllById(List.of(100L))).thenReturn(List.of(airService));
-        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(
-                Percentage.builder().id(1L).serviceId(100L).carId(5L)
-                        .lastServiceKm(10000).nextServiceKm(20000)
-                        .lastServiceDate(LocalDate.of(2026, 1, 1)).nextServiceDate(LocalDate.of(2027, 1, 1))
-                        .build(),
-                Percentage.builder().id(2L).serviceId(100L).carId(5L)
-                        .lastServiceKm(0).nextServiceKm(10000)
-                        .lastServiceDate(LocalDate.of(2024, 1, 1)).nextServiceDate(LocalDate.of(2025, 1, 1))
-                        .build()
-        ));
-        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(100L, new PercentageLifeService.Snapshot(0, 0)));
         when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
                 IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
         ));
@@ -192,15 +166,42 @@ class BookingIndividualCatalogServiceTest {
 
         assertEquals(2, out.getServices().size());
         assertEquals(airCode, out.getServices().get(0).getCode());
-        assertEquals(0, out.getServices().get(0).getIndividualServiceMappedPercentage());
-        assertEquals(0, out.getServices().get(0).getRemainingKm());
-        assertEquals(0, out.getServices().get(0).getRemainingMonth());
+        assertEquals(62, out.getServices().get(0).getIndividualServiceMappedPercentage());
+        assertEquals(30980, out.getServices().get(0).getRemainingKm());
+        assertEquals(40, out.getServices().get(0).getRemainingMonth());
         assertNull(out.getServices().get(0).getPercentageNote());
         assertEquals(sparkCode, out.getServices().get(1).getCode());
         assertNull(out.getServices().get(1).getIndividualServiceMappedPercentage());
         assertNull(out.getServices().get(1).getRemainingKm());
         assertNull(out.getServices().get(1).getRemainingMonth());
         assertEquals("No information has been entered for this service", out.getServices().get(1).getPercentageNote());
+    }
+
+    @Test
+    void monthOnlyPercentageIsShownWithoutAServicedAnswer() {
+        Partner partner = Partner.builder().id(1L).active(true).build();
+        Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
+        IndividualService battery = IndividualService.builder()
+                .id(4L).code("BAT").titleJson("{\"az\":\"Akkumulyator\"}").sortOrder(1).active(true).build();
+        when(branchRepository.findById(12L)).thenReturn(Optional.of(branch));
+        when(branchIndividualServiceRepository.findByBranch_Id(12L)).thenReturn(List.of(
+                BranchIndividualService.builder().branch(branch).individualService(battery).active(true).priceSimple(10).build()
+        ));
+        Car car = Car.builder().carId(5L).customer(Customer.builder().userId(9L).build()).mileage(1000L).build();
+        when(carRepository.findByCarId(5L)).thenReturn(car);
+        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(
+                300L, new PercentageLifeService.Snapshot(null, 1071, null, 98)
+        ));
+        when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
+                IndividualServiceSource.builder().serviceId(300L).individualServiceId(4L).build()
+        ));
+
+        BookingIndividualServicesResponse out = service.list(12L, "az", null, 5L, 9L, null, null);
+
+        assertEquals(98, out.getServices().get(0).getIndividualServiceMappedPercentage());
+        assertNull(out.getServices().get(0).getRemainingKm());
+        assertEquals(1071, out.getServices().get(0).getRemainingMonth());
+        assertNull(out.getServices().get(0).getPercentageNote());
     }
 
     @Test
@@ -215,8 +216,6 @@ class BookingIndividualCatalogServiceTest {
         ));
         Car car = Car.builder().carId(5L).customer(Customer.builder().userId(9L).build()).mileage(1000L).build();
         when(carRepository.findByCarId(5L)).thenReturn(car);
-        when(customerServiceRecordRepository.findAllByCar(car)).thenReturn(List.of());
-        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of());
 
         BookingIndividualServicesResponse out = service.list(12L, "az", null, 5L, 9L, null, null);
 
@@ -224,7 +223,7 @@ class BookingIndividualCatalogServiceTest {
         assertNull(out.getServices().get(0).getIndividualServiceMappedPercentage());
         assertNull(out.getServices().get(0).getRemainingKm());
         assertNull(out.getServices().get(0).getRemainingMonth());
-        assertEquals("Bu servis üzrə məlumat daxil edilməyib", out.getServices().get(0).getPercentageNote());
+        assertEquals("Məlumat daxil etməmisiniz", out.getServices().get(0).getPercentageNote());
     }
 
     @Test
@@ -240,28 +239,19 @@ class BookingIndividualCatalogServiceTest {
         ));
         Car car = Car.builder().carId(5L).customer(Customer.builder().userId(9L).build()).mileage(15000L).build();
         when(carRepository.findByCarId(5L)).thenReturn(car);
-        when(customerServiceRecordRepository.findAllByCar(car)).thenReturn(List.of(
-                CustomerServiceRecord.builder().serviceId(100L).car(car).servicedStatus("serviced").build()
+        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(
+                100L, new PercentageLifeService.Snapshot(5000, 40, 50, 80)
         ));
-        LocalDate next = LocalDate.now().plusDays(40);
-        when(serviceEntityRepository.findAllById(List.of(100L))).thenReturn(List.of(
-                ServiceEntity.builder().id(100L).nameAz("Hava filtri").nameEn("Air filter").nameRu("Фильтр").build()
-        ));
-        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(
-                Percentage.builder().id(1L).serviceId(100L).carId(5L)
-                        .lastServiceKm(10000).nextServiceKm(20000)
-                        .lastServiceDate(LocalDate.now().minusDays(10)).nextServiceDate(next)
-                        .build()
-        ));
-        when(percentageLifeService.byServiceId(car)).thenReturn(Map.of(100L, new PercentageLifeService.Snapshot(5000, 40)));
         when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
                 IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
         ));
 
         BookingIndividualServicesResponse out = service.list(12L, "en", "all", 5L, 9L, null, null);
 
+        assertEquals(50, out.getServices().get(0).getIndividualServiceMappedPercentage());
         assertEquals(5000, out.getServices().get(0).getRemainingKm());
         assertEquals(40, out.getServices().get(0).getRemainingMonth());
+        assertNull(out.getServices().get(0).getPercentageNote());
     }
 
     @Test

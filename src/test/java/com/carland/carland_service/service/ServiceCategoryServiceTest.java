@@ -70,7 +70,7 @@ class ServiceCategoryServiceTest {
         routine = ServiceCategory.builder()
                 .id(1L)
                 .code("routine")
-                .titleJson("{\"az\":\"Dövri Qulluq\",\"en\":\"Routine Care\",\"ru\":\"Плановое обслуживание\"}")
+                .titleJson("{\"az\":\"Dövri qulluq\",\"en\":\"Routine Care\",\"ru\":\"Плановое обслуживание\"}")
                 .descriptionJson("{\"az\":\"Paketlər\",\"en\":\"Packages\",\"ru\":\"Пакеты\"}")
                 .sortOrder(1)
                 .openable(true)
@@ -103,7 +103,7 @@ class ServiceCategoryServiceTest {
         assertEquals(12L, response.getBranchId());
         assertEquals(2, response.getItems().size());
         StaffCatalogCategoryView first = response.getItems().get(0);
-        assertEquals("Dövri Qulluq", first.getTitle().get("az"));
+        assertEquals("Dövri qulluq", first.getTitle().get("az"));
         assertTrue(first.getActive());
         assertFalse(first.getToggleable());
         assertEquals("/api/v1/photo/for/service-category/get?categoryId=1", first.getIconUrl());

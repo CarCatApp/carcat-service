@@ -176,7 +176,7 @@ class BranchProfileServiceTest {
         assertEquals("10:00-16:00", branch.getWorkingHoursSaturday());
         assertEquals("11:00-15:00", branch.getWorkingHoursSunday());
         assertNull(branch.getWorkingHoursWeekend());
-        assertEquals("11:00-15:00", view.getWorkingHoursSunday());
+        assertEquals("11:00 \u2014 15:00", view.getWorkingHoursSunday());
         verify(branchRepository).save(branch);
     }
 

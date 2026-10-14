@@ -75,10 +75,10 @@ public class BookingBranchProfileService {
                 .lat(branch.getLat())
                 .lng(branch.getLng())
                 .distanceKm(distanceKm(lat, lng, branch.getLat(), branch.getLng()))
-                .workingHoursWeekday(BranchWorkingHours.weekdayOf(branch))
-                .workingHoursSaturday(BranchWorkingHours.saturdayOf(branch))
-                .workingHoursSunday(BranchWorkingHours.sundayOf(branch))
-                .workingHoursWeekend(branch.getWorkingHoursWeekend())
+                .workingHoursWeekday(BranchWorkingHours.display(BranchWorkingHours.weekdayOf(branch)))
+                .workingHoursSaturday(BranchWorkingHours.display(BranchWorkingHours.saturdayOf(branch)))
+                .workingHoursSunday(BranchWorkingHours.display(BranchWorkingHours.sundayOf(branch)))
+                .workingHoursWeekend(BranchWorkingHours.display(branch.getWorkingHoursWeekend()))
                 .open(openNow(
                         BranchWorkingHours.weekdayOf(branch),
                         BranchWorkingHours.saturdayOf(branch),

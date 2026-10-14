@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>color sort — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=colorsort1">
+  <style>
+    .lang-switch { display: flex; gap: 8px; margin: 4px 0 18px; }
+    .lang-switch a {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 64px; min-height: 40px; padding: 0 14px;
+      border: 1px solid var(--border); border-radius: var(--radius-pill);
+      background: var(--card); color: var(--text); text-decoration: none;
+      font-size: 13px; font-weight: 700;
+    }
+    .lang-switch a.on { background: var(--text); color: #fff; border-color: var(--text); }
+    .sort-list { list-style: none; display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+    .sort-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; background: var(--card); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .sort-row.dragging { opacity: 0.45; }
+    .grip {
+      width: 28px; text-align: center; color: var(--text-muted);
+      cursor: grab; user-select: none; font-size: 16px; letter-spacing: -2px;
+    }
+    .pos {
+      width: 28px; text-align: right; font-variant-numeric: tabular-nums;
+      font-weight: 700; color: var(--text);
+    }
+    .swatch {
+      width: 22px; height: 22px; border-radius: 4px; flex: none;
+      border: 1px solid var(--border); background: var(--neutral-bg);
+    }
+    .sort-name { flex: 1; min-width: 0; font-weight: 600; color: var(--text); }
+    .sort-code {
+      font-family: ui-monospace, "SF Mono", Consolas, monospace;
+      font-size: 13px; color: var(--text-muted);
+    }
+    .nudge { display: flex; gap: 6px; }
+    .nudge button {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card); color: var(--text);
+      font-size: 14px; line-height: 1;
+    }
+    .nudge button:hover { background: var(--primary-soft); }
+    .nudge button:disabled { opacity: 0.35; cursor: default; }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Offered services</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link active" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container" id="main">
+  <div class="page-head">
+    <div>
+      <h1>color sort</h1>
+      <p class="muted">AZ, EN və RU ayrı sıradır. Mobil siyahı Accept-Language hansı dildirsə onun nömrəsini qaytarır.</p>
+    </div>
+  </div>
+  <div class="lang-switch">
+    <a th:href="@{/admin/color-sort(lang='az')}" th:class="${lang == 'az'} ? 'on' : ''">AZ</a>
+    <a th:href="@{/admin/color-sort(lang='en')}" th:class="${lang == 'en'} ? 'on' : ''">EN</a>
+    <a th:href="@{/admin/color-sort(lang='ru')}" th:class="${lang == 'ru'} ? 'on' : ''">RU</a>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <p class="muted" th:if="${rows.isEmpty()}">Rəng yoxdur.</p>
+  <ul class="sort-list" id="colorSort" th:attr="data-lang=${lang}">
+    <li class="sort-row" th:each="row, stat : ${rows}" th:attr="data-id=${row.colorId}">
+      <span class="grip" draggable="true" aria-hidden="true">⋮⋮</span>
+      <span class="pos" th:text="${row.sortOrder}">1</span>
+      <span class="swatch" th:style="${row.swatch != ''} ? 'background:' + row.swatch : ''"></span>
+      <span class="sort-name" th:text="${row.name}">Qara</span>
+      <span class="sort-code" th:text="${row.hex}">#111111</span>
+      <span class="nudge">
+        <button type="button" class="js-up" th:disabled="${stat.first}" aria-label="up">↑</button>
+        <button type="button" class="js-down" th:disabled="${stat.last}" aria-label="down">↓</button>
+      </span>
+    </li>
+  </ul>
+</main>
+<script src="/admin/admin.js?v=colorsort1"></script>
+<script>
+  const list = document.getElementById("colorSort");
+  const errBox = document.getElementById("errBox");
+  let dragging = null;
+  let startIndex = -1;
+  let busy = false;
+
+  function showErr(msg) {
+    errBox.hidden = false;
+    errBox.textContent = msg;
+  }
+
+  async function moveTo(colorId, position) {
+    if (busy) return;
+    busy = true;
+    const res = await fetch("/admin/color-sort/move", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang: list.dataset.lang, colorId: Number(colorId), position: position })
+    });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return;
+    }
+    if (!res.ok) {
+      busy = false;
+      let msg = "Sıra saxlanılmadı (" + res.status + ")";
+      try {
+        const payload = await res.json();
+        if (payload && payload.message) msg = payload.message;
+      } catch (_) {}
+      showErr(msg);
+      window.location.reload();
+      return;
+    }
+    window.location.reload();
+  }
+
+  function rowAfter(y) {
+    const rows = [...list.querySelectorAll(".sort-row:not(.dragging)")];
+    let closest = null;
+    let closestOffset = Number.NEGATIVE_INFINITY;
+    rows.forEach((row) => {
+      const box = row.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closestOffset) {
+        closestOffset = offset;
+        closest = row;
+      }
+    });
+    return closest;
+  }
+
+  list.addEventListener("dragstart", (event) => {
+    const grip = event.target.closest(".grip");
+    if (!grip) {
+      event.preventDefault();
+      return;
+    }
+    dragging = grip.closest(".sort-row");
+    startIndex = [...list.children].indexOf(dragging);
+    dragging.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", dragging.dataset.id);
+    event.dataTransfer.setDragImage(dragging, 24, 24);
+  });
+
+  list.addEventListener("dragover", (event) => {
+    if (!dragging) return;
+    event.preventDefault();
+    const after = rowAfter(event.clientY);
+    if (after == null) list.appendChild(dragging);
+    else list.insertBefore(dragging, after);
+  });
+
+  list.addEventListener("dragend", () => {
+    if (!dragging) return;
+    const row = dragging;
+    const from = startIndex;
+    const to = [...list.children].indexOf(row);
+    row.classList.remove("dragging");
+    dragging = null;
+    startIndex = -1;
+    if (to < 0 || to === from) return;
+    moveTo(row.dataset.id, to + 1);
+  });
+
+  list.addEventListener("click", (event) => {
+    const up = event.target.closest(".js-up");
+    const down = event.target.closest(".js-down");
+    if (!up && !down) return;
+    const row = event.target.closest(".sort-row");
+    const index = [...list.children].indexOf(row);
+    if (up && index > 0) moveTo(row.dataset.id, index);
+    if (down && index < list.children.length - 1) moveTo(row.dataset.id, index + 2);
+  });
+</script>
+</body>
+</html>
