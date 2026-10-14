@@ -6,7 +6,9 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
+import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.exceptions.ForbiddenException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.feign.AuthStaffFeign;
 import com.carland.carland_service.repository.BookingStaffRepository;
 import com.carland.carland_service.repository.BranchRepository;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +66,8 @@ class BookingOrgServiceVisibilityTest {
         assertEquals(2, out.getPartner().getBranches().size());
         assertEquals("A", out.getPartner().getBranches().get(0).getName());
         assertEquals("B", out.getPartner().getBranches().get(1).getName());
+        assertEquals(BranchCompletion.WEBHOOK, out.getPartner().getBranches().get(0).getCompletionMode());
+        assertEquals(BranchCompletion.WEBHOOK, out.getPartner().getBranches().get(1).getCompletionMode());
         assertEquals(0L, out.getPartner().getRatingCount());
         assertNull(out.getPartner().getRating());
     }
@@ -155,5 +160,38 @@ class BookingOrgServiceVisibilityTest {
                 .build();
         when(staffRepository.findByUserId(9L)).thenReturn(List.of(row));
         assertEquals("ALLOWED", service.loginGate(9L).getResult());
+    }
+
+    @Test
+    void newBranchOpensOnDetailedCompletion() {
+        Partner partner = Partner.builder().id(1L).name("Castrol").build();
+        when(partnerRepository.findById(1L)).thenReturn(Optional.of(partner));
+        when(branchRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Branch saved = service.addBranch(1L, "Baku", null, null, null, true,
+                null, null, null, null, false, null);
+
+        assertEquals(BranchCompletion.DETAILED, saved.getCompletionMode());
+    }
+
+    @Test
+    void completionSwitchWritesTheChosenMode() {
+        Partner partner = Partner.builder().id(1L).build();
+        Branch branch = Branch.builder().id(7L).partner(partner).name("Babek").build();
+        when(branchRepository.findById(7L)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertEquals(BranchCompletion.DETAILED, service.setBranchCompletion(1L, 7L, true).getCompletionMode());
+        assertEquals(BranchCompletion.WEBHOOK, service.setBranchCompletion(1L, 7L, false).getCompletionMode());
+    }
+
+    @Test
+    void completionSwitchRejectsAnotherPartnersBranch() {
+        Partner owner = Partner.builder().id(2L).build();
+        Branch branch = Branch.builder().id(7L).partner(owner).name("Babek").build();
+        when(branchRepository.findById(7L)).thenReturn(Optional.of(branch));
+
+        assertThrows(ResourceNotFoundException.class, () -> service.setBranchCompletion(1L, 7L, true));
+        verify(branchRepository, never()).save(any());
     }
 }

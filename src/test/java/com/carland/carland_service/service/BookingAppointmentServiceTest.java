@@ -12,6 +12,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -38,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -128,6 +130,27 @@ class BookingAppointmentServiceTest {
 
         assertEquals("pending", response.getStatus());
         assertEquals("approval", response.getBookingMode());
+    }
+
+    @Test
+    void sameCarCannotBookTheSameRangeAgain() {
+        LocalDate day = LocalDate.now(StaffSlotWindows.ZONE).plusDays(1);
+        Range range = range(70L, day, "approval");
+        when(rangeRepository.lockByRangeId(70L)).thenReturn(Optional.of(range));
+        when(calendarService.selection(any(), any(), any(), any(), any()))
+                .thenReturn(new BookingCalendarService.Selection(10L, Set.of(), false));
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        Customer customer = Customer.builder().userId(3L).build();
+        Car car = Car.builder().carId(15L).vin("VIN15").customer(customer).build();
+        when(customerRepository.findByUserId(3L)).thenReturn(customer);
+        when(carRepository.findByCarIdAndCustomer(15L, customer)).thenReturn(car);
+        when(bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
+                eq(15L), eq(70L), eq(BookingStatus.holdingCarOnRange()))).thenReturn(true);
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> service.create(7L, request(), 3L, "az"));
+
+        assertEquals("Bu avtomobil bu saat üçün artıq yazılıb.", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test

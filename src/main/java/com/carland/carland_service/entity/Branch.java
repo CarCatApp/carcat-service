@@ -95,6 +95,13 @@ public class Branch {
     @Column(nullable = false)
     Boolean active = true;
 
+    /**
+     * tr: Tamamlama yolu. Boş qalan köhnə sətir webhook sayılır. Yeni şöbə detailed açılır.
+     * en: How a branch completes a booking. A blank legacy row counts as webhook. A new branch opens as detailed.
+     */
+    @Column(name = "completion_mode", length = 16)
+    String completionMode;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
@@ -114,6 +121,9 @@ public class Branch {
         }
         if (verified == null) {
             verified = false;
+        }
+        if (completionMode == null || completionMode.isBlank()) {
+            completionMode = BranchCompletion.DETAILED;
         }
     }
 

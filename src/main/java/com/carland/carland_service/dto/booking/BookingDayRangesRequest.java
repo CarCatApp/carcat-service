@@ -14,4 +14,6 @@ public class BookingDayRangesRequest {
     Long packageId;
     List<Long> individualServiceIds;
     String issue;
+    /** Bu arabanın pending veya accepted book'u olan saat listeden düşer. */
+    Long carId;
 }

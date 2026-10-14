@@ -152,8 +152,8 @@ public class StaffBookingService {
     }
 
     /**
-     * tr: Təsdiqlənmiş booku completed edir. Xidmət sətirləri webhookdan gəlir.
-     * en: Marks a confirmed booking completed. Service lines arrive from the webhook.
+     * tr: Təsdiqlənmiş booku completed edir. Panel forması hələ yazılmır; xidmət sətirləri webhookdan gəlir.
+     * en: Marks a confirmed booking completed. The panel form is not stored yet; service lines arrive from the webhook.
      */
     @Transactional
     public BookingView complete(Long userId, boolean mustChangePassword, Long bookingId, String timezone,

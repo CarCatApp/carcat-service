@@ -113,6 +113,10 @@ public class BookingCreateService {
         }
         Prepared prepared = prepare(request, true, null);
         Car car = requireOwnedCar(customerUserId, request);
+        if (bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
+                car.getCarId(), prepared.range.getRangeId(), BookingStatus.holdingCarOnRange())) {
+            throw new ConflictException(carAlreadyBooked(acceptLanguage));
+        }
         BookingSelectionWriter.Priced priced = extras(prepared.branch, request);
         String timezone = timezoneHeader == null || timezoneHeader.isBlank() ? DEFAULT_TZ : timezoneHeader.trim();
         String mode = modeOf(prepared.range);
@@ -220,6 +224,11 @@ public class BookingCreateService {
             throw new ResourceNotFoundException("booking not found");
         }
         Long targetSlot = slotId != null ? slotId : booking.getRange().getRangeId();
+        if (booking.getCarId() != null && targetSlot != null
+                && bookingRepository.existsByCarIdAndRange_RangeIdAndStatusInAndIdNot(
+                booking.getCarId(), targetSlot, BookingStatus.holdingCarOnRange(), booking.getId())) {
+            throw new ConflictException("This car is already booked for this hour.");
+        }
         List<String> keys = normalizeKeys(serviceKeys);
         if (keys.isEmpty()) {
             keys = bookingItemRepository.findByBooking_IdOrderByIdAsc(booking.getId()).stream()
@@ -500,6 +509,17 @@ public class BookingCreateService {
             throw new ResourceNotFoundException("car not found");
         }
         return car;
+    }
+
+    private static String carAlreadyBooked(String acceptLanguage) {
+        String lang = BookingMineService.langOf(acceptLanguage);
+        if ("en".equals(lang)) {
+            return "This car is already booked for this hour.";
+        }
+        if ("ru".equals(lang)) {
+            return "Этот автомобиль уже записан на это время.";
+        }
+        return "Bu avtomobil bu saat üçün artıq yazılıb.";
     }
 
     private String nextRef() {

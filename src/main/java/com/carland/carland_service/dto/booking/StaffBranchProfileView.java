@@ -17,6 +17,8 @@ import java.util.List;
 @AllArgsConstructor
 public class StaffBranchProfileView {
     Long branchId;
+    /** webhook | detailed. Blank legacy rows are returned as webhook. */
+    String completionMode;
     String name;
     String instagram;
     String contactEmail;

@@ -10,6 +10,7 @@ import com.carland.carland_service.dto.booking.StaffNotifySmsRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionRequest;
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
@@ -111,6 +112,7 @@ public class BookingOrgService {
                 .contactPhone(blankToNull(contactPhone))
                 .verified(verified)
                 .photo(blankToNull(photo))
+                .completionMode(BranchCompletion.DETAILED)
                 .build();
         BranchWorkingHours.apply(branch, blankToNull(weekday), blankToNull(saturday), blankToNull(sunday));
         return branchRepository.save(branch);
@@ -272,6 +274,24 @@ public class BookingOrgService {
     }
 
     /**
+     * tr: Şöbənin tamamlama yolunu dərhal yazır. true = detailed, false = webhook.
+     * en: Writes the branch completion path immediately. true = detailed, false = webhook.
+     */
+    @Transactional
+    public Branch setBranchCompletion(Long partnerId, Long branchId, boolean detailed) {
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Şöbə tapılmadı"));
+        if (branch.getPartner() == null || !partnerId.equals(branch.getPartner().getId())) {
+            throw new ResourceNotFoundException("Şöbə tapılmadı");
+        }
+        branch.setCompletionMode(detailed ? BranchCompletion.DETAILED : BranchCompletion.WEBHOOK);
+        branchRepository.save(branch);
+        log.info("BOOKING_BRANCH_COMPLETION partnerId={} branchId={} mode={}",
+                partnerId, branchId, branch.getCompletionMode());
+        return branch;
+    }
+
+    /**
      * Hand-close or reopen one person. Leaves INVITED / ACTIVE as they are.
      * Auth is updated first; the local flag follows so a failed auth call does not mark them closed.
      */
@@ -410,6 +430,7 @@ public class BookingOrgService {
                 .workingHoursSunday(BranchWorkingHours.display(BranchWorkingHours.sundayOf(branch)))
                 .workingHoursWeekend(BranchWorkingHours.display(branch.getWorkingHoursWeekend()))
                 .verified(Boolean.TRUE.equals(branch.getVerified()))
+                .completionMode(BranchCompletion.shown(branch.getCompletionMode()))
                 .photo(branch.getPhoto())
                 .rating(branch.getRating())
                 .ratingCount(BookingRatingService.storedCount(branch.getRatingCount()))

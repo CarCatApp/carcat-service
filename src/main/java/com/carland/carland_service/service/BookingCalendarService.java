@@ -36,6 +36,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -80,6 +81,7 @@ public class BookingCalendarService {
         LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
         LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
+        Set<Long> held = heldByCar(body.getCarId());
         Map<LocalDate, List<Range>> byDay = rangesByDay(
                 calendarRepository.findByBranchIdAndDayBetween(branch.getId(), today, end));
 
@@ -87,7 +89,7 @@ public class BookingCalendarService {
         for (LocalDate day = today; !day.isAfter(end); day = day.plusDays(1)) {
             boolean open = false;
             for (Range range : byDay.getOrDefault(day, List.of())) {
-                if (bookable(range, now) && matches(range, selection)) {
+                if (bookable(range, now) && matches(range, selection) && !held.contains(range.getRangeId())) {
                     open = true;
                     break;
                 }
@@ -122,13 +124,15 @@ public class BookingCalendarService {
         LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
         LocalDate day = parseDay(body.getDate(), today, end, lang);
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
+        Set<Long> held = heldByCar(body.getCarId());
         List<Range> ranges = rangesByDay(calendarRepository.findByBranchIdAndDayBetween(branch.getId(), day, day))
                 .getOrDefault(day, List.of());
 
         Map<LocalTime, Range> winners = new HashMap<>();
         Map<LocalTime, Integer> seats = new HashMap<>();
         for (Range range : ranges) {
-            if (range.getEnd() == null || !bookable(range, now) || !matches(range, selection)) {
+            if (range.getEnd() == null || !bookable(range, now) || !matches(range, selection)
+                    || held.contains(range.getRangeId())) {
                 continue;
             }
             LocalTime start = clock(range.getStart());
@@ -219,6 +223,17 @@ public class BookingCalendarService {
             byDay.computeIfAbsent(calendar.getDay(), ignored -> new ArrayList<>()).addAll(calendar.getTimeRanges());
         }
         return byDay;
+    }
+
+    private Set<Long> heldByCar(Long carId) {
+        if (carId == null) {
+            return Set.of();
+        }
+        List<Long> ids = bookingRepository.findRangeIdsByCarIdAndStatusIn(carId, BookingStatus.holdingCarOnRange());
+        if (ids == null || ids.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(ids);
     }
 
     private boolean bookable(Range range, OffsetDateTime now) {

@@ -121,6 +121,12 @@ public class BookingAppointmentService {
         if (car == null) {
             throw new ResourceNotFoundException("car not found");
         }
+        if (bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
+                car.getCarId(), range.getRangeId(), BookingStatus.holdingCarOnRange())) {
+            throw new ConflictException(sentence(lang, "Bu avtomobil bu saat üçün artıq yazılıb.",
+                    "This car is already booked for this hour.",
+                    "Этот автомобиль уже записан на это время."));
+        }
         String mode = range.getBookingMode() == null || range.getBookingMode().isBlank()
                 ? BookingMode.INSTANT.apiValue() : range.getBookingMode();
         String status = BookingMode.APPROVAL.apiValue().equals(mode)

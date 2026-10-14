@@ -219,6 +219,21 @@ class BranchProfileServiceTest {
         assertEquals(1, view.getBrandModelServices().size());
         assertEquals("Oils", view.getBrandModelServices().get(0).getTitle());
         assertEquals(0, view.getBrandModelServices().get(0).getModels().size());
+        assertEquals("webhook", view.getCompletionMode());
+    }
+
+    @Test
+    void profileReportsDetailedCompletionWhenTheBranchIsOnThatPath() {
+        branch.setCompletionMode("detailed");
+        when(bookingStaffAccess.requireStaff(8L, false, "en")).thenReturn(branchAdmin);
+        when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(brandModelRepository.findByBranch_IdOrderByIdAsc(12L)).thenReturn(List.of());
+        when(branchPhotoRepository.existsByBranchId(12L)).thenReturn(false);
+        when(staffPhotoRepository.existsByUserId(8L)).thenReturn(false);
+
+        StaffBranchProfileView view = profile.get(8L, false, "en");
+
+        assertEquals("detailed", view.getCompletionMode());
     }
 
     @Test

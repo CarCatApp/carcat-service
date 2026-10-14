@@ -21,6 +21,10 @@
     .branch-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .branch-edit label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
     .branch-edit input[type="time"] { height: 32px; }
+    .completion-switch {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; white-space: nowrap; color: var(--text, #111);
+    }
   </style>
 </head>
 <body class="booking-page">
@@ -230,7 +234,7 @@
         <thead>
         <tr>
           <th>ID</th><th>Şöbə</th><th>Ünvan</th><th>Telefon</th>
-          <th>Həftə içi</th><th>Şənbə</th><th>Bazar</th><th>Verified</th><th>Məkan</th><th>Vəziyyət</th><th></th>
+          <th>Həftə içi</th><th>Şənbə</th><th>Bazar</th><th>Verified</th><th>Tamamlama</th><th>Məkan</th><th>Vəziyyət</th><th></th>
         </tr>
         </thead>
         <tbody>
@@ -269,6 +273,19 @@
                      th:form="'branch-edit-' + ${b.id}" th:checked="${b.verified}">
             </label>
           </td>
+          <td>
+            <form method="post"
+                  th:action="@{/admin/booking-partners/{id}/branches/{branchId}/completion(id=${partner.id}, branchId=${b.id})}">
+              <label class="completion-switch">
+                <span>Webhook</span>
+                <input class="verified-switch" type="checkbox" name="detailed" value="true"
+                       th:checked="${b.completionMode == 'detailed'}"
+                       onchange="this.form.submit()"
+                       aria-label="Tamamlama rejimi">
+                <span>Detailed</span>
+              </label>
+            </form>
+          </td>
           <td th:text="${b.lat != null && b.lng != null} ? ${b.lat} + ', ' + ${b.lng} : '—'">—</td>
           <td>
             <form method="post" th:action="@{/admin/booking-partners/{id}/branches/{branchId}/active(id=${partner.id}, branchId=${b.id})}">
@@ -279,7 +296,7 @@
           </td>
           <td><button class="btn btn-filter" type="submit" th:form="'branch-edit-' + ${b.id}">Saxla</button></td>
         </tr>
-        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="11">Şöbə yoxdur</td></tr>
+        <tr class="empty-row" th:if="${#lists.isEmpty(branches)}"><td colspan="12">Şöbə yoxdur</td></tr>
         </tbody>
       </table>
     </div>

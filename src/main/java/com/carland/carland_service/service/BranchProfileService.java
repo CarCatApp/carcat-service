@@ -9,6 +9,7 @@ import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.dto.request.StaffNameSaveRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.enums.BookingStaffRole;
@@ -212,6 +213,7 @@ public class BranchProfileService {
         boolean partnerAdmin = BookingStaffRole.PARTNER_ADMIN.name().equals(staff.getRole());
         return StaffBranchProfileView.builder()
                 .branchId(branch.getId())
+                .completionMode(BranchCompletion.shown(branch.getCompletionMode()))
                 .name(branch.getName())
                 .instagram(branch.getInstagram())
                 .contactEmail(branch.getContactEmail())

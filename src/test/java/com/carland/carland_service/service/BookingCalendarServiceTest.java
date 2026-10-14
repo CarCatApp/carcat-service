@@ -12,6 +12,7 @@ import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.repository.BookingRepository;
@@ -241,6 +242,44 @@ class BookingCalendarServiceTest {
 
         assertEquals(1, response.getRanges().size());
         assertEquals(40L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
+    void sameCarHeldRangeIsHiddenAndTheNextHourStays() {
+        LocalDate day = openDay();
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.findRangeIdsByCarIdAndStatusIn(eq(11L), eq(BookingStatus.holdingCarOnRange())))
+                .thenReturn(List.of(40L));
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(40L, at(day, 9, 0), 2, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(41L, at(day, 10, 0), 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesRequest body = request(day, 10L, null, null);
+        body.setCarId(11L);
+        BookingDayRangesResponse response = service.day(7L, body, "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(41L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
+    void heldRangeDoesNotKeepTheDayOpen() {
+        LocalDate day = openDay();
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.findRangeIdsByCarIdAndStatusIn(eq(11L), any())).thenReturn(List.of(40L));
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), any(), any())).thenReturn(List.of(
+                day(day, slot(40L, at(day, 11, 0), 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingCalendarRequest body = new BookingCalendarRequest();
+        body.setPackageId(10L);
+        body.setCarId(11L);
+
+        assertEquals(Boolean.FALSE, available(service.month(7L, body, "az"), day));
     }
 
     @Test

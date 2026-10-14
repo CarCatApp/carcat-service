@@ -28,6 +28,8 @@ public class BookingBranchView {
     String workingHoursSunday;
     String workingHoursWeekend;
     Boolean verified;
+    /** webhook | detailed. Blank legacy rows are returned as webhook. */
+    String completionMode;
     String photo;
     Double rating;
     Long ratingCount;

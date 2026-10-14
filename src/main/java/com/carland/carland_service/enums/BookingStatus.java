@@ -26,4 +26,12 @@ public enum BookingStatus {
     public static List<String> occupyingCapacity() {
         return List.of(CONFIRMED.apiValue(), AUTO_ACCEPTED.apiValue());
     }
+
+    /**
+     * tr: Aynı araba bu range'i tekrar alamaz. Reject, iptal, completed ve no-show serbest bırakır.
+     * en: The same car cannot take this range again. Reject, cancel, completed and no-show release it.
+     */
+    public static List<String> holdingCarOnRange() {
+        return List.of(PENDING.apiValue(), CONFIRMED.apiValue(), AUTO_ACCEPTED.apiValue());
+    }
 }

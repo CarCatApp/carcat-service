@@ -179,6 +179,28 @@ public class BookingAdminController {
         return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
     }
 
+    @PostMapping("/admin/booking-partners/{id}/branches/{branchId}/completion")
+    public String setBranchCompletion(
+            @PathVariable Long id,
+            @PathVariable Long branchId,
+            @RequestParam(required = false) String detailed,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            boolean panel = "true".equals(detailed);
+            bookingOrgService.setBranchCompletion(id, branchId, panel);
+            redirect.addFlashAttribute("detailMessage",
+                    panel ? "Şöbə detailed tamamlama rejiminə keçdi" : "Şöbə webhook rejiminə keçdi");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
     @PostMapping("/admin/booking-partners/{id}/staff/{staffId}/manual")
     public String setStaffManual(
             @PathVariable Long id,

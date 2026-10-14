@@ -295,6 +295,21 @@ class BookingCreateServiceTest {
     }
 
     @Test
+    void sameCarCannotCreateTheSameRangeAgain() {
+        stubCatalogAndRange(true);
+        stubOwnedCar();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
+                eq(55L), eq(105L), eq(com.carland.carland_service.enums.BookingStatus.holdingCarOnRange())))
+                .thenReturn(true);
+
+        ConflictException ex = assertThrows(ConflictException.class, () -> service.create(request(), 77L, "Asia/Baku", "az"));
+
+        assertEquals("Bu avtomobil bu saat üçün artıq yazılıb.", ex.getMessage());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
     void fullSlotConflicts() {
         when(rangeRepository.findByRangeId(105L)).thenReturn(range);
         when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(3L);

@@ -20,6 +20,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     long countByRange_RangeIdAndStatusInAndIdNot(Long rangeId, Collection<String> statuses, Long id);
 
+    boolean existsByCarIdAndRange_RangeIdAndStatusIn(Long carId, Long rangeId, Collection<String> statuses);
+
+    boolean existsByCarIdAndRange_RangeIdAndStatusInAndIdNot(
+            Long carId, Long rangeId, Collection<String> statuses, Long id);
+
+    @Query("select b.range.rangeId from Booking b where b.carId = :carId and b.status in :statuses")
+    List<Long> findRangeIdsByCarIdAndStatusIn(
+            @Param("carId") Long carId, @Param("statuses") Collection<String> statuses);
+
     boolean existsByRef(String ref);
 
     boolean existsByCustomerUserIdAndBranch_Id(Long customerUserId, Long branchId);
