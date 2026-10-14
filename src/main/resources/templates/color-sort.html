@@ -96,7 +96,7 @@
     <li class="sort-row" th:each="row, stat : ${rows}" th:attr="data-id=${row.colorId}">
       <span class="grip" draggable="true" aria-hidden="true">⋮⋮</span>
       <span class="pos" th:text="${row.sortOrder}">1</span>
-      <span class="swatch" th:style="${row.swatch != ''} ? 'background:' + row.swatch : ''"></span>
+      <span class="swatch" th:attr="style=${'background-color:' + row.swatch}"></span>
       <span class="sort-name" th:text="${row.name}">Qara</span>
       <span class="sort-code" th:text="${row.hex}">#111111</span>
       <span class="nudge">
