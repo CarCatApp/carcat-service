@@ -82,15 +82,17 @@ public class BookingCalendarService {
         LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
         Set<Long> held = heldByCar(body.getCarId());
+        boolean single = selection.single();
         Map<LocalDate, List<Range>> byDay = rangesByDay(
                 calendarRepository.findByBranchIdAndDayBetween(branch.getId(), today, end));
 
         List<BookingCalendarDayView> days = new ArrayList<>();
         for (LocalDate day = today; !day.isAfter(end); day = day.plusDays(1)) {
             List<Range> dayRanges = byDay.getOrDefault(day, List.of());
+            Set<LocalTime> blocked = single ? heldMatchingStarts(held, dayRanges, selection) : Set.of();
             boolean open = false;
             for (Range range : dayRanges) {
-                if (bookable(range, now) && matches(range, selection) && !held.contains(range.getRangeId())) {
+                if (bookable(range, now) && matches(range, selection) && !taken(range, held, blocked, single)) {
                     open = true;
                     break;
                 }
@@ -128,14 +130,16 @@ public class BookingCalendarService {
         LocalDate day = parseDay(body.getDate(), today, end, lang);
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
         Set<Long> held = heldByCar(body.getCarId());
+        boolean single = selection.single();
         List<Range> ranges = rangesByDay(calendarRepository.findByBranchIdAndDayBetween(branch.getId(), day, day))
                 .getOrDefault(day, List.of());
+        Set<LocalTime> blocked = single ? heldMatchingStarts(held, ranges, selection) : Set.of();
 
         Map<LocalTime, Range> winners = new HashMap<>();
         Map<LocalTime, Integer> seats = new HashMap<>();
         for (Range range : ranges) {
             if (range.getEnd() == null || !bookable(range, now) || !matches(range, selection)
-                    || held.contains(range.getRangeId())) {
+                    || taken(range, held, blocked, single)) {
                 continue;
             }
             LocalTime start = clock(range.getStart());
@@ -243,6 +247,54 @@ public class BookingCalendarService {
             }
         }
         return held;
+    }
+
+    /**
+     * tr: Tek hizmette tutulan range'in saati. Aynı başlangıçtaki kardeş range de düşer.
+     * en: Start times a single offering already holds. A sibling range at that start drops too.
+     */
+    private static Set<LocalTime> heldMatchingStarts(Set<Long> held, List<Range> ranges, Selection selection) {
+        if (held.isEmpty() || ranges == null || ranges.isEmpty()) {
+            return Set.of();
+        }
+        Set<LocalTime> starts = new HashSet<>();
+        for (Range range : ranges) {
+            if (range.getRangeId() != null && held.contains(range.getRangeId())
+                    && range.getStart() != null && matches(range, selection)) {
+                starts.add(clock(range.getStart()));
+            }
+        }
+        return starts;
+    }
+
+    private static boolean taken(Range range, Set<Long> held, Set<LocalTime> blocked, boolean single) {
+        if (range.getRangeId() != null && held.contains(range.getRangeId())) {
+            return true;
+        }
+        return single && range.getStart() != null && blocked.contains(clock(range.getStart()));
+    }
+
+    /**
+     * tr: Tek hizmette aynı başlangıcı da kapatır. Karışık seçimde yalnız aynı range.
+     * en: A single offering also blocks the same start. A mixed selection blocks only that range.
+     */
+    boolean carRepeatsOffering(Long carId, Range wanted, Selection selection) {
+        if (carId == null || wanted == null || wanted.getRangeId() == null) {
+            return false;
+        }
+        Set<Long> held = heldByCar(carId);
+        if (held.contains(wanted.getRangeId())) {
+            return true;
+        }
+        if (selection == null || !selection.single() || wanted.getStart() == null || wanted.getCalendar() == null
+                || wanted.getCalendar().getDay() == null || wanted.getCalendar().getBranch() == null) {
+            return false;
+        }
+        LocalDate day = wanted.getCalendar().getDay();
+        Long branchId = wanted.getCalendar().getBranch().getId();
+        List<Range> ranges = rangesByDay(calendarRepository.findByBranchIdAndDayBetween(branchId, day, day))
+                .getOrDefault(day, List.of());
+        return heldMatchingStarts(held, ranges, selection).contains(clock(wanted.getStart()));
     }
 
     private boolean bookable(Range range, OffsetDateTime now) {
@@ -360,5 +412,11 @@ public class BookingCalendarService {
     }
 
     record Selection(Long packageId, Set<Long> serviceIds, boolean repair) {
+        /** Paket, tek individual veya yalnız təmir. Birkaç hizmet birlikte değil. */
+        boolean single() {
+            int services = serviceIds == null ? 0 : serviceIds.size();
+            int kinds = (packageId != null ? 1 : 0) + (services > 0 ? 1 : 0) + (repair ? 1 : 0);
+            return kinds == 1 && services <= 1;
+        }
     }
 }

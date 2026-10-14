@@ -294,6 +294,30 @@ class BookingCalendarServiceTest {
     }
 
     @Test
+    void singlePackageHidesTheWholeHourWhenASiblingSharesTheStart() {
+        LocalDate day = openDay();
+        OffsetDateTime start = at(day, 9, 0);
+        OffsetDateTime later = start.plusHours(1);
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(bookingRepository.findRangeIdsByCarIdAndStatusIn(eq(11L), eq(BookingStatus.holdingCarOnRange())))
+                .thenReturn(List.of(40L));
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(day), eq(day))).thenReturn(List.of(
+                day(day,
+                        slot(40L, start, 4, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(80L, start, 1, StaffSlotTargets.PACKAGE, pkg, null),
+                        slot(41L, later, 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesRequest body = request(day, 10L, null, null);
+        body.setCarId(11L);
+        BookingDayRangesResponse response = service.day(7L, body, "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(41L, response.getRanges().get(0).getRangeId());
+    }
+
+    @Test
     void singleRepairBookingHidesThatHour() {
         LocalDate day = openDay();
         OffsetDateTime start = at(day, 11, 0);

@@ -24,8 +24,8 @@ import java.time.ZonedDateTime;
 import java.util.Map;
 
 /**
- * tr: Qəbul və rədddən sonra eyni title/body-ni bildiriş siyahısına yazır və müştərinin cihaz tokeninə FCM göndərir. Commitdən sonra işləyir; xəta statusu geri almır.
- * en: After accept or reject, writes the same title/body into the notification list and sends FCM to the customer's device token. Runs after commit; a failure does not undo the status.
+ * tr: Qəbul, rədd, ləğv və tamamlamadan sonra eyni title/body-ni bildiriş siyahısına yazır və müştərinin cihaz tokeninə FCM göndərir. Commitdən sonra işləyir; xəta statusu geri almır.
+ * en: After accept, reject, cancel, or complete, writes the same title/body into the notification list and sends FCM to the customer's device token. Runs after commit; a failure does not undo the status.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +44,7 @@ public class BookingPushService {
     static final String TYPE_REJECTED = "BOOKING_REJECTED";
     static final String TYPE_NO_SHOW = "BOOKING_NO_SHOW";
     static final String TYPE_CANCELLED = "BOOKING_CANCELLED";
+    static final String TYPE_COMPLETED = "BOOKING_COMPLETED";
 
     private final DeviceTokenRepository deviceTokenRepository;
     private final CustomerRepository customerRepository;
@@ -75,6 +76,11 @@ public class BookingPushService {
     /** Customer cancelled their own booking. */
     public void cancelled(Booking booking) {
         schedule(booking, Kind.CANCELLED);
+    }
+
+    /** Staff marked the booking completed. */
+    public void completed(Booking booking) {
+        schedule(booking, Kind.COMPLETED);
     }
 
     private void schedule(Booking booking, Kind kind) {
@@ -109,6 +115,7 @@ public class BookingPushService {
             case REJECTED -> TYPE_REJECTED;
             case NO_SHOW -> TYPE_NO_SHOW;
             case CANCELLED -> TYPE_CANCELLED;
+            case COMPLETED -> TYPE_COMPLETED;
         };
         OffsetDateTime createdAt = Notification.nowLocal();
         try {
@@ -187,6 +194,11 @@ public class BookingPushService {
                 case "ru" -> "Запись отменена";
                 default -> "Növbə ləğv edildi";
             };
+            case COMPLETED -> switch (lang) {
+                case "en" -> "Appointment completed";
+                case "ru" -> "Запись завершена";
+                default -> "Növbə tamamlandı";
+            };
         };
     }
 
@@ -197,6 +209,7 @@ public class BookingPushService {
             case REJECTED -> rejectBody(lang, notice.branchName(), notice.note());
             case NO_SHOW -> noShowBody(lang, notice.branchName());
             case CANCELLED -> cancelBody(lang, notice.branchName());
+            case COMPLETED -> completeBody(lang, notice.branchName());
         };
     }
 
@@ -245,6 +258,15 @@ public class BookingPushService {
         };
     }
 
+    /** {service_name}: Növbəniz uğurla tamamlandı. */
+    private static String completeBody(String lang, String serviceName) {
+        return switch (lang) {
+            case "en" -> serviceName + ": Your appointment was completed.";
+            case "ru" -> serviceName + ": Ваша запись успешно завершена.";
+            default -> serviceName + ": Növbəniz uğurla tamamlandı.";
+        };
+    }
+
     /** {service_name}: Növbəniz uğurla ləğv edildi. İstədiyiniz vaxt yenidən növbə götürə bilərsiniz. */
     private static String cancelBody(String lang, String serviceName) {
         return switch (lang) {
@@ -279,7 +301,7 @@ public class BookingPushService {
     }
 
     private enum Kind {
-        ACCEPTED, REJECTED, NO_SHOW, CANCELLED
+        ACCEPTED, REJECTED, NO_SHOW, CANCELLED, COMPLETED
     }
 
     private record Notice(

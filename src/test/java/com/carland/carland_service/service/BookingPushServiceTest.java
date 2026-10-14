@@ -136,6 +136,35 @@ class BookingPushServiceTest {
     }
 
     @Test
+    void completedCopyFollowsCustomerLanguage() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"), customer("en"), customer("ru"));
+
+        service.completed(sample(null));
+        service.completed(sample(null));
+        service.completed(sample("ignored"));
+
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"));
+        assertEquals(List.of(
+                "Növbə tamamlandı",
+                "Appointment completed",
+                "Запись завершена"), title.getAllValues());
+        assertEquals(List.of(
+                "Nərimanov: Növbəniz uğurla tamamlandı.",
+                "Nərimanov: Your appointment was completed.",
+                "Nərimanov: Ваша запись успешно завершена."), body.getAllValues());
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(3)).save(saved.capture());
+        List<Notification> rows = saved.getAllValues();
+        for (int i = 0; i < rows.size(); i++) {
+            assertInbox(rows.get(i), BookingPushService.TYPE_COMPLETED, title.getAllValues().get(i), body.getAllValues().get(i));
+        }
+    }
+
+    @Test
     void unknownLanguageFallsBackToAz() {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
         when(customerRepository.findByUserId(5L)).thenReturn(customer("de"));

@@ -216,7 +216,7 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingStaffNoteService.apply(eq("cancel"), any(), eq("az")))
+        when(bookingStaffNoteService.apply(eq("reject"), any(), eq("az")))
                 .thenReturn(new BookingStaffNoteService.Applied(null, "ehtiyat yoxdur"));
         when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
 
@@ -234,7 +234,7 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingStaffNoteService.apply(eq("cancel"), any(), eq("az")))
+        when(bookingStaffNoteService.apply(eq("reject"), any(), eq("az")))
                 .thenReturn(new BookingStaffNoteService.Applied(null, "ehtiyat yoxdur"));
         when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
         doThrow(new RuntimeException("fcm")).when(bookingPushService).rejected(booking);
@@ -257,6 +257,7 @@ class StaffBookingServiceTest {
         BookingView out = service.complete(9L, false, 1L, "Asia/Baku", "az");
 
         assertEquals("completed", out.getStatus());
+        verify(bookingPushService).completed(booking);
         verify(bookingPushService, never()).accepted(any());
         verify(bookingPushService, never()).rejected(any());
     }

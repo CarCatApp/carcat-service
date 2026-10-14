@@ -121,8 +121,7 @@ public class BookingAppointmentService {
         if (car == null) {
             throw new ResourceNotFoundException("car not found");
         }
-        if (bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
-                car.getCarId(), range.getRangeId(), BookingStatus.holdingCarOnRange())) {
+        if (calendarService.carRepeatsOffering(car.getCarId(), range, selection)) {
             throw new ConflictException(sentence(lang, "Bu avtomobil bu saat üçün artıq yazılıb.",
                     "This car is already booked for this hour.",
                     "Этот автомобиль уже записан на это время."));

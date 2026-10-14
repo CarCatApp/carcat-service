@@ -227,6 +227,8 @@ public class StaffBookingService {
                 notifyCustomer(booking, false);
             } else if (BookingStatus.NO_SHOW.apiValue().equals(nextStatus)) {
                 notifyNoShow(booking);
+            } else if (BookingStatus.COMPLETED.apiValue().equals(nextStatus)) {
+                notifyCompleted(booking);
             }
         }
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
@@ -261,6 +263,14 @@ public class StaffBookingService {
             bookingPushService.noShow(booking);
         } catch (Exception ex) {
             log.warn("booking no-show push skipped id={}", booking == null ? null : booking.getId());
+        }
+    }
+
+    private void notifyCompleted(Booking booking) {
+        try {
+            bookingPushService.completed(booking);
+        } catch (Exception ex) {
+            log.warn("booking complete push skipped id={}", booking == null ? null : booking.getId());
         }
     }
 

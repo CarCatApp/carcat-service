@@ -12,7 +12,6 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
-import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -144,8 +143,7 @@ class BookingAppointmentServiceTest {
         Car car = Car.builder().carId(15L).vin("VIN15").customer(customer).build();
         when(customerRepository.findByUserId(3L)).thenReturn(customer);
         when(carRepository.findByCarIdAndCustomer(15L, customer)).thenReturn(car);
-        when(bookingRepository.existsByCarIdAndRange_RangeIdAndStatusIn(
-                eq(15L), eq(70L), eq(BookingStatus.holdingCarOnRange()))).thenReturn(true);
+        when(calendarService.carRepeatsOffering(eq(15L), eq(range), any())).thenReturn(true);
 
         ConflictException ex = assertThrows(ConflictException.class, () -> service.create(7L, request(), 3L, "az"));
 
