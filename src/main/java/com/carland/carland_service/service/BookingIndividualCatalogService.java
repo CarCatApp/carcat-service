@@ -84,6 +84,7 @@ public class BookingIndividualCatalogService {
         Map<Long, PercentageLifeService.Snapshot> loaded = car == null ? Map.of() : percentageLifeService.byServiceId(car);
         Map<Long, PercentageLifeService.Snapshot> lives = loaded == null ? Map.of() : loaded;
         Map<Long, List<Long>> serviceIdsByIndividual = lives.isEmpty() ? Map.of() : linksOf(rows);
+        Long clickedServiceId = carServiceEntry(bookingEntry) ? catalogServiceId : null;
         rows.sort(Comparator
                 .comparing((BranchIndividualService row) -> sortOf(row.getIndividualService()))
                 .thenComparing(row -> row.getIndividualService() == null ? 0L : row.getIndividualService().getId()));
@@ -104,7 +105,7 @@ public class BookingIndividualCatalogService {
             Integer remainingKm = null;
             Integer remainingMonth = null;
             if (car != null) {
-                PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), serviceIdsByIndividual, lives);
+                PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), clickedServiceId, serviceIdsByIndividual, lives);
                 if (life != null) {
                     remainingKm = life.remainingKm();
                     remainingMonth = life.remainingDays();
@@ -206,8 +207,14 @@ public class BookingIndividualCatalogService {
         return byIndividual;
     }
 
-    /** The car's template service linked to this individual service. Smallest id if several match. */
-    private static PercentageLifeService.Snapshot lifeOf(Long individualServiceId, Map<Long, List<Long>> serviceIdsByIndividual,
+    /**
+     * tr: Bu individual servise bağlı şablon servisi. Kullanıcının tıkladığı kart bağlıysa o kart,
+     *     yoksa birden çok eşleşmede en küçük id.
+     * en: The car's template service linked to this individual service. The clicked card when it is linked,
+     *     otherwise the smallest id if several match.
+     */
+    private static PercentageLifeService.Snapshot lifeOf(Long individualServiceId, Long clickedServiceId,
+                                                          Map<Long, List<Long>> serviceIdsByIndividual,
                                                           Map<Long, PercentageLifeService.Snapshot> lives) {
         if (individualServiceId == null || lives == null || lives.isEmpty()) {
             return null;
@@ -215,6 +222,9 @@ public class BookingIndividualCatalogService {
         List<Long> serviceIds = serviceIdsByIndividual.get(individualServiceId);
         if (serviceIds == null || serviceIds.isEmpty()) {
             return null;
+        }
+        if (clickedServiceId != null && serviceIds.contains(clickedServiceId) && lives.containsKey(clickedServiceId)) {
+            return lives.get(clickedServiceId);
         }
         Long chosen = null;
         for (Long serviceId : serviceIds) {
