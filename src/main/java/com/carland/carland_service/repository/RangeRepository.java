@@ -61,4 +61,7 @@ public interface RangeRepository extends JpaRepository<Range, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Range r join fetch r.calendar c join fetch c.branch b join fetch b.partner where r.rangeId = :id")
     Optional<Range> lockByRangeId(@Param("id") Long id);
+
+    @Query("select r.rangeId from Range r where r.calendar.calendarId = :calendarId")
+    List<Long> findIdsByCalendarId(@Param("calendarId") Long calendarId);
 }

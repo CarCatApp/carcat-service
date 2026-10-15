@@ -222,6 +222,7 @@ public class StaffSlotGenerateService {
             }
             slots.add(StaffSlotView.builder()
                     .slotId(range.getRangeId())
+                    .calendarId(range.getCalendar() == null ? null : range.getCalendar().getCalendarId())
                     .day(day.toString())
                     .start(clock(range.getStart()))
                     .end(clock(range.getEnd()))

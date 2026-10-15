@@ -12,6 +12,7 @@ import com.carland.carland_service.service.StaffSlotEditService;
 import com.carland.carland_service.service.StaffSlotGenerateService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -131,6 +132,22 @@ public class BookingStaffSlotController {
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
+                acceptLanguage);
+    }
+
+    /**
+     * tr: Günün takvimini bütün saatleri ve rezervasyonları ile siler.
+     * en: Deletes the day's calendar with all its hours and bookings.
+     */
+    @DeleteMapping("/api/v1/booking/staff/calendars/{calendarId}")
+    public void deleteCalendar(
+            HttpServletRequest request,
+            @PathVariable Long calendarId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        staffSlotEditService.deleteCalendar(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                calendarId,
                 acceptLanguage);
     }
 }

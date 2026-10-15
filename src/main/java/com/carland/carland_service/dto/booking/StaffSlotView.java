@@ -11,6 +11,8 @@ import lombok.Data;
 @Builder
 public class StaffSlotView {
     Long slotId;
+    /** Day calendar that holds this hour. Delete removes the whole day. */
+    Long calendarId;
     String day;
     String start;
     String end;
