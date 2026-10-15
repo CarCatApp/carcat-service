@@ -13,12 +13,7 @@ import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.AppointmentRepository;
-import com.carland.carland_service.repository.BookingIndividualLineRepository;
-import com.carland.carland_service.repository.BookingInspectionRepository;
-import com.carland.carland_service.repository.BookingItemRepository;
-import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
-import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.CalendarRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,11 +39,6 @@ public class StaffSlotEditService {
     private final CalendarRepository calendarRepository;
     private final BookingRepository bookingRepository;
     private final BookingCapacityService bookingCapacityService;
-    private final BookingItemRepository bookingItemRepository;
-    private final BookingIndividualLineRepository bookingIndividualLineRepository;
-    private final BookingSelectedServiceRepository bookingSelectedServiceRepository;
-    private final BookingMessageRepository bookingMessageRepository;
-    private final BookingInspectionRepository bookingInspectionRepository;
     private final AppointmentRepository appointmentRepository;
 
     /**
@@ -152,8 +142,8 @@ public class StaffSlotEditService {
     }
 
     /**
-     * tr: Günün takvimini siler. İçindeki bütün saatler ve onların rezervasyonları da silinir.
-     * en: Deletes the day's calendar with all its hours and their bookings, whatever their status.
+     * tr: Günün takvimini saatleriyle siler. Rezervasyonu olan gün silinmez.
+     * en: Deletes the day's calendar with its hours. A day with any booking is refused.
      */
     @Transactional
     public void deleteCalendar(Long userId, boolean mustChangePassword, Long calendarId, String acceptLanguage) {
@@ -169,18 +159,10 @@ public class StaffSlotEditService {
                         "Calendar was not found.", "Календарь не найден.")));
         bookingStaffAccess.requireWritableBranch(staff, calendar.getBranch().getId(), lang);
         List<Long> rangeIds = rangeRepository.findIdsByCalendarId(calendarId);
-        if (!rangeIds.isEmpty()) {
-            List<Long> bookingIds = bookingRepository.findIdsByRangeIds(rangeIds);
-            List<Long> bookingKeys = bookingIds.isEmpty() ? List.of(-1L) : bookingIds;
-            bookingInspectionRepository.deleteByBookingIdsOrRangeIds(bookingKeys, rangeIds);
-            if (!bookingIds.isEmpty()) {
-                bookingItemRepository.deleteByBookingIds(bookingIds);
-                bookingIndividualLineRepository.deleteByBookingIds(bookingIds);
-                bookingSelectedServiceRepository.deleteByBookingIds(bookingIds);
-                bookingMessageRepository.deleteByBookingIds(bookingIds);
-                bookingRepository.deleteByIds(bookingIds);
-            }
-            appointmentRepository.deleteByRangeIds(rangeIds);
+        if (!rangeIds.isEmpty() && (bookingRepository.existsByRange_RangeIdIn(rangeIds)
+                || appointmentRepository.existsByRange_RangeIdIn(rangeIds))) {
+            throw new ConflictException(sentence(lang, "Bu gündə rezervasiya var, silmək olmaz.",
+                    "This day has bookings and cannot be deleted.", "В этот день есть бронирования, удалить нельзя."));
         }
         calendarRepository.delete(calendar);
     }

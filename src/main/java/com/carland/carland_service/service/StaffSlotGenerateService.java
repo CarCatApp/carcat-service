@@ -216,7 +216,9 @@ public class StaffSlotGenerateService {
                 continue;
             }
             int booked = 0;
+            boolean hasBookings = false;
             if (range.getRangeId() != null) {
+                hasBookings = bookingRepository.existsByRange_RangeIdIn(List.of(range.getRangeId()));
                 booked = (int) bookingRepository.countByRange_RangeIdAndStatusIn(
                         range.getRangeId(), BookingStatus.occupyingCapacity());
             }
@@ -228,6 +230,7 @@ public class StaffSlotGenerateService {
                     .end(clock(range.getEnd()))
                     .capacity(range.getWorkerCount())
                     .bookedCount(booked)
+                    .hasBookings(hasBookings)
                     .bookingMode(range.getBookingMode())
                     .status(range.getStatus())
                     .dayHidden(Boolean.TRUE.equals(range.getDayHidden()))

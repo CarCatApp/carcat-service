@@ -18,6 +18,8 @@ public class StaffSlotView {
     String end;
     Integer capacity;
     Integer bookedCount;
+    /** Any booking on this hour, whatever its status. The day cannot be deleted then. */
+    Boolean hasBookings;
     String bookingMode;
     String status;
     /** True when Günlük tam bağla hid this service's day. Hour status is separate. */
