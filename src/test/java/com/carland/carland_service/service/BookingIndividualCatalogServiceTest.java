@@ -8,12 +8,14 @@ import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +50,7 @@ class BookingIndividualCatalogServiceTest {
     @Mock CarRepository carRepository;
     @Mock IndividualServiceSourceRepository individualServiceSourceRepository;
     @Mock PercentageLifeService percentageLifeService;
+    @Mock CustomerServiceRecordRepository customerServiceRecordRepository;
 
     BookingIndividualCatalogService service;
     ObjectMapper json = JsonMapper.builder().addModule(new Jdk8Module()).build();
@@ -61,6 +64,7 @@ class BookingIndividualCatalogServiceTest {
                 carRepository,
                 individualServiceSourceRepository,
                 percentageLifeService,
+                customerServiceRecordRepository,
                 new ObjectMapper());
     }
 
@@ -161,6 +165,8 @@ class BookingIndividualCatalogServiceTest {
         when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
                 IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
         ));
+        when(customerServiceRecordRepository.findByServiceIdAndCar(100L, car))
+                .thenReturn(CustomerServiceRecord.builder().servicedStatus("serviced").build());
 
         BookingIndividualServicesResponse out = service.list(12L, "en", null, 5L, 9L, null, null);
 
@@ -178,7 +184,7 @@ class BookingIndividualCatalogServiceTest {
     }
 
     @Test
-    void monthOnlyPercentageIsShownWithoutAServicedAnswer() {
+    void percentageIsShownButANullServicedStatusStillGetsTheNote() {
         Partner partner = Partner.builder().id(1L).active(true).build();
         Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
         IndividualService battery = IndividualService.builder()
@@ -201,7 +207,7 @@ class BookingIndividualCatalogServiceTest {
         assertEquals(98, out.getServices().get(0).getIndividualServiceMappedPercentage());
         assertNull(out.getServices().get(0).getRemainingKm());
         assertEquals(1071, out.getServices().get(0).getRemainingMonth());
-        assertNull(out.getServices().get(0).getPercentageNote());
+        assertEquals("Məlumat daxil etməmisiniz", out.getServices().get(0).getPercentageNote());
     }
 
     @Test
@@ -245,6 +251,8 @@ class BookingIndividualCatalogServiceTest {
         when(individualServiceSourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
                 IndividualServiceSource.builder().serviceId(100L).individualServiceId(19L).build()
         ));
+        when(customerServiceRecordRepository.findByServiceIdAndCar(100L, car))
+                .thenReturn(CustomerServiceRecord.builder().servicedStatus("").build());
 
         BookingIndividualServicesResponse out = service.list(12L, "en", "all", 5L, 9L, null, null);
 

@@ -8,6 +8,7 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.entity.CustomerServiceRecord;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
 import com.carland.carland_service.entity.IndividualServiceSource;
@@ -16,6 +17,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -50,6 +52,7 @@ public class BookingIndividualCatalogService {
     private final CarRepository carRepository;
     private final IndividualServiceSourceRepository individualServiceSourceRepository;
     private final PercentageLifeService percentageLifeService;
+    private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -89,6 +92,7 @@ public class BookingIndividualCatalogService {
                 .comparing((BranchIndividualService row) -> sortOf(row.getIndividualService()))
                 .thenComparing(row -> row.getIndividualService() == null ? 0L : row.getIndividualService().getId()));
         boolean all = isAll(filter);
+        Map<Long, String> servicedStatuses = new HashMap<>();
         List<BookingIndividualServiceView> services = new ArrayList<>();
         for (BranchIndividualService row : rows) {
             IndividualService catalog = row.getIndividualService();
@@ -105,13 +109,14 @@ public class BookingIndividualCatalogService {
             Integer remainingKm = null;
             Integer remainingMonth = null;
             if (car != null) {
-                PercentageLifeService.Snapshot life = lifeOf(catalog.getId(), clickedServiceId, serviceIdsByIndividual, lives);
+                Long serviceId = linkedServiceId(catalog.getId(), clickedServiceId, serviceIdsByIndividual, lives);
+                PercentageLifeService.Snapshot life = serviceId == null ? null : lives.get(serviceId);
                 if (life != null) {
                     remainingKm = life.remainingKm();
                     remainingMonth = life.remainingDays();
                     percentage = life.shownPercentage();
                 }
-                if (percentage == null) {
+                if (servicedStatusOf(serviceId, car, servicedStatuses) == null) {
                     note = missingNote;
                 }
             }
@@ -208,14 +213,29 @@ public class BookingIndividualCatalogService {
     }
 
     /**
-     * tr: Bu individual servise bağlı şablon servisi. Kullanıcının tıkladığı kart bağlıysa o kart,
+     * tr: GET /service/percentages ile aynı servicedStatus (CustomerServiceRecord). Bağlı servis veya kayıt yoksa null.
+     * en: Same servicedStatus as GET /service/percentages (CustomerServiceRecord). Null when no linked service or record.
+     */
+    private String servicedStatusOf(Long serviceId, Car car, Map<Long, String> cache) {
+        if (serviceId == null) {
+            return null;
+        }
+        if (!cache.containsKey(serviceId)) {
+            CustomerServiceRecord record = customerServiceRecordRepository.findByServiceIdAndCar(serviceId, car);
+            cache.put(serviceId, record == null ? null : record.getServicedStatus());
+        }
+        return cache.get(serviceId);
+    }
+
+    /**
+     * tr: Bu individual servise bağlı şablon servisinin id'si. Kullanıcının tıkladığı kart bağlıysa o kart,
      *     yoksa birden çok eşleşmede en küçük id.
-     * en: The car's template service linked to this individual service. The clicked card when it is linked,
+     * en: Id of the car's template service linked to this individual service. The clicked card when it is linked,
      *     otherwise the smallest id if several match.
      */
-    private static PercentageLifeService.Snapshot lifeOf(Long individualServiceId, Long clickedServiceId,
-                                                          Map<Long, List<Long>> serviceIdsByIndividual,
-                                                          Map<Long, PercentageLifeService.Snapshot> lives) {
+    private static Long linkedServiceId(Long individualServiceId, Long clickedServiceId,
+                                        Map<Long, List<Long>> serviceIdsByIndividual,
+                                        Map<Long, PercentageLifeService.Snapshot> lives) {
         if (individualServiceId == null || lives == null || lives.isEmpty()) {
             return null;
         }
@@ -224,7 +244,7 @@ public class BookingIndividualCatalogService {
             return null;
         }
         if (clickedServiceId != null && serviceIds.contains(clickedServiceId) && lives.containsKey(clickedServiceId)) {
-            return lives.get(clickedServiceId);
+            return clickedServiceId;
         }
         Long chosen = null;
         for (Long serviceId : serviceIds) {
@@ -235,7 +255,7 @@ public class BookingIndividualCatalogService {
                 chosen = serviceId;
             }
         }
-        return chosen == null ? null : lives.get(chosen);
+        return chosen;
     }
 
     private static String missingNote(String lang) {
