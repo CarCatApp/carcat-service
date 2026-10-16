@@ -27,6 +27,10 @@ public class AdminAccessService {
     @Value("${access.token.secret-key}")
     private String accessTokenSecretKey;
 
+    /** Must match carland_auth carland.admin.panel-token-seconds. */
+    @Value("${carland.admin.panel-token-seconds:21600}")
+    private int panelTokenSeconds;
+
     public String getPanelPhone() {
         return panelPhone;
     }
@@ -35,7 +39,7 @@ public class AdminAccessService {
         Cookie cookie = new Cookie(COOKIE, accessToken);
         cookie.setHttpOnly(true);
         cookie.setPath("/admin");
-        cookie.setMaxAge(15 * 60);
+        cookie.setMaxAge(panelTokenSeconds);
         response.addCookie(cookie);
     }
 
