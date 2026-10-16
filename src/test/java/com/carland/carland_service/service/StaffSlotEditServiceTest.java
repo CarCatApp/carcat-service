@@ -15,6 +15,7 @@ import com.carland.carland_service.enums.BookingStaffStatus;
 import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.AppointmentRepository;
 import com.carland.carland_service.repository.BookingRepository;
@@ -35,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -71,8 +73,8 @@ class StaffSlotEditServiceTest {
                 .status(BookingStaffStatus.ACTIVE.name())
                 .build();
         calendar = Calendar.builder().calendarId(1L).day(LocalDate.of(2026, 10, 7)).branch(branch).build();
-        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(staff);
-        when(bookingStaffAccess.requireWritableBranch(staff, 5L, "az")).thenReturn(branch);
+        lenient().when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(staff);
+        lenient().when(bookingStaffAccess.requireWritableBranch(staff, 5L, "az")).thenReturn(branch);
     }
 
     @Test
@@ -164,33 +166,22 @@ class StaffSlotEditServiceTest {
     }
 
     @Test
-    void dayWithoutBookingsIsRemovedCompletely() {
-        Range first = range(1L, 2);
-        Range second = range(2L, 2);
-        dayOf(first, second);
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L, 2L), BookingStatus.holdingCarOnRange()))
-                .thenReturn(List.of());
-        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(false);
-        when(appointmentRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(false);
-
-        service.deleteCalendar(9L, false, 1L, "az");
-
-        verify(calendarRepository).delete(calendar);
-        verify(bookingPushService, never()).rejected(any());
-    }
-
-    @Test
-    void activeBookingsAreRejectedAndTheDayIsHidden() {
-        Range first = range(1L, 2);
-        Range second = range(2L, 2);
-        dayOf(first, second);
-        Booking waiting = Booking.builder().id(31L).range(first).status(BookingStatus.PENDING.apiValue()).build();
-        Booking accepted = Booking.builder().id(32L).range(second).status(BookingStatus.CONFIRMED.apiValue()).build();
+    void deleteTouchesOnlyTheSelectedPackage() {
+        BranchCarePackage oil = BranchCarePackage.builder().id(10L).name("Yağ").build();
+        Range oilEmpty = target(1L, StaffSlotTargets.PACKAGE, oil);
+        Range oilBooked = target(2L, StaffSlotTargets.PACKAGE, oil);
+        Range repair = target(3L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        dayOf(oilEmpty, oilBooked, repair);
+        lock(oilEmpty, oilBooked);
+        Booking waiting = Booking.builder().id(31L).range(oilBooked).status(BookingStatus.PENDING.apiValue()).build();
+        Booking accepted = Booking.builder().id(32L).range(oilBooked).status(BookingStatus.CONFIRMED.apiValue()).build();
         when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L, 2L), BookingStatus.holdingCarOnRange()))
                 .thenReturn(List.of(waiting, accepted));
-        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(true);
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(false);
+        when(appointmentRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(false);
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(2L))).thenReturn(true);
 
-        service.deleteCalendar(9L, false, 1L, "az");
+        service.deleteCalendar(9L, false, 1L, 10L, null, null, "az");
 
         for (Booking booking : List.of(waiting, accepted)) {
             assertEquals(BookingStatus.REJECTED.apiValue(), booking.getStatus());
@@ -198,23 +189,44 @@ class StaffSlotEditServiceTest {
             assertEquals("Xidmət təqvimi silindi", booking.getCancelNote());
         }
         verify(bookingPushService, times(2)).rejected(any());
-        assertEquals(RangeStatus.DELETED.name(), first.getStatus());
-        assertEquals(RangeStatus.DELETED.name(), second.getStatus());
+        assertEquals(RangeStatus.DELETED.name(), oilBooked.getStatus());
+        assertEquals(List.of(oilBooked, repair), calendar.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), repair.getStatus());
+        verify(rangeRepository, never()).lockByRangeId(3L);
         verify(calendarRepository, never()).delete(any());
     }
 
     @Test
-    void finishedBookingsKeepTheHoursButNobodyIsRejected() {
-        Range first = range(1L, 2);
-        dayOf(first);
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L), BookingStatus.holdingCarOnRange()))
+    void lastServiceOfTheDayRemovesTheCalendar() {
+        Range repair = target(3L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        dayOf(repair);
+        lock(repair);
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(3L), BookingStatus.holdingCarOnRange()))
                 .thenReturn(List.of());
-        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(true);
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(3L))).thenReturn(false);
+        when(appointmentRepository.existsByRange_RangeIdIn(List.of(3L))).thenReturn(false);
 
-        service.deleteCalendar(9L, false, 1L, "az");
+        service.deleteCalendar(9L, false, 1L, null, null, true, "az");
 
+        verify(calendarRepository).delete(calendar);
         verify(bookingPushService, never()).rejected(any());
-        assertEquals(RangeStatus.DELETED.name(), first.getStatus());
+    }
+
+    @Test
+    void deleteNeedsExactlyOneService() {
+        assertThrows(MissingFieldException.class,
+                () -> service.deleteCalendar(9L, false, 1L, null, null, null, "az"));
+        assertThrows(MissingFieldException.class,
+                () -> service.deleteCalendar(9L, false, 1L, 10L, 20L, null, "az"));
+        verify(calendarRepository, never()).delete(any());
+    }
+
+    @Test
+    void serviceWithoutHoursThatDayIsNotFound() {
+        dayOf(target(3L, StaffSlotTargets.REPAIR_INSPECTION, null));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.deleteCalendar(9L, false, 1L, 10L, null, null, "az"));
         verify(calendarRepository, never()).delete(any());
     }
 
@@ -227,15 +239,22 @@ class StaffSlotEditServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.capacity(9L, false, 8L, delta(1), "az"));
     }
 
+    private Range target(Long id, String slotTarget, BranchCarePackage carePackage) {
+        Range range = range(id, 2);
+        range.setSlotTarget(slotTarget);
+        range.setCarePackage(carePackage);
+        return range;
+    }
+
     private void dayOf(Range... ranges) {
         calendar.setTimeRanges(new java.util.ArrayList<>(List.of(ranges)));
         when(calendarRepository.findById(1L)).thenReturn(Optional.of(calendar));
-        List<Long> ids = new java.util.ArrayList<>();
+    }
+
+    private void lock(Range... ranges) {
         for (Range range : ranges) {
-            ids.add(range.getRangeId());
             when(rangeRepository.lockByRangeId(range.getRangeId())).thenReturn(Optional.of(range));
         }
-        when(rangeRepository.findIdsByCalendarId(1L)).thenReturn(ids);
     }
 
     private Range range(Long id, int capacity) {

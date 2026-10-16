@@ -146,19 +146,29 @@ public class StaffSlotEditService {
     }
 
     /**
-     * tr: Günün takvimini siler. Aktiv rezervasiyalar "calendar_deleted" ilə rədd edilir. Rezervasiyası olan gün
-     *     gizli silinir (saatlar DELETED, sətirlər durur ki köhnə rezervasiyaların vaxtı itməsin); heç rezervasiyası
-     *     olmayan gün tam silinir.
-     * en: Deletes the day's calendar. Active bookings are rejected with "calendar_deleted". A day with bookings is
-     *     soft-deleted (hours DELETED, rows stay so old bookings keep their time); a day that never had bookings is
-     *     removed completely.
+     * tr: Günün yalnız seçili hizmətinin saatlarını silir (packageId, individualServiceId və ya repairInspection,
+     *     dəqiq biri). Digər hizmətlərin saatlarına toxunmur. Aktiv rezervasiyalar "calendar_deleted" ilə rədd
+     *     edilir. Rezervasiyası olmuş saat DELETED olur (sətir durur ki köhnə rezervasiyanın vaxtı itməsin),
+     *     heç rezervasiyası olmamış saat silinir. Gündə saat qalmasa təqvim də silinir.
+     * en: Deletes only the selected service's hours on the day (exactly one of packageId, individualServiceId or
+     *     repairInspection). Other services' hours are untouched. Active bookings are rejected with
+     *     "calendar_deleted". An hour that ever had a booking becomes DELETED (the row stays so the old booking
+     *     keeps its time); an hour that never had one is removed. The calendar goes when no hour is left.
      */
     @Transactional
-    public void deleteCalendar(Long userId, boolean mustChangePassword, Long calendarId, String acceptLanguage) {
+    public void deleteCalendar(Long userId, boolean mustChangePassword, Long calendarId, Long packageId,
+                               Long individualServiceId, Boolean repairInspection, String acceptLanguage) {
         String lang = lang(acceptLanguage);
         if (calendarId == null) {
             throw new MissingFieldException(sentence(lang, "Təqvimi seçin.",
                     "Select the calendar.", "Выберите календарь."));
+        }
+        int picked = (packageId != null ? 1 : 0)
+                + (individualServiceId != null ? 1 : 0)
+                + (Boolean.TRUE.equals(repairInspection) ? 1 : 0);
+        if (picked != 1) {
+            throw new MissingFieldException(sentence(lang, "Bir xidmət seçin.",
+                    "Select one service.", "Выберите одну услугу."));
         }
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, lang);
         Calendar calendar = calendarRepository.findById(calendarId)
@@ -166,10 +176,18 @@ public class StaffSlotEditService {
                 .orElseThrow(() -> new ResourceNotFoundException(sentence(lang, "Təqvim tapılmadı.",
                         "Calendar was not found.", "Календарь не найден.")));
         bookingStaffAccess.requireWritableBranch(staff, calendar.getBranch().getId(), lang);
-        List<Long> rangeIds = rangeRepository.findIdsByCalendarId(calendarId);
+        List<Long> rangeIds = new ArrayList<>();
+        if (calendar.getTimeRanges() != null) {
+            for (Range range : calendar.getTimeRanges()) {
+                if (range.getRangeId() != null && !deleted(range)
+                        && sameTarget(range, packageId, individualServiceId, repairInspection)) {
+                    rangeIds.add(range.getRangeId());
+                }
+            }
+        }
         if (rangeIds.isEmpty()) {
-            calendarRepository.delete(calendar);
-            return;
+            throw new ResourceNotFoundException(sentence(lang, "Bu gün üçün slot yoxdur.",
+                    "There is no slot for this day.", "На этот день слота нет."));
         }
         List<Range> ranges = new ArrayList<>();
         for (Long rangeId : rangeIds) {
@@ -185,13 +203,16 @@ public class StaffSlotEditService {
                 notifyRejected(booking);
             }
         }
-        if (!bookingRepository.existsByRange_RangeIdIn(rangeIds)
-                && !appointmentRepository.existsByRange_RangeIdIn(rangeIds)) {
-            calendarRepository.delete(calendar);
-            return;
-        }
         for (Range range : ranges) {
-            range.setStatus(RangeStatus.DELETED.name());
+            List<Long> one = List.of(range.getRangeId());
+            if (bookingRepository.existsByRange_RangeIdIn(one) || appointmentRepository.existsByRange_RangeIdIn(one)) {
+                range.setStatus(RangeStatus.DELETED.name());
+            } else {
+                calendar.getTimeRanges().removeIf(row -> range.getRangeId().equals(row.getRangeId()));
+            }
+        }
+        if (calendar.getTimeRanges().isEmpty()) {
+            calendarRepository.delete(calendar);
         }
     }
 
@@ -248,17 +269,22 @@ public class StaffSlotEditService {
     }
 
     private static boolean sameTarget(Range range, StaffSlotDayHiddenRequest body) {
-        if (body.getPackageId() != null) {
+        return sameTarget(range, body.getPackageId(), body.getIndividualServiceId(), body.getRepairInspection());
+    }
+
+    private static boolean sameTarget(Range range, Long packageId, Long individualServiceId,
+                                      Boolean repairInspection) {
+        if (packageId != null) {
             return StaffSlotTargets.PACKAGE.equals(range.getSlotTarget())
                     && range.getCarePackage() != null
-                    && body.getPackageId().equals(range.getCarePackage().getId());
+                    && packageId.equals(range.getCarePackage().getId());
         }
-        if (body.getIndividualServiceId() != null) {
+        if (individualServiceId != null) {
             return StaffSlotTargets.INDIVIDUAL.equals(range.getSlotTarget())
                     && range.getIndividualService() != null
-                    && body.getIndividualServiceId().equals(range.getIndividualService().getId());
+                    && individualServiceId.equals(range.getIndividualService().getId());
         }
-        return Boolean.TRUE.equals(body.getRepairInspection())
+        return Boolean.TRUE.equals(repairInspection)
                 && StaffSlotTargets.REPAIR_INSPECTION.equals(range.getSlotTarget());
     }
 

@@ -136,20 +136,26 @@ public class BookingStaffSlotController {
     }
 
     /**
-     * tr: Günün takvimini siler. Aktiv rezervasiyalar "calendar_deleted" ilə rədd edilir; rezervasiyası olan gün
-     *     gizli silinir, heç rezervasiyası olmayan gün tam silinir.
-     * en: Deletes the day's calendar. Active bookings are rejected with "calendar_deleted"; a day with bookings is
-     *     soft-deleted, a day that never had bookings is removed completely.
+     * tr: Günün yalnız seçili hizmətinin saatlarını silir (packageId, individualServiceId və ya repairInspection,
+     *     dəqiq biri). Digər hizmətlərə toxunmur. Aktiv rezervasiyalar "calendar_deleted" ilə rədd edilir.
+     * en: Deletes only the selected service's hours on the day (exactly one of packageId, individualServiceId or
+     *     repairInspection). Other services are untouched. Active bookings are rejected with "calendar_deleted".
      */
     @DeleteMapping("/api/v1/booking/staff/calendars/{calendarId}")
     public void deleteCalendar(
             HttpServletRequest request,
             @PathVariable Long calendarId,
+            @RequestParam(required = false) Long packageId,
+            @RequestParam(required = false) Long individualServiceId,
+            @RequestParam(required = false) Boolean repairInspection,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         staffSlotEditService.deleteCalendar(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 calendarId,
+                packageId,
+                individualServiceId,
+                repairInspection,
                 acceptLanguage);
     }
 }
