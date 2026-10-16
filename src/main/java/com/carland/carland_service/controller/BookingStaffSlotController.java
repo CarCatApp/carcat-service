@@ -136,8 +136,10 @@ public class BookingStaffSlotController {
     }
 
     /**
-     * tr: Günün takvimini saatleriyle siler. Rezervasyonu olan gün silinmez.
-     * en: Deletes the day's calendar with its hours. A day with bookings is refused.
+     * tr: Günün takvimini siler. Aktiv rezervasiyalar "calendar_deleted" ilə rədd edilir; rezervasiyası olan gün
+     *     gizli silinir, heç rezervasiyası olmayan gün tam silinir.
+     * en: Deletes the day's calendar. Active bookings are rejected with "calendar_deleted"; a day with bookings is
+     *     soft-deleted, a day that never had bookings is removed completely.
      */
     @DeleteMapping("/api/v1/booking/staff/calendars/{calendarId}")
     public void deleteCalendar(

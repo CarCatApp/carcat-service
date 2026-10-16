@@ -25,6 +25,7 @@ public interface CalendarRepository extends JpaRepository<Calendar, Long> {
     @Query("select distinct c.day, r.slotTarget, r.carePackage.id, r.individualService.id "
             + "from Calendar c join c.timeRanges r "
             + "where c.branch.id = :branchId and c.day >= :fromDay and r.slotTarget is not null "
+            + "and (r.status is null or r.status <> 'DELETED') "
             + "order by c.day")
     List<Object[]> findSlotDaysFrom(@Param("branchId") Long branchId, @Param("fromDay") LocalDate fromDay);
 }

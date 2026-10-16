@@ -372,7 +372,7 @@ public class StaffBookingService {
                 .carModel(car == null ? null : car.getModel())
                 .car(carPanel(car, brandIds))
                 .cancelReasonCode(booking.getCancelReasonCode())
-                .cancelNote(booking.getCancelNote())
+                .cancelNote(BookingSystemNotes.resolve(booking.getCancelReasonCode(), booking.getCancelNote(), lang))
                 .serviceKeys(keys)
                 .packageName(booking.getPackageName())
                 .packagePrice(booking.getPackagePrice())

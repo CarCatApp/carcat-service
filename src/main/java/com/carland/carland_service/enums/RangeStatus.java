@@ -17,5 +17,7 @@ public enum RangeStatus {
     PENDING_LOCAL,
     FULL,
     /** Staff hid this hour. The row stays; Flutter treats it as missing. */
-    HIDDEN
+    HIDDEN,
+    /** Staff deleted the day. The row stays so old bookings keep their time; nobody sees it. */
+    DELETED
 }

@@ -54,6 +54,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByRange_RangeIdAndStatus(Long rangeId, String status);
 
+    List<Booking> findByRange_RangeIdInAndStatusIn(Collection<Long> rangeIds, Collection<String> statuses);
+
     @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})
     Page<Booking> findByCustomerUserId(Long customerUserId, Pageable pageable);
 

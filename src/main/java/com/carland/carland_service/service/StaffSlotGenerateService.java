@@ -203,7 +203,8 @@ public class StaffSlotGenerateService {
                 continue;
             }
             for (Range range : calendar.getTimeRanges()) {
-                if (range.getSlotTarget() != null && !range.getSlotTarget().isBlank()) {
+                if (range.getSlotTarget() != null && !range.getSlotTarget().isBlank()
+                        && !RangeStatus.DELETED.name().equals(range.getStatus())) {
                     ranges.add(range);
                 }
             }

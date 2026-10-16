@@ -24,17 +24,20 @@ public interface RangeRepository extends JpaRepository<Range, Long> {
     Range findByRangeId(Long rangeId);
 
     @Query("select count(r) from Range r join r.calendar c join c.branch b "
-            + "where b.id = :branchId and c.day = :day and r.carePackage.id = :packageId")
+            + "where b.id = :branchId and c.day = :day and r.carePackage.id = :packageId "
+            + "and (r.status is null or r.status <> 'DELETED')")
     long countCarePackageOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
                                @Param("packageId") Long packageId);
 
     @Query("select count(r) from Range r join r.calendar c join c.branch b "
-            + "where b.id = :branchId and c.day = :day and r.individualService.id = :serviceId")
+            + "where b.id = :branchId and c.day = :day and r.individualService.id = :serviceId "
+            + "and (r.status is null or r.status <> 'DELETED')")
     long countIndividualOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
                               @Param("serviceId") Long serviceId);
 
     @Query("select count(r) from Range r join r.calendar c join c.branch b "
-            + "where b.id = :branchId and c.day = :day and r.slotTarget = :slotTarget")
+            + "where b.id = :branchId and c.day = :day and r.slotTarget = :slotTarget "
+            + "and (r.status is null or r.status <> 'DELETED')")
     long countTargetOnDay(@Param("branchId") Long branchId, @Param("day") LocalDate day,
                           @Param("slotTarget") String slotTarget);
 

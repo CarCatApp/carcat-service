@@ -777,7 +777,8 @@ public class BookingMineService {
         } else {
             return null;
         }
-        String note = booking.getCancelNote();
+        String note = BookingSystemNotes.resolve(
+                booking.getCancelReasonCode(), booking.getCancelNote(), acceptLanguage);
         if (note != null && note.isBlank()) {
             note = null;
         }

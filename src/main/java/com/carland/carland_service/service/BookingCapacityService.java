@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Locale;
 
 /**
  * tr: Yeri yalnız qəbul edilmiş rezervasiya tutur. Yer dolunca gözləyənlər rədd olunur.
@@ -21,7 +20,7 @@ import java.util.Locale;
 @Slf4j
 public class BookingCapacityService {
 
-    public static final String PLACES_FULL = "places_full";
+    public static final String PLACES_FULL = BookingSystemNotes.PLACES_FULL;
 
     private final BookingRepository bookingRepository;
     private final BookingPushService bookingPushService;
@@ -70,14 +69,7 @@ public class BookingCapacityService {
     }
 
     public static String note(String acceptLanguage) {
-        String lang = acceptLanguage == null ? "" : acceptLanguage.toLowerCase(Locale.ROOT);
-        if (lang.startsWith("en")) {
-            return "We were unable to accept your reservation because all places are taken.";
-        }
-        if (lang.startsWith("ru")) {
-            return "Мы не смогли принять вашу бронь, поскольку все места заняты.";
-        }
-        return "Yerlər dolduğu üçün rezervasiyanızı qəbul edə bilmədik.";
+        return BookingSystemNotes.text(PLACES_FULL, acceptLanguage);
     }
 
     private long accepted(Range range) {

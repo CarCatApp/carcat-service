@@ -21,7 +21,8 @@ public final class SlotOffer {
         if (Boolean.TRUE.equals(range.getDayHidden())) {
             return true;
         }
-        if (RangeStatus.HIDDEN.name().equals(range.getStatus())) {
+        if (RangeStatus.HIDDEN.name().equals(range.getStatus())
+                || RangeStatus.DELETED.name().equals(range.getStatus())) {
             return true;
         }
         Calendar calendar = range.getCalendar();

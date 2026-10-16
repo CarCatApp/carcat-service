@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.StaffSlotCapacityRequest;
 import com.carland.carland_service.dto.request.StaffSlotDayHiddenRequest;
 import com.carland.carland_service.dto.request.StaffSlotHiddenRequest;
+import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
@@ -11,8 +12,11 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
+import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.AppointmentRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CalendarRepository;
 import com.carland.carland_service.repository.RangeRepository;
@@ -32,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +48,8 @@ class StaffSlotEditServiceTest {
     @Mock CalendarRepository calendarRepository;
     @Mock BookingRepository bookingRepository;
     @Mock BookingCapacityService bookingCapacityService;
+    @Mock AppointmentRepository appointmentRepository;
+    @Mock BookingPushService bookingPushService;
 
     StaffSlotEditService service;
     Branch branch;
@@ -52,7 +59,8 @@ class StaffSlotEditServiceTest {
     @BeforeEach
     void setUp() {
         service = new StaffSlotEditService(
-                bookingStaffAccess, rangeRepository, calendarRepository, bookingRepository, bookingCapacityService);
+                bookingStaffAccess, rangeRepository, calendarRepository, bookingRepository, bookingCapacityService,
+                appointmentRepository, bookingPushService);
         Partner partner = Partner.builder().id(1L).name("HS").build();
         branch = Branch.builder().id(5L).name("Babek").partner(partner).build();
         staff = BookingStaff.builder()
@@ -153,6 +161,81 @@ class StaffSlotEditServiceTest {
         assertEquals(false, closedHour.getDayHidden());
         assertEquals(RangeStatus.HIDDEN.name(), closedHour.getStatus());
         assertEquals(RangeStatus.AVAILABLE.name(), other.getStatus());
+    }
+
+    @Test
+    void dayWithoutBookingsIsRemovedCompletely() {
+        Range first = range(1L, 2);
+        Range second = range(2L, 2);
+        dayOf(first, second);
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L, 2L), BookingStatus.holdingCarOnRange()))
+                .thenReturn(List.of());
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(false);
+        when(appointmentRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(false);
+
+        service.deleteCalendar(9L, false, 1L, "az");
+
+        verify(calendarRepository).delete(calendar);
+        verify(bookingPushService, never()).rejected(any());
+    }
+
+    @Test
+    void activeBookingsAreRejectedAndTheDayIsHidden() {
+        Range first = range(1L, 2);
+        Range second = range(2L, 2);
+        dayOf(first, second);
+        Booking waiting = Booking.builder().id(31L).range(first).status(BookingStatus.PENDING.apiValue()).build();
+        Booking accepted = Booking.builder().id(32L).range(second).status(BookingStatus.CONFIRMED.apiValue()).build();
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L, 2L), BookingStatus.holdingCarOnRange()))
+                .thenReturn(List.of(waiting, accepted));
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L, 2L))).thenReturn(true);
+
+        service.deleteCalendar(9L, false, 1L, "az");
+
+        for (Booking booking : List.of(waiting, accepted)) {
+            assertEquals(BookingStatus.REJECTED.apiValue(), booking.getStatus());
+            assertEquals(BookingSystemNotes.CALENDAR_DELETED, booking.getCancelReasonCode());
+            assertEquals("Xidmət təqvimi silindi", booking.getCancelNote());
+        }
+        verify(bookingPushService, times(2)).rejected(any());
+        assertEquals(RangeStatus.DELETED.name(), first.getStatus());
+        assertEquals(RangeStatus.DELETED.name(), second.getStatus());
+        verify(calendarRepository, never()).delete(any());
+    }
+
+    @Test
+    void finishedBookingsKeepTheHoursButNobodyIsRejected() {
+        Range first = range(1L, 2);
+        dayOf(first);
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L), BookingStatus.holdingCarOnRange()))
+                .thenReturn(List.of());
+        when(bookingRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(true);
+
+        service.deleteCalendar(9L, false, 1L, "az");
+
+        verify(bookingPushService, never()).rejected(any());
+        assertEquals(RangeStatus.DELETED.name(), first.getStatus());
+        verify(calendarRepository, never()).delete(any());
+    }
+
+    @Test
+    void deletedHourCannotBeEdited() {
+        Range range = range(8L, 2);
+        range.setStatus(RangeStatus.DELETED.name());
+        when(rangeRepository.lockByRangeId(8L)).thenReturn(Optional.of(range));
+
+        assertThrows(ResourceNotFoundException.class, () -> service.capacity(9L, false, 8L, delta(1), "az"));
+    }
+
+    private void dayOf(Range... ranges) {
+        calendar.setTimeRanges(new java.util.ArrayList<>(List.of(ranges)));
+        when(calendarRepository.findById(1L)).thenReturn(Optional.of(calendar));
+        List<Long> ids = new java.util.ArrayList<>();
+        for (Range range : ranges) {
+            ids.add(range.getRangeId());
+            when(rangeRepository.lockByRangeId(range.getRangeId())).thenReturn(Optional.of(range));
+        }
+        when(rangeRepository.findIdsByCalendarId(1L)).thenReturn(ids);
     }
 
     private Range range(Long id, int capacity) {

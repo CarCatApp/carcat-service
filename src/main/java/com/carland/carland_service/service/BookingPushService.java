@@ -174,7 +174,8 @@ public class BookingPushService {
         OffsetDateTime start = range == null ? null : range.getStart();
         String ref = booking.getRef() == null ? "" : booking.getRef().trim();
         String note = kind == Kind.REJECTED ? booking.getCancelNote() : null;
-        return new Notice(booking.getCustomerUserId(), branchName, start, ref, note, kind);
+        String reasonCode = kind == Kind.REJECTED ? booking.getCancelReasonCode() : null;
+        return new Notice(booking.getCustomerUserId(), branchName, start, ref, note, reasonCode, kind);
     }
 
     private static String title(String lang, Kind kind) {
@@ -206,7 +207,8 @@ public class BookingPushService {
         String when = whenText(notice.startUtc(), lang);
         return switch (notice.kind()) {
             case ACCEPTED -> acceptBody(lang, notice.branchName(), when, notice.ref());
-            case REJECTED -> rejectBody(lang, notice.branchName(), notice.note());
+            case REJECTED -> rejectBody(lang, notice.branchName(),
+                    BookingSystemNotes.resolve(notice.reasonCode(), notice.note(), lang));
             case NO_SHOW -> noShowBody(lang, notice.branchName());
             case CANCELLED -> cancelBody(lang, notice.branchName());
             case COMPLETED -> completeBody(lang, notice.branchName());
@@ -310,6 +312,7 @@ public class BookingPushService {
             OffsetDateTime startUtc,
             String ref,
             String note,
+            String reasonCode,
             Kind kind
     ) {}
 }
