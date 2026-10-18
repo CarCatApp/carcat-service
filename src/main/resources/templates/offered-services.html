@@ -59,7 +59,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th></th><th>Qrup</th><th>Filter</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Active</th><th></th></tr>
+      <tr><th></th><th>Qrup</th><th>Filter</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Periodic</th><th>Active</th><th></th></tr>
       </thead>
       <tbody>
       <tr th:each="row : ${services}">
@@ -70,6 +70,7 @@
         <td th:text="${row.titleEn}">EN</td>
         <td th:text="${row.titleRu}">RU</td>
         <td th:text="${row.sortOrder}">1</td>
+        <td th:text="${row.periodic} ? 'yes' : 'no'">no</td>
         <td th:text="${row.active} ? 'yes' : 'no'">yes</td>
         <td>
           <button type="button" class="btn btn-ghost js-edit"
@@ -80,6 +81,7 @@
                   th:data-title-en="${row.titleEn}"
                   th:data-title-ru="${row.titleRu}"
                   th:data-sort-order="${row.sortOrder}"
+                  th:data-periodic="${row.periodic}"
                   th:data-active="${row.active}">Düzəlt</button>
         </td>
       </tr>
@@ -114,7 +116,10 @@
       <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
       <div class="field"><label for="fTitleRu">Title RU</label><input id="fTitleRu"></div>
       <div class="field"><label for="fSort">Sıra</label><input id="fSort" type="number" value="0"></div>
-      <div class="checks full"><label><input id="fActive" type="checkbox" checked> active</label></div>
+      <div class="checks full">
+        <label><input id="fPeriodic" type="checkbox"> periodic</label>
+        <label><input id="fActive" type="checkbox" checked> active</label>
+      </div>
     </div>
     <div style="display:flex; gap:8px; margin-top:16px;">
       <button class="btn btn-primary" type="submit">Saxla</button>
@@ -139,6 +144,7 @@
     document.getElementById("fTitleEn").value = data.titleEn || "";
     document.getElementById("fTitleRu").value = data.titleRu || "";
     document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
+    document.getElementById("fPeriodic").checked = data.periodic === true || data.periodic === "true";
     document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
     document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
     editor.hidden = false;
@@ -161,6 +167,7 @@
       titleEn: document.getElementById("fTitleEn").value.trim(),
       titleRu: document.getElementById("fTitleRu").value.trim(),
       sortOrder: Number(document.getElementById("fSort").value || 0),
+      periodic: document.getElementById("fPeriodic").checked,
       active: document.getElementById("fActive").checked
     };
     const res = await fetch("/admin/offered-services/save", {

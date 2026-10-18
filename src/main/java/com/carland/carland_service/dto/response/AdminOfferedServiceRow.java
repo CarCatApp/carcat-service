@@ -25,4 +25,5 @@ public class AdminOfferedServiceRow {
     String titleRu;
     Integer sortOrder;
     Boolean active;
+    Boolean periodic;
 }

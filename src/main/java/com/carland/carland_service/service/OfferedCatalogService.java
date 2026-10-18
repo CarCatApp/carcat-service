@@ -162,6 +162,7 @@ public class OfferedCatalogService {
         row.setTitleJson(json.write(body.getTitleAz().trim(), trimToEmpty(body.getTitleEn()), trimToEmpty(body.getTitleRu())));
         row.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
         row.setActive(body.getActive() == null ? Boolean.TRUE : body.getActive());
+        row.setPeriodic(Boolean.TRUE.equals(body.getPeriodic()));
         return toOfferedRow(offeredServiceRepository.save(row));
     }
 
@@ -195,6 +196,7 @@ public class OfferedCatalogService {
                 .titleRu(title.get("ru"))
                 .sortOrder(row.getSortOrder())
                 .active(row.getActive())
+                .periodic(Boolean.TRUE.equals(row.getPeriodic()))
                 .build();
     }
 

@@ -22,4 +22,5 @@ public class AdminOfferedServiceSaveRequest {
     String titleRu;
     Integer sortOrder;
     Boolean active;
+    Boolean periodic;
 }

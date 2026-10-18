@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * tr: Bir davranış grubunun altındaki xidmət satırı. Başlıklar az/en/ru JSON.
@@ -55,6 +56,15 @@ public class OfferedService {
     @Column(nullable = false)
     @Builder.Default
     Boolean active = true;
+
+    /**
+     * tr: true ise xidməti tamamla bu paket satırını ayrı karta çıkarır. Mevcut satır false kalır.
+     * en: When true, complete-service extracts this package line into its own card. Existing rows stay false.
+     */
+    @Column(name = "periodic", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    Boolean periodic = false;
 
     /** Paket ekranındaki grup. Fərdi xidmət filteri değil. Mevcut satırda boş kalabilir. */
     @ManyToOne(fetch = FetchType.LAZY)
