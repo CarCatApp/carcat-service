@@ -163,6 +163,7 @@ public class OfferedCatalogService {
         row.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
         row.setActive(body.getActive() == null ? Boolean.TRUE : body.getActive());
         row.setPeriodic(Boolean.TRUE.equals(body.getPeriodic()));
+        row.setMaintenanceCode(maintenanceCode(body.getMaintenanceCode()));
         return toOfferedRow(offeredServiceRepository.save(row));
     }
 
@@ -197,6 +198,7 @@ public class OfferedCatalogService {
                 .sortOrder(row.getSortOrder())
                 .active(row.getActive())
                 .periodic(Boolean.TRUE.equals(row.getPeriodic()))
+                .maintenanceCode(row.getMaintenanceCode())
                 .build();
     }
 
@@ -217,5 +219,13 @@ public class OfferedCatalogService {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private static String maintenanceCode(String raw) {
+        try {
+            return com.carland.carland_service.enums.HyperServiceMapping.normalizeCode(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new MissingFieldException("unknown maintenanceCode: " + raw);
+        }
     }
 }

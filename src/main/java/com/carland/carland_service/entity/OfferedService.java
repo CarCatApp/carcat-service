@@ -66,6 +66,15 @@ public class OfferedService {
     @Builder.Default
     Boolean periodic = false;
 
+    /**
+     * tr: Xatırlatma bağı. {@link com.carland.carland_service.enums.HyperServiceMapping} adı (ENGINE_OIL, AIR_FILTER…).
+     *     Tamamlanan satır bu kodu universalServiceId olarak yazar, percentage Hyper satırı gibi eşleşir.
+     * en: Reminder link. A {@link com.carland.carland_service.enums.HyperServiceMapping} name (ENGINE_OIL, AIR_FILTER…).
+     *     A completed line writes it as universalServiceId so percentages match it like a Hyper line.
+     */
+    @Column(name = "maintenance_code", length = 48)
+    String maintenanceCode;
+
     /** Paket ekranındaki grup. Fərdi xidmət filteri değil. Mevcut satırda boş kalabilir. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "offered_service_filter_id")

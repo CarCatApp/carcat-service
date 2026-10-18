@@ -21,5 +21,6 @@ public class AdminIndividualServiceSaveRequest {
     String titleRu;
     Integer sortOrder;
     Boolean active;
+    String maintenanceCode;
     Long filterId;
 }

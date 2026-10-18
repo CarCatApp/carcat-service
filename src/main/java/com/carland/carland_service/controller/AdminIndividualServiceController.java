@@ -38,6 +38,9 @@ public class AdminIndividualServiceController {
         }
         model.addAttribute("services", individualCatalogService.adminRows());
         model.addAttribute("filters", individualCatalogService.adminFilters());
+        model.addAttribute("maintenanceCodes", java.util.Arrays.stream(com.carland.carland_service.enums.HyperServiceMapping.values())
+                .map(m -> java.util.Map.of("code", m.name(), "nameEn", m.getNameEn()))
+                .toList());
         return "individual-services";
     }
 

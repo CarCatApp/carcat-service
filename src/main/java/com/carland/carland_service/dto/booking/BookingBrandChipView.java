@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class BookingBrandChipView {
     Long id;
     String name;
+    /** AZN, optional. */
+    java.math.BigDecimal price;
 }

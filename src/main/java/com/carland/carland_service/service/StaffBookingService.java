@@ -6,6 +6,8 @@ import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffNotesResponse;
+import com.carland.carland_service.dto.booking.StaffCompletionDraftView;
+import com.carland.carland_service.dto.request.StaffCompleteRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.BookingIndividualLine;
@@ -13,6 +15,7 @@ import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.BookingStaffNote;
+import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
@@ -81,6 +84,7 @@ public class StaffBookingService {
     private final BookingStaffNoteService bookingStaffNoteService;
     private final BrandRepository brandRepository;
     private final BookingPushService bookingPushService;
+    private final BookingCompletionService bookingCompletionService;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -152,14 +156,47 @@ public class StaffBookingService {
     }
 
     /**
-     * tr: Təsdiqlənmiş booku completed edir. Panel forması hələ yazılmır; xidmət sətirləri webhookdan gəlir.
-     * en: Marks a confirmed booking completed. The panel form is not stored yet; service lines arrive from the webhook.
+     * tr: "Xidməti tamamla" pəncərəsinin taslağı. Yalnız təsdiqlənmiş bron üçün.
+     * en: Draft for the "Complete service" dialog. Confirmed bookings only.
+     */
+    @Transactional(readOnly = true)
+    public StaffCompletionDraftView completionDraft(Long userId, boolean mustChangePassword, Long bookingId,
+                                                    String acceptLanguage) {
+        Booking booking = requireConfirmed(userId, mustChangePassword, bookingId, acceptLanguage);
+        return bookingCompletionService.draft(booking, acceptLanguage);
+    }
+
+    /**
+     * tr: Təsdiqlənmiş booku completed edir. detailed şöbədə gövdə gəlibsə forma eyni tranzaksiyada
+     *     rəqəmsal tarixçəyə (visits) yazılır. webhook şöbəsində gövdə nəzərə alınmır — xidmət sətirləri webhookdan gəlir.
+     * en: Marks a confirmed booking completed. On a detailed branch a body is written to the digital history
+     *     (visits) in the same transaction. On a webhook branch the body is ignored — lines arrive from the webhook.
      */
     @Transactional
-    public BookingView complete(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
-                                String acceptLanguage) {
+    public BookingView complete(Long userId, boolean mustChangePassword, Long bookingId, StaffCompleteRequest request,
+                                String timezone, String acceptLanguage) {
+        if (request != null) {
+            Booking booking = requireConfirmed(userId, mustChangePassword, bookingId, acceptLanguage);
+            String mode = BranchCompletion.shown(booking.getBranch().getCompletionMode());
+            if (BranchCompletion.DETAILED.equals(mode)) {
+                bookingCompletionService.write(booking, request, timezone, acceptLanguage);
+            }
+        }
         return decide(userId, mustChangePassword, bookingId, BookingStatus.COMPLETED.apiValue(),
                 null, timezone, acceptLanguage);
+    }
+
+    private Booking requireConfirmed(Long userId, boolean mustChangePassword, Long bookingId, String acceptLanguage) {
+        BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        bookingStaffAccess.requireWritableBranch(staff, booking.getBranch().getId(), acceptLanguage);
+        String current = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
+        if (!BookingStatus.CONFIRMED.apiValue().equals(current)
+                && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(current)) {
+            throw new ConflictException("booking is not confirmed");
+        }
+        return booking;
     }
 
     /**

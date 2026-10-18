@@ -21,4 +21,6 @@ public class VisitPartResponse {
     private String name;
     private BigDecimal qty;
     private String unit;
+    /** Partner panel: product total in AZN; null when included in the package or unknown. */
+    private BigDecimal price;
 }

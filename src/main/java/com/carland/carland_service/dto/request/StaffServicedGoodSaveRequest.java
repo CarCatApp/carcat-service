@@ -11,4 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StaffServicedGoodSaveRequest {
     String name;
+    /** AZN, optional. */
+    java.math.BigDecimal price;
 }

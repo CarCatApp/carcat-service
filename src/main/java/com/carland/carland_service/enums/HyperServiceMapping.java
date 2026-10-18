@@ -99,6 +99,17 @@ public enum HyperServiceMapping {
         return Optional.ofNullable(matched);
     }
 
+    /**
+     * tr: Admin panelden gelen bakım kodunu enum adına çevirir. Boş → null, bilinmeyen → IllegalArgumentException.
+     * en: Normalizes an admin maintenance code to the enum name. Blank → null, unknown → IllegalArgumentException.
+     */
+    public static String normalizeCode(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        return valueOf(code.trim().toUpperCase(java.util.Locale.ROOT)).name();
+    }
+
     private boolean hyperIdMatches(String hyperId) {
         if (nameEn.equalsIgnoreCase(hyperId)) {
             return true;

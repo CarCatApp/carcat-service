@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -24,4 +25,18 @@ public class VisitServiceLineResponse {
     private MoneyResponse cost;
     private LocalDate nextServiceDate;
     private Integer nextServiceMileage;
+
+    /* Partner panel lines only (null for Hyper). cost = service + product before discount. */
+
+    /** package | package_info | individual | one_time | inspection */
+    private String kind;
+    private LocalDate doneDate;
+    private Integer doneKm;
+    private MoneyResponse serviceAmount;
+    private String productName;
+    private BigDecimal productQty;
+    private MoneyResponse productAmount;
+    private BigDecimal discountPercent;
+    private MoneyResponse finalAmount;
+    private String notes;
 }

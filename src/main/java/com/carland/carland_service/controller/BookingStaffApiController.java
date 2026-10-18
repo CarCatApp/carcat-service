@@ -3,6 +3,8 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.booking.BookingInboxResponse;
 import com.carland.carland_service.dto.booking.BookingStaffOrgResponse;
 import com.carland.carland_service.dto.booking.StaffNotesResponse;
+import com.carland.carland_service.dto.booking.StaffCompletionDraftView;
+import com.carland.carland_service.dto.request.StaffCompleteRequest;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.dto.booking.StaffAuditRequest;
@@ -130,17 +132,38 @@ public class BookingStaffApiController {
                 kind, acceptLanguage);
     }
 
+    /**
+     * tr: "Xidməti tamamla" pəncərəsinin taslağı: kartlar, fərdi xidmət siyahısı, məhsullar (AZN).
+     * en: Draft for the "Complete service" dialog: cards, individual-service list, products (AZN).
+     */
+    @GetMapping("/api/v1/booking/staff/bookings/{bookingId}/completion-draft")
+    public StaffCompletionDraftView completionDraft(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return staffBookingService.completionDraft(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, acceptLanguage);
+    }
+
+    /**
+     * tr: Gövdə olmadan yalnız status dəyişir. detailed şöbədə gövdə rəqəmsal tarixçəyə yazılır.
+     * en: Without a body only the status changes. On a detailed branch the body is written to the digital history.
+     */
     @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/complete")
     public BookingView complete(
             HttpServletRequest request,
             @PathVariable Long bookingId,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
-            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone
+            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone,
+            @RequestBody(required = false) StaffCompleteRequest body
     ) {
         return staffBookingService.complete(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
-                bookingId, timezone, acceptLanguage);
+                bookingId, body, timezone, acceptLanguage);
     }
 
     @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/no-show")

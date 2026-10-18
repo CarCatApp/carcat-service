@@ -23,4 +23,5 @@ public class AdminOfferedServiceSaveRequest {
     Integer sortOrder;
     Boolean active;
     Boolean periodic;
+    String maintenanceCode;
 }

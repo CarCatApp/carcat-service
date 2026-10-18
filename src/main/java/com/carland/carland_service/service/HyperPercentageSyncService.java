@@ -187,8 +187,8 @@ public class HyperPercentageSyncService {
         Visit visit = match.visit();
         VisitServiceLine line = match.line();
 
-        LocalDate lastServiceDate = visit.getLastServiceDate();
-        Integer lastServiceKm = visit.getLastServiceMileage();
+        LocalDate lastServiceDate = doneDate(match);
+        Integer lastServiceKm = doneKm(match);
 
         Integer nextServiceKm = resolveNextServiceKm(line.getNextServiceMileage(), lastServiceKm, intervalKm);
 
@@ -237,6 +237,8 @@ public class HyperPercentageSyncService {
         VisitServiceLine line = match.line();
         return visit.getLastServiceDate() != null
                 || visit.getLastServiceMileage() != null
+                || line.getDoneDate() != null
+                || line.getDoneKm() != null
                 || line.getNextServiceDate() != null
                 || line.getNextServiceMileage() != null;
     }
@@ -295,8 +297,8 @@ public class HyperPercentageSyncService {
         Visit visit = match.visit();
         VisitServiceLine line = match.line();
 
-        LocalDate lastServiceDate = visit.getLastServiceDate();
-        Integer lastServiceKm = visit.getLastServiceMileage();
+        LocalDate lastServiceDate = doneDate(match);
+        Integer lastServiceKm = doneKm(match);
 
         if (lastServiceDate != null) {
             percentage.setLastServiceDate(lastServiceDate);
@@ -372,7 +374,22 @@ public class HyperPercentageSyncService {
     }
 
     private String recordIdOf(Visit visit) {
-        return visit.getHyperRecordId() != null ? String.valueOf(visit.getHyperRecordId()) : null;
+        if (visit.getHyperRecordId() != null) {
+            return String.valueOf(visit.getHyperRecordId());
+        }
+        // Panel ziyarəti: Hyper id yoxdur, öz id-si ilə izlənir.
+        return visit.getId() != null ? "visit:" + visit.getId() : null;
+    }
+
+    /** Panel lines carry their own done date/km; Hyper lines fall back to the visit. */
+    private static LocalDate doneDate(HyperServiceMatch match) {
+        LocalDate lineDate = match.line().getDoneDate();
+        return lineDate != null ? lineDate : match.visit().getLastServiceDate();
+    }
+
+    private static Integer doneKm(HyperServiceMatch match) {
+        Integer lineKm = match.line().getDoneKm();
+        return lineKm != null ? lineKm : match.visit().getLastServiceMileage();
     }
 
     private record HyperServiceMatch(Visit visit, VisitServiceLine line) {

@@ -37,8 +37,38 @@ public class Visit {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "hyper_record_id", nullable = false)
+    /** Hyper record id. Null for visits written by the partner panel ({@link #source} = panel). */
+    @Column(name = "hyper_record_id")
     private Long hyperRecordId;
+
+    /**
+     * tr: Kaydın kaynağı. null/hyper = Hyper GET veya webhook, "panel" = partner panelində "Xidməti tamamla".
+     * en: Where the row came from. null/hyper = Hyper GET or webhook, "panel" = partner panel "Complete service".
+     */
+    @Column(name = "source", length = 16)
+    private String source;
+
+    /** Panel visits: the completed booking. */
+    @Column(name = "booking_id")
+    private Long bookingId;
+
+    @Column(name = "branch_id")
+    private Long branchId;
+
+    /** Panel visits: package snapshot (name + price in AZN) at completion time. */
+    @Column(name = "package_name", length = 80)
+    private String packageName;
+
+    @Column(name = "package_price", precision = 12, scale = 2)
+    private BigDecimal packagePrice;
+
+    /** Panel visits: overall discount % applied after line discounts. */
+    @Column(name = "discount_percent", precision = 5, scale = 2)
+    private BigDecimal discountPercent;
+
+    /** Panel visits: customer's repair / inspection text from the booking. */
+    @Column(name = "inspection_note", length = 1000)
+    private String inspectionNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "car_id", nullable = false)

@@ -59,7 +59,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th>Kod</th><th>AZ</th><th>EN</th><th>RU</th><th>Filter</th><th>Sıra</th><th>Active</th><th></th></tr>
+      <tr><th>Kod</th><th>AZ</th><th>EN</th><th>RU</th><th>Filter</th><th>Sıra</th><th>Xatırlatma</th><th>Active</th><th></th></tr>
       </thead>
       <tbody>
       <tr th:each="row : ${services}">
@@ -69,6 +69,7 @@
         <td th:text="${row.titleRu}">RU</td>
         <td th:text="${row.filterName}">Filters</td>
         <td th:text="${row.sortOrder}">1</td>
+        <td th:text="${row.maintenanceCode} ?: '—'">—</td>
         <td th:text="${row.active} ? 'yes' : 'no'">yes</td>
         <td>
           <button type="button" class="btn btn-ghost js-edit"
@@ -79,6 +80,7 @@
                   th:data-title-ru="${row.titleRu}"
                   th:data-sort-order="${row.sortOrder}"
                   th:data-filter-id="${row.filterId}"
+                  th:data-maintenance-code="${row.maintenanceCode}"
                   th:data-active="${row.active}">Düzəlt</button>
         </td>
       </tr>
@@ -103,6 +105,13 @@
       <div class="field"><label for="fTitleAz">Title AZ</label><input id="fTitleAz" required></div>
       <div class="field"><label for="fTitleEn">Title EN</label><input id="fTitleEn"></div>
       <div class="field full"><label for="fTitleRu">Title RU</label><input id="fTitleRu"></div>
+      <div class="field full">
+        <label for="fMaintenance">Xatırlatma kodu (percentage)</label>
+        <select id="fMaintenance">
+          <option value="">— yoxdur —</option>
+          <option th:each="m : ${maintenanceCodes}" th:value="${m.code}" th:text="${m.nameEn + ' (' + m.code + ')'}"></option>
+        </select>
+      </div>
       <div class="checks full"><label><input id="fActive" type="checkbox" checked> kataloqda aktiv</label></div>
     </div>
     <div style="display:flex; gap:8px; margin-top:16px;">
@@ -127,6 +136,7 @@
     document.getElementById("fTitleRu").value = data.titleRu || "";
     document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
     document.getElementById("fFilter").value = data.filterId || "";
+    document.getElementById("fMaintenance").value = data.maintenanceCode || "";
     document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
     document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
     editor.hidden = false;
@@ -147,6 +157,7 @@
       titleRu: document.getElementById("fTitleRu").value.trim(),
       sortOrder: Number(document.getElementById("fSort").value || 0),
       filterId: Number(document.getElementById("fFilter").value),
+      maintenanceCode: document.getElementById("fMaintenance").value || null,
       active: document.getElementById("fActive").checked
     };
     const res = await fetch("/admin/individual-services/save", {

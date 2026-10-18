@@ -278,6 +278,12 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                 .amount(toMoney(visit.getFinalCostAmount(), visit.getFinalCostCurrency()))
                 .invoiceNumber(visit.getInvoiceNumber())
                 .parts(mapParts(visit.getParts()))
+                .source(visit.getSource())
+                .packageName(visit.getPackageName())
+                .packagePrice(visit.getPackagePrice() == null ? null : toMoney(visit.getPackagePrice(), visit.getCostCurrency()))
+                .discountPercent(visit.getDiscountPercent())
+                .discount(discountOf(visit))
+                .inspectionNote(visit.getInspectionNote())
                 .build();
     }
 
@@ -302,6 +308,16 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                             .cost(toMoney(line.getCostAmount(), line.getCostCurrency()))
                             .nextServiceDate(line.getNextServiceDate())
                             .nextServiceMileage(line.getNextServiceMileage())
+                            .kind(line.getKind())
+                            .doneDate(line.getDoneDate())
+                            .doneKm(line.getDoneKm())
+                            .serviceAmount(line.getServiceAmount() == null ? null : toMoney(line.getServiceAmount(), line.getCostCurrency()))
+                            .productName(line.getProductName())
+                            .productQty(line.getProductQty())
+                            .productAmount(line.getProductAmount() == null ? null : toMoney(line.getProductAmount(), line.getCostCurrency()))
+                            .discountPercent(line.getDiscountPercent())
+                            .finalAmount(line.getFinalAmount() == null ? null : toMoney(line.getFinalAmount(), line.getCostCurrency()))
+                            .notes(line.getNotes())
                             .build();
                 })
                 .toList();
@@ -320,8 +336,20 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                         .name(part.getName())
                         .qty(part.getQty())
                         .unit(part.getUnit())
+                        .price(part.getPrice())
                         .build())
                 .toList();
+    }
+
+    /**
+     * tr: Panel ziyarəti üçün ümumi endirim (cost − amount). Hyper ziyarətində null.
+     * en: Total discount (cost − amount) for panel visits. Null for Hyper visits.
+     */
+    private MoneyResponse discountOf(Visit visit) {
+        if (visit.getSource() == null || visit.getCostAmount() == null || visit.getFinalCostAmount() == null) {
+            return null;
+        }
+        return toMoney(visit.getCostAmount().subtract(visit.getFinalCostAmount()), visit.getCostCurrency());
     }
 
     /**
@@ -404,9 +432,16 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         Long partnerId = HYPER_PARTNER.getId();
         String partnerName = hyperPartner != null ? hyperPartner.getName() : HYPER_PARTNER.getDefaultName();
 
-        Map<Long, Visit> existingByRecordId = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
+        List<Visit> existingVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        Map<Long, Visit> existingByRecordId = existingVisits.stream()
                 .filter(visit -> visit.getHyperRecordId() != null)
                 .collect(Collectors.toMap(Visit::getHyperRecordId, visit -> visit, (a, b) -> a));
+        // Panel ziyarətləri Hyper cavabında yoxdur; allTimeCost onları itirməsin.
+        for (Visit visit : existingVisits) {
+            if (visit.getHyperRecordId() == null && visit.getFinalCostAmount() != null) {
+                allTimeCost = allTimeCost.add(visit.getFinalCostAmount());
+            }
+        }
 
         List<Visit> toSave = new ArrayList<>();
 

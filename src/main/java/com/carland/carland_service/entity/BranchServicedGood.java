@@ -60,4 +60,11 @@ public class BranchServicedGood {
 
     @Column(nullable = false, length = 80)
     String name;
+
+    /**
+     * tr: Vahid qiyməti, AZN. Xidməti tamamla zamanı miqdarla vurulur. Boş ola bilər.
+     * en: Unit price in AZN. Multiplied by quantity on service completion. Optional.
+     */
+    @Column(precision = 10, scale = 2)
+    java.math.BigDecimal price;
 }

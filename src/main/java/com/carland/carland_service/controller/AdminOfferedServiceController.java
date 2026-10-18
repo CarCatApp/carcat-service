@@ -51,6 +51,9 @@ public class AdminOfferedServiceController {
         model.addAttribute("services", offeredCatalogService.offeredRows());
         model.addAttribute("behaviors", offeredCatalogService.behaviorRows());
         model.addAttribute("filters", offeredCatalogService.adminFilters());
+        model.addAttribute("maintenanceCodes", java.util.Arrays.stream(com.carland.carland_service.enums.HyperServiceMapping.values())
+                .map(m -> java.util.Map.of("code", m.name(), "nameEn", m.getNameEn()))
+                .toList());
         return "offered-services";
     }
 

@@ -56,4 +56,55 @@ public class VisitServiceLine {
     private LocalDate nextServiceDate;
 
     private Integer nextServiceMileage;
+
+    /*
+     * tr: Aşağıdakiler yalnız panel ("Xidməti tamamla") satırlarında dolar. costAmount = xidmət + məhsul (endirimsiz).
+     * en: Fields below are filled only for panel ("Complete service") lines. costAmount = service + product (pre-discount).
+     */
+
+    /** package | individual | one_time | package_info — see {@code VisitLineKind}. */
+    @Column(name = "kind", length = 16)
+    private String kind;
+
+    @Column(name = "offered_service_id")
+    private Long offeredServiceId;
+
+    @Column(name = "individual_service_id")
+    private Long individualServiceId;
+
+    /** Date this line was done. Falls back to the visit date when null. */
+    @Column(name = "done_date")
+    private LocalDate doneDate;
+
+    /** Mileage when this line was done. Falls back to the visit mileage when null. */
+    @Column(name = "done_km")
+    private Integer doneKm;
+
+    /** Service (labour) price, AZN, pre-discount. */
+    @Column(name = "service_amount", precision = 12, scale = 2)
+    private BigDecimal serviceAmount;
+
+    @Column(name = "discount_percent", precision = 5, scale = 2)
+    private BigDecimal discountPercent;
+
+    /** After the line discount, AZN. */
+    @Column(name = "final_amount", precision = 12, scale = 2)
+    private BigDecimal finalAmount;
+
+    @Column(name = "product_good_id")
+    private Long productGoodId;
+
+    /** "Heading · Brand", e.g. "Mühərrik yağı · Castrol EDGE". */
+    @Column(name = "product_name", length = 200)
+    private String productName;
+
+    @Column(name = "product_qty", precision = 10, scale = 2)
+    private BigDecimal productQty;
+
+    /** Product total (unit price × qty), AZN. Null when included in the package. */
+    @Column(name = "product_amount", precision = 12, scale = 2)
+    private BigDecimal productAmount;
+
+    @Column(name = "notes", length = 1000)
+    private String notes;
 }

@@ -54,6 +54,13 @@ public class IndividualService {
     @Builder.Default
     Boolean active = true;
 
+    /**
+     * tr: Xatırlatma bağı. {@link com.carland.carland_service.enums.HyperServiceMapping} adı (ENGINE_OIL…). Boş ola bilər.
+     * en: Reminder link. A {@link com.carland.carland_service.enums.HyperServiceMapping} name (ENGINE_OIL…). Optional.
+     */
+    @Column(name = "maintenance_code", length = 48)
+    String maintenanceCode;
+
     /** Filters, Brakes, Fluids, … All bu kolonda durmaz. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "individual_service_filter_id")

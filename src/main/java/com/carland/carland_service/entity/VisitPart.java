@@ -36,4 +36,8 @@ public class VisitPart {
     private BigDecimal qty;
 
     private String unit;
+
+    /** Panel visits: product total in AZN (unit price × qty). Null when included in the package or unknown. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal price;
 }

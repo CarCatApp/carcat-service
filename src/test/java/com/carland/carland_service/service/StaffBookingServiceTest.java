@@ -60,6 +60,7 @@ class StaffBookingServiceTest {
     @Mock BookingStaffNoteService bookingStaffNoteService;
     @Mock BrandRepository brandRepository;
     @Mock BookingPushService bookingPushService;
+    @Mock BookingCompletionService bookingCompletionService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -71,7 +72,8 @@ class StaffBookingServiceTest {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
-                customerRepository, carRepository, bookingStaffNoteService, brandRepository, bookingPushService);
+                customerRepository, carRepository, bookingStaffNoteService, brandRepository, bookingPushService,
+                bookingCompletionService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -254,7 +256,7 @@ class StaffBookingServiceTest {
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
         when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
 
-        BookingView out = service.complete(9L, false, 1L, "Asia/Baku", "az");
+        BookingView out = service.complete(9L, false, 1L, null, "Asia/Baku", "az");
 
         assertEquals("completed", out.getStatus());
         verify(bookingPushService).completed(booking);

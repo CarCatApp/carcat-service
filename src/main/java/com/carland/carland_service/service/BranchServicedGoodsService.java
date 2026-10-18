@@ -55,6 +55,7 @@ public class BranchServicedGoodsService {
                 .branch(branch)
                 .brandModelService(heading)
                 .name(name)
+                .price(price(body))
                 .build());
         return bookingBranchBrandsService.groups(branch.getId(), acceptLanguage, true);
     }
@@ -68,6 +69,7 @@ public class BranchServicedGoodsService {
         String name = requireName(body);
         rejectDuplicate(branch.getId(), headingId, name, good.getId());
         good.setName(name);
+        good.setPrice(price(body));
         servicedGoodRepository.save(good);
         return bookingBranchBrandsService.groups(branch.getId(), acceptLanguage, true);
     }
@@ -111,6 +113,17 @@ public class BranchServicedGoodsService {
     private BrandModelService heading(Long headingId) {
         return brandModelServiceRepository.findById(headingId)
                 .orElseThrow(() -> new ResourceNotFoundException("heading not found"));
+    }
+
+    /** Null → qiymət yoxdur. Mənfi qəbul edilmir. */
+    private java.math.BigDecimal price(StaffServicedGoodSaveRequest body) {
+        if (body == null || body.getPrice() == null) {
+            return null;
+        }
+        if (body.getPrice().signum() < 0) {
+            throw new MissingFieldException("price must be >= 0");
+        }
+        return body.getPrice().setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private String requireName(StaffServicedGoodSaveRequest body) {

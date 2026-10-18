@@ -148,6 +148,7 @@ public class IndividualCatalogService {
         row.setTitleJson(json.write(body.getTitleAz().trim(), trim(body.getTitleEn()), trim(body.getTitleRu())));
         row.setSortOrder(body.getSortOrder() == null ? 0 : body.getSortOrder());
         row.setActive(body.getActive() == null || body.getActive());
+        row.setMaintenanceCode(maintenanceCode(body.getMaintenanceCode()));
         if (body.getFilterId() == null) {
             throw MissingFieldException.required("filterId");
         }
@@ -198,6 +199,7 @@ public class IndividualCatalogService {
                 .titleRu(title.getOrDefault("ru", ""))
                 .sortOrder(catalog.getSortOrder())
                 .active(catalog.getActive())
+                .maintenanceCode(catalog.getMaintenanceCode())
                 .filterId(catalog.getFilter() == null ? null : catalog.getFilter().getId())
                 .filterName(catalog.getFilter() == null ? null : catalog.getFilter().getNameEn())
                 .build();
@@ -243,5 +245,13 @@ public class IndividualCatalogService {
 
     private static String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String maintenanceCode(String raw) {
+        try {
+            return com.carland.carland_service.enums.HyperServiceMapping.normalizeCode(raw);
+        } catch (IllegalArgumentException ex) {
+            throw new MissingFieldException("unknown maintenanceCode: " + raw);
+        }
     }
 }

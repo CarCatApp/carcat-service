@@ -56,7 +56,11 @@ public class BookingBranchBrandsService {
             }
             brandsByHeading
                     .computeIfAbsent(good.getBrandModelService().getId(), id -> new ArrayList<>())
-                    .add(BookingBrandChipView.builder().id(good.getId()).name(good.getName()).build());
+                    .add(BookingBrandChipView.builder()
+                            .id(good.getId())
+                            .name(good.getName())
+                            .price(includeEmpty ? good.getPrice() : null)
+                            .build());
         }
         String lang = BookingMineService.langOf(acceptLanguage);
         List<BookingBrandModelGroupView> groups = new ArrayList<>();

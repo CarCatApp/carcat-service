@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -35,4 +36,21 @@ public class VisitHistoryItemResponse {
     private MoneyResponse cost;
     private String invoiceNumber;
     private List<VisitPartResponse> parts;
+
+    /*
+     * Partner panel ("Xidməti tamamla") visits only. Mobile "Service summary":
+     * Package = packageName/packagePrice, Individual services = services[kind in (package, individual, one_time)],
+     * Products = parts, Inspection & repair = inspectionNote + services[kind = inspection],
+     * Subtotal = cost, Discount = discount, Total = amount.
+     */
+
+    /** "panel" for partner-panel visits; null for Hyper. */
+    private String source;
+    private String packageName;
+    private MoneyResponse packagePrice;
+    /** Overall % applied after line discounts. */
+    private BigDecimal discountPercent;
+    /** cost − amount (all discounts together). */
+    private MoneyResponse discount;
+    private String inspectionNote;
 }
