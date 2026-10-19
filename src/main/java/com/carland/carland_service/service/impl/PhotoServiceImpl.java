@@ -849,21 +849,24 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: Offered service ikonunu döner. Servis veya foto yoksa 404. Redis key photo:offered-service:{id}.
-     * en: Returns the offered-service icon. 404 when the service or the photo is missing.
-     *     Redis key photo:offered-service:{id}.
+     * tr: Offered service ikonunu döner. Redis HIT ise offered_services count yok.
+     *     Miss'te servis veya foto yoksa 404. Key photo:offered-service:{id}.
+     *     Yükleme commit sonrası key'i siler; silinmiş servis en fazla TTL kadar eski ikonu dönebilir.
+     * en: Returns the offered-service icon. A Redis HIT skips the offered_services count.
+     *     On a miss, 404 when the service or the photo is missing. Key photo:offered-service:{id}.
+     *     Upload deletes the key after commit; a removed service can still serve the icon until TTL.
      */
     @Override
     public ResponseEntity<byte[]> getOfferedServicePhoto(Long offeredServiceId) {
         if (offeredServiceId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
-        if (!offeredServiceRepository.existsById(offeredServiceId)) {
-            throw new ResourceNotFoundException("service not found");
-        }
         ResponseEntity<byte[]> cached = redisCacheService.getOfferedServicePhoto(offeredServiceId);
         if (cached != null && cached.getBody() != null && cached.getBody().length > 0) {
             return cached;
+        }
+        if (!offeredServiceRepository.existsById(offeredServiceId)) {
+            throw new ResourceNotFoundException("service not found");
         }
         OfferedServicePhoto photo = offeredServicePhotoRepository.findByOfferedServiceId(offeredServiceId);
         if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {

@@ -18,6 +18,7 @@ import com.carland.carland_service.entity.BookingStaffNote;
 import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
@@ -32,6 +33,7 @@ import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +83,7 @@ public class StaffBookingService {
     private final BookingCapacityService bookingCapacityService;
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
+    private final ColorRepository colorRepository;
     private final BookingStaffNoteService bookingStaffNoteService;
     private final BrandRepository brandRepository;
     private final BookingPushService bookingPushService;
@@ -407,7 +410,7 @@ public class StaffBookingService {
                 .plateNumber(car == null ? null : car.getPlateNumber())
                 .carBrand(car == null ? null : car.getBrand())
                 .carModel(car == null ? null : car.getModel())
-                .car(carPanel(car, brandIds))
+                .car(carPanel(car, brandIds, lang))
                 .cancelReasonCode(booking.getCancelReasonCode())
                 .cancelNote(BookingSystemNotes.resolve(booking.getCancelReasonCode(), booking.getCancelNote(), lang))
                 .serviceKeys(keys)
@@ -428,7 +431,7 @@ public class StaffBookingService {
                 .build();
     }
 
-    private CarResponseForSlotPanel carPanel(Car car, Map<String, Long> brandIds) {
+    private CarResponseForSlotPanel carPanel(Car car, Map<String, Long> brandIds, String lang) {
         if (car == null) {
             return null;
         }
@@ -444,7 +447,23 @@ public class StaffBookingService {
                 .modelYear(car.getModelYear())
                 .engineVolume(car.getEngineVolume())
                 .mileage(car.getMileage())
+                .color(colorName(car, lang))
                 .build();
+    }
+
+    private String colorName(Car car, String lang) {
+        if (car.getColorId() == null) {
+            return null;
+        }
+        Color color = colorRepository.findByColorId(car.getColorId());
+        if (color == null) {
+            return null;
+        }
+        String name = color.nameForLang(lang);
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        return name;
     }
 
     private Long brandId(String brandName, Map<String, Long> brandIds) {

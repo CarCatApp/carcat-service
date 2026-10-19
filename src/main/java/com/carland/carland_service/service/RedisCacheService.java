@@ -154,9 +154,11 @@ public class RedisCacheService {
     }
 
     /**
-     * tr: Offered service ikonu. Key photo:offered-service:{offeredServiceId}, TTL photo ile aynı (1 saat).
+     * tr: Offered service ikonu. Key photo:offered-service:{offeredServiceId}, TTL 1 saat.
+     *     GET önce bu key'e bakar; HIT'te offered_services count çalışmaz.
      *     Yazan: PhotoServiceImpl.uploadOfferedServicePhoto → evict after commit. Put yalnız GET miss sonrası.
-     * en: Offered-service icon. Key photo:offered-service:{offeredServiceId}, same photo TTL (1 hour).
+     * en: Offered-service icon. Key photo:offered-service:{offeredServiceId}, TTL 1 hour.
+     *     GET reads this key first; a HIT skips the offered_services count.
      *     Writer: PhotoServiceImpl.uploadOfferedServicePhoto evicts after commit. Put only after a GET miss.
      */
     public ResponseEntity<byte[]> getOfferedServicePhoto(Long offeredServiceId) {

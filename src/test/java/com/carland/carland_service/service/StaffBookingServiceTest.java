@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.booking.BookingView;
 import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
@@ -20,6 +21,7 @@ import com.carland.carland_service.repository.BookingItemRepository;
 import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +59,7 @@ class StaffBookingServiceTest {
     @Mock BookingCapacityService bookingCapacityService;
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
+    @Mock ColorRepository colorRepository;
     @Mock BookingStaffNoteService bookingStaffNoteService;
     @Mock BrandRepository brandRepository;
     @Mock BookingPushService bookingPushService;
@@ -72,7 +75,7 @@ class StaffBookingServiceTest {
         service = new StaffBookingService(
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
-                customerRepository, carRepository, bookingStaffNoteService, brandRepository, bookingPushService,
+                customerRepository, carRepository, colorRepository, bookingStaffNoteService, brandRepository, bookingPushService,
                 bookingCompletionService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
@@ -152,6 +155,35 @@ class StaffBookingServiceTest {
         assertEquals(2023, out.getItems().get(0).getCar().getModelYear());
         assertEquals(4500, out.getItems().get(0).getCar().getEngineVolume());
         assertEquals(230300L, out.getItems().get(0).getCar().getMileage());
+        assertNull(out.getItems().get(0).getCar().getColor());
+    }
+
+    @Test
+    void inboxCarIncludesLocalizedColor() {
+        booking.setCarId(15L);
+        Car car = Car.builder()
+                .carId(15L)
+                .brand("Mercedes")
+                .model("G 65 AMG")
+                .colorId(3L)
+                .build();
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(eq(7L), eq("pending"), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+        when(carRepository.findByCarId(15L)).thenReturn(car);
+        when(brandRepository.findAllByBrandNameIgnoreCase("Mercedes")).thenReturn(List.of());
+        when(colorRepository.findByColorId(3L)).thenReturn(Color.builder()
+                .colorId(3L)
+                .color("Green")
+                .az("Yaşıl")
+                .ru("Зелёный")
+                .build());
+
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+
+        assertEquals("Yaşıl", out.getItems().get(0).getCar().getColor());
     }
 
     @Test

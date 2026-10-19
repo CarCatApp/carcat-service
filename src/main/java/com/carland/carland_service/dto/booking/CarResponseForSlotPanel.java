@@ -6,8 +6,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: Slot panelindeki araç kutusu. Değerler cars satırının kendisi; çeviri ve uydurma yok.
- * en: Vehicle box on the slot panel. Values are the cars row as stored; no translation and no invented specs.
+ * tr: Slot panelindeki araç kutusu. Değerler cars satırının kendisi.
+ *     Rəng, colors cədvəlindən Accept-Language adına görə gəlir.
+ * en: Vehicle box on the slot panel. Values are the cars row as stored.
+ *     Color is the colors-table name for Accept-Language.
  */
 @Data
 @Builder
@@ -25,4 +27,5 @@ public class CarResponseForSlotPanel {
     Integer modelYear;
     Integer engineVolume;
     Long mileage;
+    String color;
 }
