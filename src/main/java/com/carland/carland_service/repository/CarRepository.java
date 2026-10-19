@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -54,4 +55,11 @@ public interface CarRepository extends JpaRepository<Car, Long>, JpaSpecificatio
     /** tr: Kayıtlı araçlarda geçen benzersiz marka adları. / en: Distinct brand names present on stored cars. */
     @Query("SELECT DISTINCT c.brand FROM Car c WHERE c.brand IS NOT NULL AND c.brand <> '' ORDER BY c.brand")
     List<String> findDistinctBrands();
+
+    /**
+     * tr: Bu rengi kullanan araç sahiplerinin user id'leri. Ad değişince onların carlist anahtarı düşer.
+     * en: User ids of owners whose cars use this color. A renamed color drops those carlist keys.
+     */
+    @Query("SELECT DISTINCT c.customer.userId FROM Car c WHERE c.colorId = :colorId AND c.customer.userId IS NOT NULL")
+    List<Long> findOwnerUserIdsByColorId(@Param("colorId") Long colorId);
 }

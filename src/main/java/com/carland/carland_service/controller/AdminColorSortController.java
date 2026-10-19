@@ -1,5 +1,7 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.request.AdminColorNameRow;
+import com.carland.carland_service.dto.request.AdminColorNameSaveRequest;
 import com.carland.carland_service.dto.request.AdminColorSortMoveRequest;
 import com.carland.carland_service.dto.response.AdminColorSortRow;
 import com.carland.carland_service.security.AdminAccessService;
@@ -59,5 +61,21 @@ public class AdminColorSortController {
             body = new AdminColorSortMoveRequest();
         }
         return ResponseEntity.ok(colorSortService.move(body.getLang(), body.getColorId(), body.getPosition()));
+    }
+
+    /**
+     * tr: Değişen adları ve yeni renk satırlarını yazar. Hex ve sıra bu istekte değişmez.
+     * en: Writes changed names and new color rows. Hex and order do not change on this request.
+     */
+    @PostMapping(value = "/admin/color-sort/names", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Void> saveNames(@RequestBody AdminColorNameSaveRequest body,
+                                          HttpServletRequest request) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<AdminColorNameRow> rows = body == null || body.getRows() == null ? List.of() : body.getRows();
+        colorSortService.saveNames(rows);
+        return ResponseEntity.ok().build();
     }
 }

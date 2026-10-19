@@ -16,6 +16,12 @@ import lombok.NoArgsConstructor;
 public class AdminColorSortRow {
     Long colorId;
     String name;
+    /** tr: Kayıtlı AZ adı. Boşsa input boş kalır; ekran adı yedek dilden gelebilir. / en: Stored AZ name. */
+    String nameAz;
+    /** tr: Kayıtlı EN adı (`colors.color`). / en: Stored EN name (`colors.color`). */
+    String nameEn;
+    /** tr: Kayıtlı RU adı. / en: Stored RU name. */
+    String nameRu;
     String hex;
     Integer sortOrder;
     String swatch;

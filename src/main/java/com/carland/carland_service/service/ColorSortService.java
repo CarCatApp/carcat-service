@@ -1,30 +1,38 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.request.AdminColorNameRow;
 import com.carland.carland_service.dto.response.AdminColorSortRow;
 import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * tr: Renk sırası. Üç dilin numarası ayrıdır. GET /get/color/list istenen dilin numarasını döner.
  *     catalog:colors:{lang} okuyan RedisCacheService.getOrLoadColors.
- *     Yazan: rows (boş numara) ve move → evictCatalogColorsAfterCommit (catalog:colors:*).
+ *     Yazan: rows (boş numara), move ve saveNames → evictCatalogColorsAfterCommit (catalog:colors:*).
+ *     saveNames ad değiştirince o rengi kullanan sahiplerin carlist:{userId}:* anahtarını da düşer.
  * en: Color order. Each language has its own numbers. GET /get/color/list returns that language.
- *     Reader: RedisCacheService.getOrLoadColors. Writers: rows and move evict catalog:colors:* after commit.
+ *     Reader: RedisCacheService.getOrLoadColors. Writers: rows, move, and saveNames evict catalog:colors:*.
+ *     saveNames also drops carlist:{userId}:* for owners whose cars use a renamed color.
  */
 @Service
 @RequiredArgsConstructor
 public class ColorSortService {
 
     private final ColorRepository colorRepository;
+    private final CarRepository carRepository;
     private final RedisCacheService redisCacheService;
 
     @Transactional(readOnly = true)
@@ -102,6 +110,121 @@ public class ColorSortService {
         return toRows(ordered, key);
     }
 
+    /**
+     * tr: Değişen adları ve yeni satırları yazar. Hex ve sıra ad kaydında değişmez.
+     *     Yeni rengin hex'i boştur, numarası bir sonrakidir, üç dilde listenin sonuna eklenir.
+     *     Ad değişen rengin sahibi carlist'i ve catalog:colors:* commit sonrası silinir.
+     * en: Writes changed names and new rows. A name save does not change hex or order.
+     *     A new color has an empty hex, the next id, and is appended in all three languages.
+     *     A renamed color drops its owners' carlist and catalog:colors:* after commit.
+     */
+    @Transactional
+    public void saveNames(List<AdminColorNameRow> rows) {
+        List<AdminColorNameRow> requested = normalize(rows);
+        if (requested.isEmpty()) {
+            return;
+        }
+        List<Color> colors = new ArrayList<>(colorRepository.findAll());
+        boolean filled = assignMissing(colors);
+        Map<Long, Color> byId = new LinkedHashMap<>();
+        long nextId = 0L;
+        int nextAz = 0;
+        int nextEn = 0;
+        int nextRu = 0;
+        for (Color color : colors) {
+            if (color.getColorId() != null) {
+                byId.put(color.getColorId(), color);
+                nextId = Math.max(nextId, color.getColorId());
+            }
+            nextAz = Math.max(nextAz, color.getSortOrderAz() == null ? 0 : color.getSortOrderAz());
+            nextEn = Math.max(nextEn, color.getSortOrderEn() == null ? 0 : color.getSortOrderEn());
+            nextRu = Math.max(nextRu, color.getSortOrderRu() == null ? 0 : color.getSortOrderRu());
+        }
+        List<Long> renamed = new ArrayList<>();
+        boolean wroteName = false;
+        for (AdminColorNameRow row : requested) {
+            if (row.getColorId() == null) {
+                nextId++;
+                nextAz++;
+                nextEn++;
+                nextRu++;
+                colors.add(Color.builder()
+                        .colorId(nextId)
+                        .az(row.getAz())
+                        .color(row.getEn())
+                        .ru(row.getRu())
+                        .hex(null)
+                        .sortOrderAz(nextAz)
+                        .sortOrderEn(nextEn)
+                        .sortOrderRu(nextRu)
+                        .build());
+                wroteName = true;
+                continue;
+            }
+            Color color = byId.get(row.getColorId());
+            if (color == null) {
+                throw new ResourceNotFoundException("color not found");
+            }
+            if (same(color.getAz(), row.getAz()) && same(color.getColor(), row.getEn()) && same(color.getRu(), row.getRu())) {
+                continue;
+            }
+            color.setAz(row.getAz());
+            color.setColor(row.getEn());
+            color.setRu(row.getRu());
+            renamed.add(color.getColorId());
+            wroteName = true;
+        }
+        if (!filled && !wroteName) {
+            return;
+        }
+        colorRepository.saveAll(colors);
+        redisCacheService.evictCatalogColorsAfterCommit();
+        for (Long colorId : renamed) {
+            for (Long userId : carRepository.findOwnerUserIdsByColorId(colorId)) {
+                if (userId != null) {
+                    redisCacheService.evictCarListAfterCommit(String.valueOf(userId));
+                }
+            }
+        }
+    }
+
+    private static List<AdminColorNameRow> normalize(List<AdminColorNameRow> rows) {
+        List<AdminColorNameRow> requested = new ArrayList<>();
+        if (rows == null) {
+            return requested;
+        }
+        for (AdminColorNameRow row : rows) {
+            if (row == null) {
+                continue;
+            }
+            String az = blankToNull(row.getAz());
+            String en = blankToNull(row.getEn());
+            String ru = blankToNull(row.getRu());
+            if (az == null && en == null && ru == null) {
+                throw MissingFieldException.required("name");
+            }
+            requested.add(AdminColorNameRow.builder()
+                    .colorId(row.getColorId())
+                    .az(az)
+                    .en(en)
+                    .ru(ru)
+                    .build());
+        }
+        return requested;
+    }
+
+    private static boolean same(String stored, String incoming) {
+        return Objects.equals(blankToNull(stored), incoming);
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private boolean assignMissing(List<Color> colors) {
         boolean changed = false;
         for (String lang : List.of("az", "en", "ru")) {
@@ -146,6 +269,9 @@ public class ColorSortService {
             rows.add(AdminColorSortRow.builder()
                     .colorId(color.getColorId())
                     .name(name == null ? "" : name)
+                    .nameAz(color.getAz() == null ? "" : color.getAz())
+                    .nameEn(color.getColor() == null ? "" : color.getColor())
+                    .nameRu(color.getRu() == null ? "" : color.getRu())
                     .hex(color.getHex() == null ? "" : color.getHex())
                     .sortOrder(stored != null ? stored : i + 1)
                     .swatch(ColorCatalogOrder.swatch(color.getHex()))

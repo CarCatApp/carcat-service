@@ -16,7 +16,23 @@
     .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .editor-grid .full { grid-column: 1 / -1; }
     .checks { display: flex; gap: 16px; align-items: center; }
-    .checks label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+    .checks label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text); }
+    tr.js-row { cursor: pointer; }
+    tr.is-dirty td:first-child { box-shadow: inset 3px 0 0 var(--text); }
+    .data-table tbody tr.edit-row td {
+      height: auto; white-space: normal; overflow: visible;
+      background: var(--card); color: var(--text); font-weight: 400;
+    }
+    .data-table tbody tr.edit-row:hover td { background: var(--card); }
+    .inline-editor { padding: 4px 0 8px; }
+    .inline-editor input, .inline-editor select {
+      width: 100%; color: var(--text); background: #fff;
+    }
+    .save-bar {
+      position: sticky; bottom: 0; margin-top: 16px; padding: 12px 0;
+      background: var(--bg);
+    }
+    .save-bar button:disabled { opacity: 0.45; cursor: default; }
   </style>
 </head>
 <body>
@@ -51,7 +67,7 @@
   <div class="page-head">
     <div>
       <h1>Paket içi xidmətlər</h1>
-      <p class="muted">Behavior və filter səhifə açılınca yüklənir. Icon ayrıca yüklənir.</p>
+      <p class="muted">Sətrə klikləyin. Form sətrin altında açılır, bir neçəsi eyni anda açıq qala bilər. Saxla yalnız dəyişən sətirləri yazır.</p>
     </div>
     <button class="btn btn-primary" type="button" id="newBtn">Yeni xidmət</button>
   </div>
@@ -59,10 +75,11 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-      <tr><th></th><th>Qrup</th><th>Filter</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Xatırlatma</th><th>Periodic</th><th>Active</th><th></th></tr>
+      <tr><th></th><th>Qrup</th><th>Filter</th><th>AZ</th><th>EN</th><th>RU</th><th>Sıra</th><th>Xatırlatma</th><th>Periodic</th><th>Active</th></tr>
       </thead>
-      <tbody>
-      <tr th:each="row : ${services}">
+      <tbody id="serviceRows">
+      <tr class="js-row" th:each="row : ${services}"
+          th:attr="data-id=${row.id},data-behavior-id=${row.behaviorId},data-filter-id=${row.filterId},data-title-az=${row.titleAz},data-title-en=${row.titleEn},data-title-ru=${row.titleRu},data-sort-order=${row.sortOrder},data-periodic=${row.periodic},data-maintenance-code=${row.maintenanceCode},data-active=${row.active}">
         <td><img th:src="@{/admin/offered-services/photo(offeredServiceId=${row.id})}" alt="" width="28" height="28" style="object-fit:contain" onerror="this.style.visibility='hidden'"></td>
         <td th:text="${row.behaviorTitleAz}">qrup</td>
         <td th:text="${row.filterName}">filter</td>
@@ -73,24 +90,55 @@
         <td th:text="${row.maintenanceCode} ?: '—'">—</td>
         <td th:text="${row.periodic} ? 'yes' : 'no'">no</td>
         <td th:text="${row.active} ? 'yes' : 'no'">yes</td>
-        <td>
-          <button type="button" class="btn btn-ghost js-edit"
-                  th:data-id="${row.id}"
-                  th:data-behavior-id="${row.behaviorId}"
-                  th:data-filter-id="${row.filterId}"
-                  th:data-title-az="${row.titleAz}"
-                  th:data-title-en="${row.titleEn}"
-                  th:data-title-ru="${row.titleRu}"
-                  th:data-sort-order="${row.sortOrder}"
-                  th:data-periodic="${row.periodic}"
-                  th:data-maintenance-code="${row.maintenanceCode}"
-                  th:data-active="${row.active}">Düzəlt</button>
-        </td>
       </tr>
       </tbody>
     </table>
   </div>
+  <div class="save-bar">
+    <button class="btn btn-primary" type="button" id="saveDirty" disabled>Saxla</button>
+  </div>
 </main>
+<template id="rowEditor">
+  <tr class="edit-row">
+    <td colspan="10">
+      <div class="inline-editor editor-grid">
+        <div class="field full">
+          <label>Service behavior</label>
+          <select class="f-behavior" required>
+            <option value="">Seçin</option>
+            <option th:each="b : ${behaviors}" th:value="${b.id}" th:text="${b.titleAz + ' (' + b.code + ')'}"></option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Filter</label>
+          <select class="f-filter" required>
+            <option value="">Seçin</option>
+            <option th:each="f : ${filters}" th:value="${f.id}" th:text="${f.nameEn}"></option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Icon</label>
+          <input class="f-icon" type="file" accept="image/*">
+        </div>
+        <div class="field"><label>Title AZ</label><input class="f-title-az" required></div>
+        <div class="field"><label>Title EN</label><input class="f-title-en"></div>
+        <div class="field"><label>Title RU</label><input class="f-title-ru"></div>
+        <div class="field"><label>Sıra</label><input class="f-sort" type="number" value="0"></div>
+        <div class="field full">
+          <label>Xatırlatma kodu (percentage)</label>
+          <select class="f-maintenance">
+            <option value="">— yoxdur —</option>
+            <option th:each="m : ${maintenanceCodes}" th:value="${m.code}" th:text="${m.nameEn + ' (' + m.code + ')'}"></option>
+          </select>
+        </div>
+        <div class="checks full">
+          <label><input class="f-periodic" type="checkbox"> periodic</label>
+          <label><input class="f-active" type="checkbox"> active</label>
+        </div>
+      </div>
+    </td>
+  </tr>
+</template>
 <div class="editor" id="editor" hidden>
   <form class="editor-card" id="editorForm">
     <h2 id="editorTitle">Yeni xidmət</h2>
@@ -155,14 +203,148 @@
     document.getElementById("fSort").value = data.sortOrder == null ? 0 : data.sortOrder;
     document.getElementById("fMaintenance").value = data.maintenanceCode || "";
     document.getElementById("fPeriodic").checked = data.periodic === true || data.periodic === "true";
-    document.getElementById("fActive").checked = data.id ? (data.active === true || data.active === "true") : true;
-    document.getElementById("editorTitle").textContent = data.id ? "Düzəlt" : "Yeni xidmət";
+    document.getElementById("fActive").checked = true;
+    document.getElementById("editorTitle").textContent = "Yeni xidmət";
     editor.hidden = false;
   }
   document.getElementById("newBtn").addEventListener("click", () => fill({}));
   document.getElementById("cancelBtn").addEventListener("click", () => { editor.hidden = true; });
-  document.querySelectorAll(".js-edit").forEach((btn) => {
-    btn.addEventListener("click", () => fill(btn.dataset));
+
+  const saveDirtyBtn = document.getElementById("saveDirty");
+  let listBusy = false;
+
+  function editorOf(tr) {
+    const next = tr.nextElementSibling;
+    return next && next.classList.contains("edit-row") ? next : null;
+  }
+
+  function readEditor(edit) {
+    return {
+      behaviorId: edit.querySelector(".f-behavior").value,
+      filterId: edit.querySelector(".f-filter").value,
+      titleAz: edit.querySelector(".f-title-az").value.trim(),
+      titleEn: edit.querySelector(".f-title-en").value.trim(),
+      titleRu: edit.querySelector(".f-title-ru").value.trim(),
+      sortOrder: edit.querySelector(".f-sort").value,
+      maintenanceCode: edit.querySelector(".f-maintenance").value,
+      periodic: edit.querySelector(".f-periodic").checked,
+      active: edit.querySelector(".f-active").checked,
+      file: edit.querySelector(".f-icon").files[0] || null
+    };
+  }
+
+  function isDirty(tr) {
+    const edit = editorOf(tr);
+    if (!edit) return false;
+    const v = readEditor(edit);
+    const d = tr.dataset;
+    if (v.file) return true;
+    return v.behaviorId !== (d.behaviorId || "")
+      || v.filterId !== (d.filterId || "")
+      || v.titleAz !== (d.titleAz || "").trim()
+      || v.titleEn !== (d.titleEn || "").trim()
+      || v.titleRu !== (d.titleRu || "").trim()
+      || String(v.sortOrder) !== String(d.sortOrder == null || d.sortOrder === "" ? "0" : d.sortOrder)
+      || v.maintenanceCode !== (d.maintenanceCode || "")
+      || String(v.periodic) !== String(d.periodic === "true")
+      || String(v.active) !== String(d.active === "true");
+  }
+
+  function refreshDirty() {
+    document.querySelectorAll("tr.js-row").forEach((tr) => tr.classList.toggle("is-dirty", isDirty(tr)));
+    saveDirtyBtn.disabled = listBusy || !document.querySelector("tr.js-row.is-dirty");
+  }
+
+  function openEditor(tr) {
+    const existing = editorOf(tr);
+    if (existing) {
+      existing.hidden = !existing.hidden;
+      return;
+    }
+    const edit = document.getElementById("rowEditor").content.firstElementChild.cloneNode(true);
+    const d = tr.dataset;
+    edit.querySelector(".f-behavior").value = d.behaviorId || "";
+    edit.querySelector(".f-filter").value = d.filterId || "";
+    edit.querySelector(".f-title-az").value = d.titleAz || "";
+    edit.querySelector(".f-title-en").value = d.titleEn || "";
+    edit.querySelector(".f-title-ru").value = d.titleRu || "";
+    edit.querySelector(".f-sort").value = d.sortOrder == null || d.sortOrder === "" ? 0 : d.sortOrder;
+    edit.querySelector(".f-maintenance").value = d.maintenanceCode || "";
+    edit.querySelector(".f-periodic").checked = d.periodic === "true";
+    edit.querySelector(".f-active").checked = d.active === "true";
+    tr.after(edit);
+    edit.querySelectorAll("input, select").forEach((el) => {
+      el.addEventListener("input", refreshDirty);
+      el.addEventListener("change", refreshDirty);
+    });
+    refreshDirty();
+  }
+
+  document.getElementById("serviceRows").addEventListener("click", (event) => {
+    const tr = event.target.closest("tr.js-row");
+    if (!tr) return;
+    openEditor(tr);
+  });
+
+  saveDirtyBtn.addEventListener("click", async () => {
+    const dirty = [...document.querySelectorAll("tr.js-row")].filter(isDirty);
+    if (!dirty.length || listBusy) return;
+    for (const tr of dirty) {
+      const v = readEditor(editorOf(tr));
+      if (!v.behaviorId || !v.filterId || !v.titleAz) {
+        editorOf(tr).hidden = false;
+        showErr("Qrup, filter və AZ adı lazımdır");
+        return;
+      }
+    }
+    listBusy = true;
+    refreshDirty();
+    for (const tr of dirty) {
+      const edit = editorOf(tr);
+      const v = readEditor(edit);
+      const body = {
+        id: Number(tr.dataset.id),
+        behaviorId: Number(v.behaviorId),
+        filterId: Number(v.filterId),
+        titleAz: v.titleAz,
+        titleEn: v.titleEn,
+        titleRu: v.titleRu,
+        sortOrder: Number(v.sortOrder || 0),
+        periodic: v.periodic,
+        maintenanceCode: v.maintenanceCode || null,
+        active: v.active
+      };
+      const res = await fetch("/admin/offered-services/save", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return; }
+      if (!res.ok) {
+        listBusy = false;
+        refreshDirty();
+        let msg = "Saxlanılmadı (" + res.status + ")";
+        try { const payload = await res.json(); if (payload && payload.message) msg = payload.message; } catch (_) {}
+        showErr(msg);
+        return;
+      }
+      const saved = await res.json();
+      if (v.file && saved && saved.id) {
+        const form = new FormData();
+        form.append("file", v.file);
+        form.append("offeredServiceId", String(saved.id));
+        const up = await fetch("/admin/offered-services/photo", {
+          method: "POST", credentials: "same-origin", body: form
+        });
+        if (!up.ok) {
+          listBusy = false;
+          refreshDirty();
+          showErr("Xidmət saxlandı, icon yüklənmədi (" + up.status + ")");
+          return;
+        }
+      }
+    }
+    window.location.reload();
   });
   document.getElementById("editorForm").addEventListener("submit", async (e) => {
     e.preventDefault();

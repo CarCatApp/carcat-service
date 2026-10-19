@@ -22,7 +22,7 @@
       padding: 10px 12px; background: var(--card); color: var(--text);
       border: 1px solid var(--border); border-radius: var(--radius);
     }
-    .sort-row.dragging { opacity: 0.45; }
+    .sort-row.dragging, .sort-item.dragging { opacity: 0.45; }
     .grip {
       width: 28px; text-align: center; color: var(--text-muted);
       cursor: grab; user-select: none; font-size: 16px; letter-spacing: -2px;
@@ -48,6 +48,31 @@
     }
     .nudge button:hover { background: var(--primary-soft); }
     .nudge button:disabled { opacity: 0.35; cursor: default; }
+    .btn-rename {
+      height: 32px; padding: 0 10px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--card); color: var(--text);
+      font-size: 12px; font-weight: 700;
+    }
+    .btn-rename:hover { background: var(--primary-soft); }
+    .name-edit {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+      margin-top: 8px;
+    }
+    .name-edit[hidden] { display: none; }
+    .name-edit label {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+    }
+    .name-edit input {
+      width: 100%; min-height: 36px; color: var(--text); background: var(--card);
+    }
+    .sort-item { list-style: none; }
+    .new-list { margin-top: 12px; }
+    .save-bar {
+      position: sticky; bottom: 0; margin-top: 16px; padding: 12px 0;
+      background: var(--bg);
+    }
+    .save-bar button:disabled { opacity: 0.45; cursor: default; }
   </style>
 </head>
 <body>
@@ -82,8 +107,9 @@
   <div class="page-head">
     <div>
       <h1>color sort</h1>
-      <p class="muted">AZ, EN və RU ayrı sıradır. Mobil siyahı Accept-Language hansı dildirsə onun nömrəsini qaytarır.</p>
+      <p class="muted">AZ, EN və RU ayrı sıradır. «dəyişdir» üç adı açır. Hex və sıra oradan dəyişmir. Saxla yalnız dəyişən adları və yeni sətri yazır.</p>
     </div>
+    <button class="btn btn-primary" type="button" id="newColorBtn">Yeni rəng</button>
   </div>
   <div class="lang-switch">
     <a th:href="@{/admin/color-sort(lang='az')}" th:class="${lang == 'az'} ? 'on' : ''">AZ</a>
@@ -93,22 +119,37 @@
   <div class="error-box" id="errBox" hidden></div>
   <p class="muted" th:if="${rows.isEmpty()}">Rəng yoxdur.</p>
   <ul class="sort-list" id="colorSort" th:attr="data-lang=${lang}">
-    <li class="sort-row" th:each="row, stat : ${rows}" th:attr="data-id=${row.colorId}">
-      <span class="grip" draggable="true" aria-hidden="true">⋮⋮</span>
-      <span class="pos" th:text="${row.sortOrder}">1</span>
-      <span class="swatch" th:attr="style=${'background-color:' + row.swatch}"></span>
-      <span class="sort-name" th:text="${row.name}">Qara</span>
-      <span class="sort-code" th:text="${row.hex}">#111111</span>
-      <span class="nudge">
-        <button type="button" class="js-up" th:disabled="${stat.first}" aria-label="up">↑</button>
-        <button type="button" class="js-down" th:disabled="${stat.last}" aria-label="down">↓</button>
-      </span>
+    <li class="sort-item" th:each="row, stat : ${rows}"
+        th:attr="data-id=${row.colorId},data-az=${row.nameAz},data-en=${row.nameEn},data-ru=${row.nameRu}">
+      <div class="sort-row">
+        <span class="grip" draggable="true" aria-hidden="true">⋮⋮</span>
+        <span class="pos" th:text="${row.sortOrder}">1</span>
+        <button type="button" class="btn-rename js-rename">dəyişdir</button>
+        <span class="swatch" th:attr="style=${'background-color:' + row.swatch}"></span>
+        <span class="sort-name" th:text="${row.name}">Qara</span>
+        <span class="sort-code" th:text="${row.hex}">#111111</span>
+        <span class="nudge">
+          <button type="button" class="js-up" th:disabled="${stat.first}" aria-label="up">↑</button>
+          <button type="button" class="js-down" th:disabled="${stat.last}" aria-label="down">↓</button>
+        </span>
+      </div>
+      <div class="name-edit" hidden>
+        <label>AZ <input class="js-az" th:value="${row.nameAz}" autocomplete="off"></label>
+        <label>EN <input class="js-en" th:value="${row.nameEn}" autocomplete="off"></label>
+        <label>RU <input class="js-ru" th:value="${row.nameRu}" autocomplete="off"></label>
+      </div>
     </li>
   </ul>
+  <ul class="sort-list new-list" id="newColors"></ul>
+  <div class="save-bar">
+    <button class="btn btn-primary" type="button" id="saveNames" disabled>Saxla</button>
+  </div>
 </main>
 <script src="/admin/admin.js?v=colorsort1"></script>
 <script>
   const list = document.getElementById("colorSort");
+  const newList = document.getElementById("newColors");
+  const saveBtn = document.getElementById("saveNames");
   const errBox = document.getElementById("errBox");
   let dragging = null;
   let startIndex = -1;
@@ -119,8 +160,41 @@
     errBox.textContent = msg;
   }
 
+  function clearErr() {
+    errBox.hidden = true;
+    errBox.textContent = "";
+  }
+
+  function textOf(item, selector) {
+    const input = item.querySelector(selector);
+    return input ? input.value.trim() : "";
+  }
+
+  function namesDirty(item) {
+    return textOf(item, ".js-az") !== (item.dataset.az || "").trim()
+      || textOf(item, ".js-en") !== (item.dataset.en || "").trim()
+      || textOf(item, ".js-ru") !== (item.dataset.ru || "").trim();
+  }
+
+  function draftDirty(item) {
+    return textOf(item, ".js-az") !== "" || textOf(item, ".js-en") !== "" || textOf(item, ".js-ru") !== "";
+  }
+
+  function nameEditsPending() {
+    return [...list.querySelectorAll(".sort-item")].some(namesDirty);
+  }
+
+  function refreshSave() {
+    const dirty = nameEditsPending() || [...newList.children].some(draftDirty);
+    saveBtn.disabled = busy || !dirty;
+  }
+
   async function moveTo(colorId, position) {
     if (busy) return;
+    if (nameEditsPending() || [...newList.children].some(draftDirty)) {
+      showErr("Əvvəl adları saxlayın");
+      return;
+    }
     busy = true;
     const res = await fetch("/admin/color-sort/move", {
       method: "POST",
@@ -147,7 +221,7 @@
   }
 
   function rowAfter(y) {
-    const rows = [...list.querySelectorAll(".sort-row:not(.dragging)")];
+    const rows = [...list.querySelectorAll(".sort-item:not(.dragging)")];
     let closest = null;
     let closestOffset = Number.NEGATIVE_INFINITY;
     rows.forEach((row) => {
@@ -163,11 +237,12 @@
 
   list.addEventListener("dragstart", (event) => {
     const grip = event.target.closest(".grip");
-    if (!grip) {
+    if (!grip || nameEditsPending() || [...newList.children].some(draftDirty)) {
       event.preventDefault();
+      if (grip) showErr("Əvvəl adları saxlayın");
       return;
     }
-    dragging = grip.closest(".sort-row");
+    dragging = grip.closest(".sort-item");
     startIndex = [...list.children].indexOf(dragging);
     dragging.classList.add("dragging");
     event.dataTransfer.effectAllowed = "move";
@@ -199,10 +274,93 @@
     const up = event.target.closest(".js-up");
     const down = event.target.closest(".js-down");
     if (!up && !down) return;
-    const row = event.target.closest(".sort-row");
+    const row = event.target.closest(".sort-item");
     const index = [...list.children].indexOf(row);
     if (up && index > 0) moveTo(row.dataset.id, index);
     if (down && index < list.children.length - 1) moveTo(row.dataset.id, index + 2);
+  });
+
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest(".js-rename");
+    if (!button) return;
+    const item = button.closest(".sort-item");
+    const editor = item.querySelector(".name-edit");
+    editor.hidden = !editor.hidden;
+    if (!editor.hidden) editor.querySelector(".js-az").focus();
+  });
+
+  list.addEventListener("input", refreshSave);
+
+  document.getElementById("newColorBtn").addEventListener("click", () => {
+    const item = document.createElement("li");
+    item.className = "sort-item";
+    item.innerHTML =
+      '<div class="sort-row">' +
+        '<span class="pos">+</span>' +
+        '<span class="swatch"></span>' +
+        '<span class="sort-name">Yeni rəng</span>' +
+        '<button type="button" class="btn-rename js-drop">Ləğv</button>' +
+      '</div>' +
+      '<div class="name-edit">' +
+        '<label>AZ <input class="js-az" autocomplete="off"></label>' +
+        '<label>EN <input class="js-en" autocomplete="off"></label>' +
+        '<label>RU <input class="js-ru" autocomplete="off"></label>' +
+      '</div>';
+    newList.appendChild(item);
+    item.querySelector(".js-az").focus();
+    refreshSave();
+  });
+
+  newList.addEventListener("click", (event) => {
+    const drop = event.target.closest(".js-drop");
+    if (!drop) return;
+    drop.closest(".sort-item").remove();
+    refreshSave();
+  });
+
+  newList.addEventListener("input", refreshSave);
+
+  function payloadOf(item) {
+    const row = {
+      az: textOf(item, ".js-az"),
+      en: textOf(item, ".js-en"),
+      ru: textOf(item, ".js-ru")
+    };
+    if (item.dataset.id) row.colorId = Number(item.dataset.id);
+    return row;
+  }
+
+  saveBtn.addEventListener("click", async () => {
+    const rows = [
+      ...[...list.querySelectorAll(".sort-item")].filter(namesDirty).map(payloadOf),
+      ...[...newList.children].filter(draftDirty).map(payloadOf)
+    ];
+    if (!rows.length || busy) return;
+    busy = true;
+    refreshSave();
+    clearErr();
+    const res = await fetch("/admin/color-sort/names", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: rows })
+    });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return;
+    }
+    if (!res.ok) {
+      busy = false;
+      refreshSave();
+      let msg = "Ad saxlanılmadı (" + res.status + ")";
+      try {
+        const payload = await res.json();
+        if (payload && payload.message) msg = payload.message;
+      } catch (_) {}
+      showErr(msg);
+      return;
+    }
+    window.location.reload();
   });
 </script>
 </body>

@@ -351,10 +351,14 @@ public class RedisCacheService {
     /**
      * tr: Renk kataloğu. Key catalog:colors:{lang} (Accept-Language lower-case), TTL 30 gün.
      *     Sıra dil bazlıdır (sort_order_az / sort_order_en / sort_order_ru).
-     *     Yazan: ColorSortService.rows (boş numara) ve ColorSortService.move
+     *     Yazan: ColorSortService.rows (boş numara), move ve saveNames
      *     → evictCatalogColorsAfterCommit, pattern catalog:colors:*.
+     *     saveNames ad değiştirince ayrıca o rengi kullanan sahiplerin carlist:{userId}:* anahtarını düşer
+     *     (liste JSON'u renk adını kopyalar).
      * en: Color catalog. Key catalog:colors:{lang}, 30-day TTL. Order is per language.
-     *     Writers: ColorSortService.rows and move evict catalog:colors:* after commit.
+     *     Writers: ColorSortService.rows, move, and saveNames evict catalog:colors:* after commit.
+     *     saveNames also drops carlist:{userId}:* for owners of a renamed color
+     *     (the list JSON copies the color name).
      */
     public List<Color> getOrLoadColors(String lang, Supplier<List<Color>> loader) {
         return getOrLoadCatalog("catalog:colors:" + langKey(lang), new TypeReference<>() {}, loader, "catalog colors");
