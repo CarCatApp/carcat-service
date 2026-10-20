@@ -4,11 +4,13 @@ import com.carland.carland_service.dto.request.AdminColorNameRow;
 import com.carland.carland_service.dto.response.AdminColorSortRow;
 import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +23,13 @@ import java.util.Objects;
 /**
  * tr: Renk sırası. Üç dilin numarası ayrıdır. GET /get/color/list istenen dilin numarasını döner.
  *     catalog:colors:{lang} okuyan RedisCacheService.getOrLoadColors.
- *     Yazan: rows (boş numara), move ve saveNames → evictCatalogColorsAfterCommit (catalog:colors:*).
- *     saveNames ad değiştirince o rengi kullanan sahiplerin carlist:{userId}:* anahtarını da düşer.
+ *     Yazan: rows (boş numara), move, saveNames ve delete → evictCatalogColorsAfterCommit (catalog:colors:*).
+ *     saveNames ad değiştirince, delete satırı silince o rengi kullanan sahiplerin carlist:{userId}:* anahtarını da düşer.
+ *     colors.active yok: delete kaydı DB'den siler.
  * en: Color order. Each language has its own numbers. GET /get/color/list returns that language.
- *     Reader: RedisCacheService.getOrLoadColors. Writers: rows, move, and saveNames evict catalog:colors:*.
- *     saveNames also drops carlist:{userId}:* for owners whose cars use a renamed color.
+ *     Reader: RedisCacheService.getOrLoadColors. Writers: rows, move, saveNames, and delete evict catalog:colors:*.
+ *     saveNames and delete also drop carlist:{userId}:* for owners whose cars use that color.
+ *     colors has no active flag: delete removes the row from the DB.
  */
 @Service
 @RequiredArgsConstructor
@@ -108,6 +112,53 @@ public class ColorSortService {
             redisCacheService.evictCatalogColorsAfterCommit();
         }
         return toRows(ordered, key);
+    }
+
+    /**
+     * tr: Rengi DB'den siler. colors'ta active kolonu yok. Kalan satırların üç dil sırası 1, 2, 3… olur.
+     *     catalog:colors:* ve bu rengi kullanan sahiplerin carlist:{userId}:* anahtarı commit sonrası düşer.
+     *     Araç hâlâ bu colorId'yi tutuyorsa FK silmeyi keser.
+     * en: Deletes the color from the DB. colors has no active column. Remaining rows are renumbered 1, 2, 3… in each language.
+     *     catalog:colors:* and carlist:{userId}:* for owners of this color drop after commit.
+     *     A foreign key from a car that still stores this colorId blocks the delete.
+     */
+    @Transactional
+    public void delete(Long colorId) {
+        if (colorId == null) {
+            throw MissingFieldException.required("colorId");
+        }
+        List<Color> colors = new ArrayList<>(colorRepository.findAll());
+        Color target = null;
+        List<Color> remaining = new ArrayList<>();
+        for (Color color : colors) {
+            if (colorId.equals(color.getColorId())) {
+                target = color;
+            } else {
+                remaining.add(color);
+            }
+        }
+        if (target == null) {
+            throw new ResourceNotFoundException("color not found");
+        }
+        List<Long> owners = carRepository.findOwnerUserIdsByColorId(colorId);
+        try {
+            colorRepository.delete(target);
+            colorRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("Bu rəng avtomobillərdə istifadə olunur");
+        }
+        for (String lang : List.of("az", "en", "ru")) {
+            renumber(sorted(remaining, lang), lang);
+        }
+        if (!remaining.isEmpty()) {
+            colorRepository.saveAll(remaining);
+        }
+        redisCacheService.evictCatalogColorsAfterCommit();
+        for (Long userId : owners) {
+            if (userId != null) {
+                redisCacheService.evictCarListAfterCommit(String.valueOf(userId));
+            }
+        }
     }
 
     /**

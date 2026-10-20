@@ -3,8 +3,10 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.AdminColorNameRow;
 import com.carland.carland_service.dto.response.AdminColorSortRow;
 import com.carland.carland_service.entity.Color;
+import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -230,6 +233,47 @@ class ColorSortServiceTest {
                 AdminColorNameRow.builder().colorId(99L).az("A").build()
         )));
         verify(colorRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void deleteRemovesTheRowRenumbersAndDropsCaches() {
+        Color black = color(1L, "Black", "Qara", "Чёрный", 1, 3, 2, "#111111");
+        Color white = color(2L, "White", "Ağ", "Белый", 2, 2, 3, "#ffffff");
+        Color green = color(3L, "Green", "Yaşıl", "Зелёный", 3, 1, 1, "#00aa00");
+        when(colorRepository.findAll()).thenReturn(new ArrayList<>(List.of(black, white, green)));
+        when(carRepository.findOwnerUserIdsByColorId(2L)).thenReturn(List.of(9L));
+        when(colorRepository.saveAll(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.delete(2L);
+
+        verify(colorRepository).delete(white);
+        assertEquals(1, black.getSortOrderAz());
+        assertEquals(2, green.getSortOrderAz());
+        assertEquals(2, black.getSortOrderEn());
+        assertEquals(1, green.getSortOrderEn());
+        assertEquals(2, black.getSortOrderRu());
+        assertEquals(1, green.getSortOrderRu());
+        assertEquals("#111111", black.getHex());
+        assertEquals("Qara", black.getAz());
+        verify(redisCacheService).evictCatalogColorsAfterCommit();
+        verify(redisCacheService).evictCarListAfterCommit("9");
+    }
+
+    @Test
+    void deleteRejectsMissingIdAndAColorCarsStillReference() {
+        assertThrows(MissingFieldException.class, () -> service.delete(null));
+        verify(colorRepository, never()).findAll();
+
+        Color black = color(1L, "Black", "Qara", "Чёрный", 1, 1, 1, "#111");
+        when(colorRepository.findAll()).thenReturn(new ArrayList<>(List.of(black)));
+        assertThrows(ResourceNotFoundException.class, () -> service.delete(4L));
+
+        doThrow(new DataIntegrityViolationException("fk")).when(colorRepository).delete(black);
+        assertThrows(ConflictException.class, () -> service.delete(1L));
+        assertEquals(1, black.getSortOrderAz());
+        verify(colorRepository, never()).saveAll(any());
+        verify(redisCacheService, never()).evictCatalogColorsAfterCommit();
+        verify(redisCacheService, never()).evictCarListAfterCommit(any());
     }
 
     @Test

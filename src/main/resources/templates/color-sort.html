@@ -54,6 +54,12 @@
       font-size: 12px; font-weight: 700;
     }
     .btn-rename:hover { background: var(--primary-soft); }
+    .btn-delete {
+      height: 32px; padding: 0 10px; border-radius: 8px; flex: none;
+      border: 1px solid var(--danger-border); background: var(--danger-bg); color: var(--danger-text);
+      font-size: 12px; font-weight: 700;
+    }
+    .btn-delete:hover { background: #fde8e8; }
     .name-edit {
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
       margin-top: 8px;
@@ -107,7 +113,7 @@
   <div class="page-head">
     <div>
       <h1>color sort</h1>
-      <p class="muted">AZ, EN və RU ayrı sıradır. «dəyişdir» üç adı açır. Hex və sıra oradan dəyişmir. Saxla yalnız dəyişən adları və yeni sətri yazır.</p>
+      <p class="muted">AZ, EN və RU ayrı sıradır. «dəyişdir» üç adı açır. Hex və sıra oradan dəyişmir. Saxla yalnız dəyişən adları və yeni sətri yazır. Sil rəngi bazadan silir.</p>
     </div>
     <button class="btn btn-primary" type="button" id="newColorBtn">Yeni rəng</button>
   </div>
@@ -122,6 +128,7 @@
     <li class="sort-item" th:each="row, stat : ${rows}"
         th:attr="data-id=${row.colorId},data-az=${row.nameAz},data-en=${row.nameEn},data-ru=${row.nameRu}">
       <div class="sort-row">
+        <button type="button" class="btn-delete js-delete">Sil</button>
         <span class="grip" draggable="true" aria-hidden="true">⋮⋮</span>
         <span class="pos" th:text="${row.sortOrder}">1</span>
         <button type="button" class="btn-rename js-rename">dəyişdir</button>
@@ -278,6 +285,41 @@
     const index = [...list.children].indexOf(row);
     if (up && index > 0) moveTo(row.dataset.id, index);
     if (down && index < list.children.length - 1) moveTo(row.dataset.id, index + 2);
+  });
+
+  list.addEventListener("click", async (event) => {
+    const button = event.target.closest(".js-delete");
+    if (!button || busy) return;
+    if (nameEditsPending() || [...newList.children].some(draftDirty)) {
+      showErr("Əvvəl adları saxlayın");
+      return;
+    }
+    const item = button.closest(".sort-item");
+    const name = item.querySelector(".sort-name").textContent.trim();
+    if (!confirm(name + " silinsin?")) return;
+    busy = true;
+    clearErr();
+    const res = await fetch("/admin/color-sort/delete", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ colorId: Number(item.dataset.id) })
+    });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return;
+    }
+    if (!res.ok) {
+      busy = false;
+      let msg = "Silinmədi (" + res.status + ")";
+      try {
+        const payload = await res.json();
+        if (payload && payload.message) msg = payload.message;
+      } catch (_) {}
+      showErr(msg);
+      return;
+    }
+    window.location.reload();
   });
 
   list.addEventListener("click", (event) => {

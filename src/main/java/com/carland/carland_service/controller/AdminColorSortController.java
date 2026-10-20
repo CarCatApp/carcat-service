@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.request.AdminColorDeleteRequest;
 import com.carland.carland_service.dto.request.AdminColorNameRow;
 import com.carland.carland_service.dto.request.AdminColorNameSaveRequest;
 import com.carland.carland_service.dto.request.AdminColorSortMoveRequest;
@@ -76,6 +77,21 @@ public class AdminColorSortController {
         }
         List<AdminColorNameRow> rows = body == null || body.getRows() == null ? List.of() : body.getRows();
         colorSortService.saveNames(rows);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * tr: Renk satırını siler. active kolonu olmadığı için kayıt DB'den gider.
+     * en: Deletes a color row. There is no active column, so the row is removed from the DB.
+     */
+    @PostMapping(value = "/admin/color-sort/delete", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Void> delete(@RequestBody AdminColorDeleteRequest body,
+                                       HttpServletRequest request) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        colorSortService.delete(body == null ? null : body.getColorId());
         return ResponseEntity.ok().build();
     }
 }
