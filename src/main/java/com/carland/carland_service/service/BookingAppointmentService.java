@@ -68,6 +68,7 @@ public class BookingAppointmentService {
     private final BookingCapacityService bookingCapacityService;
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPushService bookingPushService;
+    private final BookingPercentageSnapshot percentageSnapshot;
 
     /**
      * tr: Range kilitlenir, yeri varsa book ve alt satırları yazılır.
@@ -148,6 +149,7 @@ public class BookingAppointmentService {
                 .packageName(packageName(selection.packageId()))
                 .packagePrice(selection.packageId() == null ? null : packageQepik)
                 .build());
+        percentageSnapshot.snapshotPackage(booking, car);
         if (priced != null) {
             selectionWriter.save(booking, customer, car, priced);
         }

@@ -81,6 +81,7 @@ public class BookingCreateService {
     private final BookingSelectionWriter selectionWriter;
     private final BookingCapacityService bookingCapacityService;
     private final StaffBookingLiveService staffBookingLiveService;
+    private final BookingPercentageSnapshot percentageSnapshot;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
@@ -161,7 +162,8 @@ public class BookingCreateService {
                     .priceMax(line.priceMax)
                     .build());
         }
-        attachOfferedServices(booking, request.getOfferedServiceIds());
+        attachOfferedServices(booking, car, request.getOfferedServiceIds());
+        percentageSnapshot.snapshotPackage(booking, car);
         Calendar calendar = prepared.range.getCalendar();
         staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
                 .bookingId(booking.getId())
@@ -346,7 +348,7 @@ public class BookingCreateService {
         booking.setPriceMax(max + qepik);
     }
 
-    private void attachOfferedServices(Booking booking, List<Long> offeredServiceIds) {
+    private void attachOfferedServices(Booking booking, Car car, List<Long> offeredServiceIds) {
         if (offeredServiceIds == null || offeredServiceIds.isEmpty()) {
             return;
         }
@@ -360,10 +362,14 @@ public class BookingCreateService {
             if (!Boolean.TRUE.equals(service.getActive())) {
                 throw new ResourceNotFoundException("offered service not found");
             }
+            Long percentageServiceId = Boolean.TRUE.equals(service.getPeriodic())
+                    ? percentageSnapshot.resolve(car, service.getMaintenanceCode())
+                    : null;
             bookingSelectedServiceRepository.save(BookingSelectedService.builder()
                     .booking(booking)
                     .offeredServiceId(service.getId())
                     .titleJson(service.getTitleJson())
+                    .percentageServiceId(percentageServiceId)
                     .build());
         }
     }

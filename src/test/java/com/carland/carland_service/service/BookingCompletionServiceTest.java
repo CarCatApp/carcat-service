@@ -60,7 +60,7 @@ class BookingCompletionServiceTest {
     @Mock ServiceCategoryJson json;
     @Mock BookingBranchBrandsService bookingBranchBrandsService;
     @Mock VisitWebhookSupport visitWebhookSupport;
-    @Mock HyperPercentageSyncService hyperPercentageSyncService;
+    @Mock DetailedPercentageService detailedPercentageService;
     @Mock RedisCacheService redisCacheService;
 
     BookingCompletionService service;
@@ -73,7 +73,7 @@ class BookingCompletionServiceTest {
         service = new BookingCompletionService(carePackageItemRepository, individualLineRepository,
                 selectedServiceRepository, inspectionRepository, branchIndividualServiceRepository,
                 individualServiceRepository, offeredServiceRepository, servicedGoodRepository, carRepository,
-                visitRepository, json, bookingBranchBrandsService, visitWebhookSupport, hyperPercentageSyncService,
+                visitRepository, json, bookingBranchBrandsService, visitWebhookSupport, detailedPercentageService,
                 redisCacheService);
         Partner partner = Partner.builder().id(1L).name("HyperService").active(true).build();
         Branch branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(partner).build();
@@ -151,7 +151,7 @@ class BookingCompletionServiceTest {
         assertEquals(2, visit.getParts().size());
         assertNull(visit.getParts().get(0).getPrice(), "package product is included in the package price");
         assertEquals(42580L, car.getMileage());
-        verify(hyperPercentageSyncService).syncFromVisit(car, visit);
+        verify(detailedPercentageService).applyFromVisit(car, booking, visit);
     }
 
     @Test

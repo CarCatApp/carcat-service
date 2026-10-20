@@ -56,6 +56,7 @@ class BookingAppointmentServiceTest {
     @Mock BookingCapacityService capacity;
     @Mock StaffBookingLiveService live;
     @Mock BookingPushService bookingPushService;
+    @Mock BookingPercentageSnapshot percentageSnapshot;
 
     BookingAppointmentService service;
     Branch branch;
@@ -65,7 +66,8 @@ class BookingAppointmentServiceTest {
     void setUp() {
         service = new BookingAppointmentService(
                 rangeRepository, bookingRepository, carePackageRepository, customerRepository,
-                carRepository, calendarService, selectionWriter, capacity, live, bookingPushService);
+                carRepository, calendarService, selectionWriter, capacity, live, bookingPushService,
+                percentageSnapshot);
         Partner partner = Partner.builder().id(1L).name("HS").active(true).build();
         branch = Branch.builder().id(7L).name("Babek").active(true).partner(partner).build();
         pkg = BranchCarePackage.builder().id(10L).name("Yağ").active(true).branch(branch).price(40).build();

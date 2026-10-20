@@ -50,4 +50,8 @@ public class BookingSelectedService {
     /** {"az":"...","en":"...","ru":"..."} kopyası. Katalog sonradan değişse rezervasyon aynı kalır. */
     @Column(name = "title_json", length = 1024)
     String titleJson;
+
+    /** Dövri satırda bu arabanın şablonundaki services.id. Book anında kopyalanır. */
+    @Column(name = "percentage_service_id")
+    Long percentageServiceId;
 }

@@ -37,6 +37,7 @@ public class BookingSelectionWriter {
     private final BranchIndividualServiceRepository branchIndividualServiceRepository;
     private final BookingIndividualLineRepository lineRepository;
     private final BookingInspectionRepository inspectionRepository;
+    private final BookingPercentageSnapshot percentageSnapshot;
 
     public Priced price(Branch branch, List<Long> individualServiceIds, String issue) {
         String message = message(issue);
@@ -77,6 +78,7 @@ public class BookingSelectionWriter {
                     .priceSimple(row.getPriceSimple())
                     .priceMedium(row.getPriceMedium())
                     .priceComplex(row.getPriceComplex())
+                    .percentageServiceId(percentageSnapshot.resolve(car, catalog.getMaintenanceCode()))
                     .build());
         }
         if (priced.message == null) {

@@ -52,9 +52,11 @@ import org.springframework.stereotype.Service;
 
 /**
  * tr: "Xidməti tamamla": pəncərənin taslağını qurur və doldurulan formu avtomobilin rəqəmsal tarixçəsinə
- *     (visits, source=panel) yazır. Status dəyişimi StaffBookingService-də qalır.
+ *     (visits, source=panel) yazır. Detailed şubede yüzde, Hyper eşlemesiyle değil satırdaki services.id ile güncellenir.
+ *     Status dəyişimi StaffBookingService-də qalır. Webhook şubesi bu write metoduna girmez.
  * en: "Complete service": builds the dialog draft and writes the submitted form into the car's digital history
- *     (visits, source=panel). The status change stays in StaffBookingService.
+ *     (visits, source=panel). On a detailed branch the percentage is updated from the line's services.id,
+ *     not from Hyper name matching. The status change stays in StaffBookingService. A webhook branch never enters write.
  */
 @Slf4j
 @Service
@@ -80,7 +82,7 @@ public class BookingCompletionService {
     private final ServiceCategoryJson json;
     private final BookingBranchBrandsService bookingBranchBrandsService;
     private final VisitWebhookSupport visitWebhookSupport;
-    private final HyperPercentageSyncService hyperPercentageSyncService;
+    private final DetailedPercentageService detailedPercentageService;
     private final RedisCacheService redisCacheService;
 
     /** Package line split: periodic lines become cards, the rest are info lines. */
@@ -173,9 +175,9 @@ public class BookingCompletionService {
 
     /**
      * tr: Formu yeni bir panel ziyarəti kimi yazır (əvvəlki qeydlər üzərinə yazılmır — AC15).
-     *     Sonra allTimeCost, servis görmüş partnerlər, percentage və tarixçə keşi yenilənir.
+     *     Sonra allTimeCost, servis görmüş partnerlər və detailed yüzde güncellenir. carlist commit sonrası düşer.
      * en: Writes the form as a new panel visit (older records are never overwritten — AC15).
-     *     Then refreshes allTimeCost, serviced partners, percentages and the history cache.
+     *     Then refreshes allTimeCost, serviced partners and the detailed percentage. The car list is evicted after commit.
      */
     public Visit write(Booking booking, StaffCompleteRequest request, String timezone, String acceptLanguage) {
         String lang = BookingMineService.langOf(acceptLanguage);
@@ -253,7 +255,7 @@ public class BookingCompletionService {
         }
         visitWebhookSupport.recalculateAllTimeCost(car);
         refreshServicedPartnerIds(car);
-        hyperPercentageSyncService.syncFromVisit(car, visit);
+        detailedPercentageService.applyFromVisit(car, booking, visit);
         redisCacheService.evictCarAndHistoryAfterCommit(car);
         log.info("panel visit written | bookingId={} visitId={} carId={} lines={} gross={} total={}",
                 booking.getId(), visit.getId(), car.getCarId(), visit.getServices().size(), gross, total);

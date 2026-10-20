@@ -39,6 +39,7 @@ class BookingSelectionWriterTest {
     @Mock BranchIndividualServiceRepository branchIndividualServiceRepository;
     @Mock BookingIndividualLineRepository lineRepository;
     @Mock BookingInspectionRepository inspectionRepository;
+    @Mock BookingPercentageSnapshot percentageSnapshot;
 
     BookingSelectionWriter writer;
     Branch branch;
@@ -47,13 +48,14 @@ class BookingSelectionWriterTest {
     @BeforeEach
     void setUp() {
         writer = new BookingSelectionWriter(
-                branchIndividualServiceRepository, lineRepository, inspectionRepository);
+                branchIndividualServiceRepository, lineRepository, inspectionRepository, percentageSnapshot);
         Partner partner = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(12L).name("Xeqani").active(true).partner(partner).build();
         oil = IndividualService.builder()
                 .id(3L)
                 .code("MYF")
                 .titleJson("{\"az\":\"Yağ dəyişimi\",\"en\":\"Oil change\"}")
+                .maintenanceCode("ENGINE_OIL")
                 .active(true)
                 .build();
     }
@@ -74,6 +76,7 @@ class BookingSelectionWriterTest {
         BookingSelectionWriter.Priced priced = writer.price(branch, List.of(3L), "  Generator akkumulyatoru doldurmur  ");
         Customer customer = Customer.builder().userId(77L).name("Aysu").surname("İsmayılov").phoneNumber("+994501112233").build();
         Car car = Car.builder().carId(55L).vin("EXFR0XNVBUXU61NHE").plateNumber("50-NE-805").brand("Ford").model("F-150").modelYear(2020).build();
+        when(percentageSnapshot.resolve(car, "ENGINE_OIL")).thenReturn(91L);
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 2)).branch(branch).build();
         Range range = Range.builder()
                 .rangeId(8801L)
@@ -100,6 +103,7 @@ class BookingSelectionWriterTest {
         verify(lineRepository).save(line.capture());
         assertEquals(3L, line.getValue().getIndividualServiceId());
         assertEquals("MYF", line.getValue().getCode());
+        assertEquals(91L, line.getValue().getPercentageServiceId());
         assertEquals("Dövri qulluq + Təmir Xidməti və Yoxlanış",
                 BookingKindLabel.of(true, true));
     }

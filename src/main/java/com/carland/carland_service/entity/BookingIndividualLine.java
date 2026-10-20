@@ -61,4 +61,8 @@ public class BookingIndividualLine {
 
     @Column(name = "price_complex")
     Integer priceComplex;
+
+    /** Bu arabanın bakım şablonundaki services.id. Book anında kopyalanır. */
+    @Column(name = "percentage_service_id")
+    Long percentageServiceId;
 }

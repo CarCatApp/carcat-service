@@ -70,6 +70,7 @@ class BookingCreateServiceTest {
     @Mock BookingSelectionWriter selectionWriter;
     @Mock BookingCapacityService capacity;
     @Mock StaffBookingLiveService live;
+    @Mock BookingPercentageSnapshot percentageSnapshot;
 
     BookingCreateService service;
     Range range;
@@ -83,7 +84,7 @@ class BookingCreateServiceTest {
                 rangeRepository, bookingRepository, bookingItemRepository,
                 packageRepository, serviceRepository, carePackageRepository, offeredServiceRepository,
                 bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper(),
-                selectionWriter, capacity, live);
+                selectionWriter, capacity, live, percentageSnapshot);
         customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
         car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();
