@@ -2,6 +2,7 @@ package com.carland.carland_service.digitalfinance;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ public class DigitalFinanceClient {
     private final String baseUrl;
     private final String apiKey;
 
+    @Autowired
     public DigitalFinanceClient(
             @Value("${digital-finance.base-url}") String baseUrl,
             @Value("${digital-finance.api-key:}") String apiKey) {
