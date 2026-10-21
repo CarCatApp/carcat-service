@@ -51,8 +51,10 @@ class VisitHistoryServiceImplBranchTest {
         Customer customer = Customer.builder().userId(9L).phoneNumber("0501112233").build();
         Car car = Car.builder().carId(5L).vin("VIN1").customer(customer)
                 .servicedPartnerIds(List.of("4", "1")).build();
-        Branch xirdalan = Branch.builder().id(22L).name("Auto Zone Xırdalan").lat(40.45).lng(49.75).build();
-        Branch babek = Branch.builder().id(10L).name("Hyper Service").lat(40.40).lng(49.85).build();
+        Branch xirdalan = Branch.builder().id(22L).name("Auto Zone Xırdalan")
+                .address("Xırdalan, Abşeron").lat(40.45).lng(49.75).build();
+        Branch babek = Branch.builder().id(10L).name("Hyper Service")
+                .address("Babək pr. 43A").lat(40.40).lng(49.85).build();
         Visit panel = Visit.builder().id(1L).car(car).source("panel").branchId(22L)
                 .serviceCenterId(4L).serviceCenterName("Auto Zone").build();
         Visit hyper = Visit.builder().id(2L).car(car).hyperRecordId(90L).serviceCenterId(1L)
@@ -82,6 +84,7 @@ class VisitHistoryServiceImplBranchTest {
         VisitHistoryItemResponse detailed = response.getItems().get(0);
         assertEquals(22L, detailed.getBranchId());
         assertEquals("Auto Zone Xırdalan", detailed.getBranchName());
+        assertEquals("Xırdalan, Abşeron", detailed.getBranchAddress());
         assertEquals(40.45, detailed.getLat());
         assertEquals(49.75, detailed.getLng());
         assertEquals(4L, detailed.getServiceCenterId());
@@ -89,6 +92,7 @@ class VisitHistoryServiceImplBranchTest {
         VisitHistoryItemResponse fromHyper = response.getItems().get(1);
         assertEquals(10L, fromHyper.getBranchId());
         assertEquals("Hyper Service", fromHyper.getBranchName());
+        assertEquals("Babək pr. 43A", fromHyper.getBranchAddress());
         assertNull(hyper.getBranchId());
     }
 }

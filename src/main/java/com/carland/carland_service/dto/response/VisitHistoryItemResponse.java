@@ -42,6 +42,8 @@ public class VisitHistoryItemResponse {
      */
     private Long branchId;
     private String branchName;
+    /** {@code branches.address} of the same branch as {@link #branchId}. */
+    private String branchAddress;
     private Double lat;
     private Double lng;
     private MoneyResponse amount;

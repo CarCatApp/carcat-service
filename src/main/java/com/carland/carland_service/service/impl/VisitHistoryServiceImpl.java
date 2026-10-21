@@ -364,6 +364,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                 .dealer(visit.getDealer())
                 .branchId(shownBranch == null ? null : shownBranch.getId())
                 .branchName(shownBranch == null ? null : shownBranch.getName())
+                .branchAddress(shownBranch == null ? null : shownBranch.getAddress())
                 .lat(shownBranch == null ? null : shownBranch.getLat())
                 .lng(shownBranch == null ? null : shownBranch.getLng())
                 .cost(toMoney(visit.getCostAmount(), visit.getCostCurrency()))
