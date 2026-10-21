@@ -28,4 +28,13 @@ public interface CalendarRepository extends JpaRepository<Calendar, Long> {
             + "and (r.status is null or r.status <> 'DELETED') "
             + "order by c.day")
     List<Object[]> findSlotDaysFrom(@Param("branchId") Long branchId, @Param("fromDay") LocalDate fromDay);
+
+    /**
+     * tr: Bugünden itibaren şubede saati olan son gün. Silinmiş saat sayılmaz.
+     * en: Latest day from today that still has a slot. Deleted hours do not count.
+     */
+    @Query("select max(c.day) from Calendar c join c.timeRanges r "
+            + "where c.branch.id = :branchId and c.day >= :fromDay and r.slotTarget is not null "
+            + "and (r.status is null or r.status <> 'DELETED')")
+    LocalDate findLatestDayFrom(@Param("branchId") Long branchId, @Param("fromDay") LocalDate fromDay);
 }

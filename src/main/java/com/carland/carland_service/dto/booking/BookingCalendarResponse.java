@@ -6,8 +6,8 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * tr: Bugünden ay sonuna her gün: date ve available.
- * en: Each day from today through month end: date and available.
+ * tr: Bugünden şubenin son ayının sonuna her gün: date ve available.
+ * en: Each day from today through the end of the branch's last month: date and available.
  */
 @Data
 @Builder

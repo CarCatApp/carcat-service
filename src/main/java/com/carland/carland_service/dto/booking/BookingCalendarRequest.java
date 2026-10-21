@@ -5,8 +5,8 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * tr: Flutter ay takvimi isteği. issue boşsa təmir+yoxlama yok.
- * en: Flutter month-calendar request. A blank issue means no repair+inspection.
+ * tr: Flutter takvim isteği. issue boşsa təmir+yoxlama yok.
+ * en: Flutter calendar request. A blank issue means no repair+inspection.
  */
 @Data
 public class BookingCalendarRequest {

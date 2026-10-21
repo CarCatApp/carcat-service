@@ -44,8 +44,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * tr: Flutter ay takvimi. Bugünden ay sonuna, yazılabilen saati olan gün available.
- * en: Flutter month calendar. From today through month end, a day is available when a bookable hour exists.
+ * tr: Flutter takvimi. Bugünden şubenin son ayının sonuna, yazılabilen saati olan gün available.
+ * en: Flutter calendar. From today through the end of the branch's last month, a day is available when a bookable hour exists.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,8 +63,8 @@ public class BookingCalendarService {
     private final ServiceCategoryJson json;
 
     /**
-     * tr: Seçilen paket, hizmet veya şikayet için bu ayın günlerini boyar.
-     * en: Paints this month's days for the selected package, services, or complaint.
+     * tr: Seçilen paket, hizmet veya şikayet için bugünden şubenin son ayına kadar günleri boyar.
+     * en: Paints days from today through the branch's last month for the selected package, services, or complaint.
      */
     @Transactional(readOnly = true)
     public BookingCalendarResponse month(Long branchId, BookingCalendarRequest request, String acceptLanguage) {
@@ -79,7 +79,7 @@ public class BookingCalendarService {
         BookingCalendarRequest body = request == null ? new BookingCalendarRequest() : request;
         Selection selection = selection(branch, body.getPackageId(), body.getIndividualServiceIds(), body.getIssue(), lang);
         LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
-        LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate end = horizonEnd(branch.getId(), today);
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
         Set<Long> held = heldByCar(body.getCarId());
         boolean single = selection.single();
@@ -126,8 +126,7 @@ public class BookingCalendarService {
         BookingDayRangesRequest body = request == null ? new BookingDayRangesRequest() : request;
         Selection selection = selection(branch, body.getPackageId(), body.getIndividualServiceIds(), body.getIssue(), lang);
         LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
-        LocalDate end = today.withDayOfMonth(today.lengthOfMonth());
-        LocalDate day = parseDay(body.getDate(), today, end, lang);
+        LocalDate day = parseDay(body.getDate(), today, lang);
         OffsetDateTime now = OffsetDateTime.now(StaffSlotWindows.ZONE);
         Set<Long> held = heldByCar(body.getCarId());
         boolean single = selection.single();
@@ -216,6 +215,19 @@ public class BookingCalendarService {
                     "Отправьте пакет, услугу или текст жалобы."));
         }
         return new Selection(packageId, serviceIds, repair);
+    }
+
+    /**
+     * tr: Bu ayın sonu, ya da şubenin son saati daha ilerideyse o ayın sonu.
+     * en: End of this month, or the end of the later month when the branch still has a slot.
+     */
+    private LocalDate horizonEnd(Long branchId, LocalDate today) {
+        LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate latest = calendarRepository.findLatestDayFrom(branchId, today);
+        if (latest == null || !latest.isAfter(monthEnd)) {
+            return monthEnd;
+        }
+        return latest.withDayOfMonth(latest.lengthOfMonth());
     }
 
     private static Map<LocalDate, List<Range>> rangesByDay(List<Calendar> calendars) {
@@ -343,7 +355,7 @@ public class BookingCalendarService {
         return 2;
     }
 
-    private static LocalDate parseDay(String raw, LocalDate today, LocalDate end, String lang) {
+    private static LocalDate parseDay(String raw, LocalDate today, String lang) {
         if (raw == null || raw.isBlank()) {
             throw new MissingFieldException(sentence(lang, "Tarix göndərin.",
                     "Send a date.", "Отправьте дату."));
@@ -355,11 +367,11 @@ public class BookingCalendarService {
             throw new MissingFieldException(sentence(lang, "Tarix gün.ay.il olmalıdır.",
                     "The date must be day.month.year.", "Дата должна быть в виде день.месяц.год."));
         }
-        if (day.isBefore(today) || day.isAfter(end)) {
+        if (day.isBefore(today)) {
             throw new MissingFieldException(sentence(lang,
-                    "Tarix bu ayın bugündən sonuna qədər olmalıdır.",
-                    "The date must be from today through the end of this month.",
-                    "Дата должна быть с сегодняшнего дня до конца этого месяца."));
+                    "Tarix bugün və ya sonrakı gün olmalıdır.",
+                    "The date must be today or a later day.",
+                    "Дата должна быть сегодняшним или более поздним днём."));
         }
         return day;
     }

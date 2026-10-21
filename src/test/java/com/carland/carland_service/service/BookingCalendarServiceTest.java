@@ -32,6 +32,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -114,6 +115,31 @@ class BookingCalendarServiceTest {
         BookingCalendarResponse response = service.month(7L, issue, "az");
         assertEquals(Boolean.TRUE, available(response, today));
         assertEquals(today.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), response.getDays().get(0).getDate());
+    }
+
+    @Test
+    void laterMonthsStayWhenTheBranchStillHasASlot() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        LocalDate later = today.plusMonths(2).withDayOfMonth(15);
+        LocalDate end = later.withDayOfMonth(later.lengthOfMonth());
+        OffsetDateTime start = ZonedDateTime.of(later, LocalTime.NOON, StaffSlotWindows.ZONE).toOffsetDateTime();
+        BranchCarePackage pkg = BranchCarePackage.builder().id(10L).name("Yağ").active(true).branch(branch).price(1).build();
+        when(carePackageRepository.findById(10L)).thenReturn(Optional.of(pkg));
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findLatestDayFrom(7L, today)).thenReturn(later);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(today), eq(end))).thenReturn(List.of(
+                day(later, range(2L, start, 2, pkg))
+        ));
+
+        BookingCalendarRequest request = new BookingCalendarRequest();
+        request.setPackageId(10L);
+        BookingCalendarResponse response = service.month(7L, request, "az");
+
+        assertEquals(Boolean.FALSE, available(response, today));
+        assertEquals(Boolean.TRUE, available(response, later));
+        assertEquals(end.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+                response.getDays().get(response.getDays().size() - 1).getDate());
+        assertEquals((int) ChronoUnit.DAYS.between(today, end) + 1, response.getDays().size());
     }
 
     @Test
@@ -357,10 +383,25 @@ class BookingCalendarServiceTest {
     }
 
     @Test
-    void dateOutsideThisMonthIsRejected() {
+    void pastDateIsRejected() {
         LocalDate yesterday = LocalDate.now(StaffSlotWindows.ZONE).minusDays(1);
         assertThrows(MissingFieldException.class,
                 () -> service.day(7L, request(yesterday, null, null, "səs"), "az"));
+    }
+
+    @Test
+    void laterMonthHourIsReturned() {
+        LocalDate later = LocalDate.now(StaffSlotWindows.ZONE).plusMonths(1).withDayOfMonth(15);
+        BranchCarePackage pkg = packageRow();
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(anyLong(), any())).thenReturn(0L);
+        when(calendarRepository.findByBranchIdAndDayBetween(eq(7L), eq(later), eq(later))).thenReturn(List.of(
+                day(later, slot(40L, at(later, 11, 0), 2, StaffSlotTargets.PACKAGE, pkg, null))
+        ));
+
+        BookingDayRangesResponse response = service.day(7L, request(later, 10L, null, null), "az");
+
+        assertEquals(1, response.getRanges().size());
+        assertEquals(40L, response.getRanges().get(0).getRangeId());
     }
 
     @Test

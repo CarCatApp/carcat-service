@@ -157,8 +157,8 @@ public class BookingDiscoveryController {
     }
 
     /**
-     * tr: Bu ayın günleri. date gün.ay.yıl, available true/false.
-     * en: Days of this month. date is day.month.year, available is true or false.
+     * tr: Bugünden şubenin son ayına kadar günler. date gün.ay.yıl, available true/false.
+     * en: Days from today through the branch's last month. date is day.month.year, available is true or false.
      */
     @GetMapping("/api/v1/booking/branches/{branchId}/calendar")
     public BookingCalendarResponse calendar(
