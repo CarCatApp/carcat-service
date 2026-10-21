@@ -48,6 +48,15 @@ public class DigitalFinanceClient {
      */
     public void forward(String method, String path, byte[] body, String requestIdentifier, HttpServletResponse response)
             throws IOException {
+        forward(method, path, body, requestIdentifier, null, response);
+    }
+
+    /**
+     * tr: Upstream cevabını bayt bayt yazar. RequestPurposeId doluysa header olarak gider.
+     * en: Writes the upstream response byte for byte. RequestPurposeId is sent when present.
+     */
+    public void forward(String method, String path, byte[] body, String requestIdentifier,
+                        String requestPurposeId, HttpServletResponse response) throws IOException {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("DIGITAL_FINANCE_API_KEY is empty");
         }
@@ -59,6 +68,9 @@ public class DigitalFinanceClient {
                 .header("Accept", "application/json")
                 .header("ApiKey", apiKey)
                 .header("RequestIdentifier", requestId);
+        if (requestPurposeId != null && !requestPurposeId.isBlank()) {
+            builder.header("RequestPurposeId", requestPurposeId.trim());
+        }
         if ("POST".equals(method)) {
             builder.header("Content-Type", "application/json");
             builder.POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
