@@ -75,7 +75,8 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.startsWith("/auth/")
                         || path.contains("/test/get")
                         || path.startsWith("/api/v1/user/customer-cars")
-                        || path.equals("/api/v1/group/by/get/brand/list/with/models");
+                        || path.equals("/api/v1/group/by/get/brand/list/with/models")
+                        || isAppAnnouncementActive(path);
 
         if (isPublic) {
             filterChain.doFilter(request, response);
@@ -97,5 +98,14 @@ public class CustomFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * tr: Cold start duyurusu. Bearer yok veya bozuk olsa da 401 yazılmaz.
+     * en: Cold-start announcements. A missing or broken Bearer must not become 401.
+     */
+    private static boolean isAppAnnouncementActive(String path) {
+        return "/api/v1/app-announcements/active".equals(path)
+                || (path != null && path.endsWith("/api/v1/app-announcements/active"));
     }
 }

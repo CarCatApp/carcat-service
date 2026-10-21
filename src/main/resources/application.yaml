@@ -60,6 +60,14 @@ carland:
     # ADMIN_ACCESS cookie lifetime; keep equal to carland_auth panel-token-seconds (6 hours).
     panel-token-seconds: ${ADMIN_PANEL_TOKEN_SECONDS:21600}
     auth-base-url: ${ADMIN_AUTH_BASE_URL:https://digital-innovation.agency/auth/server/api/v1/newUsers}
+  app-announcements:
+    cache-ttl-seconds: ${APP_ANNOUNCEMENT_CACHE_TTL_SECONDS:60}
+    android-store-url: ${APP_ANNOUNCEMENT_ANDROID_STORE_URL:https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat}
+    ios-store-url: ${APP_ANNOUNCEMENT_IOS_STORE_URL:}
+    cta-host-allowlist:
+      - play.google.com
+      - apps.apple.com
+      - itunes.apple.com
   swagger:
     auth-login-url: ${SWAGGER_AUTH_LOGIN_URL:https://digital-innovation.agency/auth/server/api/v1/users/login}
     auth-refresh-url: ${SWAGGER_AUTH_REFRESH_URL:https://digital-innovation.agency/auth/server/api/v1/users/refresh}

@@ -458,7 +458,8 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 || requestPath.startsWith("/legal")
                 || requestPath.equals("/error")
                 || requestPath.startsWith("/actuator")
-                || requestPath.startsWith("/api/v1/feature-flags");
+                || requestPath.startsWith("/api/v1/feature-flags")
+                || requestPath.startsWith("/api/v1/app-announcements");
     }
 
     @Override

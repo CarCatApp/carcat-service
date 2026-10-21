@@ -42,15 +42,15 @@ public class RedisCacheService {
 
     /**
      * GEÇİCİ. history:v2 normalde süresiz ({@code putJson} ttl = null).
-     * Eski JSON'da branch alanları yok. Yazım 2 dk; süresiz anahtar ilk okumada da 2 dk ömür alır.
-     * Süre bitince miss, yeni gövde yine 2 dk yazılır. Branch alanları prod'da görününce
+     * Eski JSON'da branch alanları yok. Yazım 24 saat; süresiz anahtar ilk okumada da 24 saat ömür alır.
+     * Süre bitince miss, yeni gövde yine 24 saat yazılır. Branch alanları prod'da görününce
      * bunu sil, {@code putJson} ttl'ini null yap, {@link #expireHistoryV2IfPersistent} çağrısını kaldır.
-     * TEMPORARY. history:v2 is normally persistent. Writes live 2 minutes, and a persistent key
-     * is given 2 minutes on the first read. After it dies the miss stores the new body for 2 minutes.
+     * TEMPORARY. history:v2 is normally persistent. Writes live 24 hours, and a persistent key
+     * is given 24 hours on the first read. After it dies the miss stores the new body for 24 hours.
      * When the branch fields show in prod, delete this, pass null to {@code putJson}, and remove
      * the {@link #expireHistoryV2IfPersistent} call.
      */
-    private static final Duration HISTORY_V2_TEMPORARY_TTL = Duration.ofMinutes(2);
+    private static final Duration HISTORY_V2_TEMPORARY_TTL = Duration.ofHours(24);
 
     private final StringRedisTemplate stringRedisTemplate;
     @Qualifier("redisBytesTemplate")
@@ -267,9 +267,9 @@ public class RedisCacheService {
 
     /**
      * GEÇİCİ. Süresiz history:v2 anahtarı kod TTL'ini kendiliğinden almaz.
-     * İlk okumada 2 dk EXPIRE konur; sonraki okuma pencereyi uzatmaz.
+     * İlk okumada 24 saat EXPIRE konur; sonraki okuma pencereyi uzatmaz.
      * TEMPORARY. A persistent history:v2 key does not pick up the code TTL by itself.
-     * The first read sets a 2 minute EXPIRE. Later reads do not slide that window.
+     * The first read sets a 24 hour EXPIRE. Later reads do not slide that window.
      */
     private void expireHistoryV2IfPersistent(String key) {
         try {

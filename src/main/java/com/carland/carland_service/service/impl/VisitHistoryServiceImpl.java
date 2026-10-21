@@ -84,14 +84,14 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * Satıra {@code branch_id} yazılmaz. {@code serviceCenterId} partner olarak kalır.
      * Hyper'a ikinci şube gelince veya partner 1 refactor edilince bu sabiti ve
      * {@link #hyperBranchFor(Long, Branch)} bağını sil.
-     * history:v2 TTL geçici olarak 2 dk ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
+     * history:v2 TTL geçici olarak 24 saat ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
      * Alanlar görününce o süreyi tekrar süresiz yap.
      * Hyper webhook/GET does not send a branch id, so {@code visits.branch_id} stays empty.
      * Partner 1 currently has one branch: {@code branches.id = 10}.
      * When {@code serviceCenterId == 1} the response copies that branch's id, name, lat and lng.
      * The visit row is not updated. Remove this constant and {@link #hyperBranchFor(Long, Branch)}
      * when Hyper gets a second branch or partner 1 is refactored.
-     * history:v2 TTL is temporarily 2 minutes. Set it back to no expiry once the fields show.
+     * history:v2 TTL is temporarily 24 hours. Set it back to no expiry once the fields show.
      */
     private static final long HYPER_TEMPORARY_BRANCH_ID = 10L;
 

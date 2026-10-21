@@ -91,6 +91,7 @@ public class FeatureFlagEndpointScanner implements ApplicationRunner {
     private boolean isNeverGuardPath(String path) {
         return path.startsWith("/legal")
                 || path.startsWith("/api/v1/feature-flags")
+                || path.startsWith("/api/v1/app-announcements")
                 || path.startsWith("/api/v1/user/customer-cars")
                 || path.equals("/api/v1/group/by/get/brand/list/with/models");
     }

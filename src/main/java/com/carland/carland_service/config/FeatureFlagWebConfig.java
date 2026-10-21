@@ -20,6 +20,8 @@ public class FeatureFlagWebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(featureFlagInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/v1/feature-flags/**");
+                .excludePathPatterns(
+                        "/api/v1/feature-flags/**",
+                        "/api/v1/app-announcements/**");
     }
 }

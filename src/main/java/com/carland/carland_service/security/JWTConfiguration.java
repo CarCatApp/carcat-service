@@ -52,6 +52,7 @@ public class JWTConfiguration {
                         .requestMatchers("/partner", "/partner/**").permitAll()
                         .requestMatchers("/api/v1/internal/booking/**").permitAll()
                         .requestMatchers("/api/v1/car/test/**").permitAll()
+                        .requestMatchers("/api/v1/app-announcements/active").permitAll()
                         .anyRequest().authenticated())
 
                 .addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
