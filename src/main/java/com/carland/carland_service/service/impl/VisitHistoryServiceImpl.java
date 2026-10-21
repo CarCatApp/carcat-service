@@ -85,7 +85,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * tamamlamada yazılan {@code branch_id} cevapta ad, lat ve lng ile döner.
      * Hyper'a ikinci şube gelince veya partner 1 refactor edilince bu sabiti ve
      * {@link #hyperBranchFor(Long, Branch)} bağını sil.
-     * history:v2 TTL geçici olarak 24 saat ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
+     * history:v2 TTL geçici olarak 2 dakika ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
      * TEMPORARY — Hyper GET/webhook rows only.
      * Hyper sends no branch id, so those rows keep {@code visits.branch_id} empty.
      * When {@code serviceCenterId == 1} and {@code branch_id} is empty the response uses
@@ -93,7 +93,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * stored at completion is returned with name, lat and lng.
      * Remove this constant and {@link #hyperBranchFor(Long, Branch)} when Hyper gets a
      * second branch or partner 1 is refactored.
-     * history:v2 TTL is temporarily 24 hours.
+     * history:v2 TTL is temporarily 2 minutes.
      */
     private static final long HYPER_TEMPORARY_BRANCH_ID = 10L;
 

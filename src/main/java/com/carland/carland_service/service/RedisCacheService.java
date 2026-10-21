@@ -42,15 +42,17 @@ public class RedisCacheService {
 
     /**
      * GEÇİCİ. history:v2 normalde süresiz ({@code putJson} ttl = null).
-     * Eski JSON'da branch alanları yok. Yazım 24 saat; süresiz anahtar ilk okumada da 24 saat ömür alır.
-     * Süre bitince miss, yeni gövde yine 24 saat yazılır. Branch alanları prod'da görününce
-     * bunu sil, {@code putJson} ttl'ini null yap, {@link #expireHistoryV2IfPersistent} çağrısını kaldır.
-     * TEMPORARY. history:v2 is normally persistent. Writes live 24 hours, and a persistent key
-     * is given 24 hours on the first read. After it dies the miss stores the new body for 24 hours.
+     * Eski JSON'da branch alanları yok. Yazım 2 dakika; süresiz veya daha uzun anahtar
+     * ilk okumada 2 dakikaya kesilir, sonraki okuma pencereyi uzatmaz.
+     * Süre bitince miss, yeni gövde yine 2 dakika yazılır. Branch alanları prod'da görününce
+     * bunu sil, {@code putJson} ttl'ini null yap, {@link #capHistoryV2Ttl} çağrısını kaldır.
+     * TEMPORARY. history:v2 is normally persistent. Writes live 2 minutes. A persistent key
+     * or one with a longer TTL is cut to 2 minutes on the first read. Later reads do not
+     * extend that window. After it dies the miss stores the new body for 2 minutes.
      * When the branch fields show in prod, delete this, pass null to {@code putJson}, and remove
-     * the {@link #expireHistoryV2IfPersistent} call.
+     * the {@link #capHistoryV2Ttl} call.
      */
-    private static final Duration HISTORY_V2_TEMPORARY_TTL = Duration.ofHours(24);
+    private static final Duration HISTORY_V2_TEMPORARY_TTL = Duration.ofMinutes(2);
 
     private final StringRedisTemplate stringRedisTemplate;
     @Qualifier("redisBytesTemplate")
@@ -257,7 +259,7 @@ public class RedisCacheService {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);
         if (hit != null) {
-            expireHistoryV2IfPersistent(key);
+            capHistoryV2Ttl(key);
             return hit;
         }
         VisitHistoryResponse loaded = loader.get();
@@ -266,15 +268,17 @@ public class RedisCacheService {
     }
 
     /**
-     * GEÇİCİ. Süresiz history:v2 anahtarı kod TTL'ini kendiliğinden almaz.
-     * İlk okumada 24 saat EXPIRE konur; sonraki okuma pencereyi uzatmaz.
-     * TEMPORARY. A persistent history:v2 key does not pick up the code TTL by itself.
-     * The first read sets a 24 hour EXPIRE. Later reads do not slide that window.
+     * GEÇİCİ. Süresiz veya 2 dakikadan uzun history:v2 anahtarı kod TTL'ini kendiliğinden almaz.
+     * İlk okumada 2 dakika EXPIRE konur; kalan süre zaten 2 dakika veya kısaysa dokunulmaz.
+     * TEMPORARY. A persistent history:v2 key, or one living longer than 2 minutes, does not
+     * pick up the shorter TTL by itself. The first read sets a 2 minute EXPIRE.
+     * A remaining TTL already at or under 2 minutes is left alone.
      */
-    private void expireHistoryV2IfPersistent(String key) {
+    private void capHistoryV2Ttl(String key) {
         try {
             Long ttlSeconds = stringRedisTemplate.getExpire(key);
-            if (ttlSeconds == null || ttlSeconds < 0) {
+            long capSeconds = HISTORY_V2_TEMPORARY_TTL.toSeconds();
+            if (ttlSeconds == null || ttlSeconds < 0 || ttlSeconds > capSeconds) {
                 stringRedisTemplate.expire(key, HISTORY_V2_TEMPORARY_TTL);
             }
         } catch (Exception ex) {
