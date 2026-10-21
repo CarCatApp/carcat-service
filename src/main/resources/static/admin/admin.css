@@ -1515,6 +1515,38 @@ body.booking-page .card { margin-bottom: 4px; }
 .time-opt:hover { background: #ececef; }
 .time-opt.is-on { background: var(--text); color: #fff; }
 
+.clock24 {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.clock24 select {
+  width: auto;
+  min-width: 64px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.clock24-colon { font-weight: 800; line-height: 1; color: var(--text); }
+.clock24 input[type="hidden"] { display: none; }
+td .clock24 { display: flex; width: fit-content; margin: 2px 0; }
+.dt24 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dt24-date {
+  width: auto;
+  min-width: 168px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+}
+.dt24 .clock24 select { min-height: 36px; height: 36px; }
+body.booking-page td:has(.clock24) { height: auto; }
+
 @media (max-width: 1100px) {
   .booking-form-grid-partner,
   .booking-form-grid-branch,

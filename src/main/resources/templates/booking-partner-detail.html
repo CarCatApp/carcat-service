@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="'Partner ' + ${partner.name}">Partner</title>
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
-  <link rel="stylesheet" href="/admin/admin.css?v=booking3">
+  <link rel="stylesheet" href="/admin/admin.css?v=clock24">
   <style>
     .verified-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
     .verified-switch {
@@ -20,7 +20,6 @@
     .verified-switch:checked::after { transform: translateX(16px); }
     .branch-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .branch-edit label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
-    .branch-edit input[type="time"] { height: 32px; }
     .completion-switch {
       display: inline-flex; align-items: center; gap: 8px;
       font-size: 12px; white-space: nowrap; color: var(--text, #111);
@@ -250,23 +249,35 @@
           <td>
             <form class="branch-edit" th:id="'branch-edit-' + ${b.id}" method="post"
                   th:action="@{/admin/booking-partners/{id}/branches/{branchId}(id=${partner.id}, branchId=${b.id})}">
-              <input type="time" name="weekdayStart" th:form="'branch-edit-' + ${b.id}"
-                     th:value="${#strings.isEmpty(day) ? '' : #strings.substring(day, 0, 5)}">
-              <input type="time" name="weekdayEnd" th:form="'branch-edit-' + ${b.id}"
-                     th:value="${#strings.isEmpty(day) or #strings.length(day) < 11 ? '' : #strings.substring(day, 6, 11)}">
+              <span class="clock24" data-clock>
+                <input type="hidden" name="weekdayStart" th:form="'branch-edit-' + ${b.id}"
+                       th:value="${#strings.isEmpty(day) ? '' : #strings.substring(day, 0, 5)}">
+              </span>
+              <span class="clock24" data-clock>
+                <input type="hidden" name="weekdayEnd" th:form="'branch-edit-' + ${b.id}"
+                       th:value="${#strings.isEmpty(day) or #strings.length(day) < 11 ? '' : #strings.substring(day, 6, 11)}">
+              </span>
             </form>
           </td>
           <td>
-            <input type="time" name="saturdayStart" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(sat) ? '' : #strings.substring(sat, 0, 5)}">
-            <input type="time" name="saturdayEnd" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(sat) or #strings.length(sat) < 11 ? '' : #strings.substring(sat, 6, 11)}">
+            <span class="clock24" data-clock>
+              <input type="hidden" name="saturdayStart" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(sat) ? '' : #strings.substring(sat, 0, 5)}">
+            </span>
+            <span class="clock24" data-clock>
+              <input type="hidden" name="saturdayEnd" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(sat) or #strings.length(sat) < 11 ? '' : #strings.substring(sat, 6, 11)}">
+            </span>
           </td>
           <td>
-            <input type="time" name="sundayStart" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(sun) ? '' : #strings.substring(sun, 0, 5)}">
-            <input type="time" name="sundayEnd" th:form="'branch-edit-' + ${b.id}"
-                   th:value="${#strings.isEmpty(sun) or #strings.length(sun) < 11 ? '' : #strings.substring(sun, 6, 11)}">
+            <span class="clock24" data-clock>
+              <input type="hidden" name="sundayStart" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(sun) ? '' : #strings.substring(sun, 0, 5)}">
+            </span>
+            <span class="clock24" data-clock>
+              <input type="hidden" name="sundayEnd" th:form="'branch-edit-' + ${b.id}"
+                     th:value="${#strings.isEmpty(sun) or #strings.length(sun) < 11 ? '' : #strings.substring(sun, 6, 11)}">
+            </span>
           </td>
           <td>
             <label class="verified-label">
@@ -405,7 +416,7 @@
     </div>
   </div>
 </main>
-<script src="/admin/admin.js?v=booking1"></script>
+<script src="/admin/admin.js?v=clock24"></script>
 <script>
   CarlandAdmin.initTimeWheels();
   const staffRole = document.getElementById('staffRole');

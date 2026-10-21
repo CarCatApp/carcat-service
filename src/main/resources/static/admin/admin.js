@@ -30,6 +30,153 @@
     }
   }
 
+  function parseParts(value) {
+    var raw = (value || "").trim();
+    var bits = raw.split(":");
+    if (bits.length < 2 || bits[0] === "" || bits[1] === "") return null;
+    var h = parseInt(bits[0], 10);
+    var m = parseInt(bits[1], 10);
+    if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m < 0 || m > 59) return null;
+    return { h: h, m: m };
+  }
+
+  function fillClockSelect(select, max, selected) {
+    select.innerHTML = "";
+    var blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "--";
+    select.appendChild(blank);
+    for (var i = 0; i < max; i++) {
+      var opt = document.createElement("option");
+      opt.value = pad(i);
+      opt.textContent = pad(i);
+      select.appendChild(opt);
+    }
+    select.value = selected == null ? "" : pad(selected);
+  }
+
+  function addClockSelects(wrap, parts, hidden) {
+    if (wrap.querySelector("select")) return;
+    var hour = document.createElement("select");
+    hour.className = "clock24-h";
+    hour.setAttribute("aria-label", "Saat");
+    var colon = document.createElement("span");
+    colon.className = "clock24-colon";
+    colon.setAttribute("aria-hidden", "true");
+    colon.textContent = ":";
+    var minute = document.createElement("select");
+    minute.className = "clock24-m";
+    minute.setAttribute("aria-label", "Dəqiqə");
+    fillClockSelect(hour, 24, parts ? parts.h : null);
+    fillClockSelect(minute, 60, parts ? parts.m : null);
+    wrap.appendChild(hour);
+    wrap.appendChild(colon);
+    wrap.appendChild(minute);
+    function write() {
+      if (hidden) hidden.value = hour.value && minute.value ? hour.value + ":" + minute.value : "";
+    }
+    hour.addEventListener("change", function () {
+      if (!hour.value) minute.value = "";
+      else if (!minute.value) minute.value = "00";
+      write();
+    });
+    minute.addEventListener("change", function () {
+      if (!minute.value) hour.value = "";
+      else if (!hour.value) hour.value = "00";
+      write();
+    });
+  }
+
+  function upgradeTimeInputs() {
+    document.querySelectorAll("input[type='time']").forEach(function (input) {
+      var wrap = document.createElement("span");
+      wrap.className = "clock24";
+      wrap.setAttribute("data-clock", "");
+      var hidden = document.createElement("input");
+      hidden.type = "hidden";
+      if (input.name) hidden.name = input.name;
+      if (input.id) hidden.id = input.id;
+      var formId = input.getAttribute("form");
+      if (formId) hidden.setAttribute("form", formId);
+      hidden.value = input.value || "";
+      wrap.appendChild(hidden);
+      input.replaceWith(wrap);
+    });
+  }
+
+  function enhanceClocks() {
+    document.querySelectorAll(".clock24[data-clock]").forEach(function (wrap) {
+      var hidden = wrap.querySelector("input[type='hidden']");
+      if (!hidden) return;
+      var parts = parseParts(hidden.value);
+      hidden.value = parts ? pad(parts.h) + ":" + pad(parts.m) : "";
+      addClockSelects(wrap, parts, hidden);
+    });
+  }
+
+  function mountDateTime(root) {
+    if (!root || root.querySelector(".dt24-date")) return;
+    var key = root.getAttribute("data-dt24") || "";
+    var date = document.createElement("input");
+    date.type = "date";
+    date.className = "dt24-date";
+    date.autocomplete = "off";
+    if (key) date.id = key + "Date";
+    var clock = document.createElement("span");
+    clock.className = "clock24";
+    var hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.className = "dt24-time";
+    hidden.value = "";
+    clock.appendChild(hidden);
+    root.appendChild(date);
+    root.appendChild(clock);
+    addClockSelects(clock, null, hidden);
+  }
+
+  function upgradeDateTimes() {
+    document.querySelectorAll("input[type='datetime-local']").forEach(function (input) {
+      var root = document.createElement("div");
+      root.className = "dt24";
+      if (input.id) root.setAttribute("data-dt24", input.id);
+      var match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(input.value || "");
+      input.replaceWith(root);
+      mountDateTime(root);
+      if (match) writeDateTime(input.id, match[1] + "T" + match[2]);
+    });
+    document.querySelectorAll("[data-dt24]").forEach(mountDateTime);
+  }
+
+  function readDateTime(key) {
+    var root = document.querySelector('[data-dt24="' + key + '"]');
+    if (!root) return "";
+    var date = root.querySelector(".dt24-date");
+    var hour = root.querySelector(".clock24-h");
+    var minute = root.querySelector(".clock24-m");
+    if (!date || !date.value || !hour || !hour.value || !minute || !minute.value) return "";
+    return date.value + "T" + hour.value + ":" + minute.value;
+  }
+
+  function writeDateTime(key, value) {
+    var root = document.querySelector('[data-dt24="' + key + '"]');
+    if (!root) return;
+    var date = root.querySelector(".dt24-date");
+    var hour = root.querySelector(".clock24-h");
+    var minute = root.querySelector(".clock24-m");
+    var hidden = root.querySelector(".dt24-time");
+    var match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value || "");
+    if (date) date.value = match ? match[1] : "";
+    if (hour) hour.value = match ? match[2] : "";
+    if (minute) minute.value = match ? match[3] : "";
+    if (hidden) hidden.value = match ? match[2] + ":" + match[3] : "";
+  }
+
+  function upgradeClocks() {
+    upgradeTimeInputs();
+    enhanceClocks();
+    upgradeDateTimes();
+  }
+
   function syncTimeWheel(root) {
     var hidden = root.querySelector("input[type='hidden']");
     var face = root.querySelector(".time-wheel-face");
@@ -56,6 +203,7 @@
   }
 
   function initTimeWheels() {
+    upgradeClocks();
     document.querySelectorAll(".time-wheel[data-time]").forEach(function (root) {
       var hidden = root.querySelector("input[type='hidden']");
       if (root.getAttribute("data-default") && (!hidden.value || !hidden.value.trim())) {
@@ -277,6 +425,9 @@
     confirmModal: confirmModal,
     initColumnToggle: initColumnToggle,
     initExpandCells: initExpandCells,
-    initTimeWheels: initTimeWheels
+    initTimeWheels: initTimeWheels,
+    upgradeClocks: upgradeClocks,
+    readDateTime: readDateTime,
+    writeDateTime: writeDateTime
   };
 })(window);

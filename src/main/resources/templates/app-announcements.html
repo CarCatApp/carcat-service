@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
   <title>Duyurular — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <link rel="stylesheet" href="/admin/admin.css?v=clock24">
   <style>
     .ann-lead { max-width: 72ch; }
     .ann-rules { margin: 12px 0 0 18px; color: var(--text-muted); }
@@ -203,12 +203,12 @@
       </div>
       <div class="form-row">
         <div class="field">
-          <label for="fStart">Başlangıç (Bakü)</label>
-          <input id="fStart" name="startsAt" type="datetime-local">
+          <label for="fStartDate">Başlangıç (Bakü)</label>
+          <div class="dt24" data-dt24="fStart"></div>
         </div>
         <div class="field">
-          <label for="fEnd">Bitiş (Bakü)</label>
-          <input id="fEnd" name="endsAt" type="datetime-local">
+          <label for="fEndDate">Bitiş (Bakü)</label>
+          <div class="dt24" data-dt24="fEnd"></div>
           <span class="hint">Bitiş anı dahil değildir.</span>
         </div>
       </div>
@@ -302,8 +302,8 @@
         </select>
       </div>
       <div class="filter-field">
-        <label for="pAt">An (Bakü)</label>
-        <input id="pAt" type="datetime-local">
+        <label for="pAtDate">An (Bakü)</label>
+        <div class="dt24" data-dt24="pAt"></div>
       </div>
       <button class="btn btn-ghost" type="submit">Göster</button>
     </form>
@@ -311,8 +311,9 @@
   </section>
 </main>
 
-<script src="/admin/admin.js?v=premium1"></script>
+<script src="/admin/admin.js?v=clock24"></script>
 <script>
+  CarlandAdmin.upgradeClocks();
   const LANGS = ["az", "en", "ru"];
   const LIMITS = { title: 60, body: 500, cta: 30 };
   let editingId = null;
@@ -500,6 +501,8 @@
     document.getElementById("editorTitle").textContent = "Yeni taslak";
     document.getElementById("editorMeta").replaceChildren();
     document.getElementById("editorForm").reset();
+    CarlandAdmin.writeDateTime("fStart", "");
+    CarlandAdmin.writeDateTime("fEnd", "");
     document.getElementById("fPriority").value = "0";
     document.getElementById("fDismissible").value = "true";
     LANGS.forEach(function (lang) { fillLang(lang, null); });
@@ -528,8 +531,8 @@
     document.getElementById("fMin").value = row.minAppVersion || "";
     document.getElementById("fMax").value = row.maxAppVersion || "";
     document.getElementById("fCta").value = row.ctaUrl || "";
-    document.getElementById("fStart").value = utcToBakuInput(row.startsAt);
-    document.getElementById("fEnd").value = utcToBakuInput(row.endsAt);
+    CarlandAdmin.writeDateTime("fStart", utcToBakuInput(row.startsAt));
+    CarlandAdmin.writeDateTime("fEnd", utcToBakuInput(row.endsAt));
     LANGS.forEach(function (lang) { fillLang(lang, row); });
     document.getElementById("editor").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -557,8 +560,8 @@
       showError("az başlık ve metin zorunlu");
       return null;
     }
-    const starts = bakuInputToUtc(document.getElementById("fStart").value);
-    const ends = bakuInputToUtc(document.getElementById("fEnd").value);
+    const starts = bakuInputToUtc(CarlandAdmin.readDateTime("fStart"));
+    const ends = bakuInputToUtc(CarlandAdmin.readDateTime("fEnd"));
     if (starts && ends && ends <= starts) {
       showError("Bitiş, başlangıçtan sonra olmalı");
       return null;
@@ -672,7 +675,7 @@
     const version = document.getElementById("pVersion").value.trim();
     const platform = document.getElementById("pPlatform").value;
     const lang = document.getElementById("pLang").value;
-    const at = bakuInputToUtc(document.getElementById("pAt").value);
+    const at = bakuInputToUtc(CarlandAdmin.readDateTime("pAt"));
     if (version) params.set("version", version);
     if (platform) params.set("platform", platform);
     if (lang) params.set("lang", lang);
