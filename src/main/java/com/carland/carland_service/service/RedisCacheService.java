@@ -40,6 +40,18 @@ public class RedisCacheService {
     private static final Duration PHOTO_TTL = Duration.ofHours(1);
     private static final Duration CATALOG_TTL = Duration.ofDays(30);
 
+    /**
+     * GEÇİCİ. history:v2 normalde süresiz ({@code putJson} ttl = null).
+     * Eski JSON'da branch alanları yok. Yazım 2 dk; süresiz anahtar ilk okumada da 2 dk ömür alır.
+     * Süre bitince miss, yeni gövde yine 2 dk yazılır. Branch alanları prod'da görününce
+     * bunu sil, {@code putJson} ttl'ini null yap, {@link #expireHistoryV2IfPersistent} çağrısını kaldır.
+     * TEMPORARY. history:v2 is normally persistent. Writes live 2 minutes, and a persistent key
+     * is given 2 minutes on the first read. After it dies the miss stores the new body for 2 minutes.
+     * When the branch fields show in prod, delete this, pass null to {@code putJson}, and remove
+     * the {@link #expireHistoryV2IfPersistent} call.
+     */
+    private static final Duration HISTORY_V2_TEMPORARY_TTL = Duration.ofMinutes(2);
+
     private final StringRedisTemplate stringRedisTemplate;
     @Qualifier("redisBytesTemplate")
     private final RedisTemplate<String, byte[]> redisBytesTemplate;
@@ -245,11 +257,29 @@ public class RedisCacheService {
         String key = "history:v2:" + vinKey(vin) + ":" + langKey(lang);
         VisitHistoryResponse hit = getJson(key, new TypeReference<>() {}, "history-v2 vin=" + vin);
         if (hit != null) {
+            expireHistoryV2IfPersistent(key);
             return hit;
         }
         VisitHistoryResponse loaded = loader.get();
-        putJson(key, loaded, null);
+        putJson(key, loaded, HISTORY_V2_TEMPORARY_TTL);
         return loaded;
+    }
+
+    /**
+     * GEÇİCİ. Süresiz history:v2 anahtarı kod TTL'ini kendiliğinden almaz.
+     * İlk okumada 2 dk EXPIRE konur; sonraki okuma pencereyi uzatmaz.
+     * TEMPORARY. A persistent history:v2 key does not pick up the code TTL by itself.
+     * The first read sets a 2 minute EXPIRE. Later reads do not slide that window.
+     */
+    private void expireHistoryV2IfPersistent(String key) {
+        try {
+            Long ttlSeconds = stringRedisTemplate.getExpire(key);
+            if (ttlSeconds == null || ttlSeconds < 0) {
+                stringRedisTemplate.expire(key, HISTORY_V2_TEMPORARY_TTL);
+            }
+        } catch (Exception ex) {
+            log.warn("REDIS_EXPIRE_FAIL {} | {}", key, ex.getMessage());
+        }
     }
 
     public CarVinServiceHistoryResponse getOrLoadHistoryV1(String vin, String lang,
