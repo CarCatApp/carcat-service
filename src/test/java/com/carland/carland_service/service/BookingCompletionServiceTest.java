@@ -129,6 +129,9 @@ class BookingCompletionServiceTest {
         assertEquals(new BigDecimal("129.00"), visit.getPackagePrice());
         assertEquals("panel", visit.getSource());
         assertNull(visit.getHyperRecordId());
+        assertEquals(7L, visit.getBranchId());
+        assertEquals(1L, visit.getServiceCenterId());
+        assertEquals("HyperService", visit.getServiceCenterName());
         assertEquals(4, visit.getServices().size(), "3 cards + 1 package info line");
 
         VisitServiceLine pkg = visit.getServices().get(0);

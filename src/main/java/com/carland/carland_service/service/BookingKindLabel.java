@@ -7,7 +7,7 @@ package com.carland.carland_service.service;
 public final class BookingKindLabel {
 
     public static final String ROUTINE = "Dövri qulluq";
-    public static final String REPAIR = "Təmir Xidməti və Yoxlanış";
+    public static final String REPAIR = "Təmir və diaqnostika";
 
     private BookingKindLabel() {
     }

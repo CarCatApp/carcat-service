@@ -33,14 +33,12 @@ public class VisitHistoryItemResponse {
     private String dealer;
 
     /*
-     * GEÇİCİ / TEMPORARY — Hyper partner 1 refactor.
-     * Webhook ve Hyper GET şube göndermez. Partner 1'in tek şubesi branches.id = 10
-     * (Hyper Service, Babək pr. 43A). serviceCenterId 1 ise cevapta bu şube yazılır.
-     * visits.branch_id güncellenmez. İkinci Hyper şubesi açılınca veya partner 1
-     * refactor edilince bu alanların doldurulduğu bağ kaldırılacak.
-     * Hyper webhook/GET sends no branch. Partner 1's only branch is branches.id = 10.
-     * When serviceCenterId is 1 the response shows that branch. visits.branch_id is not updated.
-     * Remove the binding when a second Hyper branch appears or partner 1 is refactored.
+     * Detailed panel ziyareti: visits.branch_id doluysa bu alanlar o şubedir.
+     * Hyper GET/webhook şube göndermez; branch_id boş ve serviceCenterId 1 ise
+     * geçici olarak branches.id = 10 (Hyper Service, Babək pr. 43A) yazılır.
+     * A detailed panel visit with visits.branch_id fills these fields from that branch.
+     * Hyper GET/webhook sends no branch; an empty branch_id with serviceCenterId 1
+     * still shows branches.id = 10 until that temporary binding is removed.
      */
     private Long branchId;
     private String branchName;

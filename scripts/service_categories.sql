@@ -45,7 +45,13 @@ INSERT INTO service_categories (
     code, title_json, description_json, sort_order, openable, toggleable, active, direction_keys
 ) VALUES (
     'repair_inspection',
-    '{"az":"Təmir Xidməti və Yoxlanış","en":"Repair & Inspection","ru":"Ремонт и диагностика"}',
-    '{"az":"Avtomobil təmir və yoxlanış xidmətləri","en":"Vehicle repair and inspection services","ru":"Ремонт и диагностика автомобиля"}',
+    '{"az":"Təmir və diaqnostika","en":"Repair and diagnostics","ru":"Ремонт и диагностика"}',
+    '{"az":"Avtomobil təmir və diaqnostika xidmətləri","en":"Vehicle repair and diagnostics services","ru":"Ремонт и диагностика автомобиля"}',
     2, false, true, true, 'dir:repair,dir:inspection'
 ) ON CONFLICT (code) DO NOTHING;
+
+-- INSERT conflict leaves the old title. This renames the live repair card in az/en/ru.
+UPDATE service_categories
+SET title_json = '{"az":"Təmir və diaqnostika","en":"Repair and diagnostics","ru":"Ремонт и диагностика"}',
+    description_json = '{"az":"Avtomobil təmir və diaqnostika xidmətləri","en":"Vehicle repair and diagnostics services","ru":"Ремонт и диагностика автомобиля"}'
+WHERE code = 'repair_inspection';

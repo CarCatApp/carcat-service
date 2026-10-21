@@ -138,6 +138,11 @@ idda:
   partner-code: ${IDDA_PARTNER_CODE:}
   api-key: ${IDDA_API_KEY:}
 
+# Prod host must resolve to the VPN proxy (10.114.0.10). ApiKey only in /root/carland.env.
+digital-finance:
+  base-url: ${DIGITAL_FINANCE_BASE_URL:http://prod.asanfinance.gov.az}
+  api-key: ${DIGITAL_FINANCE_API_KEY:}
+
 # Placeholder values are "test". Put the real key only in /root/carland.env (never git).
 openai:
   api-key: ${OPENAI_API_KEY:test}

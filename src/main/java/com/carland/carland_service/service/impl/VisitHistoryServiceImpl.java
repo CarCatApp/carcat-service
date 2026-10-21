@@ -50,6 +50,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -77,21 +78,22 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     private static final PartnerId HYPER_PARTNER = PartnerId.HYPER;
 
     /**
-     * GEÇİCİ / TEMPORARY — Hyper partner 1 refactor.
-     * Hyper webhook ve Hyper GET şube id'si göndermez; {@code visits.branch_id} boş kalır.
-     * Partner 1'in bugün tek şubesi var: {@code branches.id = 10}, Hyper Service, Babək pr. 43A.
-     * Cevapta {@code serviceCenterId == 1} ise bu şubenin id, ad, lat ve lng yazılır.
-     * Satıra {@code branch_id} yazılmaz. {@code serviceCenterId} partner olarak kalır.
+     * GEÇİCİ / TEMPORARY — yalnız Hyper GET/webhook satırı.
+     * Hyper şube id'si göndermez; o satırda {@code visits.branch_id} boş kalır.
+     * {@code serviceCenterId == 1} ve {@code branch_id} boşsa cevapta {@code branches.id = 10}
+     * (Hyper Service, Babək pr. 43A) yazılır. Detailed panel ziyareti bunu kullanmaz:
+     * tamamlamada yazılan {@code branch_id} cevapta ad, lat ve lng ile döner.
      * Hyper'a ikinci şube gelince veya partner 1 refactor edilince bu sabiti ve
      * {@link #hyperBranchFor(Long, Branch)} bağını sil.
      * history:v2 TTL geçici olarak 24 saat ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
-     * Alanlar görününce o süreyi tekrar süresiz yap.
-     * Hyper webhook/GET does not send a branch id, so {@code visits.branch_id} stays empty.
-     * Partner 1 currently has one branch: {@code branches.id = 10}.
-     * When {@code serviceCenterId == 1} the response copies that branch's id, name, lat and lng.
-     * The visit row is not updated. Remove this constant and {@link #hyperBranchFor(Long, Branch)}
-     * when Hyper gets a second branch or partner 1 is refactored.
-     * history:v2 TTL is temporarily 24 hours. Set it back to no expiry once the fields show.
+     * TEMPORARY — Hyper GET/webhook rows only.
+     * Hyper sends no branch id, so those rows keep {@code visits.branch_id} empty.
+     * When {@code serviceCenterId == 1} and {@code branch_id} is empty the response uses
+     * {@code branches.id = 10}. A detailed panel visit does not: the {@code branch_id}
+     * stored at completion is returned with name, lat and lng.
+     * Remove this constant and {@link #hyperBranchFor(Long, Branch)} when Hyper gets a
+     * second branch or partner 1 is refactored.
+     * history:v2 TTL is temporarily 24 hours.
      */
     private static final long HYPER_TEMPORARY_BRANCH_ID = 10L;
 
@@ -224,8 +226,9 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     private VisitHistoryResponse buildResponse(Car car, String vin, String source, List<Visit> visits, String acceptLanguage) {
         Map<Long, Partner> partnerById = loadPartnersForVisits(visits);
         Branch hyperBranch = loadHyperTemporaryBranch(visits);
+        Map<Long, Branch> branchById = loadStoredBranches(visits);
         List<VisitHistoryItemResponse> items = visits.stream()
-                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch))
+                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById))
                 .toList();
 
         return VisitHistoryResponse.builder()
@@ -272,8 +275,38 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
-     * GEÇİCİ. Partner 1 ise branch 10. Başka partnerde şube alanları boş kalır.
-     * TEMPORARY. Partner 1 uses branch 10. Other partners leave the branch fields empty.
+     * Panel ziyaretindeki şubeyi döner. {@code branch_id} boşsa Hyper geçici şubesine düşer.
+     * Returns the branch stored on a panel visit. An empty {@code branch_id} falls back to the temporary Hyper branch.
+     */
+    private Branch shownBranch(Visit visit, Long partnerId, Branch hyperTemporaryBranch, Map<Long, Branch> branchById) {
+        if (visit.getBranchId() != null) {
+            return branchById.get(visit.getBranchId());
+        }
+        return hyperBranchFor(partnerId, hyperTemporaryBranch);
+    }
+
+    /**
+     * tr: Detailed tamamlamada yazılmış {@code visits.branch_id} değerlerini bir kez okur.
+     * en: Loads the {@code visits.branch_id} values written when a detailed branch completes a service.
+     */
+    private Map<Long, Branch> loadStoredBranches(List<Visit> visits) {
+        Set<Long> branchIds = visits.stream()
+                .map(Visit::getBranchId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+        if (branchIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Branch> branchById = new HashMap<>();
+        for (Branch branch : branchRepository.findAllById(branchIds)) {
+            branchById.put(branch.getId(), branch);
+        }
+        return branchById;
+    }
+
+    /**
+     * GEÇİCİ. Partner 1 ve boş branch_id ise branch 10. Başka partnerde şube alanları boş kalır.
+     * TEMPORARY. Partner 1 with an empty branch_id uses branch 10. Other partners leave the branch fields empty.
      */
     private Branch hyperBranchFor(Long partnerId, Branch hyperTemporaryBranch) {
         if (!HYPER_PARTNER.getId().equals(partnerId)) {
@@ -283,12 +316,13 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
-     * tr: Partner 1 ziyareti varsa branch 10'u bir kez okur. Satır yoksa alanlar boş kalır.
-     * en: Loads branch 10 once when a partner-1 visit is present. Missing row leaves the fields empty.
+     * tr: branch_id boş partner 1 ziyareti varsa branch 10'u bir kez okur. Satır yoksa alanlar boş kalır.
+     * en: Loads branch 10 once when a partner-1 visit has no branch_id. Missing row leaves the fields empty.
      */
     private Branch loadHyperTemporaryBranch(List<Visit> visits) {
         boolean hyper = visits.stream().anyMatch(visit ->
-                HYPER_PARTNER.getId().equals(
+                visit.getBranchId() == null
+                        && HYPER_PARTNER.getId().equals(
                         partnerLookupService.resolvePartnerId(visit.getServiceCenterId(), HYPER_PARTNER)));
         if (!hyper) {
             return null;
@@ -305,12 +339,12 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * en: Maps a single Visit entity into the response model enriched with partner and translation info.
      */
     private VisitHistoryItemResponse mapVisit(Visit visit, Map<Long, Partner> partnerById, String acceptLanguage,
-                                               Branch hyperTemporaryBranch) {
+                                               Branch hyperTemporaryBranch, Map<Long, Branch> branchById) {
         Long partnerId = partnerLookupService.resolvePartnerId(visit.getServiceCenterId(), HYPER_PARTNER);
         PartnerId enumPartner = PartnerId.fromId(partnerId).orElse(HYPER_PARTNER);
         String partnerName = partnerLookupService.resolvePartnerName(
                 visit.getServiceCenterId(), visit.getServiceCenterName(), partnerById, enumPartner);
-        Branch shownBranch = hyperBranchFor(partnerId, hyperTemporaryBranch);
+        Branch shownBranch = shownBranch(visit, partnerId, hyperTemporaryBranch, branchById);
 
         List<String> serviceGroups = visit.getServiceGroups() == null
                 ? Collections.emptyList()

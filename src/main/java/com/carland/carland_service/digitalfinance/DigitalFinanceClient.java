@@ -1,0 +1,88 @@
+package com.carland.carland_service.digitalfinance;
+
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.UUID;
+
+/**
+ * tr: Digital Finance prod çağrısı. Gövde ve status olduğu gibi servlet cevabına yazılır. ApiKey loglanmaz.
+ * en: Digital Finance prod call. Body and status are written to the servlet response unchanged. ApiKey is never logged.
+ */
+@Slf4j
+@Component
+public class DigitalFinanceClient {
+
+    private final HttpClient httpClient;
+    private final String baseUrl;
+    private final String apiKey;
+
+    public DigitalFinanceClient(
+            @Value("${digital-finance.base-url}") String baseUrl,
+            @Value("${digital-finance.api-key:}") String apiKey) {
+        this(baseUrl, apiKey, HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(15))
+                .build());
+    }
+
+    DigitalFinanceClient(String baseUrl, String apiKey, HttpClient httpClient) {
+        this.baseUrl = stripTrailingSlash(baseUrl);
+        this.apiKey = apiKey == null ? "" : apiKey.trim();
+        this.httpClient = httpClient;
+    }
+
+    /**
+     * tr: Upstream cevabını bayt bayt yazar. JSON yeniden üretilmez.
+     * en: Writes the upstream response byte for byte. JSON is not rebuilt.
+     */
+    public void forward(String method, String path, byte[] body, String requestIdentifier, HttpServletResponse response)
+            throws IOException {
+        if (apiKey.isBlank()) {
+            throw new IllegalStateException("DIGITAL_FINANCE_API_KEY is empty");
+        }
+        String requestId = (requestIdentifier == null || requestIdentifier.isBlank())
+                ? UUID.randomUUID().toString()
+                : requestIdentifier.trim();
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Accept", "application/json")
+                .header("ApiKey", apiKey)
+                .header("RequestIdentifier", requestId);
+        if ("POST".equals(method)) {
+            builder.header("Content-Type", "application/json");
+            builder.POST(HttpRequest.BodyPublishers.ofByteArray(body == null ? new byte[0] : body));
+        } else {
+            builder.GET();
+        }
+        HttpResponse<byte[]> upstream;
+        try {
+            upstream = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Digital Finance call interrupted", ex);
+        }
+        log.info("Digital Finance {} {} status={}", method, path, upstream.statusCode());
+        byte[] bytes = upstream.body() == null ? new byte[0] : upstream.body();
+        response.setStatus(upstream.statusCode());
+        response.setContentType(upstream.headers().firstValue("Content-Type").orElse("application/json;charset=UTF-8"));
+        response.getOutputStream().write(bytes);
+        response.flushBuffer();
+    }
+
+    private static String stripTrailingSlash(String url) {
+        if (url == null || url.isBlank()) {
+            throw new IllegalStateException("digital-finance.base-url is empty");
+        }
+        String trimmed = url.trim();
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+}

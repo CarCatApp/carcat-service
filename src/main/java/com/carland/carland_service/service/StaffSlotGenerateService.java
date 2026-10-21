@@ -338,7 +338,7 @@ public class StaffSlotGenerateService {
             targets.add(new Target(StaffSlotTargets.INDIVIDUAL, null, serviceId, null, catalog, name));
         }
         if (Boolean.TRUE.equals(request.getRepairInspection())) {
-            String repairName = sentence(lang, "Təmir və yoxlama", "Repair and inspection", "Ремонт и осмотр");
+            String repairName = sentence(lang, "Təmir və diaqnostika", "Repair and diagnostics", "Ремонт и диагностика");
             ServiceCategory category = categoryRepository.findByCode(StaffSlotTargets.REPAIR_INSPECTION).orElse(null);
             if (category != null) {
                 Map<String, String> titles = json.read(category.getTitleJson());
