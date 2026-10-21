@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Duyurular — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .ann-lead { max-width: 72ch; }
+    .ann-rules { margin: 12px 0 0 18px; color: var(--text-muted); }
+    .ann-rules li { margin: 4px 0; }
+    .ann-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .ann-lang {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+    .ann-lang h3 { font-size: 15px; margin-bottom: 12px; }
+    .ann-lang .req { color: var(--danger-text); font-weight: 700; }
+    .ann-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ann-actions .btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+    .ann-editor[hidden], .ann-preview-list[hidden] { display: none; }
+    .ann-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .sheet-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .sheet {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 18px 16px;
+      max-width: 440px;
+    }
+    .sheet h3 { font-size: 18px; line-height: 1.3; margin: 8px 0; }
+    .sheet p { white-space: pre-wrap; margin-bottom: 12px; }
+    .sheet .cta {
+      display: inline-flex;
+      min-height: 40px;
+      padding: 8px 16px;
+      border-radius: var(--radius-pill);
+      background: var(--primary);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .hint { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    @media (max-width: 980px) {
+      .ann-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">İçeriğe geç</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link active" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <a class="btn btn-logout" href="/admin/logout">Logout</a>
+</header>
+
+<main class="container" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Duyurular</h1>
+      <p class="muted ann-lead">Uygulama her açılışta aktif duyuruları sorar. Telefon kapatılamaz olan varsa onu, yoksa daha önce görmediği ilk kaydı gösterir. Görüldü takibi <strong>id</strong> ile tutulur. Aynı metni yeniden göstermek için kaydı silmeyin, <strong>Kopyala</strong> ile yeni id üretin.</p>
+    </div>
+    <button class="btn btn-primary" type="button" id="newBtn">Yeni taslak</button>
+  </div>
+
+  <div class="err" id="errorBox" hidden></div>
+  <p class="ok-box" id="okBox" hidden role="status"></p>
+
+  <section class="create-card">
+    <h2>Liste</h2>
+    <form id="filterForm" class="filter-bar bare">
+      <div class="filter-field">
+        <label for="filterActive">Durum</label>
+        <select id="filterActive" name="active">
+          <option value="">Hepsi</option>
+          <option value="true">Yayında</option>
+          <option value="false">Taslak</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterType">Tür</label>
+        <select id="filterType" name="type">
+          <option value="">Hepsi</option>
+          <option value="UPDATE">UPDATE</option>
+          <option value="INFO">INFO</option>
+          <option value="MAINTENANCE">MAINTENANCE</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="filterPlatform">Platform</label>
+        <select id="filterPlatform" name="platform">
+          <option value="">Hepsi</option>
+          <option value="ALL">ALL</option>
+          <option value="IOS">IOS</option>
+          <option value="ANDROID">ANDROID</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost" type="submit">Filtrele</button>
+    </form>
+    <div class="table-wrap compact">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>Id</th>
+          <th>Durum</th>
+          <th>Tür</th>
+          <th>Platform</th>
+          <th>Sürüm</th>
+          <th>Zaman (Bakü)</th>
+          <th>Öncelik</th>
+          <th>Az başlık</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody id="listBody">
+        <tr class="empty-row"><td colspan="9">Yükleniyor</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="create-card ann-editor" id="editor" hidden>
+    <h2 id="editorTitle">Taslak</h2>
+    <div class="ann-meta" id="editorMeta"></div>
+    <ul class="ann-rules">
+      <li><strong>az</strong> başlık ve metin zorunlu. Başlık 60, metin 500, buton yazısı 30 karakter.</li>
+      <li><strong>UPDATE</strong> için üst sürüm zorunlu. Üst sınır yoksa güncellemeyi yapan kullanıcı da duyuruyu görür.</li>
+      <li>Kapatılamaz UPDATE için <strong>https</strong> CTA gerekir. Host: play.google.com, apps.apple.com, itunes.apple.com. CTA boşsa ilgili mağaza linki config’te dolu olmalıdır.</li>
+      <li>Saatler <strong>Asia/Baku</strong> olarak girilir. Kayıt UTC gider. Bitiş, başlangıçtan sonra olmalıdır.</li>
+      <li>Yayın ayrı adımdır. Kayıt taslak kalır. Silme yok; yayından alın.</li>
+    </ul>
+    <form id="editorForm">
+      <div class="form-row">
+        <div class="field">
+          <label for="fType">Tür</label>
+          <select id="fType" name="type" required>
+            <option value="INFO">INFO</option>
+            <option value="UPDATE">UPDATE</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fPlatform">Platform</label>
+          <select id="fPlatform" name="platform">
+            <option value="ALL">ALL</option>
+            <option value="IOS">IOS</option>
+            <option value="ANDROID">ANDROID</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fPriority">Öncelik</label>
+          <input id="fPriority" name="priority" type="number" value="0" step="1">
+        </div>
+        <div class="field">
+          <label for="fDismissible">Kapatılabilir</label>
+          <select id="fDismissible" name="dismissible">
+            <option value="true" selected>Evet</option>
+            <option value="false">Hayır, zorunlu</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="fMin">Min sürüm</label>
+          <input id="fMin" name="minAppVersion" placeholder="3.0.0" autocomplete="off">
+          <span class="hint">Boş = altsız. 3.1 ve 3.1.0 aynıdır.</span>
+        </div>
+        <div class="field">
+          <label for="fMax">Max sürüm</label>
+          <input id="fMax" name="maxAppVersion" placeholder="3.0.5" autocomplete="off">
+          <span class="hint" id="maxHint">UPDATE için zorunlu. 3.0.5 bu sürümü de kapsar.</span>
+        </div>
+        <div class="field grow">
+          <label for="fCta">CTA URL</label>
+          <input id="fCta" name="ctaUrl" type="url" placeholder="https://play.google.com/..." autocomplete="off">
+          <span class="hint">Boşsa UPDATE, platformun mağaza linkini kullanır. iOS linki env’de yoksa iOS UPDATE düşer.</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="fStart">Başlangıç (Bakü)</label>
+          <input id="fStart" name="startsAt" type="datetime-local">
+        </div>
+        <div class="field">
+          <label for="fEnd">Bitiş (Bakü)</label>
+          <input id="fEnd" name="endsAt" type="datetime-local">
+          <span class="hint">Bitiş anı dahil değildir.</span>
+        </div>
+      </div>
+
+      <div class="ann-grid">
+        <article class="ann-lang">
+          <h3>az <span class="req">zorunlu</span></h3>
+          <div class="field stack-field">
+            <label for="azTitle">Başlık</label>
+            <input id="azTitle" maxlength="60" autocomplete="off">
+            <span class="char-count" id="azTitleCount">0 / 60</span>
+          </div>
+          <div class="field stack-field">
+            <label for="azBody">Metin</label>
+            <textarea id="azBody" maxlength="500" rows="5"></textarea>
+            <span class="char-count" id="azBodyCount">0 / 500</span>
+          </div>
+          <div class="field stack-field">
+            <label for="azCta">Buton</label>
+            <input id="azCta" maxlength="30" autocomplete="off">
+            <span class="char-count" id="azCtaCount">0 / 30</span>
+          </div>
+        </article>
+        <article class="ann-lang">
+          <h3>en</h3>
+          <div class="field stack-field">
+            <label for="enTitle">Title</label>
+            <input id="enTitle" maxlength="60" autocomplete="off">
+            <span class="char-count" id="enTitleCount">0 / 60</span>
+          </div>
+          <div class="field stack-field">
+            <label for="enBody">Body</label>
+            <textarea id="enBody" maxlength="500" rows="5"></textarea>
+            <span class="char-count" id="enBodyCount">0 / 500</span>
+          </div>
+          <div class="field stack-field">
+            <label for="enCta">Button</label>
+            <input id="enCta" maxlength="30" autocomplete="off">
+            <span class="char-count" id="enCtaCount">0 / 30</span>
+          </div>
+        </article>
+        <article class="ann-lang">
+          <h3>ru</h3>
+          <div class="field stack-field">
+            <label for="ruTitle">Заголовок</label>
+            <input id="ruTitle" maxlength="60" autocomplete="off">
+            <span class="char-count" id="ruTitleCount">0 / 60</span>
+          </div>
+          <div class="field stack-field">
+            <label for="ruBody">Текст</label>
+            <textarea id="ruBody" maxlength="500" rows="5"></textarea>
+            <span class="char-count" id="ruBodyCount">0 / 500</span>
+          </div>
+          <div class="field stack-field">
+            <label for="ruCta">Кнопка</label>
+            <input id="ruCta" maxlength="30" autocomplete="off">
+            <span class="char-count" id="ruCtaCount">0 / 30</span>
+          </div>
+        </article>
+      </div>
+      <p class="hint">en veya ru boşsa telefon az metnini görür. Yalnız başlık doluysa kayıt reddedilir; ikisini birden yazın ya da ikisini de boş bırakın.</p>
+      <div class="ann-actions" style="margin-top: 16px">
+        <button class="btn btn-primary" type="submit" id="saveBtn">Taslak kaydet</button>
+        <button class="btn btn-ghost" type="button" id="cancelBtn">Vazgeç</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="create-card">
+    <h2>Telefonda ne görünür</h2>
+    <p class="muted">Aynı seçim kuralları. Saat boşsa şu an. Platform bilinmiyorsa yalnız ALL kayıtlar, sürüm bilinmiyorsa yalnız sürüm sınırı olmayanlar gelir. En fazla 5, sıra: kapatılamaz, MAINTENANCE, UPDATE, INFO, öncelik, yeni kayıt.</p>
+    <form id="previewForm" class="filter-bar bare">
+      <div class="filter-field">
+        <label for="pVersion">X-App-Version</label>
+        <input id="pVersion" placeholder="3.0.5" autocomplete="off">
+      </div>
+      <div class="filter-field">
+        <label for="pPlatform">Platform</label>
+        <select id="pPlatform">
+          <option value="">Bilinmiyor</option>
+          <option value="IOS">IOS</option>
+          <option value="ANDROID">ANDROID</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="pLang">Dil</label>
+        <select id="pLang">
+          <option value="az">az</option>
+          <option value="en">en</option>
+          <option value="ru">ru</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="pAt">An (Bakü)</label>
+        <input id="pAt" type="datetime-local">
+      </div>
+      <button class="btn btn-ghost" type="submit">Göster</button>
+    </form>
+    <div class="sheet-list" id="previewList"></div>
+  </section>
+</main>
+
+<script src="/admin/admin.js?v=premium1"></script>
+<script>
+  const LANGS = ["az", "en", "ru"];
+  const LIMITS = { title: 60, body: 500, cta: 30 };
+  let editingId = null;
+
+  function showError(msg) {
+    const box = document.getElementById("errorBox");
+    if (!msg) { box.hidden = true; box.textContent = ""; return; }
+    box.hidden = false;
+    box.textContent = msg;
+  }
+
+  function showOk(msg) {
+    const box = document.getElementById("okBox");
+    if (!msg) { box.hidden = true; box.textContent = ""; return; }
+    box.hidden = false;
+    box.textContent = msg;
+  }
+
+  async function api(url, options) {
+    const opts = options || {};
+    const headers = { Accept: "application/json" };
+    if (opts.body) headers["Content-Type"] = "application/json";
+    const res = await fetch(url, { credentials: "same-origin", method: opts.method || "GET", headers: headers, body: opts.body || undefined });
+    if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return null; }
+    const raw = await res.text();
+    let body = null;
+    try { body = raw ? JSON.parse(raw) : null; } catch (e) { body = { error: raw.slice(0, 180) }; }
+    if (!res.ok) {
+      showError((body && (body.error || body.message)) || ("İstek başarısız HTTP " + res.status));
+      return null;
+    }
+    return body;
+  }
+
+  function bakuParts(date) {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Baku",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    });
+    const bag = {};
+    fmt.formatToParts(date).forEach(function (part) { bag[part.type] = part.value; });
+    if (bag.hour === "24") bag.hour = "00";
+    return bag;
+  }
+
+  function formatBaku(iso) {
+    if (!iso) return "—";
+    const bag = bakuParts(new Date(iso));
+    return bag.day + "." + bag.month + "." + bag.year + " " + bag.hour + ":" + bag.minute;
+  }
+
+  function utcToBakuInput(iso) {
+    if (!iso) return "";
+    const bag = bakuParts(new Date(iso));
+    return bag.year + "-" + bag.month + "-" + bag.day + "T" + bag.hour + ":" + bag.minute;
+  }
+
+  function bakuInputToUtc(value) {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return null;
+    const utc = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]) - 4, Number(match[5]), 0);
+    return new Date(utc).toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+
+  function textOf(row, lang, field) {
+    const found = (row.translations || []).find(function (item) { return item.lang === lang; });
+    return found && found[field] ? found[field] : "";
+  }
+
+  function versionSpan(row) {
+    const min = row.minAppVersion || "—";
+    const max = row.maxAppVersion || "—";
+    return min + " … " + max;
+  }
+
+  function windowText(row) {
+    if (!row.startsAt && !row.endsAt) return "Süresiz";
+    return formatBaku(row.startsAt) + " → " + formatBaku(row.endsAt);
+  }
+
+  function badge(label, kind) {
+    const span = document.createElement("span");
+    span.className = "badge badge-" + kind;
+    span.textContent = label;
+    return span;
+  }
+
+  function renderList(rows) {
+    const body = document.getElementById("listBody");
+    body.replaceChildren();
+    if (!rows || !rows.length) {
+      const tr = document.createElement("tr");
+      tr.className = "empty-row";
+      const td = document.createElement("td");
+      td.colSpan = 9;
+      td.textContent = "Kayıt yok";
+      tr.appendChild(td);
+      body.appendChild(tr);
+      return;
+    }
+    rows.forEach(function (row) {
+      const tr = document.createElement("tr");
+      const cells = [
+        String(row.id),
+        null,
+        row.type,
+        row.platform,
+        versionSpan(row),
+        windowText(row),
+        String(row.priority),
+        textOf(row, "az", "title") || "—"
+      ];
+      cells.forEach(function (value, index) {
+        const td = document.createElement("td");
+        if (index === 1) {
+          td.appendChild(row.active ? badge("Yayında", "success") : badge("Taslak", "neutral"));
+          if (row.dismissible === false) td.appendChild(document.createTextNode(" "));
+          if (row.dismissible === false) td.appendChild(badge("Zorunlu", "danger"));
+        } else {
+          td.textContent = value;
+        }
+        tr.appendChild(td);
+      });
+      const actions = document.createElement("td");
+      actions.className = "ann-actions";
+      actions.appendChild(actionButton("Düzenle", function () { openEditor(row.id); }));
+      actions.appendChild(actionButton(row.active ? "Yayından al" : "Yayınla", function () { setActive(row); }));
+      actions.appendChild(actionButton("Kopyala", function () { copyRow(row); }));
+      tr.appendChild(actions);
+      body.appendChild(tr);
+    });
+  }
+
+  function actionButton(label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-ghost";
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  async function loadList() {
+    const params = new URLSearchParams();
+    const active = document.getElementById("filterActive").value;
+    const type = document.getElementById("filterType").value;
+    const platform = document.getElementById("filterPlatform").value;
+    if (active) params.set("active", active);
+    if (type) params.set("type", type);
+    if (platform) params.set("platform", platform);
+    const qs = params.toString();
+    const data = await api("/admin/app-announcements" + (qs ? "?" + qs : ""));
+    if (data) renderList(data);
+  }
+
+  function count(id, max) {
+    const el = document.getElementById(id);
+    const out = document.getElementById(id + "Count");
+    const update = function () {
+      out.textContent = el.value.length + " / " + max;
+      out.classList.toggle("over", el.value.length > max);
+    };
+    el.addEventListener("input", update);
+    update();
+  }
+
+  function fillLang(lang, row) {
+    document.getElementById(lang + "Title").value = row ? textOf(row, lang, "title") : "";
+    document.getElementById(lang + "Body").value = row ? textOf(row, lang, "body") : "";
+    document.getElementById(lang + "Cta").value = row ? textOf(row, lang, "ctaLabel") : "";
+    document.getElementById(lang + "Title").dispatchEvent(new Event("input"));
+    document.getElementById(lang + "Body").dispatchEvent(new Event("input"));
+    document.getElementById(lang + "Cta").dispatchEvent(new Event("input"));
+  }
+
+  function openBlank() {
+    editingId = null;
+    document.getElementById("editor").hidden = false;
+    document.getElementById("editorTitle").textContent = "Yeni taslak";
+    document.getElementById("editorMeta").replaceChildren();
+    document.getElementById("editorForm").reset();
+    document.getElementById("fPriority").value = "0";
+    document.getElementById("fDismissible").value = "true";
+    LANGS.forEach(function (lang) { fillLang(lang, null); });
+    document.getElementById("editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function openEditor(id) {
+    showError("");
+    const row = await api("/admin/app-announcements/" + id);
+    if (!row) return;
+    editingId = row.id;
+    document.getElementById("editor").hidden = false;
+    document.getElementById("editorTitle").textContent = "Duyuru #" + row.id;
+    const meta = document.getElementById("editorMeta");
+    meta.replaceChildren();
+    meta.appendChild(row.active ? badge("Yayında", "success") : badge("Taslak", "neutral"));
+    const who = document.createElement("span");
+    who.className = "hint";
+    who.textContent = "Oluşturan " + (row.createdBy || "—") + " · " + formatBaku(row.createdAt)
+      + (row.updatedAt ? " · Güncelleyen " + (row.updatedBy || "—") + " · " + formatBaku(row.updatedAt) : "");
+    meta.appendChild(who);
+    document.getElementById("fType").value = row.type;
+    document.getElementById("fPlatform").value = row.platform || "ALL";
+    document.getElementById("fPriority").value = String(row.priority || 0);
+    document.getElementById("fDismissible").value = row.dismissible === false ? "false" : "true";
+    document.getElementById("fMin").value = row.minAppVersion || "";
+    document.getElementById("fMax").value = row.maxAppVersion || "";
+    document.getElementById("fCta").value = row.ctaUrl || "";
+    document.getElementById("fStart").value = utcToBakuInput(row.startsAt);
+    document.getElementById("fEnd").value = utcToBakuInput(row.endsAt);
+    LANGS.forEach(function (lang) { fillLang(lang, row); });
+    document.getElementById("editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function optionalLang(lang) {
+    const title = document.getElementById(lang + "Title").value.trim();
+    const body = document.getElementById(lang + "Body").value.trim();
+    const cta = document.getElementById(lang + "Cta").value.trim();
+    if (!title && !body && !cta) return null;
+    if (!title || !body) {
+      showError(lang + " için başlık ve metin birlikte dolu olmalı");
+      return false;
+    }
+    return { lang: lang, title: title, body: body, ctaLabel: cta || null };
+  }
+
+  function payload() {
+    const translations = [];
+    for (let i = 0; i < LANGS.length; i++) {
+      const row = optionalLang(LANGS[i]);
+      if (row === false) return null;
+      if (row) translations.push(row);
+    }
+    if (!translations.some(function (row) { return row.lang === "az"; })) {
+      showError("az başlık ve metin zorunlu");
+      return null;
+    }
+    const starts = bakuInputToUtc(document.getElementById("fStart").value);
+    const ends = bakuInputToUtc(document.getElementById("fEnd").value);
+    if (starts && ends && ends <= starts) {
+      showError("Bitiş, başlangıçtan sonra olmalı");
+      return null;
+    }
+    const min = document.getElementById("fMin").value.trim();
+    const max = document.getElementById("fMax").value.trim();
+    const cta = document.getElementById("fCta").value.trim();
+    return {
+      type: document.getElementById("fType").value,
+      platform: document.getElementById("fPlatform").value,
+      priority: Number(document.getElementById("fPriority").value || 0),
+      dismissible: document.getElementById("fDismissible").value === "true",
+      minAppVersion: min || null,
+      maxAppVersion: max || null,
+      ctaUrl: cta || null,
+      startsAt: starts,
+      endsAt: ends,
+      translations: translations
+    };
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    showError("");
+    showOk("");
+    const body = payload();
+    if (!body) return;
+    const saved = editingId
+      ? await api("/admin/app-announcements/" + editingId, { method: "PUT", body: JSON.stringify(body) })
+      : await api("/admin/app-announcements", { method: "POST", body: JSON.stringify(body) });
+    if (!saved) return;
+    showOk("Taslak kaydedildi #" + saved.id + ". Telefonda görünmesi için Yayınla.");
+    await loadList();
+    await openEditor(saved.id);
+  }
+
+  async function setActive(row) {
+    const next = !row.active;
+    const label = next ? "Yayına alınsın mı?" : "Yayından alınsın mı?";
+    if (!window.confirm("#" + row.id + " " + label)) return;
+    showError("");
+    const saved = await api("/admin/app-announcements/" + row.id + "/active", {
+      method: "POST",
+      body: JSON.stringify({ active: next })
+    });
+    if (!saved) return;
+    showOk(next ? "Yayında #" + saved.id : "Taslak #" + saved.id);
+    await loadList();
+    if (editingId === row.id) await openEditor(row.id);
+  }
+
+  async function copyRow(row) {
+    if (!window.confirm("#" + row.id + " yeni id ile taslak kopyalansın mı? Eski id telefonda görüldü kalır.")) return;
+    showError("");
+    const saved = await api("/admin/app-announcements/" + row.id + "/copy", { method: "POST", body: "{}" });
+    if (!saved) return;
+    showOk("Kopya taslak #" + saved.id);
+    await loadList();
+    await openEditor(saved.id);
+  }
+
+  function renderPreview(items) {
+    const list = document.getElementById("previewList");
+    list.replaceChildren();
+    if (!items || !items.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Bu kombinasyonda gösterilecek duyuru yok.";
+      list.appendChild(empty);
+      return;
+    }
+    items.forEach(function (item, index) {
+      const card = document.createElement("article");
+      card.className = "sheet";
+      const order = document.createElement("span");
+      order.className = "hint";
+      order.textContent = (index + 1) + " / " + items.length + " · #" + item.id;
+      card.appendChild(order);
+      card.appendChild(document.createTextNode(" "));
+      card.appendChild(badge(item.type, item.type === "UPDATE" ? "warning" : item.type === "MAINTENANCE" ? "danger" : "info"));
+      card.appendChild(document.createTextNode(" "));
+      card.appendChild(badge(item.dismissible ? "Kapatılabilir" : "Kapatılamaz", item.dismissible ? "neutral" : "danger"));
+      const title = document.createElement("h3");
+      title.textContent = item.title;
+      const body = document.createElement("p");
+      body.textContent = item.body;
+      card.appendChild(title);
+      card.appendChild(body);
+      if (item.ctaUrl) {
+        const link = document.createElement("a");
+        link.className = "cta";
+        link.href = item.ctaUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = item.ctaLabel || "Aç";
+        card.appendChild(link);
+      } else if (item.ctaLabel) {
+        const label = document.createElement("span");
+        label.className = "hint";
+        label.textContent = item.ctaLabel;
+        card.appendChild(label);
+      }
+      list.appendChild(card);
+    });
+  }
+
+  async function preview(event) {
+    event.preventDefault();
+    showError("");
+    const params = new URLSearchParams();
+    const version = document.getElementById("pVersion").value.trim();
+    const platform = document.getElementById("pPlatform").value;
+    const lang = document.getElementById("pLang").value;
+    const at = bakuInputToUtc(document.getElementById("pAt").value);
+    if (version) params.set("version", version);
+    if (platform) params.set("platform", platform);
+    if (lang) params.set("lang", lang);
+    if (at) params.set("at", at);
+    const data = await api("/admin/app-announcements/preview?" + params.toString());
+    if (data) renderPreview(data);
+  }
+
+  LANGS.forEach(function (lang) {
+    count(lang + "Title", LIMITS.title);
+    count(lang + "Body", LIMITS.body);
+    count(lang + "Cta", LIMITS.cta);
+  });
+  document.getElementById("newBtn").addEventListener("click", openBlank);
+  document.getElementById("cancelBtn").addEventListener("click", function () {
+    document.getElementById("editor").hidden = true;
+    editingId = null;
+  });
+  document.getElementById("filterForm").addEventListener("submit", function (event) {
+    event.preventDefault();
+    loadList();
+  });
+  document.getElementById("editorForm").addEventListener("submit", save);
+  document.getElementById("previewForm").addEventListener("submit", preview);
+  loadList();
+</script>
+</body>
+</html>
