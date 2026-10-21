@@ -189,6 +189,8 @@ public class BookingMineService {
                 .branchId(branch == null ? null : branch.getId())
                 .branchName(branch == null ? null : branch.getName())
                 .branchAddress(branch == null ? null : branch.getAddress())
+                .lat(branch == null ? null : branch.getLat())
+                .lng(branch == null ? null : branch.getLng())
                 .partnerId(partner == null ? null : partner.getId())
                 .partnerName(partner == null ? null : partner.getName())
                 .logoUrl(logoUrl(partner))
