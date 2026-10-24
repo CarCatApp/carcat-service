@@ -78,13 +78,14 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
-    void sameCustomerSecondCallUsesTheStoredSuccess() throws Exception {
+    void fifthOwnSuccessStillCallsIddaAndSixthUsesTheStoredRow() throws Exception {
         customer();
-        IddaPlateCheck stored = successRow(7L);
+        List<IddaPlateCheck> four = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L));
+        List<IddaPlateCheck> five = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L), successRow(7L));
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
-                .thenReturn(List.of())
-                .thenReturn(List.of(stored));
+                .thenReturn(four)
+                .thenReturn(five);
         when(brandRepository.existsByIsnew(".")).thenReturn(false);
         when(brandRepository.findAll()).thenReturn(List.of());
         when(modelRepository.findAll()).thenReturn(List.of());
@@ -92,11 +93,10 @@ class IddaPlateCheckServiceTest {
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        CarResponse first = service.check("77BU669", "050", "7", "az");
-        CarResponse second = service.check("77BU669", "050", "7", "az");
+        service.check("77BU669", "050", "7", "az");
+        CarResponse cached = service.check("77BU669", "050", "7", "az");
 
-        assertEquals("19XZE4F54NE012640", first.getVin());
-        assertEquals("idda", second.getResource());
+        assertEquals("idda", cached.getResource());
         verify(digitalFinanceClient, times(1)).exchange(eq("GET"), anyString(), any(), anyString(), any());
     }
 
@@ -114,14 +114,18 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
-    void thirdCustomerGetsLatestStoredSuccess() throws Exception {
+    void eleventhPlateQueryUsesTheLatestStoredSuccess() throws Exception {
         customer();
-        IddaPlateCheck older = successRow(1L);
-        IddaPlateCheck newer = successRow(2L);
-        newer.setVin("NEWERVIN000000001");
+        List<IddaPlateCheck> ten = new java.util.ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            ten.add(successRow(1L));
+        }
+        IddaPlateCheck newest = successRow(2L);
+        newest.setVin("NEWERVIN000000001");
+        ten.add(0, newest);
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
-                .thenReturn(List.of(newer, older));
+                .thenReturn(ten);
 
         CarResponse response = service.check("77BU669", "050", "7", "az");
 

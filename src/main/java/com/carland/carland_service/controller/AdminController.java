@@ -208,8 +208,8 @@ public class AdminController {
 
 
     /**
-     * tr: Tüm araçları XLSX dosyası olarak indirir (VIN, plaka, marka, model, km vb. kolonlarla); login yoksa admin giriş sayfasına yönlendirir.
-     * en: Downloads all cars as an XLSX file (columns for VIN, plate, brand, model, mileage etc.); redirects to the admin login page if not authenticated.
+     * tr: Araçları XLSX indirir. Hyper visited, listedekiyle aynı kural: partner 1 ve şube 10, boş branch dahil. Yes/No.
+     * en: Downloads cars as XLSX. Hyper visited uses the same rule as the list: partner 1 and branch 10, including a null branch. Yes/No.
      */
     @GetMapping("/admin/cars/export")
     public void exportCars(
@@ -231,13 +231,14 @@ public class AdminController {
         List<Car> cars = carRepository.findAll(
                 CarSpec.filters(userId, vinFilter),
                 Sort.by(Sort.Direction.DESC, "carId"));
+        Set<Long> hyperVisited = hyperVisitedIds(cars);
 
         try (Workbook workbook = new XSSFWorkbook()) {
 
             Sheet sheet = workbook.createSheet("Cars");
 
             String[] headers = {
-                    "VIN", "Plate Number", "Brand", "Model", "Model Year",
+                    "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Model Year",
                     "Engine Type", "Engine Type ID", "Engine Volume",
                     "Transmission Type", "Body Type", "Mileage",
                     "Created At", "Updated At"
@@ -251,18 +252,19 @@ public class AdminController {
                 Row row = sheet.createRow(rowIndex++);
 
                 setCell(row, 0, car.getVin());
-                setCell(row, 1, car.getPlateNumber());
-                setCell(row, 2, car.getBrand());
-                setCell(row, 3, car.getModel());
-                setNumericCell(row, 4, car.getModelYear());
-                setCell(row, 5, car.getEngineType());
-                setNumericCell(row, 6, car.getEngineTypeId());
-                setNumericCell(row, 7, car.getEngineVolume());
-                setCell(row, 8, car.getTransmissionType());
-                setCell(row, 9, car.getBodyType());
-                setNumericCell(row, 10, car.getMileage());
-                setCell(row, 11, formatDate(car.getCreatedAt()));
-                setCell(row, 12, formatDate(car.getUpdatedAt()));
+                setCell(row, 1, hyperVisited.contains(car.getCarId()) ? "Yes" : "No");
+                setCell(row, 2, car.getPlateNumber());
+                setCell(row, 3, car.getBrand());
+                setCell(row, 4, car.getModel());
+                setNumericCell(row, 5, car.getModelYear());
+                setCell(row, 6, car.getEngineType());
+                setNumericCell(row, 7, car.getEngineTypeId());
+                setNumericCell(row, 8, car.getEngineVolume());
+                setCell(row, 9, car.getTransmissionType());
+                setCell(row, 10, car.getBodyType());
+                setNumericCell(row, 11, car.getMileage());
+                setCell(row, 12, formatDate(car.getCreatedAt()));
+                setCell(row, 13, formatDate(car.getUpdatedAt()));
             }
 
             String baseName = (userId != null || vinFilter != null) ? "cars-filtered" : "cars";
@@ -270,6 +272,23 @@ public class AdminController {
         }
     }
 
+    /**
+     * tr: Excel satırları ekrandaki Hyper visited ile aynı kümeyi kullanır. IN listesi 500'lük dilimlenir.
+     * en: Excel rows use the same Hyper visited set as the screen. The IN list is sliced by 500.
+     */
+    private Set<Long> hyperVisitedIds(List<Car> cars) {
+        if (cars == null || cars.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> ids = cars.stream().map(Car::getCarId).filter(id -> id != null).toList();
+        Set<Long> visited = new HashSet<>();
+        int batch = 500;
+        for (int i = 0; i < ids.size(); i += batch) {
+            List<Long> slice = ids.subList(i, Math.min(i + batch, ids.size()));
+            visited.addAll(visitHistoryService.carIdsWithHyperBranchVisit(slice));
+        }
+        return visited;
+    }
 
     /**
      * tr: Araç partner servis geçmişini (visits) DB'den gösterir; Hyper API çağırmaz.

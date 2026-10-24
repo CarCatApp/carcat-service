@@ -33,10 +33,12 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * tr: Plaka check. Code 0 bir ay saklanır ve plaka başına ayda en fazla 2 canlı çağrıdır.
+ * tr: Plaka check. Code 0 bir ay saklanır.
+ *     Geçici test: aynı müşteri + plaka ayda 5 canlı, plaka geneli ayda 10 canlı.
  *     Code 4 ve timeout hakka yazılmaz. Check araç satırı açmaz, sahip değiştirmez.
  *     Redis: bu servis carlist yazmaz. Araç yazısı IddaCarWriteService içindedir, orada evict vardır.
- * en: Plate check. Code 0 is kept for one month and a plate gets at most two live calls a month.
+ * en: Plate check. Code 0 is kept for one month.
+ *     Temporary test caps: 5 live calls per customer and plate, 10 live calls per plate.
  *     Code 4 and timeouts do not count. The check does not insert a car or change an owner.
  *     Redis: this service does not write carlist. Car writes and evicts live in IddaCarWriteService.
  */
@@ -46,7 +48,12 @@ import java.util.UUID;
 public class IddaPlateCheckService {
 
     private static final String NEW_SET_MARKER = ".";
-    private static final int PLATE_LIVE_CAP = 2;
+    /**
+     * tr: Geçici test hakkı. Canlıda aynı müşteri + plaka ayda 1, plaka geneli ayda 2 idi.
+     * en: Temporary test cap. Production was 1 per customer+plate and 2 per plate each month.
+     */
+    private static final int USER_LIVE_CAP = 5;
+    private static final int PLATE_LIVE_CAP = 10;
 
     private final DigitalFinanceClient digitalFinanceClient;
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
@@ -67,12 +74,12 @@ public class IddaPlateCheckService {
         List<IddaPlateCheck> recent = iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(plateKey, since);
 
-        IddaPlateCheck own = recent.stream()
+        List<IddaPlateCheck> ownRows = recent.stream()
                 .filter(row -> customer.getUserId().equals(row.getQuerierUserId()))
-                .findFirst()
-                .orElse(null);
-        if (own != null) {
-            log.info("IDDA plate check cache customer plateKey={} checkId={}", plateKey, own.getId());
+                .toList();
+        if (ownRows.size() >= USER_LIVE_CAP) {
+            IddaPlateCheck own = ownRows.get(0);
+            log.info("IDDA plate check user cap plateKey={} count={} checkId={}", plateKey, ownRows.size(), own.getId());
             return toResponse(own, acceptLanguage);
         }
         if (recent.size() >= PLATE_LIVE_CAP) {
