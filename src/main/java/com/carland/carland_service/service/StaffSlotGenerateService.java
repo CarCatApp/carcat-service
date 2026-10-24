@@ -209,7 +209,9 @@ public class StaffSlotGenerateService {
                 }
             }
         }
-        ranges.sort(Comparator.comparing(Range::getStart, Comparator.nullsLast(Comparator.naturalOrder())));
+        ranges.sort(Comparator
+                .comparing((Range range) -> clock(range.getStart()), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(range -> range.getRangeId() == null ? Long.MAX_VALUE : range.getRangeId()));
         List<StaffSlotView> slots = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
         for (Range range : ranges) {

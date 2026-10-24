@@ -38,6 +38,7 @@ public class Calendar {
     Integer rangeMinutes;
 
     @OneToMany(mappedBy = "calendar", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("start ASC")
     @Builder.Default
     List<Range> timeRanges = new ArrayList<>();
 

@@ -42,9 +42,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +66,7 @@ class StaffBookingServiceTest {
     @Mock BrandRepository brandRepository;
     @Mock BookingPushService bookingPushService;
     @Mock BookingCompletionService bookingCompletionService;
+    @Mock StaffBookingLiveService staffBookingLiveService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -76,7 +79,7 @@ class StaffBookingServiceTest {
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
                 customerRepository, carRepository, colorRepository, bookingStaffNoteService, brandRepository, bookingPushService,
-                bookingCompletionService);
+                bookingCompletionService, staffBookingLiveService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -121,6 +124,52 @@ class StaffBookingServiceTest {
         assertEquals("CC-959345", out.getItems().get(0).getRef());
         assertEquals("pkg:hyper-extra", out.getItems().get(0).getServiceKeys().get(0));
         assertNull(out.getItems().get(0).getCar());
+    }
+
+    @Test
+    void inboxListsOlderDayAndEarlierStartFirst() {
+        Calendar older = Calendar.builder().day(LocalDate.of(2026, 10, 20)).branch(branch).build();
+        Range afternoon = Range.builder()
+                .rangeId(200L)
+                .start(OffsetDateTime.parse("2026-10-26T10:00:00Z"))
+                .end(OffsetDateTime.parse("2026-10-26T10:30:00Z"))
+                .calendar(booking.getRange().getCalendar())
+                .build();
+        Range morning = Range.builder()
+                .rangeId(201L)
+                .start(OffsetDateTime.parse("2026-10-20T06:00:00Z"))
+                .end(OffsetDateTime.parse("2026-10-20T06:30:00Z"))
+                .calendar(older)
+                .build();
+        Booking laterSameDay = Booking.builder()
+                .id(2L)
+                .ref("CC-2")
+                .status("completed")
+                .branch(branch)
+                .range(afternoon)
+                .currency("AZN")
+                .build();
+        Booking olderDay = Booking.builder()
+                .id(3L)
+                .ref("CC-3")
+                .status("completed")
+                .branch(branch)
+                .range(morning)
+                .currency("AZN")
+                .build();
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(eq(7L), any(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(laterSameDay, booking, olderDay)));
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        BookingInboxResponse out = service.inbox(9L, false, "board", 7L, 1, 20, "Asia/Baku", "az");
+
+        assertEquals(List.of(3L, 1L, 2L), out.getItems().stream().map(BookingView::getBookingId).toList());
+        assertEquals("2026-10-20", out.getItems().get(0).getDay());
+        assertEquals("10:00", out.getItems().get(0).getStart());
+        assertEquals("09:00", out.getItems().get(1).getStart());
+        assertEquals("14:00", out.getItems().get(2).getStart());
     }
 
     @Test
@@ -314,5 +363,25 @@ class StaffBookingServiceTest {
         verify(bookingPushService, never()).accepted(any());
         verify(bookingPushService, never()).rejected(any());
         verify(bookingPushService).noShow(booking);
+    }
+
+    @Test
+    void hideKeepsStatusAndSkipsCustomerSide() {
+        booking.setStatus("confirmed");
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        BookingView out = service.hide(9L, false, 1L, "Asia/Baku", "az");
+
+        assertEquals("confirmed", booking.getStatus());
+        assertEquals("confirmed", out.getStatus());
+        assertTrue(booking.getStaffHidden());
+        verify(bookingRepository).save(booking);
+        verify(staffBookingLiveService).refreshAfterCommit(7L);
+        verify(staffBookingLiveService, never()).publishAfterCommit(any());
+        verifyNoInteractions(bookingPushService);
+        verifyNoInteractions(bookingCapacityService);
     }
 }

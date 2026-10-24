@@ -53,6 +53,14 @@ public class Booking {
     @Column(nullable = false, length = 16)
     String status;
 
+    /**
+     * tr: Partner panelində gizlədilib. Status, yer və müştəri tərəfi dəyişmir. Köhnə sətir null qala bilər.
+     * en: Hidden from the partner panel. Status, the place and the customer side stay the same. Old rows may stay null.
+     */
+    @Builder.Default
+    @Column(name = "staff_hidden")
+    Boolean staffHidden = false;
+
     @Column(name = "price_min")
     Integer priceMin;
 
@@ -104,6 +112,9 @@ public class Booking {
         updatedAt = now;
         if (currency == null) {
             currency = "AZN";
+        }
+        if (staffHidden == null) {
+            staffHidden = false;
         }
     }
 

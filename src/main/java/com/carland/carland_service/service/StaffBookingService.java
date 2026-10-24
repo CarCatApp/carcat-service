@@ -88,6 +88,7 @@ public class StaffBookingService {
     private final BrandRepository brandRepository;
     private final BookingPushService bookingPushService;
     private final BookingCompletionService bookingCompletionService;
+    private final StaffBookingLiveService staffBookingLiveService;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -136,6 +137,7 @@ public class StaffBookingService {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), tz, lang,
                     lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds));
         }
+        items.sort(StaffBookingService::byAppointment);
         return BookingInboxResponse.builder()
                 .page(safePage)
                 .pageSize(safeSize)
@@ -213,6 +215,32 @@ public class StaffBookingService {
                 BookingStaffNote.NO_SHOW, request, acceptLanguage);
         return decide(userId, mustChangePassword, bookingId, BookingStatus.NO_SHOW.apiValue(),
                 applied, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: Partner siyahısından gizlədir. Status, yer və müştəri tərəfi eyni qalır. Push yoxdur.
+     * en: Hides the row from the partner list. Status, the place and the customer side stay the same. No push.
+     */
+    @Transactional
+    public BookingView hide(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
+                            String acceptLanguage) {
+        BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        bookingStaffAccess.requireWritableBranch(staff, booking.getBranch().getId(), acceptLanguage);
+        booking.setStaffHidden(true);
+        bookingRepository.save(booking);
+        staffBookingLiveService.refreshAfterCommit(
+                booking.getBranch() == null ? null : booking.getBranch().getId());
+        String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
+        String lang = BookingMineService.langOf(acceptLanguage);
+        List<String> keys = bookingItemRepository.findByBooking_IdOrderByIdAsc(bookingId).stream()
+                .map(BookingItem::getServiceKey)
+                .toList();
+        List<BookingIndividualLine> lines = individualLineRepository.findByBooking_IdOrderByIdAsc(bookingId);
+        java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(bookingId);
+        BookingInspection inspection = found == null ? null : found.orElse(null);
+        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
     }
 
     private BookingView decide(Long userId, boolean mustChangePassword, Long bookingId, String nextStatus,
@@ -502,6 +530,37 @@ public class StaffBookingService {
         String last = surname == null ? "" : surname.trim();
         String joined = (first + " " + last).trim();
         return joined.isEmpty() ? null : joined;
+    }
+
+    /**
+     * tr: Siyahı yaranma vaxtına görə deyil. Əvvəl gün (köhnə gün əvvəl), gün içində range başlanğıcı (erkən saat əvvəl).
+     * en: List order is not createdAt. Day first (older day first), then the range start (earlier hour first).
+     */
+    private static int byAppointment(BookingView left, BookingView right) {
+        int day = compareText(left.getDay(), right.getDay());
+        if (day != 0) {
+            return day;
+        }
+        int start = compareText(left.getStart(), right.getStart());
+        if (start != 0) {
+            return start;
+        }
+        long leftId = left.getBookingId() == null ? Long.MAX_VALUE : left.getBookingId();
+        long rightId = right.getBookingId() == null ? Long.MAX_VALUE : right.getBookingId();
+        return Long.compare(leftId, rightId);
+    }
+
+    private static int compareText(String left, String right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return left.compareTo(right);
     }
 
     private static String clock(OffsetDateTime utc, String timezone) {

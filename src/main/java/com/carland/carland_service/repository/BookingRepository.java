@@ -42,15 +42,81 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Override
     Optional<Booking> findById(Long id);
 
-    Page<Booking> findByBranch_IdAndStatusOrderByCreatedAtDesc(Long branchId, String status, Pageable pageable);
+    /**
+     * tr: Partner siyahısı. staff_hidden null və ya false görünür; true gizlidir.
+     * en: Partner list. staff_hidden null or false is visible; true is hidden.
+     */
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.id = :branchId
+                      and b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.id = :branchId
+                      and b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    """
+    )
+    Page<Booking> findByBranch_IdAndStatusOrderByCreatedAtDesc(
+            @Param("branchId") Long branchId, @Param("status") String status, Pageable pageable);
 
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.id = :branchId
+                      and b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.id = :branchId
+                      and b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    """
+    )
     Page<Booking> findByBranch_IdAndStatusInOrderByCreatedAtDesc(
-            Long branchId, Collection<String> statuses, Pageable pageable);
+            @Param("branchId") Long branchId, @Param("statuses") Collection<String> statuses, Pageable pageable);
 
-    Page<Booking> findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(Long partnerId, String status, Pageable pageable);
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    """
+    )
+    Page<Booking> findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(
+            @Param("partnerId") Long partnerId, @Param("status") String status, Pageable pageable);
 
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                    """
+    )
     Page<Booking> findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(
-            Long partnerId, Collection<String> statuses, Pageable pageable);
+            @Param("partnerId") Long partnerId, @Param("statuses") Collection<String> statuses, Pageable pageable);
 
     List<Booking> findByRange_RangeIdAndStatus(Long rangeId, String status);
 

@@ -31,6 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,6 +81,38 @@ class StaffSlotGenerateServiceTest {
                 .role(BookingStaffRole.BRANCH_ADMIN.name())
                 .status(BookingStaffStatus.ACTIVE.name())
                 .build();
+    }
+
+    @Test
+    void dayListsEarlierRangeStartFirst() {
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 5L, "az")).thenReturn(branch);
+        LocalDate day = LocalDate.of(2026, 10, 26);
+        Calendar calendar = Calendar.builder().calendarId(4L).day(day).branch(branch).build();
+        Range laterCreatedEarlierHour = Range.builder()
+                .rangeId(91L)
+                .start(OffsetDateTime.parse("2026-10-26T05:00:00Z"))
+                .end(OffsetDateTime.parse("2026-10-26T06:00:00Z"))
+                .slotTarget("package")
+                .status("AVAILABLE")
+                .calendar(calendar)
+                .build();
+        Range earlierCreatedLaterHour = Range.builder()
+                .rangeId(90L)
+                .start(OffsetDateTime.parse("2026-10-26T10:00:00Z"))
+                .end(OffsetDateTime.parse("2026-10-26T11:00:00Z"))
+                .slotTarget("package")
+                .status("AVAILABLE")
+                .calendar(calendar)
+                .build();
+        calendar.setTimeRanges(new ArrayList<>(List.of(earlierCreatedLaterHour, laterCreatedEarlierHour)));
+        when(calendarRepository.findByBranchIdAndDayBetween(5L, day, day)).thenReturn(List.of(calendar));
+        when(bookingRepository.existsByRange_RangeIdIn(any())).thenReturn(false);
+        when(bookingRepository.countByRange_RangeIdAndStatusIn(any(), any())).thenReturn(0L);
+
+        var out = service.day(9L, false, 5L, "2026-10-26", "az");
+
+        assertEquals(List.of("09:00", "14:00"), out.getSlots().stream().map(slot -> slot.getStart()).toList());
     }
 
     @Test
