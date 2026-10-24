@@ -9,10 +9,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.Map;
 
 /**
- * tr: carland_auth servisinden kullanıcının ad-soyad bilgisini çeken Feign istemcisi.
- * en: Feign client fetching a user's name and surname from the carland_auth service.
+ * tr: carland_auth iç adresinden ad-soyad çeker. Public gateway konteyner içinden reset yediği için
+ *     carland.auth.base-url (auth-service:9090) kullanılır.
+ * en: Loads name and surname from carland_auth on the internal address. The public gateway resets
+ *     from inside the container, so this uses carland.auth.base-url (auth-service:9090).
  */
-@FeignClient(name = "nameSurname", url = "https://digital-innovation.agency/auth/server/api/v1/users")
+@FeignClient(name = "nameSurname", url = "${carland.auth.base-url}/api/v1/users")
 
 public interface NameSurnameFeign {
     /**
