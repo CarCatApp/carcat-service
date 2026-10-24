@@ -8,10 +8,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 
 /**
- * tr: carland_auth servisinin kullanıcı API'sine bağlanan Feign istemcisi; kullanıcı listesini çekmek için kullanılır.
- * en: Feign client connecting to the carland_auth service's user API; used to fetch the user list.
+ * tr: carland_auth kullanıcı listesi. Public gateway konteyner içinden TLS el sıkışmasını kestiği için
+ *     carland.auth.base-url (auth-service:9090) kullanılır.
+ * en: carland_auth user list. The public gateway drops the TLS handshake from inside the container,
+ *     so this uses carland.auth.base-url (auth-service:9090).
  */
-@FeignClient(name = "authUsers", url = "https://digital-innovation.agency/auth/server/api/v1/users")
+@FeignClient(name = "authUsers", url = "${carland.auth.base-url}/api/v1/users")
 public interface AuthUsersFeign {
 
     /**
