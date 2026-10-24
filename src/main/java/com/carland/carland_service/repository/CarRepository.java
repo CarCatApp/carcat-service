@@ -24,6 +24,23 @@ public interface CarRepository extends JpaRepository<Car, Long>, JpaSpecificatio
     /** tr: Plaka numarasına göre (büyük/küçük harf duyarsız) aracı bulur. / en: Finds a car by plate number (case-insensitive). */
     Optional<Car> findByPlateNumberIgnoreCase(String plateNumber);
 
+    /**
+     * tr: VIN büyük/küçük harf duymaz. IDDA add mevcut satırın VIN metnini değiştirmez.
+     * en: VIN match ignores case. An IDDA add does not rewrite the stored VIN text.
+     */
+    @Query("SELECT c FROM Car c WHERE upper(c.vin) = upper(:vin)")
+    List<Car> findAllByVinIgnoreCase(@Param("vin") String vin);
+
+    /**
+     * tr: Plaka anahtarı: büyük harf, boşluk, tire ve nokta yok. 77-BU-669 ile 77BU669 aynıdır.
+     * en: Plate key: upper case, no space, dash or dot. 77-BU-669 and 77BU669 match.
+     */
+    @Query(value = """
+            SELECT * FROM cars
+            WHERE upper(replace(replace(replace(coalesce(plate_number, ''), '-', ''), ' ', ''), '.', '')) = :plateKey
+            """, nativeQuery = true)
+    List<Car> findByPlateKey(@Param("plateKey") String plateKey);
+
     /** tr: Müşteriye ait tüm araçları listeler. / en: Lists all cars of a customer. */
     List<Car> findAllByCustomer(Customer customer);
 

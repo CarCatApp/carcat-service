@@ -43,6 +43,13 @@ public class DigitalFinanceClient {
     }
 
     /**
+     * tr: Upstream cevabı. Gövde olduğu gibi kalır. Timeout {@link java.io.IOException} olarak çıkar.
+     * en: Upstream response. The body stays as received. A timeout surfaces as {@link java.io.IOException}.
+     */
+    public record Upstream(int statusCode, String contentType, byte[] body) {
+    }
+
+    /**
      * tr: Upstream cevabını bayt bayt yazar. JSON yeniden üretilmez.
      * en: Writes the upstream response byte for byte. JSON is not rebuilt.
      */
@@ -57,6 +64,19 @@ public class DigitalFinanceClient {
      */
     public void forward(String method, String path, byte[] body, String requestIdentifier,
                         String requestPurposeId, HttpServletResponse response) throws IOException {
+        Upstream upstream = exchange(method, path, body, requestIdentifier, requestPurposeId);
+        response.setStatus(upstream.statusCode());
+        response.setContentType(upstream.contentType());
+        response.getOutputStream().write(upstream.body());
+        response.flushBuffer();
+    }
+
+    /**
+     * tr: Digital Finance çağrısı. ApiKey loglanmaz. Kesilme IllegalStateException, timeout IOException.
+     * en: Digital Finance call. ApiKey is never logged. Interrupt is IllegalStateException, timeout is IOException.
+     */
+    public Upstream exchange(String method, String path, byte[] body, String requestIdentifier,
+                             String requestPurposeId) throws IOException {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("DIGITAL_FINANCE_API_KEY is empty");
         }
@@ -86,10 +106,8 @@ public class DigitalFinanceClient {
         }
         log.info("Digital Finance {} {} status={}", method, path, upstream.statusCode());
         byte[] bytes = upstream.body() == null ? new byte[0] : upstream.body();
-        response.setStatus(upstream.statusCode());
-        response.setContentType(upstream.headers().firstValue("Content-Type").orElse("application/json;charset=UTF-8"));
-        response.getOutputStream().write(bytes);
-        response.flushBuffer();
+        String contentType = upstream.headers().firstValue("Content-Type").orElse("application/json;charset=UTF-8");
+        return new Upstream(upstream.statusCode(), contentType, bytes);
     }
 
     private static String stripTrailingSlash(String url) {

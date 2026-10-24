@@ -53,6 +53,13 @@ class CarAiPhotoGenerateLockTest {
         assertFalse(CarAiPhotoGenerateLock.changesPromptFields(car, req));
     }
 
+    @Test
+    void bodyChangeIsPromptField() {
+        Car car = baseCar();
+        CarRequest req = CarRequest.builder().bodyType("SUV").build();
+        assertTrue(CarAiPhotoGenerateLock.changesPromptFields(car, req));
+    }
+
     private static Car baseCar() {
         return Car.builder()
                 .brand("BMW")

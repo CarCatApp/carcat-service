@@ -48,6 +48,7 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -144,6 +145,43 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         }
 
         return redisCacheService.getOrLoadHistoryV2(vin, acceptLanguage, () -> loadHistoryUncached(car, vin, acceptLanguage));
+    }
+
+    /**
+     * tr: Kayıtlı ziyaretleri müşteri geçmişiyle aynı şube kuralıyla döner. Hyper ve Redis yok.
+     * en: Returns stored visits with the same branch rule as customer history. No Hyper and no Redis.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<VisitHistoryItemResponse> listStoredByCar(Car car, String acceptLanguage) {
+        if (car == null) {
+            return List.of();
+        }
+        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        for (Visit visit : visits) {
+            if (visit.getParts() != null) {
+                visit.getParts().size();
+            }
+        }
+        Map<Long, Partner> partnerById = loadPartnersForVisits(visits);
+        Branch hyperBranch = loadHyperTemporaryBranch(visits);
+        Map<Long, Branch> branchById = loadStoredBranches(visits);
+        return visits.stream()
+                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById))
+                .toList();
+    }
+
+    /**
+     * tr: Admin araç listesi. Partner 1 ve şube 10; Hyper satırında branch_id boştur, o da sayılır.
+     * en: Admin car list. Partner 1 and branch 10; a Hyper row has a null branch_id and still counts.
+     */
+    @Override
+    public Set<Long> carIdsWithHyperBranchVisit(Collection<Long> carIds) {
+        if (carIds == null || carIds.isEmpty()) {
+            return Set.of();
+        }
+        return visitRepository.findCarIdsWithPartnerBranchOrNullBranch(
+                carIds, HYPER_PARTNER.getId(), HYPER_TEMPORARY_BRANCH_ID);
     }
 
     private VisitHistoryResponse loadHistoryUncached(Car car, String vin, String acceptLanguage) {

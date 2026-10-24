@@ -36,6 +36,15 @@ public class CarResponse {
     private String bodyType;
     private String message;
     private List<String> vinProvidedFields;
+    private List<String> iddaProvidedFields;
+    private Boolean fromIdda;
+    private Boolean engineTypeLocked;
+    private Long colorId;
+    /** tr: IDDA'nın Azerice renk metni. Katalog eşlemesi ayrı iş. / en: IDDA color text in Azerbaijani. Catalog mapping is separate. */
+    private String iddaColor;
+    private Integer iddaStatusCode;
+    private String iddaStatusName;
+    private String iddaStatusMessage;
     /** Partner ids for badge logo fetch ({@code GET /photo/for/partner/badge-logo/get/{partnerId}}). */
     private List<String> servicedPartnerIds;
     private String resource;

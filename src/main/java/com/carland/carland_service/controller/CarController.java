@@ -11,6 +11,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.MaintenanceTemplateRepository;
+import com.carland.carland_service.idda.IddaPlateCheckService;
 import com.carland.carland_service.service.impl.HyperTokenService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.CarVinHistoryService;
@@ -46,6 +47,7 @@ public class CarController {
     private final CustomerRepository customerRepository;
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
+    private final IddaPlateCheckService iddaPlateCheckService;
     /**
      * tr: Feature-flag scanner duman testi; catalog'a GET /api/v1/car/test/scanner eklenmeli.
      * en: Feature-flag scanner smoke test; catalog should gain GET /api/v1/car/test/scanner.
@@ -138,6 +140,21 @@ public class CarController {
 //                .message("vin min yoxdu :)")
 //                .build();
         return carService.checkVin(vin, acceptLanguage);
+    }
+
+    /**
+     * tr: Plakayı IDDA'dan okur. Code 4 ve timeout hak yazmaz. Başarılı cevap bir ay DB'den döner.
+     *     Bu uç araç kaydı açmaz.
+     * en: Reads the plate from IDDA. Code 4 and timeouts do not count. A success is replayed from the DB for one month.
+     *     This endpoint does not insert a car.
+     */
+    @GetMapping("/check/plate")
+    public CarResponse checkPlate(@RequestParam String plate,
+                                  @RequestHeader("Authorization") String token,
+                                  @RequestHeader("phoneNumber") String phoneNumber,
+                                  @RequestHeader("X-User-Id") String userIdHeader,
+                                  @RequestHeader("Accept-Language") String acceptLanguage) {
+        return iddaPlateCheckService.check(plate, phoneNumber, userIdHeader, acceptLanguage);
     }
 
     /**

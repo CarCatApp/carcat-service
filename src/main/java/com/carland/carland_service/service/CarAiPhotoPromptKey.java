@@ -8,9 +8,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * tr: AI prompt'una giren araç alanlarının parmak izi (marka, model, yıl, colorId, plaka).
+ * tr: AI prompt'una giren araç alanlarının parmak izi (marka, model, yıl, ban, colorId, plaka).
  *     Mileage gibi prompt dışı alanlar dahil değil.
- * en: Fingerprint of car fields that go into the AI prompt (brand, model, year, colorId, plate).
+ * en: Fingerprint of car fields that go into the AI prompt (brand, model, year, body, colorId, plate).
  *     Mileage and other non-prompt fields are excluded.
  */
 public final class CarAiPhotoPromptKey {
@@ -23,6 +23,7 @@ public final class CarAiPhotoPromptKey {
                 norm(car.getBrand()),
                 norm(car.getModel()),
                 car.getModelYear() == null ? "" : String.valueOf(car.getModelYear()),
+                norm(car.getBodyType()),
                 car.getColorId() == null ? "" : String.valueOf(car.getColorId()),
                 plate(car.getPlateNumber()));
         try {

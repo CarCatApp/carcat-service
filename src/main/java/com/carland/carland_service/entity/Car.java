@@ -77,6 +77,17 @@ public class Car {
     @Column(name = "vin_provided_fields")
     private List<String> vinProvidedFields;
 
+    /** tr: Araç bir IDDA plaka kaydından yazıldı. / en: The car was written from an IDDA plate check. */
+    Boolean fromIdda;
+
+    /**
+     * tr: Müşterinin değiştiremeyeceği IDDA alanları. Sonraki yazımı yalnız yeni bir IDDA add yapar.
+     * en: IDDA fields the customer cannot change. Only a later IDDA add writes them again.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "idda_provided_fields")
+    private List<String> iddaProvidedFields;
+
     /** Partner ids ({@code partners.id}) where this car received service — used for badge logos on car list. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "serviced_partner_ids")

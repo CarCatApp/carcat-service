@@ -29,6 +29,7 @@ import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
 import com.carland.carland_service.service.AdminCarPurgeService;
 import com.carland.carland_service.service.PhotoService;
+import com.carland.carland_service.service.VisitHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -103,6 +104,8 @@ public class AdminController {
 
     private final AdminCarPurgeService adminCarPurgeService;
 
+    private final VisitHistoryService visitHistoryService;
+
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
     private static final int PAGE_SIZE = 10;
@@ -167,7 +170,9 @@ public class AdminController {
 
     /**
      * tr: Araç listesini sayfa sayfa gösterir; VIN / userId filtresi, carId DESC (yeni kayıt üstte).
+     *     Hyper visited: partner 1 ve şube 10 (boş branch_id dahil) en az bir visit. Redis yok, DB.
      * en: Paginated car list; VIN / userId filters, carId DESC (newest first).
+     *     Hyper visited: at least one visit for partner 1 and branch 10 (null branch_id included). DB, not Redis.
      */
     @GetMapping("/admin/cars")
     public String cars(
@@ -189,12 +194,14 @@ public class AdminController {
         }
         Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE, Sort.by(Sort.Direction.DESC, "carId"));
         Page<Car> carPage = carRepository.findAll(CarSpec.filters(userId, vinFilter), pageable);
+        List<Long> carIds = carPage.getContent().stream().map(Car::getCarId).toList();
 
         addPaginationAttributes(model, carPage.getTotalPages(), pageIndex);
 
         model.addAttribute("cars", carPage);
         model.addAttribute("filterUserId", userId);
         model.addAttribute("filterVin", vinFilter);
+        model.addAttribute("hyperVisitedCarIds", visitHistoryService.carIdsWithHyperBranchVisit(carIds));
 
         return "cars";
     }

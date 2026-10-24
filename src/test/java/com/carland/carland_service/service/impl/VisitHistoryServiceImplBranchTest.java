@@ -18,6 +18,7 @@ import com.carland.carland_service.service.VisitHistoryService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -94,5 +97,42 @@ class VisitHistoryServiceImplBranchTest {
         assertEquals("Hyper Service", fromHyper.getBranchName());
         assertEquals("Babək pr. 43A", fromHyper.getBranchAddress());
         assertNull(hyper.getBranchId());
+    }
+
+    @Test
+    void storedHistoryDoesNotCallHyperAndKeepsTheBranchRule() {
+        Car car = Car.builder().carId(5L).vin("VIN1").build();
+        Branch xirdalan = Branch.builder().id(22L).name("Auto Zone Xırdalan").build();
+        Branch babek = Branch.builder().id(10L).name("Hyper Service").build();
+        Visit panel = Visit.builder().id(1L).car(car).source("panel").branchId(22L)
+                .serviceCenterId(4L).build();
+        Visit hyper = Visit.builder().id(2L).car(car).hyperRecordId(90L).serviceCenterId(1L).build();
+
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(panel, hyper));
+        when(partnerLookupService.resolvePartnerId(any(), any())).thenAnswer(inv -> {
+            Long stored = inv.getArgument(0);
+            PartnerId fallback = inv.getArgument(1);
+            return stored != null ? stored : fallback.getId();
+        });
+        when(partnerLookupService.loadByIds(any())).thenReturn(Map.of());
+        when(branchRepository.findAllById(any())).thenReturn(List.of(xirdalan));
+        when(branchRepository.findById(10L)).thenReturn(Optional.of(babek));
+
+        List<VisitHistoryItemResponse> items = service.listStoredByCar(car, "az");
+
+        assertEquals(22L, items.get(0).getBranchId());
+        assertEquals(10L, items.get(1).getBranchId());
+        assertNull(hyper.getBranchId());
+        verify(hyperTokenService, never()).getToken();
+    }
+
+    @Test
+    void hyperVisitedFlagQueriesPartner1AndBranch10() {
+        when(visitRepository.findCarIdsWithPartnerBranchOrNullBranch(List.of(3L, 4L), 1L, 10L))
+                .thenReturn(Set.of(3L));
+
+        assertEquals(Set.of(3L), service.carIdsWithHyperBranchVisit(List.of(3L, 4L)));
+        assertEquals(Set.of(), service.carIdsWithHyperBranchVisit(List.of()));
+        verify(visitRepository).findCarIdsWithPartnerBranchOrNullBranch(List.of(3L, 4L), 1L, 10L);
     }
 }

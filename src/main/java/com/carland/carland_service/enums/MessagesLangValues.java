@@ -591,6 +591,24 @@ public enum MessagesLangValues {
             "Əməkdaşlıq dayandırılıb",
             "Cooperation has been suspended",
             "Сотрудничество приостановлено"
+    ),
+
+    IDDA_CHECK_REQUIRED(
+            "Əvvəlcə dövlət qeydiyyat nişanı yoxlanmalıdır",
+            "Check the plate with the state registry first",
+            "Сначала проверьте номер в государственном реестре"
+    ),
+
+    IDDA_FIELD_LOCKED(
+            "Bu sahə dövlət məlumatıdır və dəyişdirilə bilməz",
+            "This field comes from the state registry and cannot be changed",
+            "Это поле из государственного реестра и не может быть изменено"
+    ),
+
+    IDDA_UNAVAILABLE(
+            "Dövlət reyestrinə indi çatılmır. Yenidən cəhd edin",
+            "The state registry is unreachable right now. Try again",
+            "Государственный реестр сейчас недоступен. Повторите попытку"
     );
 
     private final String azMessage;

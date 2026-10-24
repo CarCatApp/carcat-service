@@ -20,6 +20,9 @@ import com.carland.carland_service.service.PercentageLifeService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.PushNotificationService;
 import com.carland.carland_service.service.ColorSortService;
+import com.carland.carland_service.idda.IddaAddResult;
+import com.carland.carland_service.idda.IddaCarWriteService;
+import com.carland.carland_service.idda.IddaPlateKey;
 import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +72,7 @@ public class CarServiceImpl implements CarService {
     private final AfterAddCarSyncService afterAddCarSyncService;
     private final HyperPercentageSyncService hyperPercentageSyncService;
     private final RedisCacheService redisCacheService;
+    private final IddaCarWriteService iddaCarWriteService;
 //    private static final List<String> simulatedVins = List.of(
 //            "JTJGB7CX2R4121777",
 //            "LFMAAA0C6S0640604",
@@ -119,6 +123,10 @@ public class CarServiceImpl implements CarService {
                             )
                     )
                     .vinProvidedFields(vinProvidedFields)
+                    .iddaProvidedFields(carFromDb.getIddaProvidedFields() == null
+                            ? Collections.emptyList()
+                            : carFromDb.getIddaProvidedFields())
+                    .fromIdda(Boolean.TRUE.equals(carFromDb.getFromIdda()))
                     .resource("fromDb")
                     .plateNumber(carFromDb != null ? carFromDb.getPlateNumber() : null)
                     .engineTypeId(carFromDb.getEngineTypeId())
@@ -177,6 +185,8 @@ public class CarServiceImpl implements CarService {
                     .engineVolume(engineVolume)
                     .engineType(EngineTypeTranslation.translate(engineType, acceptLanguage))
                     .vinProvidedFields(vinProvidedFields)
+                    .iddaProvidedFields(Collections.emptyList())
+                    .fromIdda(false)
                     .resource("fromDecoderTool")
                     .build();
 
@@ -290,6 +300,7 @@ public class CarServiceImpl implements CarService {
 
         Customer customer = requireActiveCustomer(userIdHeader, phoneNumber, acceptLanguage);
         Car car = requireCustomerCar(carRequest.getCarId(), customer, acceptLanguage);
+        rejectLockedIddaFields(car, carRequest, acceptLanguage);
 
         if (CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())
                 && CarAiPhotoGenerateLock.changesPromptFields(car, carRequest)) {
@@ -1157,6 +1168,21 @@ public class CarServiceImpl implements CarService {
                 carRequest != null ? carRequest.getVinProvidedFields() : null);
 
         try {
+            if (carRequest != null && carRequest.getResource() != null
+                    && "idda".equalsIgnoreCase(carRequest.getResource().trim())) {
+                IddaAddResult iddaAdd = iddaCarWriteService.add(
+                        carRequest, phoneNumber, userIdHeader, acceptLanguage);
+                if (iddaAdd.created()) {
+                    triggerAfterAddCarSync(
+                            iddaAdd.car().getCarId(),
+                            iddaAdd.car().getVin(),
+                            phoneNumber,
+                            userIdHeader,
+                            timezone,
+                            acceptLanguage);
+                }
+                return convertCarEntityToResponse(iddaAdd.car(), acceptLanguage, "idda");
+            }
             if (carRequest == null) {
                 throwAddCarFailure(logUserId,
                         "carRequest is null",
@@ -1271,40 +1297,6 @@ public class CarServiceImpl implements CarService {
                         response.getCarId(), response.getVin(), existingCar.getColorId());
                 return response;
             }
-
-            Optional<Car> plateOwner = carRepository.findByPlateNumberIgnoreCase(plateNumber);
-            if (plateOwner.isPresent()) {
-                Car conflictingCar = plateOwner.get();
-                // Only block when plate is already owned; orphan cars (no customer) can be claimed.
-                if (conflictingCar.getCustomer() != null) {
-                    throwAddCarFailure(logUserId,
-                            "plateNumber already exists | plateNumber=" + plateNumber
-                                    + ", existingCarId=" + conflictingCar.getCarId()
-                                    + ", existingVin=" + conflictingCar.getVin()
-                                    + ", ownerUserId=" + conflictingCar.getCustomer().getUserId()
-                                    + ", requestVin=" + vin,
-                            new AlreadyExistsException(
-                                    MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
-                }
-                log.info("[addCar] BRANCH existing plate without customer | linking carId={} to customerUserId={}, plateNumber={}, existingVin={}, requestVin={}",
-                        conflictingCar.getCarId(), customer.getUserId(), plateNumber, conflictingCar.getVin(), vin);
-                conflictingCar.setCustomer(customer);
-                applyAddCarRequestToExisting(conflictingCar, carRequest, plateNumber, logUserId, acceptLanguage);
-                if (customer.getCars() == null) {
-                    customer.setCars(new ArrayList<>());
-                }
-                if (!customer.getCars().contains(conflictingCar)) {
-                    customer.getCars().add(conflictingCar);
-                }
-                carRepository.save(conflictingCar);
-                customerRepository.save(customer);
-                CarResponse response = convertCarEntityToResponse(conflictingCar, acceptLanguage, "fromDb");
-                redisCacheService.evictCarListAfterCommit(userIdHeader);
-                log.info("[addCar] END success (existing plate car linked) | carId={}, vin={}, plateNumber={}, colorId={}",
-                        response.getCarId(), response.getVin(), response.getPlateNumber(), conflictingCar.getColorId());
-                return response;
-            }
-            log.info("[addCar] PASS plateNumber uniqueness check | plateNumber={}", plateNumber);
 
             log.info("[addCar] BRANCH new car flow | engineTypeId={}", carRequest.getEngineTypeId());
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
@@ -1472,17 +1464,6 @@ public class CarServiceImpl implements CarService {
      */
     private void applyAddCarRequestToExisting(Car car, CarRequest carRequest, String plateNumber,
                                               String logUserId, String acceptLanguage) {
-        Optional<Car> plateOwner = carRepository.findByPlateNumberIgnoreCase(plateNumber);
-        if (plateOwner.isPresent() && !plateOwner.get().getCarId().equals(car.getCarId())
-                && plateOwner.get().getCustomer() != null) {
-            throwAddCarFailure(logUserId,
-                    "plateNumber already exists on reclaim | plateNumber=" + plateNumber
-                            + ", existingCarId=" + plateOwner.get().getCarId()
-                            + ", reclaimCarId=" + car.getCarId(),
-                    new AlreadyExistsException(
-                            MessagesLangValues.PLATE_NUMBER_ALREADY_EXISTS.getMessageByLang(acceptLanguage)));
-        }
-
         EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
         if (engineType == null) {
             throwAddCarFailure(logUserId,
@@ -1938,6 +1919,42 @@ public class CarServiceImpl implements CarService {
     }
 
     /**
+     * tr: iddaProvidedFields içindeki değer değişirse 409. Boş gelen alan değişiklik sayılmaz.
+     * en: A changed iddaProvidedFields value is 409. A blank incoming value is not a change.
+     */
+    private void rejectLockedIddaFields(Car car, CarRequest carRequest, String acceptLanguage) {
+        List<String> locked = car.getIddaProvidedFields();
+        if (locked == null || locked.isEmpty()) {
+            return;
+        }
+        boolean changed = (locked.contains("brand") && textChanged(carRequest.getBrand(), car.getBrand()))
+                || (locked.contains("model") && textChanged(carRequest.getModel(), car.getModel()))
+                || (locked.contains("plateNumber") && plateChanged(carRequest.getPlateNumber(), car.getPlateNumber()))
+                || (locked.contains("modelYear") && carRequest.getModelYear() != null
+                && !carRequest.getModelYear().equals(car.getModelYear()))
+                || (locked.contains("engineVolume") && carRequest.getEngineVolume() != null
+                && !carRequest.getEngineVolume().equals(car.getEngineVolume()));
+        if (changed) {
+            throw new ConflictException(MessagesLangValues.IDDA_FIELD_LOCKED.getMessageByLang(acceptLanguage));
+        }
+    }
+
+    private static boolean textChanged(String incoming, String current) {
+        if (incoming == null || incoming.isBlank()) {
+            return false;
+        }
+        String stored = current == null ? "" : current.trim();
+        return !incoming.trim().equals(stored);
+    }
+
+    private static boolean plateChanged(String incoming, String current) {
+        if (incoming == null || incoming.isBlank()) {
+            return false;
+        }
+        return !IddaPlateKey.of(incoming).equals(IddaPlateKey.of(current));
+    }
+
+    /**
      * tr: carId'nin verilen customer'a ait olduğunu doğrulayıp aracı döner; değilse ResourceNotFoundException fırlatır.
      * en: Verifies the carId belongs to the given customer and returns the car; throws ResourceNotFoundException otherwise.
      */
@@ -2009,6 +2026,11 @@ public class CarServiceImpl implements CarService {
                 .bodyType(BodyTypeTranslation.translate(car.getBodyType(), acceptLanguage))
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .vinProvidedFields(car.getVinProvidedFields())
+                .iddaProvidedFields(car.getIddaProvidedFields() == null
+                        ? Collections.emptyList()
+                        : car.getIddaProvidedFields())
+                .fromIdda(Boolean.TRUE.equals(car.getFromIdda()))
+                .colorId(car.getColorId())
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
                         ? car.getServicedPartnerIds()
                         : Collections.emptyList())

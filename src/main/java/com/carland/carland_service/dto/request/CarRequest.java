@@ -29,5 +29,7 @@ public class CarRequest {
     String bodyType;
     Long mileage;
     List<String> vinProvidedFields;
+    /** tr: idda ise kayıt son başarılı plaka check'inden yazılır. / en: idda writes the car from the latest successful plate check. */
+    String resource;
 
 }

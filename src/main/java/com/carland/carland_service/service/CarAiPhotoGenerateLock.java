@@ -44,7 +44,7 @@ public final class CarAiPhotoGenerateLock {
         return Math.max(1L, Duration.between(now, lockedUntil).getSeconds());
     }
 
-    /** brand / model / year / colorId / plate — mileage and other edit fields are ignored. */
+    /** brand / model / year / body / colorId / plate — mileage and other edit fields are ignored. */
     public static boolean changesPromptFields(Car car, CarRequest req) {
         if (car == null || req == null) {
             return false;
@@ -56,6 +56,9 @@ public final class CarAiPhotoGenerateLock {
             return true;
         }
         if (req.getModelYear() != null && !req.getModelYear().equals(car.getModelYear())) {
+            return true;
+        }
+        if (hasText(req.getBodyType()) && !norm(req.getBodyType()).equals(norm(car.getBodyType()))) {
             return true;
         }
         if (req.getColorId() != null && !req.getColorId().equals(car.getColorId())) {

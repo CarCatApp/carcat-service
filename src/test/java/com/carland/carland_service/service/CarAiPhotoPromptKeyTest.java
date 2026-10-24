@@ -23,6 +23,13 @@ class CarAiPhotoPromptKeyTest {
     }
 
     @Test
+    void bodyChangeDifferentKey() {
+        Car sedan = Car.builder().brand("BMW").model("X5").modelYear(2020).colorId(2L).plateNumber("10-AA-100").bodyType("Sedan").build();
+        Car suv = Car.builder().brand("BMW").model("X5").modelYear(2020).colorId(2L).plateNumber("10-AA-100").bodyType("SUV").build();
+        assertNotEquals(CarAiPhotoPromptKey.of(sedan), CarAiPhotoPromptKey.of(suv));
+    }
+
+    @Test
     void mileageIgnored() {
         Car a = Car.builder().brand("BMW").model("X5").colorId(2L).plateNumber("10-AA-100").mileage(1000L).build();
         Car b = Car.builder().brand("BMW").model("X5").colorId(2L).plateNumber("10-AA-100").mileage(90000L).build();

@@ -9,6 +9,7 @@
   <style>
     col.c-hist     { width: 100px; }
     col.c-vin      { width: 165px; }
+    col.c-hyper    { width: 118px; }
     col.c-plate    { width: 105px; }
     col.c-brand    { width: 110px; }
     col.c-model    { width: 120px; }
@@ -19,7 +20,7 @@
     col.c-mileage  { width: 90px; }
     col.c-created  { width: 160px; }
     col.c-updated  { width: 160px; }
-    .data-table { min-width: 1180px; }
+    .data-table { min-width: 1300px; }
     .vin-input { font-family: ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; }
   </style>
 </head>
@@ -90,6 +91,7 @@
         <colgroup>
           <col class="c-hist">
           <col class="c-vin">
+          <col class="c-hyper">
           <col class="c-plate">
           <col class="c-brand">
           <col class="c-model">
@@ -105,6 +107,7 @@
         <tr>
           <th></th>
           <th>VIN</th>
+          <th title="Partner 1, branch 10. A Hyper visit with an empty branch counts.">Hyper visited</th>
           <th>Plate Number</th>
           <th>Brand</th>
           <th>Model</th>
@@ -123,6 +126,10 @@
             <a class="btn-cars" th:href="@{/admin/cars/{id}/history(id=${car.carId})}">History</a>
           </td>
           <td class="vin" th:text="${car.vin}" th:title="${car.vin}"></td>
+          <td>
+            <span class="badge badge-success" th:if="${hyperVisitedCarIds.contains(car.carId)}">Yes</span>
+            <span class="badge badge-neutral" th:unless="${hyperVisitedCarIds.contains(car.carId)}">No</span>
+          </td>
           <td th:text="${car.plateNumber}"></td>
           <td th:text="${car.brand}"></td>
           <td th:text="${car.model}"></td>
@@ -145,7 +152,7 @@
               th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
         </tr>
         <tr class="empty-row" th:if="${cars.content.isEmpty()}">
-          <td colspan="12">Kayıt bulunamadı</td>
+          <td colspan="13">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -187,7 +194,7 @@
   CarlandAdmin.initColumnToggle(
     document.getElementById("carsTable"),
     "carland-admin-cols-cars-v3",
-    ["History", "VIN", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
+    ["History", "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
     []
   );
   CarlandAdmin.initExpandCells(".cell-clip");

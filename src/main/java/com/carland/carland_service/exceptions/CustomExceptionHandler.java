@@ -1,6 +1,7 @@
 package com.carland.carland_service.exceptions;
 
 import com.carland.carland_service.dto.response.ResponseException;
+import com.carland.carland_service.idda.IddaUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -290,6 +291,17 @@ public class CustomExceptionHandler {
                 .retryAfter(ex.getRemainingSeconds())
                 .build();
         return new ResponseEntity<>(responseException, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    @ExceptionHandler(IddaUnavailableException.class)
+    public ResponseEntity<ResponseException> handleIddaUnavailableException(IddaUnavailableException ex) {
+        ResponseException responseException = ResponseException.builder()
+                .error("IDDA unavailable")
+                .message(ex.getMessage())
+                .timeStamp(LocalDateTime.now())
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .build();
+        return new ResponseEntity<>(responseException, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
 

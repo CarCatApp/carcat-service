@@ -108,7 +108,11 @@ public class CarAiPhotoWorker {
         String model = car.getModel() == null ? "" : car.getModel().trim();
         String colorPart = colorForPrompt(car);
         String plate = car.getPlateNumber() == null ? "" : car.getPlateNumber().trim();
-        return "Photorealistic studio product photo of a " + year + " " + colorPart + " " + brand + " " + model
+        String body = car.getBodyType() == null ? "" : car.getBodyType().trim();
+        String vehicle = (year + " " + colorPart + " " + brand + " " + model + (body.isEmpty() ? "" : " " + body))
+                .replaceAll(" +", " ")
+                .trim();
+        return "Photorealistic studio product photo of a " + vehicle
                 + " , shown in a front three-quarter view angled toward the front — the front fascia mostly facing the camera with only a slight turn to reveal the right-side profile, roughly 20° from head-on, camera at roughly bumper height, entire vehicle centered and fully in frame. Transparent background, even soft studio lighting, subtle contact shadow and faint reflection directly beneath the car, no other reflections. Clean catalog/marketing style, sharp detail, no people, no text or watermarks, no background objects. License plate '"
                 + plate + "' in Azerbaijani format";
     }
