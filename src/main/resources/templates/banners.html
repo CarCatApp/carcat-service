@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>banner — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=banner1">
+  <style>
+    .branch-picks { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+    .branch-picks .is-on,
+    .branch-picks .is-on:hover { background: #111; color: #fff; border-color: #111; }
+    .banner-block { margin-top: 36px; }
+    .banner-block h2 { font-size: 18px; margin: 0 0 12px; }
+    .banner-grid { display: grid; grid-template-columns: 1fr 220px; gap: 12px; align-items: end; }
+    .banner-grid .full { grid-column: 1 / -1; }
+    .cell-text { max-width: 360px; white-space: pre-wrap; word-break: break-word; }
+    .show-switch { position: relative; display: inline-block; width: 44px; height: 26px; }
+    .show-switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+    .show-switch i {
+      position: absolute; inset: 0; border-radius: 999px; background: #d4d4d8; pointer-events: none;
+    }
+    .show-switch i::after {
+      content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; transition: transform 0.15s ease;
+    }
+    .show-switch input:checked + i { background: #111; }
+    .show-switch input:checked + i::after { transform: translateX(18px); }
+    .show-switch input:focus-visible + i { outline: 2px solid #111; outline-offset: 3px; }
+    .editor[hidden] { display: none; }
+    .editor {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 40;
+      display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow: auto;
+    }
+    .editor-card {
+      width: min(720px, 100%); background: #fff; color: #111;
+      border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px;
+    }
+    .editor-card h2 { color: #111; }
+    @media (max-width: 720px) {
+      .banner-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link active" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>banner</h1>
+      <p class="muted">Şube adına basınca title ve branchId dolar. İkisini yaratırken ve düzeltirken elle değiştirebilirsin.</p>
+    </div>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <div class="branch-picks" id="branchPicks"></div>
+  <form id="createForm">
+    <div class="banner-grid">
+      <div class="field full">
+        <label for="title">title</label>
+        <input id="title" autocomplete="off">
+      </div>
+      <div class="field full">
+        <label for="description">description</label>
+        <textarea id="description"></textarea>
+      </div>
+      <div class="field">
+        <label for="branchId">branchId</label>
+        <input id="branchId" inputmode="numeric" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="createBtn" type="submit">Yarat</button>
+    </div>
+  </form>
+
+  <section class="banner-block">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>title</th>
+          <th>description</th>
+          <th>branchId</th>
+          <th>showing</th>
+          <th>status</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody id="bannerRows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="editor" id="editor" hidden>
+  <form class="editor-card" id="editForm">
+    <h2>Düzəlt</h2>
+    <input type="hidden" id="editId">
+    <div class="banner-grid">
+      <div class="field full">
+        <label for="editTitle">title</label>
+        <input id="editTitle" autocomplete="off">
+      </div>
+      <div class="field full">
+        <label for="editDescription">description</label>
+        <textarea id="editDescription"></textarea>
+      </div>
+      <div class="field">
+        <label for="editBranchId">branchId</label>
+        <input id="editBranchId" inputmode="numeric" autocomplete="off">
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Saxla</button>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Bağla</button>
+    </div>
+  </form>
+</div>
+<script src="/admin/admin.js?v=banner1"></script>
+<script>
+  const errBox = document.getElementById("errBox");
+  const branchPicks = document.getElementById("branchPicks");
+  const bannerRows = document.getElementById("bannerRows");
+  const editor = document.getElementById("editor");
+  let rows = [];
+
+  function showErr(msg) {
+    if (!msg) {
+      errBox.hidden = true;
+      errBox.textContent = "";
+      return;
+    }
+    errBox.hidden = false;
+    errBox.textContent = msg;
+  }
+
+  async function api(url, options) {
+    const headers = { Accept: "application/json", ...(options && options.headers ? options.headers : {}) };
+    const res = await fetch(url, { credentials: "same-origin", ...(options || {}), headers });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return null;
+    }
+    const raw = await res.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { message: raw.slice(0, 180) }; }
+    if (!res.ok) {
+      showErr(body.message || body.error || ("Request failed HTTP " + res.status));
+      return null;
+    }
+    return body;
+  }
+
+  function readFields(titleEl, descriptionEl, branchEl) {
+    const title = titleEl.value.trim();
+    const description = descriptionEl.value.trim();
+    const branchRaw = branchEl.value.trim();
+    if (!title) return { error: "title is required" };
+    if (description.length < 3) return { error: "description must be at least 3 characters" };
+    if (!/^-?\d+$/.test(branchRaw)) return { error: "branchId is required" };
+    const branchId = Number(branchRaw);
+    if (!Number.isSafeInteger(branchId)) return { error: "branchId is required" };
+    return { title, description, branchId };
+  }
+
+  function clearPick() {
+    branchPicks.querySelectorAll("button").forEach((btn) => btn.classList.remove("is-on"));
+  }
+
+  function renderBranches(list) {
+    branchPicks.replaceChildren();
+    if (!list.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "şube yoxdur";
+      branchPicks.appendChild(empty);
+      return;
+    }
+    list.forEach((branch) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-ghost";
+      btn.textContent = branch.name || "";
+      btn.addEventListener("click", () => {
+        clearPick();
+        btn.classList.add("is-on");
+        document.getElementById("title").value = branch.name || "";
+        document.getElementById("branchId").value = branch.id == null ? "" : String(branch.id);
+      });
+      branchPicks.appendChild(btn);
+    });
+  }
+
+  function renderRows(list) {
+    rows = list || [];
+    bannerRows.replaceChildren();
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "muted";
+      td.textContent = "active banner yoxdur";
+      tr.appendChild(td);
+      bannerRows.appendChild(tr);
+      return;
+    }
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(textCell(row.title));
+      tr.appendChild(textCell(row.description));
+      tr.appendChild(textCell(row.branchId == null ? "" : String(row.branchId)));
+
+      const showingTd = document.createElement("td");
+      const label = document.createElement("label");
+      label.className = "show-switch";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.setAttribute("aria-label", "showing");
+      input.checked = row.showing === true;
+      input.addEventListener("change", () => setShowing(row, input));
+      const knob = document.createElement("i");
+      knob.setAttribute("aria-hidden", "true");
+      label.appendChild(input);
+      label.appendChild(knob);
+      showingTd.appendChild(label);
+      tr.appendChild(showingTd);
+
+      tr.appendChild(textCell(row.status || ""));
+
+      const actions = document.createElement("td");
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn-ghost";
+      edit.textContent = "Düzəlt";
+      edit.addEventListener("click", () => openEdit(row));
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn btn-ghost";
+      del.textContent = "Sil";
+      del.addEventListener("click", () => deactivate(row));
+      actions.appendChild(edit);
+      actions.appendChild(del);
+      tr.appendChild(actions);
+      bannerRows.appendChild(tr);
+    });
+  }
+
+  function textCell(value) {
+    const td = document.createElement("td");
+    td.className = "cell-text";
+    td.textContent = value == null ? "" : String(value);
+    return td;
+  }
+
+  async function loadBranches() {
+    const data = await api("/admin/banners/branches");
+    if (!data) return;
+    renderBranches(Array.isArray(data) ? data : []);
+  }
+
+  async function loadBanners() {
+    const data = await api("/admin/banners/items");
+    if (!data) return;
+    renderRows(Array.isArray(data) ? data : []);
+  }
+
+  async function setShowing(row, input) {
+    const next = input.checked;
+    input.disabled = true;
+    const saved = await api("/admin/banners/" + row.id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ showing: next })
+    });
+    input.disabled = false;
+    if (!saved) {
+      input.checked = !next;
+      return;
+    }
+    input.checked = saved.showing === true;
+    row.showing = saved.showing === true;
+  }
+
+  function openEdit(row) {
+    showErr("");
+    document.getElementById("editId").value = row.id;
+    document.getElementById("editTitle").value = row.title || "";
+    document.getElementById("editDescription").value = row.description || "";
+    document.getElementById("editBranchId").value = row.branchId == null ? "" : String(row.branchId);
+    editor.hidden = false;
+  }
+
+  async function deactivate(row) {
+    const ok = await CarlandAdmin.confirmModal("Sil", "status deactive olacaq.");
+    if (!ok) return;
+    showErr("");
+    const saved = await api("/admin/banners/" + row.id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "deactive" })
+    });
+    if (!saved) return;
+    await loadBanners();
+  }
+
+  document.getElementById("title").addEventListener("input", clearPick);
+  document.getElementById("branchId").addEventListener("input", clearPick);
+
+  document.getElementById("createForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = readFields(
+      document.getElementById("title"),
+      document.getElementById("description"),
+      document.getElementById("branchId")
+    );
+    if (fields.error) {
+      showErr(fields.error);
+      return;
+    }
+    showErr("");
+    const btn = document.getElementById("createBtn");
+    btn.disabled = true;
+    const saved = await api("/admin/banners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: fields.title,
+        description: fields.description,
+        branchId: fields.branchId
+      })
+    });
+    btn.disabled = false;
+    if (!saved) return;
+    document.getElementById("createForm").reset();
+    clearPick();
+    await loadBanners();
+  });
+
+  document.getElementById("editForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = readFields(
+      document.getElementById("editTitle"),
+      document.getElementById("editDescription"),
+      document.getElementById("editBranchId")
+    );
+    if (fields.error) {
+      showErr(fields.error);
+      return;
+    }
+    showErr("");
+    const id = document.getElementById("editId").value;
+    const saved = await api("/admin/banners/" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: fields.title,
+        description: fields.description,
+        branchId: fields.branchId
+      })
+    });
+    if (!saved) return;
+    editor.hidden = true;
+    await loadBanners();
+  });
+
+  document.getElementById("cancelBtn").addEventListener("click", () => {
+    editor.hidden = true;
+  });
+
+  loadBranches();
+  loadBanners();
+</script>
+</body>
+</html>
