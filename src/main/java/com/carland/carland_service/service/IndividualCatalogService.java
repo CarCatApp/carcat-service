@@ -10,6 +10,8 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.IndividualServiceFilter;
+import com.carland.carland_service.entity.IndividualServiceSource;
+import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
@@ -19,6 +21,8 @@ import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
+import com.carland.carland_service.repository.ServiceEntityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +47,8 @@ public class IndividualCatalogService {
 
     private final IndividualServiceRepository individualServiceRepository;
     private final IndividualServiceFilterRepository individualServiceFilterRepository;
+    private final IndividualServiceSourceRepository sourceRepository;
+    private final ServiceEntityRepository serviceEntityRepository;
     private final BranchIndividualServiceRepository branchServiceRepository;
     private final BranchRepository branchRepository;
     private final BookingStaffAccess bookingStaffAccess;
@@ -155,7 +161,54 @@ public class IndividualCatalogService {
         IndividualServiceFilter filter = individualServiceFilterRepository.findById(body.getFilterId())
                 .orElseThrow(() -> new ResourceNotFoundException("individual service filter not found"));
         row.setFilter(filter);
-        return toAdminRow(individualServiceRepository.save(row));
+        IndividualService saved = individualServiceRepository.save(row);
+        copyNamesOntoTemplateRows(saved);
+        return toAdminRow(saved);
+    }
+
+    /**
+     * tr: Kataloq adı bütün bağlı şablon sətirlərinə yazılır. Km, ay və serviceName durur.
+     * en: The catalog name is written onto every linked template row. Km, month and serviceName stay.
+     */
+    private void copyNamesOntoTemplateRows(IndividualService catalog) {
+        if (catalog.getId() == null) {
+            return;
+        }
+        List<IndividualServiceSource> links = sourceRepository.findByIndividualServiceIdIn(List.of(catalog.getId()));
+        if (links == null || links.isEmpty()) {
+            return;
+        }
+        List<Long> ids = new ArrayList<>();
+        for (IndividualServiceSource link : links) {
+            if (link != null && link.getServiceId() != null) {
+                ids.add(link.getServiceId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return;
+        }
+        List<ServiceEntity> rows = serviceEntityRepository.findAllById(ids);
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        Map<String, String> title = json.read(catalog.getTitleJson());
+        for (ServiceEntity row : rows) {
+            if (row == null) {
+                continue;
+            }
+            row.setNameAz(clipName(title.get("az")));
+            row.setNameEn(clipName(title.get("en")));
+            row.setNameRu(clipName(title.get("ru")));
+        }
+        serviceEntityRepository.saveAll(rows);
+    }
+
+    private static String clipName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        return trimmed.length() <= 240 ? trimmed : trimmed.substring(0, 240);
     }
 
     private BranchIndividualService branchRow(Branch branch, IndividualService catalog) {

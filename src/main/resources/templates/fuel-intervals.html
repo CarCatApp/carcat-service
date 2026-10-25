@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Fuel intervals — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .note { margin-top: 8px; max-width: 78ch; color: var(--text-muted); font-size: 14px; line-height: 1.55; }
+    .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .fuel-switch {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-pill); padding: 4px; margin-bottom: 16px;
+    }
+    .fuel-switch a {
+      text-decoration: none; min-height: 36px; padding: 6px 14px;
+      border-radius: var(--radius-pill); font-size: 13px; font-weight: 600;
+      color: var(--text-muted);
+    }
+    .fuel-switch a.on { background: var(--text); color: #fff; }
+    .fuel-switch a:hover:not(.on) { background: var(--primary-soft); color: var(--text); }
+    .template-name { margin: 0 0 16px; }
+    .name-line { font-size: 13px; color: var(--text-muted); }
+    .row-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .editor[hidden] { display: none; }
+    .editor {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 40;
+      display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow: auto;
+    }
+    .editor-card { width: min(560px, 100%); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+    .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .editor-grid .full { grid-column: 1 / -1; }
+    .readout { font-size: 14px; font-weight: 600; }
+    .error-box[hidden] { display: none; }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link active" href="/admin/fuel-intervals">Aralıqlar</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container wide" id="main" th:attr="data-engine-type-id=${screen.selectedEngineTypeId}">
+  <div class="page-head">
+    <div>
+      <h1>Yakıt aralıqları</h1>
+      <p class="note">Km və ay yalnız seçilmiş yakıtın şablonuna yazılır. Yeni avtomobil bu siyahını kopyalayır. Faiz ekranı şablonu oxuduğu üçün əl ilə dəyişdirilməmiş sətir növbəti açılışda yeni rəqəmi göstərir. Ad Individual səhifəsində dəyişir və bağlı bütün yakıt sətirlərinə keçir. Km və ay yalnız buradadır.</p>
+    </div>
+    <div class="head-actions">
+      <a class="btn btn-ghost" href="/admin/individual-services">Individual-da yeni xidmət</a>
+      <button class="btn btn-primary" type="button" id="addBtn"
+              th:disabled="${screen.templateMissing or screen.selectedEngineTypeId == null}">Bu yakıta əlavə et</button>
+    </div>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <div class="fuel-switch" th:if="${screen.fuels != null and !screen.fuels.isEmpty()}">
+    <a th:each="fuel : ${screen.fuels}"
+       th:href="@{/admin/fuel-intervals(engineTypeId=${fuel.engineTypeId})}"
+       th:text="${fuel.label}"
+       th:classappend="${fuel.engineTypeId == screen.selectedEngineTypeId} ? 'on' : ''">Benzin</a>
+  </div>
+  <p class="muted" th:if="${screen.fuels == null or screen.fuels.isEmpty()}">Aktiv yakıt növü yoxdur.</p>
+  <p class="muted template-name" th:if="${screen.templateName != null}"
+     th:text="|Şablon: ${screen.templateName}|">Şablon</p>
+  <p class="muted" th:if="${screen.templateMissing and screen.selectedLabel != null}"
+     th:text="|${screen.selectedLabel} üçün baxım şablonu yoxdur.|">Şablon yoxdur</p>
+  <div class="table-wrap" th:if="${!screen.templateMissing}">
+    <table class="data-table">
+      <thead>
+      <tr><th>Xidmət</th><th>Km</th><th>Ay</th><th>Digər yakıtlar</th><th></th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="row : ${screen.rows}">
+        <td>
+          <strong th:text="${row.titleAz}">Buji</strong>
+          <div class="name-line" th:text="${row.titleEn}">Spark plugs</div>
+          <div class="name-line" th:text="|serviceId ${row.serviceId}|">serviceId</div>
+        </td>
+        <td th:text="${row.intervalKm != null ? row.intervalKm : '—'}">20000</td>
+        <td th:text="${row.intervalMonth != null ? row.intervalMonth : '—'}">24</td>
+        <td th:text="${row.otherFuels == null or row.otherFuels.isBlank()} ? '—' : row.otherFuels">Benzin</td>
+        <td>
+          <div class="row-actions">
+            <button type="button" class="btn btn-ghost js-edit"
+                    th:data-service-id="${row.serviceId}"
+                    th:data-title-az="${row.titleAz}"
+                    th:data-title-en="${row.titleEn}"
+                    th:data-title-ru="${row.titleRu}"
+                    th:data-interval-km="${row.intervalKm}"
+                    th:data-interval-month="${row.intervalMonth}">Düzəlt</button>
+            <button type="button" class="btn btn-danger js-remove"
+                    th:data-service-id="${row.serviceId}"
+                    th:data-title-az="${row.titleAz}">Çıxar</button>
+          </div>
+        </td>
+      </tr>
+      <tr th:if="${screen.rows == null or screen.rows.isEmpty()}">
+        <td colspan="5">Bu yakıtda xidmət yoxdur.</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="editor" id="editEditor" hidden>
+  <form class="editor-card" id="editForm">
+    <h2>Düzəlt</h2>
+    <input type="hidden" id="eServiceId">
+    <div class="editor-grid">
+      <div class="field full"><div class="readout" id="eTitle">Buji</div></div>
+      <div class="field"><label for="eKm">Km</label><input id="eKm" inputmode="numeric" maxlength="7" placeholder="10000"></div>
+      <div class="field"><label for="eMonth">Ay</label><input id="eMonth" inputmode="numeric" maxlength="3" placeholder="12"></div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Saxla</button>
+      <button class="btn btn-ghost" type="button" id="editCancel">Bağla</button>
+    </div>
+  </form>
+</div>
+
+<div class="editor" id="addEditor" hidden>
+  <form class="editor-card" id="addForm">
+    <h2>Bu yakıta əlavə et</h2>
+    <div class="editor-grid">
+      <div class="field full">
+        <label for="aCatalog">Kataloq</label>
+        <select id="aCatalog" required>
+          <option value="">Seç</option>
+          <option th:each="opt : ${screen.catalogOptions}" th:value="${opt.id}"
+                  th:text="${opt.titleAz + (opt.code != null ? ' (' + opt.code + ')' : '')}">Yağ</option>
+        </select>
+        <p class="note" th:if="${screen.catalogOptions == null or screen.catalogOptions.isEmpty()}">Əlavə olunacaq aktiv kataloq sətri qalmayıb. Yenisini Individual səhifəsində yarat.</p>
+      </div>
+      <div class="field"><label for="aKm">Km</label><input id="aKm" inputmode="numeric" maxlength="7" placeholder="10000"></div>
+      <div class="field"><label for="aMonth">Ay</label><input id="aMonth" inputmode="numeric" maxlength="3" placeholder="12"></div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Əlavə et</button>
+      <button class="btn btn-ghost" type="button" id="addCancel">Bağla</button>
+    </div>
+  </form>
+</div>
+
+<script src="/admin/admin.js?v=premium8"></script>
+<script>
+  const editEditor = document.getElementById("editEditor");
+  const addEditor = document.getElementById("addEditor");
+  function showErr(msg) {
+    const err = document.getElementById("errBox");
+    err.hidden = false;
+    err.textContent = msg;
+  }
+  function optionalNumber(id) {
+    const raw = document.getElementById(id).value.trim();
+    if (raw === "") return null;
+    if (!/^\d+$/.test(raw)) return Number.NaN;
+    return Number(raw);
+  }
+  function intervals(kmId, monthId) {
+    const km = optionalNumber(kmId);
+    const month = optionalNumber(monthId);
+    if (Number.isNaN(km) || Number.isNaN(month)) {
+      showErr("Km və ay rəqəm olmalıdır");
+      return null;
+    }
+    if (km == null && month == null) {
+      showErr("Km və ya ay lazımdır");
+      return null;
+    }
+    return { intervalKm: km, intervalMonth: month };
+  }
+  async function postJson(url, body) {
+    const res = await fetch(url, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 401 || res.status === 403) { window.location.href = "/admin/"; return null; }
+    if (!res.ok) {
+      let msg = "Saxlanılmadı (" + res.status + ")";
+      try { const payload = await res.json(); if (payload && payload.message) msg = payload.message; } catch (_) {}
+      showErr(msg);
+      return null;
+    }
+    return res;
+  }
+  document.querySelectorAll(".js-edit").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const data = btn.dataset;
+      document.getElementById("eServiceId").value = data.serviceId || "";
+      const lines = [data.titleAz, data.titleEn, data.titleRu].filter((line) => line);
+      document.getElementById("eTitle").textContent = lines.join(" · ");
+      document.getElementById("eKm").value = data.intervalKm || "";
+      document.getElementById("eMonth").value = data.intervalMonth || "";
+      editEditor.hidden = false;
+    });
+  });
+  document.getElementById("editCancel").addEventListener("click", () => { editEditor.hidden = true; });
+  document.getElementById("editForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const span = intervals("eKm", "eMonth");
+    if (!span) return;
+    const saved = await postJson("/admin/fuel-intervals/interval", {
+      serviceId: Number(document.getElementById("eServiceId").value),
+      intervalKm: span.intervalKm,
+      intervalMonth: span.intervalMonth
+    });
+    if (saved) window.location.reload();
+  });
+  document.getElementById("addBtn").addEventListener("click", () => {
+    if (document.getElementById("addBtn").disabled) return;
+    addEditor.hidden = false;
+  });
+  document.getElementById("addCancel").addEventListener("click", () => { addEditor.hidden = true; });
+  document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const catalog = document.getElementById("aCatalog").value;
+    if (!catalog) { showErr("Kataloq seç"); return; }
+    const span = intervals("aKm", "aMonth");
+    if (!span) return;
+    const engineTypeId = Number(document.getElementById("main").dataset.engineTypeId);
+    const saved = await postJson("/admin/fuel-intervals/add", {
+      engineTypeId: engineTypeId,
+      individualServiceId: Number(catalog),
+      intervalKm: span.intervalKm,
+      intervalMonth: span.intervalMonth
+    });
+    if (saved) window.location.reload();
+  });
+  document.querySelectorAll(".js-remove").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const title = btn.dataset.titleAz || "Bu xidmət";
+      const ok = confirm(title + " bu yakıtdan düşəcək. Bu yakıttakı avtomobillərin faiz siyahısında görünməyəcək. Kataloq və digər yakıtlar qalır.");
+      if (!ok) return;
+      const saved = await postJson("/admin/fuel-intervals/remove", { serviceId: Number(btn.dataset.serviceId) });
+      if (saved) window.location.reload();
+    });
+  });
+</script>
+</body>
+</html>

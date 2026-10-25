@@ -3,8 +3,11 @@ package com.carland.carland_service.repository;
 import com.carland.carland_service.entity.MaintenanceTemplate;
 import com.carland.carland_service.entity.ServiceEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -24,4 +27,16 @@ public interface ServiceEntityRepository extends JpaRepository<ServiceEntity, Lo
 
     /** tr: Bakım şablonuna bağlı tüm servis tanımlarını listeler. / en: Lists all service definitions of a maintenance template. */
     List<ServiceEntity> findAllByMaintenanceTemplate(MaintenanceTemplate template);
+
+    /**
+     * tr: Yakıt aralığı ekranı, aynı kataloq satırının diğer yakıtlardaki şablonunu okur.
+     * en: The fuel-interval screen reads the other fuels' templates for the same catalog row.
+     */
+    @Query("""
+            select s from ServiceEntity s
+            join fetch s.maintenanceTemplate t
+            left join fetch t.engineType
+            where s.id in :ids
+            """)
+    List<ServiceEntity> findWithTemplateByIdIn(@Param("ids") Collection<Long> ids);
 }

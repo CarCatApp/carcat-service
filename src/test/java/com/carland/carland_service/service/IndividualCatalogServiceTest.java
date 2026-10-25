@@ -2,17 +2,23 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.StaffIndividualServiceListResponse;
 import com.carland.carland_service.dto.booking.StaffIndividualServiceView;
+import com.carland.carland_service.dto.request.AdminIndividualServiceSaveRequest;
 import com.carland.carland_service.dto.request.StaffIndividualServicePricesRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchIndividualService;
 import com.carland.carland_service.entity.IndividualService;
+import com.carland.carland_service.entity.IndividualServiceFilter;
+import com.carland.carland_service.entity.IndividualServiceSource;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.entity.ServiceEntity;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.IndividualServiceFilterRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.IndividualServiceSourceRepository;
+import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +46,8 @@ class IndividualCatalogServiceTest {
     @Mock BranchIndividualServiceRepository branchServiceRepository;
     @Mock BranchRepository branchRepository;
     @Mock BookingStaffAccess bookingStaffAccess;
+    @Mock IndividualServiceSourceRepository sourceRepository;
+    @Mock ServiceEntityRepository serviceEntityRepository;
 
     IndividualCatalogService service;
     BookingStaff staff;
@@ -52,6 +60,8 @@ class IndividualCatalogServiceTest {
         service = new IndividualCatalogService(
                 individualServiceRepository,
                 individualServiceFilterRepository,
+                sourceRepository,
+                serviceEntityRepository,
                 branchServiceRepository,
                 branchRepository,
                 bookingStaffAccess,
@@ -138,5 +148,44 @@ class IndividualCatalogServiceTest {
         assertEquals(40, saved.getPriceMedium());
         assertNull(saved.getPriceComplex());
         assertEquals(20, saved.getPriceSimple());
+    }
+
+    @Test
+    void saveCopiesTheCatalogNameOntoEveryLinkedFuelRow() {
+        IndividualServiceFilter filter = IndividualServiceFilter.builder().id(1L).nameEn("Ignition").build();
+        ServiceEntity spark = ServiceEntity.builder()
+                .id(9L).serviceName("plug-key").nameAz("köhnə").intervalKm(20_000L).intervalMonth(24).build();
+        ServiceEntity glow = ServiceEntity.builder()
+                .id(3L).serviceName("glow-key").nameAz("köhnə").intervalKm(40_000L).build();
+        when(individualServiceRepository.findById(4L)).thenReturn(Optional.of(catalog));
+        when(individualServiceRepository.findByCode("RZV")).thenReturn(Optional.of(catalog));
+        when(individualServiceFilterRepository.findById(1L)).thenReturn(Optional.of(filter));
+        when(individualServiceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(sourceRepository.findByIndividualServiceIdIn(any())).thenReturn(List.of(
+                IndividualServiceSource.builder().serviceId(9L).individualServiceId(4L).build(),
+                IndividualServiceSource.builder().serviceId(3L).individualServiceId(4L).build()));
+        when(serviceEntityRepository.findAllById(any())).thenReturn(List.of(spark, glow));
+
+        service.saveAdmin(AdminIndividualServiceSaveRequest.builder()
+                .id(4L)
+                .code("RZV")
+                .titleAz("Buji")
+                .titleEn("Spark plugs")
+                .titleRu("Свечи")
+                .sortOrder(5)
+                .active(true)
+                .filterId(1L)
+                .build());
+
+        assertEquals("Buji", spark.getNameAz());
+        assertEquals("Spark plugs", spark.getNameEn());
+        assertEquals("Свечи", spark.getNameRu());
+        assertEquals("plug-key", spark.getServiceName());
+        assertEquals(20_000L, spark.getIntervalKm());
+        assertEquals(24, spark.getIntervalMonth());
+        assertEquals("Buji", glow.getNameAz());
+        assertEquals("glow-key", glow.getServiceName());
+        assertEquals(40_000L, glow.getIntervalKm());
+        verify(serviceEntityRepository).saveAll(List.of(spark, glow));
     }
 }
