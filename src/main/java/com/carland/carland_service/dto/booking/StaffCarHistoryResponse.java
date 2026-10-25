@@ -1,7 +1,9 @@
 package com.carland.carland_service.dto.booking;
 
 import com.carland.carland_service.dto.response.VisitHistoryItemResponse;
+import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +24,7 @@ public class StaffCarHistoryResponse {
     String vin;
     String brand;
     String model;
+    @JsonSerialize(using = PlateNumberSerializer.class)
     String plateNumber;
     Integer modelYear;
     Long branchId;
@@ -31,5 +34,9 @@ public class StaffCarHistoryResponse {
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
         return PlateNumbers.format(plateNumber);
+    }
+
+    public void setPlateNumber(String plateNumber) {
+        this.plateNumber = PlateNumbers.format(plateNumber);
     }
 }

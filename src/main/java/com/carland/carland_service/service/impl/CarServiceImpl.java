@@ -25,6 +25,7 @@ import com.carland.carland_service.idda.IddaAddResult;
 import com.carland.carland_service.idda.IddaCarWriteService;
 import com.carland.carland_service.idda.IddaPlateKey;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -129,7 +130,7 @@ public class CarServiceImpl implements CarService {
                             : carFromDb.getIddaProvidedFields())
                     .fromIdda(Boolean.TRUE.equals(carFromDb.getFromIdda()))
                     .resource("fromDb")
-                    .plateNumber(carFromDb != null ? carFromDb.getPlateNumber() : null)
+                    .plateNumber(carFromDb != null ? PlateNumbers.format(carFromDb.getPlateNumber()) : null)
                     .engineTypeId(carFromDb.getEngineTypeId())
                     .mileage(carFromDb != null ? carFromDb.getMileage() : null)
                     .build();
@@ -2014,7 +2015,7 @@ public class CarServiceImpl implements CarService {
                 .carId(car.getCarId())
                 .customerId(customer != null ? customer.getUserId() : 0L)
                 .vin(car.getVin())
-                .plateNumber(car.getPlateNumber())
+                .plateNumber(PlateNumbers.format(car.getPlateNumber()))
                 .brand(car.getBrand())
                 .model(car.getModel())
                 .modelYear(car.getModelYear())

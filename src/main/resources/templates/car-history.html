@@ -77,7 +77,7 @@
     <div class="card" style="margin-bottom: 20px; padding: 8px 8px 16px;">
       <table class="history-kv">
         <tr><th>VIN</th><td class="vin" th:text="${car.vin}">—</td></tr>
-        <tr><th>Plate</th><td th:text="${car.plateNumber}">—</td></tr>
+        <tr><th>Plate</th><td th:text="${T(com.carland.carland_service.util.PlateNumbers).format(car.plateNumber)}">—</td></tr>
         <tr>
           <th>Vehicle</th>
           <td th:text="|${car.brand} ${car.model} · ${car.modelYear} · ${car.engineType} · ${car.bodyType}|">—</td>

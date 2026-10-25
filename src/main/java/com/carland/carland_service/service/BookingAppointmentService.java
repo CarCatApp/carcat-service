@@ -17,6 +17,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.Range;
+import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
@@ -169,7 +170,7 @@ public class BookingAppointmentService {
                 .brand(car.getBrand())
                 .model(car.getModel())
                 .vin(car.getVin())
-                .plateNumber(car.getPlateNumber())
+                .plateNumber(PlateNumbers.format(car.getPlateNumber()))
                 .customerName(personName(customer))
                 .phone(customer.getPhoneNumber())
                 .packageName(booking.getPackageName())
@@ -193,7 +194,7 @@ public class BookingAppointmentService {
                 .end(clock(range.getEnd()))
                 .carId(car.getCarId())
                 .vin(car.getVin())
-                .plateNumber(car.getPlateNumber())
+                .plateNumber(PlateNumbers.format(car.getPlateNumber()))
                 .carBrand(car.getBrand())
                 .carModel(car.getModel())
                 .carYear(car.getModelYear())

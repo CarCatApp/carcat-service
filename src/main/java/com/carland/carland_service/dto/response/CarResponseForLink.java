@@ -1,7 +1,9 @@
 package com.carland.carland_service.dto.response;
 
 
+import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +23,7 @@ import java.util.List;
 public class CarResponseForLink {
     private Long carId;
     private String vin;
+    @JsonSerialize(using = PlateNumberSerializer.class)
     private String plateNumber;
     private String brand;
     private String model;
@@ -36,5 +39,9 @@ public class CarResponseForLink {
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
         return PlateNumbers.format(plateNumber);
+    }
+
+    public void setPlateNumber(String plateNumber) {
+        this.plateNumber = PlateNumbers.format(plateNumber);
     }
 }

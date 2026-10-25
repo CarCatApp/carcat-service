@@ -18,6 +18,7 @@ import com.carland.carland_service.entity.BranchService;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.OfferedService;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
@@ -177,7 +178,7 @@ public class BookingCreateService {
                 .brand(car.getBrand())
                 .model(car.getModel())
                 .vin(vin)
-                .plateNumber(car.getPlateNumber())
+                .plateNumber(PlateNumbers.format(car.getPlateNumber()))
                 .customerName(personName(customer))
                 .phone(customer == null ? null : customer.getPhoneNumber())
                 .packageName(booking.getPackageName())

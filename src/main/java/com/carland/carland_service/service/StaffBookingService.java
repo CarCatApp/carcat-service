@@ -18,6 +18,7 @@ import com.carland.carland_service.entity.BookingStaffNote;
 import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
@@ -435,7 +436,7 @@ public class StaffBookingService {
                 .customerName(customerName)
                 .phone(customer == null ? null : customer.getPhoneNumber())
                 .customerUserId(booking.getCustomerUserId())
-                .plateNumber(car == null ? null : car.getPlateNumber())
+                .plateNumber(car == null ? null : PlateNumbers.format(car.getPlateNumber()))
                 .carBrand(car == null ? null : car.getBrand())
                 .carModel(car == null ? null : car.getModel())
                 .car(carPanel(car, brandIds, lang))
@@ -468,7 +469,7 @@ public class StaffBookingService {
                 .brandId(brandId(car.getBrand(), brandIds))
                 .brand(car.getBrand())
                 .model(car.getModel())
-                .plateNumber(car.getPlateNumber())
+                .plateNumber(PlateNumbers.format(car.getPlateNumber()))
                 .vin(car.getVin())
                 .bodyType(car.getBodyType())
                 .engineType(car.getEngineType())

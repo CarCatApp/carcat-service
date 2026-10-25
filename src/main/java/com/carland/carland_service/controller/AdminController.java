@@ -23,6 +23,7 @@ import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.repository.PartnerRepository;
+import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
@@ -253,7 +254,7 @@ public class AdminController {
 
                 setCell(row, 0, car.getVin());
                 setCell(row, 1, hyperVisited.contains(car.getCarId()) ? "Yes" : "No");
-                setCell(row, 2, car.getPlateNumber());
+                setCell(row, 2, PlateNumbers.format(car.getPlateNumber()));
                 setCell(row, 3, car.getBrand());
                 setCell(row, 4, car.getModel());
                 setNumericCell(row, 5, car.getModelYear());

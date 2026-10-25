@@ -16,6 +16,7 @@ import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.ModelRepository;
+import com.carland.carland_service.util.PlateNumbers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -180,7 +181,7 @@ public class IddaPlateCheckService {
                 .carId(existing == null ? null : existing.getCarId())
                 .customerId(existing != null && existing.getCustomer() != null ? existing.getCustomer().getUserId() : null)
                 .vin(row.getVin())
-                .plateNumber(row.getPlateNumber())
+                .plateNumber(PlateNumbers.format(row.getPlateNumber()))
                 .brand(row.getBrand())
                 .model(row.getModel())
                 .modelYear(row.getModelYear())

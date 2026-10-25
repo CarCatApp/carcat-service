@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.booking.BookingInspectionView;
 import com.carland.carland_service.dto.booking.BookingServiceLineView;
 import com.carland.carland_service.entity.BookingIndividualLine;
 import com.carland.carland_service.entity.BookingInspection;
+import com.carland.carland_service.util.PlateNumbers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,7 +38,7 @@ final class BookingSelectionViews {
                 .message(row.getMessage())
                 .vin(row.getVin())
                 .carId(row.getCarId())
-                .plateNumber(row.getPlateNumber())
+                .plateNumber(PlateNumbers.format(row.getPlateNumber()))
                 .carBrand(row.getCarBrand())
                 .carModel(row.getCarModel())
                 .carYear(row.getCarYear())

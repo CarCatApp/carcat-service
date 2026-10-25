@@ -9,6 +9,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.service.UserService;
+import com.carland.carland_service.util.PlateNumbers;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,7 +76,7 @@ public class UserController {
 
                                 responseForLink.setCarId(car.getCarId());
                                 responseForLink.setVin(car.getVin());
-                                responseForLink.setPlateNumber(car.getPlateNumber());
+                                responseForLink.setPlateNumber(PlateNumbers.format(car.getPlateNumber()));
                                 responseForLink.setBrand(car.getBrand());
                                 responseForLink.setModel(car.getModel());
                                 responseForLink.setModelYear(car.getModelYear());
@@ -241,7 +242,7 @@ public class UserController {
                 row.createCell(4).setCellValue(customer.getNotificationLanguage());
                 row.createCell(5).setCellValue(customer.getStatus().toString());
 
-                row.createCell(6).setCellValue(car.getPlateNumber() != null ? car.getPlateNumber() : "");
+                row.createCell(6).setCellValue(car.getPlateNumber() != null ? PlateNumbers.format(car.getPlateNumber()) : "");
                 row.createCell(7).setCellValue(car.getVin() != null ? car.getVin() : "");
                 row.createCell(8).setCellValue(car.getBrand() != null ? car.getBrand() : "");
                 row.createCell(9).setCellValue(car.getModel() != null ? car.getModel() : "");

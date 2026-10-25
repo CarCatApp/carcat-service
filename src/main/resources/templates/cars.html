@@ -132,7 +132,7 @@
             <span class="badge badge-success" th:if="${hyperVisitedCarIds.contains(car.carId)}">Yes</span>
             <span class="badge badge-neutral" th:unless="${hyperVisitedCarIds.contains(car.carId)}">No</span>
           </td>
-          <td th:text="${car.plateNumber}"></td>
+          <td th:text="${T(com.carland.carland_service.util.PlateNumbers).format(car.plateNumber)}"></td>
           <td th:text="${car.brand}"></td>
           <td th:text="${car.model}"></td>
           <td th:text="${car.modelYear}"></td>

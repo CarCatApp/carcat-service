@@ -1,6 +1,8 @@
 package com.carland.carland_service.dto.booking;
 
+import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,6 +26,7 @@ public class BookingAppointmentResponse {
     String end;
     Long carId;
     String vin;
+    @JsonSerialize(using = PlateNumberSerializer.class)
     String plateNumber;
     String carBrand;
     String carModel;
@@ -41,5 +44,9 @@ public class BookingAppointmentResponse {
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
         return PlateNumbers.format(plateNumber);
+    }
+
+    public void setPlateNumber(String plateNumber) {
+        this.plateNumber = PlateNumbers.format(plateNumber);
     }
 }

@@ -1,6 +1,8 @@
 package com.carland.carland_service.dto.booking;
 
+import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +23,7 @@ public class CarResponseForSlotPanel {
     Long brandId;
     String brand;
     String model;
+    @JsonSerialize(using = PlateNumberSerializer.class)
     String plateNumber;
     String vin;
     String bodyType;
@@ -33,5 +36,9 @@ public class CarResponseForSlotPanel {
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
         return PlateNumbers.format(plateNumber);
+    }
+
+    public void setPlateNumber(String plateNumber) {
+        this.plateNumber = PlateNumbers.format(plateNumber);
     }
 }

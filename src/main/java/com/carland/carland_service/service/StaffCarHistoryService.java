@@ -8,6 +8,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,7 +82,7 @@ public class StaffCarHistoryService {
                 .vin(header.getVin())
                 .brand(header.getBrand())
                 .model(header.getModel())
-                .plateNumber(header.getPlateNumber())
+                .plateNumber(PlateNumbers.format(header.getPlateNumber()))
                 .modelYear(header.getModelYear())
                 .branchId(branch.getId())
                 .branchName(branch.getName())
