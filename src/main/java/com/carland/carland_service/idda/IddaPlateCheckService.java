@@ -80,13 +80,11 @@ public class IddaPlateCheckService {
         if (ownRows.size() >= USER_LIVE_CAP) {
             IddaPlateCheck own = ownRows.get(0);
             log.info("IDDA plate check user cap plateKey={} count={} checkId={}", plateKey, ownRows.size(), own.getId());
-            logRawForTest(plateKey, "db", own.getRawJson());
             return toResponse(own, acceptLanguage);
         }
         if (recent.size() >= PLATE_LIVE_CAP) {
             IddaPlateCheck latest = recent.get(0);
             log.info("IDDA plate check cap plateKey={} checkId={}", plateKey, latest.getId());
-            logRawForTest(plateKey, "db", latest.getRawJson());
             return toResponse(latest, acceptLanguage);
         }
         return live(plateKey, customer, acceptLanguage);
@@ -102,8 +100,6 @@ public class IddaPlateCheckService {
             log.warn("IDDA plate check unreachable plateKey={}", plateKey);
             throw new IddaUnavailableException(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
         }
-        logRawForTest(plateKey, "live:" + upstream.statusCode(),
-                new String(upstream.body() == null ? new byte[0] : upstream.body(), StandardCharsets.UTF_8));
         JsonNode root;
         try {
             root = objectMapper.readTree(upstream.body());
@@ -170,11 +166,6 @@ public class IddaPlateCheckService {
                 .build();
     }
 
-    /** Temporary. Remove after the raw IDDA body is captured. Grep IDDA_PLATE_RAW. */
-    private static void logRawForTest(String plateKey, String source, String body) {
-        log.info("IDDA_PLATE_RAW source={} plateKey={} body={}", source, plateKey, body);
-    }
-
     private CarResponse toResponse(IddaPlateCheck row, String acceptLanguage) {
         boolean success = row.isCountsTowardLimit();
         Car existing = success && row.getVin() != null ? findVin(row.getVin()) : null;
@@ -210,6 +201,7 @@ public class IddaPlateCheckService {
                 .iddaStatusCode(row.getStatusCode())
                 .iddaStatusName(row.getStatusName())
                 .iddaStatusMessage(row.getStatusMessage())
+                .requestIdentifier(row.getRequestIdentifier())
                 .isRestrict(restricted(row))
                 .message(message)
                 .build();

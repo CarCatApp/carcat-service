@@ -48,6 +48,13 @@ public class CarResponse {
     private String iddaStatusName;
     private String iddaStatusMessage;
     /**
+     * tr: Yalnız {@code /check/plate}. IDDA'nın döndürdüğü RequestIdentifier. Code 0, Code 4 ve DB tekrarı dahil.
+     * en: Only {@code /check/plate}. The RequestIdentifier IDDA returned, including Code 0, Code 4 and a database replay.
+     */
+    @JsonProperty("RequestIdentifier")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String requestIdentifier;
+    /**
      * tr: Yalnız {@code /check/plate}. Code 4 və ya {@code ServiceRestrictedByPerson}. Mesaj metnine bakılmaz.
      * en: Only {@code /check/plate}. Code 4 or {@code ServiceRestrictedByPerson}. The message text is ignored.
      */

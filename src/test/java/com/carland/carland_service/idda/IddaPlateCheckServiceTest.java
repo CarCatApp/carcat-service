@@ -69,6 +69,7 @@ class IddaPlateCheckServiceTest {
         CarResponse response = service.check("77-BU-669", "050", "7", "az");
 
         assertEquals(4, response.getIddaStatusCode());
+        assertEquals("13e79e85-2e94-4f81-932a-a7b3cccbfb70", response.getRequestIdentifier());
         assertEquals("limit", response.getMessage());
         assertEquals(Boolean.TRUE, response.getIsRestrict());
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(response));
