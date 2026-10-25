@@ -44,4 +44,12 @@ public class CarResponseForLink {
     public void setPlateNumber(String plateNumber) {
         this.plateNumber = PlateNumbers.format(plateNumber);
     }
+
+    /**
+     * tr: Değer yoksa JSON {@code ""} gider.
+     * en: A missing value goes out as {@code ""}.
+     */
+    public String getTransmissionType() {
+        return transmissionType == null || transmissionType.isBlank() ? "" : transmissionType;
+    }
 }

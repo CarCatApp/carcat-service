@@ -91,4 +91,12 @@ public class CarResponse {
     public void setPlateNumber(String plateNumber) {
         this.plateNumber = PlateNumbers.format(plateNumber);
     }
+
+    /**
+     * tr: Değer yoksa JSON {@code ""} gider. Liste, VIN, plaka, ekle ve düzenle cevapları bu getter'dan çıkar.
+     * en: A missing value goes out as {@code ""}. List, VIN, plate, add and edit responses serialize through this getter.
+     */
+    public String getTransmissionType() {
+        return transmissionType == null || transmissionType.isBlank() ? "" : transmissionType;
+    }
 }
