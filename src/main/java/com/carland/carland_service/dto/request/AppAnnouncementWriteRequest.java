@@ -13,6 +13,8 @@ public class AppAnnouncementWriteRequest {
     private String minAppVersion;
     private String maxAppVersion;
     private String ctaUrl;
+    private String ctaUrlIos;
+    private String ctaUrlAndroid;
     private Integer priority;
     private Instant startsAt;
     private Instant endsAt;

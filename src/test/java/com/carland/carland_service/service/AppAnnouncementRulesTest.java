@@ -35,6 +35,8 @@ class AppAnnouncementRulesTest {
         assertEquals(AppAnnouncementPlatform.ALL, normalized.platform());
         assertEquals(0, normalized.priority());
         assertNull(normalized.ctaUrl());
+        assertNull(normalized.ctaUrlIos());
+        assertNull(normalized.ctaUrlAndroid());
         assertEquals("az", normalized.translations().get(0).lang());
     }
 
@@ -113,6 +115,38 @@ class AppAnnouncementRulesTest {
         AppAnnouncementWriteRequest withLink = forcedUpdate(
                 "https://apps.apple.com/app/id1");
         AppAnnouncementRules.validate(withLink, ANDROID_ONLY, HOSTS);
+    }
+
+    @Test
+    void allPlatformKeepsSeparateStoreLinks() {
+        String ios = "https://apps.apple.com/app/id1";
+        String android = "https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat";
+        AppAnnouncementWriteRequest request = forcedUpdate(null);
+        request.setCtaUrlIos(ios);
+        request.setCtaUrlAndroid(android);
+        AppAnnouncementRules.Normalized normalized = AppAnnouncementRules.validate(request, new StoreLinks("", ""), HOSTS);
+        assertNull(normalized.ctaUrl());
+        assertEquals(ios, normalized.ctaUrlIos());
+        assertEquals(android, normalized.ctaUrlAndroid());
+    }
+
+    @Test
+    void allForcedUpdateNeedsAndroidWhenOnlyIosLinkIsSet() {
+        AppAnnouncementWriteRequest request = forcedUpdate(null);
+        request.setCtaUrlIos("https://apps.apple.com/app/id1");
+        assertThrows(IllegalArgumentException.class,
+                () -> AppAnnouncementRules.validate(request, new StoreLinks("", ""), HOSTS));
+    }
+
+    @Test
+    void singlePlatformDropsTheOtherLink() {
+        AppAnnouncementWriteRequest request = forcedUpdate("https://apps.apple.com/app/id9");
+        request.setPlatform("IOS");
+        request.setCtaUrlAndroid("https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat");
+        AppAnnouncementRules.Normalized normalized = AppAnnouncementRules.validate(request, new StoreLinks("", ""), HOSTS);
+        assertEquals("https://apps.apple.com/app/id9", normalized.ctaUrl());
+        assertNull(normalized.ctaUrlIos());
+        assertNull(normalized.ctaUrlAndroid());
     }
 
     private static AppAnnouncementWriteRequest info(String title, String body) {

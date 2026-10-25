@@ -46,6 +46,30 @@
       font-size: 14px;
     }
     .hint { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .form-row[hidden] { display: none !important; }
+    .ann-editor-bar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .ann-editor-bar .btn-primary { color: #fff; background: var(--primary); border-color: var(--primary); }
+    .data-table tbody td.ann-status {
+      overflow: visible;
+      white-space: normal;
+    }
+    .ann-status {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
     @media (max-width: 980px) {
       .ann-grid { grid-template-columns: 1fr; }
     }
@@ -147,10 +171,16 @@
   <section class="create-card ann-editor" id="editor" hidden>
     <h2 id="editorTitle">Taslak</h2>
     <div class="ann-meta" id="editorMeta"></div>
+    <div class="ann-editor-bar">
+      <button class="btn btn-primary" type="button" id="publishBtn">Yayınla</button>
+      <button class="btn btn-ghost" type="submit" form="editorForm" id="saveBtn">Taslak kaydet</button>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Vazgeç</button>
+    </div>
     <ul class="ann-rules">
       <li><strong>az</strong> başlık ve metin zorunlu. Başlık 60, metin 500, buton yazısı 30 karakter.</li>
       <li><strong>UPDATE</strong> için üst sürüm zorunlu. Üst sınır yoksa güncellemeyi yapan kullanıcı da duyuruyu görür.</li>
       <li>Kapatılamaz UPDATE için <strong>https</strong> CTA gerekir. Host: play.google.com, apps.apple.com, itunes.apple.com. CTA boşsa ilgili mağaza linki config’te dolu olmalıdır.</li>
+      <li>Platform <strong>ALL</strong> iken linkler ayrıdır: CTA URL iOS ve CTA URL Android. Telefon <strong>X-Platform</strong> başlığına göre kendi linkini açar.</li>
       <li>Saatler <strong>Asia/Baku</strong> olarak girilir. Kayıt UTC gider. Bitiş, başlangıçtan sonra olmalıdır.</li>
       <li>Yayın ayrı adımdır. Kayıt taslak kalır. Silme yok; yayından alın.</li>
     </ul>
@@ -195,10 +225,24 @@
           <input id="fMax" name="maxAppVersion" placeholder="3.0.5" autocomplete="off">
           <span class="hint" id="maxHint">UPDATE için zorunlu. 3.0.5 bu sürümü de kapsar.</span>
         </div>
+      </div>
+      <div class="form-row" id="ctaSingleRow">
         <div class="field grow">
-          <label for="fCta">CTA URL</label>
+          <label for="fCta" id="fCtaLabel">CTA URL</label>
           <input id="fCta" name="ctaUrl" type="url" placeholder="https://play.google.com/..." autocomplete="off">
-          <span class="hint">Boşsa UPDATE, platformun mağaza linkini kullanır. iOS linki env’de yoksa iOS UPDATE düşer.</span>
+          <span class="hint" id="fCtaHint">Boşsa UPDATE, platformun mağaza linkini kullanır. iOS linki env’de yoksa iOS UPDATE düşer.</span>
+        </div>
+      </div>
+      <div class="form-row" id="ctaSplitRow" hidden>
+        <div class="field grow">
+          <label for="fCtaIos">CTA URL iOS</label>
+          <input id="fCtaIos" name="ctaUrlIos" type="url" placeholder="https://apps.apple.com/..." autocomplete="off">
+          <span class="hint">App Store. Boşsa UPDATE, iOS mağaza linkini kullanır.</span>
+        </div>
+        <div class="field grow">
+          <label for="fCtaAndroid">CTA URL Android</label>
+          <input id="fCtaAndroid" name="ctaUrlAndroid" type="url" placeholder="https://play.google.com/..." autocomplete="off">
+          <span class="hint">Play Store. Boşsa UPDATE, Android mağaza linkini kullanır.</span>
         </div>
       </div>
       <div class="form-row">
@@ -270,16 +314,12 @@
         </article>
       </div>
       <p class="hint">en veya ru boşsa telefon az metnini görür. Yalnız başlık doluysa kayıt reddedilir; ikisini birden yazın ya da ikisini de boş bırakın.</p>
-      <div class="ann-actions" style="margin-top: 16px">
-        <button class="btn btn-primary" type="submit" id="saveBtn">Taslak kaydet</button>
-        <button class="btn btn-ghost" type="button" id="cancelBtn">Vazgeç</button>
-      </div>
     </form>
   </section>
 
   <section class="create-card">
     <h2>Telefonda ne görünür</h2>
-    <p class="muted">Aynı seçim kuralları. Saat boşsa şu an. Platform bilinmiyorsa yalnız ALL kayıtlar, sürüm bilinmiyorsa yalnız sürüm sınırı olmayanlar gelir. En fazla 5, sıra: kapatılamaz, MAINTENANCE, UPDATE, INFO, öncelik, yeni kayıt.</p>
+    <p class="muted">Aynı seçim kuralları. Saat boşsa şu an. Platform bilinmiyorsa yalnız ALL kayıtlar, sürüm bilinmiyorsa yalnız sürüm sınırı olmayanlar gelir. En fazla 5, sıra: kapatılamaz, MAINTENANCE, UPDATE, INFO, öncelik, yeni kayıt. ALL kaydında önizleme, seçilen platformun linkini gösterir.</p>
     <form id="previewForm" class="filter-bar bare">
       <div class="filter-field">
         <label for="pVersion">X-App-Version</label>
@@ -317,6 +357,7 @@
   const LANGS = ["az", "en", "ru"];
   const LIMITS = { title: 60, body: 500, cta: 30 };
   let editingId = null;
+  let editingActive = false;
 
   function showError(msg) {
     const box = document.getElementById("errorBox");
@@ -435,9 +476,13 @@
       cells.forEach(function (value, index) {
         const td = document.createElement("td");
         if (index === 1) {
+          td.className = "ann-status";
           td.appendChild(row.active ? badge("Yayında", "success") : badge("Taslak", "neutral"));
-          if (row.dismissible === false) td.appendChild(document.createTextNode(" "));
           if (row.dismissible === false) td.appendChild(badge("Zorunlu", "danger"));
+          const publishWrap = document.createElement("span");
+          publishWrap.className = "ann-actions";
+          publishWrap.appendChild(publishListButton(row));
+          td.appendChild(publishWrap);
         } else {
           td.textContent = value;
         }
@@ -446,7 +491,6 @@
       const actions = document.createElement("td");
       actions.className = "ann-actions";
       actions.appendChild(actionButton("Düzenle", function () { openEditor(row.id); }));
-      actions.appendChild(actionButton(row.active ? "Yayından al" : "Yayınla", function () { setActive(row); }));
       actions.appendChild(actionButton("Kopyala", function () { copyRow(row); }));
       tr.appendChild(actions);
       body.appendChild(tr);
@@ -460,6 +504,49 @@
     button.textContent = label;
     button.addEventListener("click", onClick);
     return button;
+  }
+
+  function publishListButton(row) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = row.active ? "btn btn-ghost" : "btn btn-primary";
+    button.textContent = row.active ? "Yayından al" : "Yayınla";
+    button.addEventListener("click", function () { setActive(row); });
+    return button;
+  }
+
+  function syncPublishButton() {
+    const button = document.getElementById("publishBtn");
+    if (editingId && editingActive) {
+      button.textContent = "Yayından al";
+      button.className = "btn btn-ghost";
+    } else {
+      button.textContent = "Yayınla";
+      button.className = "btn btn-primary";
+    }
+  }
+
+  function syncCtaFields() {
+    const platform = document.getElementById("fPlatform").value;
+    const all = platform === "ALL";
+    document.getElementById("ctaSplitRow").hidden = !all;
+    document.getElementById("ctaSingleRow").hidden = all;
+    const label = document.getElementById("fCtaLabel");
+    const hint = document.getElementById("fCtaHint");
+    const input = document.getElementById("fCta");
+    if (platform === "IOS") {
+      label.textContent = "CTA URL iOS";
+      input.placeholder = "https://apps.apple.com/...";
+      hint.textContent = "Boşsa UPDATE, iOS mağaza linkini kullanır. Link env’de yoksa iOS UPDATE düşer.";
+    } else if (platform === "ANDROID") {
+      label.textContent = "CTA URL Android";
+      input.placeholder = "https://play.google.com/...";
+      hint.textContent = "Boşsa UPDATE, Android mağaza linkini kullanır.";
+    } else {
+      label.textContent = "CTA URL";
+      input.placeholder = "https://play.google.com/...";
+      hint.textContent = "Boşsa UPDATE, platformun mağaza linkini kullanır.";
+    }
   }
 
   async function loadList() {
@@ -497,6 +584,7 @@
 
   function openBlank() {
     editingId = null;
+    editingActive = false;
     document.getElementById("editor").hidden = false;
     document.getElementById("editorTitle").textContent = "Yeni taslak";
     document.getElementById("editorMeta").replaceChildren();
@@ -505,7 +593,11 @@
     CarlandAdmin.writeDateTime("fEnd", "");
     document.getElementById("fPriority").value = "0";
     document.getElementById("fDismissible").value = "true";
+    document.getElementById("fCtaIos").value = "";
+    document.getElementById("fCtaAndroid").value = "";
     LANGS.forEach(function (lang) { fillLang(lang, null); });
+    syncCtaFields();
+    syncPublishButton();
     document.getElementById("editor").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -514,6 +606,7 @@
     const row = await api("/admin/app-announcements/" + id);
     if (!row) return;
     editingId = row.id;
+    editingActive = row.active === true;
     document.getElementById("editor").hidden = false;
     document.getElementById("editorTitle").textContent = "Duyuru #" + row.id;
     const meta = document.getElementById("editorMeta");
@@ -530,11 +623,33 @@
     document.getElementById("fDismissible").value = row.dismissible === false ? "false" : "true";
     document.getElementById("fMin").value = row.minAppVersion || "";
     document.getElementById("fMax").value = row.maxAppVersion || "";
-    document.getElementById("fCta").value = row.ctaUrl || "";
+    fillCtas(row);
     CarlandAdmin.writeDateTime("fStart", utcToBakuInput(row.startsAt));
     CarlandAdmin.writeDateTime("fEnd", utcToBakuInput(row.endsAt));
     LANGS.forEach(function (lang) { fillLang(lang, row); });
+    syncCtaFields();
+    syncPublishButton();
     document.getElementById("editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function fillCtas(row) {
+    const platform = (row && row.platform) || "ALL";
+    const shared = (row && row.ctaUrl) || "";
+    const ios = (row && row.ctaUrlIos) || "";
+    const android = (row && row.ctaUrlAndroid) || "";
+    if (platform === "ALL") {
+      document.getElementById("fCtaIos").value = ios || shared;
+      document.getElementById("fCtaAndroid").value = android || shared;
+      document.getElementById("fCta").value = shared;
+    } else if (platform === "IOS") {
+      document.getElementById("fCta").value = shared || ios;
+      document.getElementById("fCtaIos").value = ios || shared;
+      document.getElementById("fCtaAndroid").value = "";
+    } else {
+      document.getElementById("fCta").value = shared || android;
+      document.getElementById("fCtaAndroid").value = android || shared;
+      document.getElementById("fCtaIos").value = "";
+    }
   }
 
   function optionalLang(lang) {
@@ -568,18 +683,36 @@
     }
     const min = document.getElementById("fMin").value.trim();
     const max = document.getElementById("fMax").value.trim();
-    const cta = document.getElementById("fCta").value.trim();
+    const platform = document.getElementById("fPlatform").value;
+    const ctas = ctaPayload(platform);
     return {
       type: document.getElementById("fType").value,
-      platform: document.getElementById("fPlatform").value,
+      platform: platform,
       priority: Number(document.getElementById("fPriority").value || 0),
       dismissible: document.getElementById("fDismissible").value === "true",
       minAppVersion: min || null,
       maxAppVersion: max || null,
-      ctaUrl: cta || null,
+      ctaUrl: ctas.ctaUrl,
+      ctaUrlIos: ctas.ctaUrlIos,
+      ctaUrlAndroid: ctas.ctaUrlAndroid,
       startsAt: starts,
       endsAt: ends,
       translations: translations
+    };
+  }
+
+  function ctaPayload(platform) {
+    if (platform === "ALL") {
+      return {
+        ctaUrl: null,
+        ctaUrlIos: document.getElementById("fCtaIos").value.trim() || null,
+        ctaUrlAndroid: document.getElementById("fCtaAndroid").value.trim() || null
+      };
+    }
+    return {
+      ctaUrl: document.getElementById("fCta").value.trim() || null,
+      ctaUrlIos: null,
+      ctaUrlAndroid: null
     };
   }
 
@@ -596,6 +729,46 @@
     showOk("Taslak kaydedildi #" + saved.id + ". Telefonda görünmesi için Yayınla.");
     await loadList();
     await openEditor(saved.id);
+  }
+
+  async function publishFromEditor() {
+    showError("");
+    showOk("");
+    if (editingId && editingActive) {
+      if (!window.confirm("#" + editingId + " yayından alınsın mı?")) return;
+      const saved = await api("/admin/app-announcements/" + editingId + "/active", {
+        method: "POST",
+        body: JSON.stringify({ active: false })
+      });
+      if (!saved) return;
+      showOk("Taslak #" + saved.id);
+      await loadList();
+      await openEditor(saved.id);
+      return;
+    }
+    const label = editingId
+      ? "#" + editingId + " kaydedilip yayına alınsın mı?"
+      : "Kaydedilip yayına alınsın mı?";
+    if (!window.confirm(label)) return;
+    const body = payload();
+    if (!body) return;
+    const saved = editingId
+      ? await api("/admin/app-announcements/" + editingId, { method: "PUT", body: JSON.stringify(body) })
+      : await api("/admin/app-announcements", { method: "POST", body: JSON.stringify(body) });
+    if (!saved) return;
+    const published = await api("/admin/app-announcements/" + saved.id + "/active", {
+      method: "POST",
+      body: JSON.stringify({ active: true })
+    });
+    await loadList();
+    if (!published) {
+      const message = document.getElementById("errorBox").textContent;
+      await openEditor(saved.id);
+      if (message) showError(message);
+      return;
+    }
+    showOk("Yayında #" + published.id);
+    await openEditor(published.id);
   }
 
   async function setActive(row) {
@@ -690,15 +863,34 @@
     count(lang + "Cta", LIMITS.cta);
   });
   document.getElementById("newBtn").addEventListener("click", openBlank);
+  document.getElementById("publishBtn").addEventListener("click", publishFromEditor);
+  document.getElementById("fPlatform").addEventListener("change", function () {
+    const platform = this.value;
+    const single = document.getElementById("fCta");
+    const ios = document.getElementById("fCtaIos");
+    const android = document.getElementById("fCtaAndroid");
+    if (platform === "ALL") {
+      if (!ios.value.trim() && single.value.trim()) ios.value = single.value.trim();
+      if (!android.value.trim() && single.value.trim()) android.value = single.value.trim();
+    } else if (platform === "IOS") {
+      if (!single.value.trim()) single.value = ios.value.trim();
+    } else if (!single.value.trim()) {
+      single.value = android.value.trim();
+    }
+    syncCtaFields();
+  });
   document.getElementById("cancelBtn").addEventListener("click", function () {
     document.getElementById("editor").hidden = true;
     editingId = null;
+    editingActive = false;
   });
   document.getElementById("filterForm").addEventListener("submit", function (event) {
     event.preventDefault();
     loadList();
   });
   document.getElementById("editorForm").addEventListener("submit", save);
+  syncCtaFields();
+  syncPublishButton();
   document.getElementById("previewForm").addEventListener("submit", preview);
   loadList();
 </script>

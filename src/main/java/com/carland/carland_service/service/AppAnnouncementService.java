@@ -144,6 +144,8 @@ public class AppAnnouncementService {
         entity.setMinAppVersion(normalized.minAppVersion());
         entity.setMaxAppVersion(normalized.maxAppVersion());
         entity.setCtaUrl(normalized.ctaUrl());
+        entity.setCtaUrlIos(normalized.ctaUrlIos());
+        entity.setCtaUrlAndroid(normalized.ctaUrlAndroid());
         entity.setPriority(normalized.priority());
         entity.setStartsAt(normalized.startsAt());
         entity.setEndsAt(normalized.endsAt());
@@ -185,6 +187,8 @@ public class AppAnnouncementService {
         request.setMinAppVersion(entity.getMinAppVersion());
         request.setMaxAppVersion(entity.getMaxAppVersion());
         request.setCtaUrl(entity.getCtaUrl());
+        request.setCtaUrlIos(entity.getCtaUrlIos());
+        request.setCtaUrlAndroid(entity.getCtaUrlAndroid());
         request.setPriority(entity.getPriority());
         request.setStartsAt(entity.getStartsAt());
         request.setEndsAt(entity.getEndsAt());
@@ -225,6 +229,8 @@ public class AppAnnouncementService {
                 .minAppVersion(entity.getMinAppVersion())
                 .maxAppVersion(entity.getMaxAppVersion())
                 .ctaUrl(entity.getCtaUrl())
+                .ctaUrlIos(entity.getCtaUrlIos())
+                .ctaUrlAndroid(entity.getCtaUrlAndroid())
                 .priority(entity.getPriority())
                 .startsAt(entity.getStartsAt())
                 .endsAt(entity.getEndsAt())

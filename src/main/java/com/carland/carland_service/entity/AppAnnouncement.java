@@ -64,6 +64,12 @@ public class AppAnnouncement {
     @Column(name = "cta_url", length = 512)
     String ctaUrl;
 
+    @Column(name = "cta_url_ios", length = 512)
+    String ctaUrlIos;
+
+    @Column(name = "cta_url_android", length = 512)
+    String ctaUrlAndroid;
+
     @Builder.Default
     @Column(nullable = false)
     int priority = 0;

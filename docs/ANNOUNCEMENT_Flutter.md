@@ -111,7 +111,7 @@ Dolu:
 | `title` | string | Düz metin, boş değil |
 | `body` | string | Düz metin. Satır sonu `\n`. Markdown / HTML yok |
 | `ctaLabel` | string veya null | Buton yazısı. Null veya alan yok = senin varsayılan metnin (UPDATE için) |
-| `ctaUrl` | string veya null | Yalnız `https`. Varsa dışarı aç (mağaza veya izinli sayfa) |
+| `ctaUrl` | string veya null | Yalnız `https`. Varsa dışarı aç. Panelde platform ALL ise sunucu `X-Platform` için iOS ya da Android linkini bu tek alana koyar |
 
 `ctaLabel` / `ctaUrl` JSON’da `null` gelebilir. Alan hiç gelmezse de null say.
 

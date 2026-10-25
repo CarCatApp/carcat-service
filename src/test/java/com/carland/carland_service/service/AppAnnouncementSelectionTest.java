@@ -83,6 +83,31 @@ class AppAnnouncementSelectionTest {
     }
 
     @Test
+    void allRecordServesTheLinkForTheRequestingPlatform() {
+        String ios = "https://apps.apple.com/app/id777";
+        String android = "https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat";
+        AppAnnouncementCandidate row = new AppAnnouncementCandidate(
+                20L, AppAnnouncementType.INFO, true, AppAnnouncementPlatform.ALL,
+                null, null, null, ios, android, 0, null, null, T, true,
+                List.of(text("az", "Link", "Body"))
+        );
+        assertEquals(ios, select(List.of(row), "az", null, "IOS").get(0).getCtaUrl());
+        assertEquals(android, select(List.of(row), "az", null, "ANDROID").get(0).getCtaUrl());
+    }
+
+    @Test
+    void androidDoesNotReceiveTheIosOnlyLink() {
+        AppAnnouncementCandidate row = new AppAnnouncementCandidate(
+                21L, AppAnnouncementType.UPDATE, false, AppAnnouncementPlatform.ALL,
+                null, "3.0.5", null, IOS_STORE, null, 0, null, null, T, true,
+                List.of(text("az", "Up", "Body"))
+        );
+        List<AppAnnouncementActiveItem> android = select(List.of(row), "az", "3.0.5", "ANDROID");
+        assertEquals(ANDROID_STORE, android.get(0).getCtaUrl());
+        assertEquals(IOS_STORE, select(List.of(row), "az", "3.0.5", "IOS").get(0).getCtaUrl());
+    }
+
+    @Test
     void scenario9_startsAtIsInclusive() {
         AppAnnouncementCandidate row = info(10, AppAnnouncementPlatform.ALL, null, null, T, null, T, true, text("az", "Now", "Body"));
         assertEquals(List.of(10L), ids(select(List.of(row), "az", null, null)));
@@ -229,7 +254,7 @@ class AppAnnouncementSelectionTest {
     private static AppAnnouncementCandidate copyWithCta(AppAnnouncementCandidate source, String ctaUrl) {
         return new AppAnnouncementCandidate(
                 source.id(), source.type(), source.dismissible(), source.platform(),
-                source.minAppVersion(), source.maxAppVersion(), ctaUrl, source.priority(),
+                source.minAppVersion(), source.maxAppVersion(), ctaUrl, source.ctaUrlIos(), source.ctaUrlAndroid(), source.priority(),
                 source.startsAt(), source.endsAt(), source.createdAt(), source.active(), source.translations()
         );
     }
@@ -254,7 +279,7 @@ class AppAnnouncementSelectionTest {
             AppAnnouncementCandidate.Text... texts
     ) {
         return new AppAnnouncementCandidate(
-                id, type, dismissible, platform, min, max, ctaUrl, priority, starts, ends, created, active, List.of(texts)
+                id, type, dismissible, platform, min, max, ctaUrl, null, null, priority, starts, ends, created, active, List.of(texts)
         );
     }
 

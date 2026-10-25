@@ -143,7 +143,10 @@ public final class AppAnnouncementSelection {
             StoreLinks stores,
             Collection<String> ctaHosts
     ) {
-        String explicit = AppAnnouncementUrls.allowlistedOrNull(candidate.ctaUrl(), ctaHosts);
+        String explicit = AppAnnouncementUrls.allowlistedOrNull(platformCta(candidate, requestPlatform), ctaHosts);
+        if (explicit == null) {
+            explicit = AppAnnouncementUrls.allowlistedOrNull(candidate.ctaUrl(), ctaHosts);
+        }
         if (explicit != null) {
             return explicit;
         }
@@ -152,6 +155,16 @@ public final class AppAnnouncementSelection {
         }
         String store = requestPlatform == AppAnnouncementPlatform.IOS ? stores.ios() : stores.android();
         return AppAnnouncementUrls.httpsOrNull(store);
+    }
+
+    private static String platformCta(AppAnnouncementCandidate candidate, AppAnnouncementPlatform requestPlatform) {
+        if (requestPlatform == AppAnnouncementPlatform.IOS) {
+            return candidate.ctaUrlIos();
+        }
+        if (requestPlatform == AppAnnouncementPlatform.ANDROID) {
+            return candidate.ctaUrlAndroid();
+        }
+        return null;
     }
 
     private static boolean isSet(String value) {

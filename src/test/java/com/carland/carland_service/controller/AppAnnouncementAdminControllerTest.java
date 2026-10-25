@@ -45,6 +45,9 @@ class AppAnnouncementAdminControllerTest {
         mockMvc.perform(get("/admin/app-announcements").accept("text/html"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Duyurular")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Telefonda ne görünür")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Telefonda ne görünür")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("CTA URL iOS")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("CTA URL Android")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"publishBtn\"")));
     }
 }

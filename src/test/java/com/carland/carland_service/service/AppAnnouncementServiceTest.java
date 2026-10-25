@@ -103,6 +103,8 @@ class AppAnnouncementServiceTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 0,
                 T,
                 null,
@@ -114,6 +116,29 @@ class AppAnnouncementServiceTest {
 
         assertEquals(1, service.preview(null, null, "az", T).size());
         assertEquals(0, service.preview(null, null, "az", T.minusSeconds(1)).size());
+    }
+
+    @Test
+    void createStoresSeparateLinksForAll() {
+        when(properties.getCtaHostAllowlist()).thenReturn(List.of("apps.apple.com", "play.google.com"));
+        when(properties.getIosStoreUrl()).thenReturn("");
+        when(properties.getAndroidStoreUrl()).thenReturn("");
+        when(repository.save(any())).thenAnswer(invocation -> {
+            AppAnnouncement saved = invocation.getArgument(0);
+            saved.setId(11L);
+            return saved;
+        });
+
+        AppAnnouncementWriteRequest request = infoRequest();
+        request.setPlatform("ALL");
+        request.setCtaUrlIos("https://apps.apple.com/app/id1");
+        request.setCtaUrlAndroid("https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat");
+
+        AppAnnouncementAdminResponse response = service.create(request, "panel");
+
+        assertNull(response.getCtaUrl());
+        assertEquals("https://apps.apple.com/app/id1", response.getCtaUrlIos());
+        assertEquals("https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat", response.getCtaUrlAndroid());
     }
 
     private static AppAnnouncementWriteRequest infoRequest() {

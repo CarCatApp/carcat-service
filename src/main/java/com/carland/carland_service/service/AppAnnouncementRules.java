@@ -33,6 +33,8 @@ public final class AppAnnouncementRules {
             String minAppVersion,
             String maxAppVersion,
             String ctaUrl,
+            String ctaUrlIos,
+            String ctaUrlAndroid,
             int priority,
             Instant startsAt,
             Instant endsAt,
@@ -64,29 +66,70 @@ public final class AppAnnouncementRules {
         if (startsAt != null && endsAt != null && !endsAt.isAfter(startsAt)) {
             throw new IllegalArgumentException("endsAt must be after startsAt");
         }
-        String ctaUrl = normalizeCta(request.getCtaUrl(), hosts);
+        CtaUrls ctas = normalizeCtas(platform, request, hosts);
         List<Translation> translations = translations(request.getTranslations());
-        if (type == AppAnnouncementType.UPDATE && !dismissible && !ctaResolvable(platform, ctaUrl, stores)) {
+        if (type == AppAnnouncementType.UPDATE && !dismissible && !ctaResolvable(platform, ctas, stores)) {
             throw new IllegalArgumentException(
                     "non-dismissible UPDATE needs an https CTA on the allowlist or a store link for each target platform");
         }
         int priority = request.getPriority() == null ? 0 : request.getPriority();
-        return new Normalized(type, dismissible, platform, min, max, ctaUrl, priority, startsAt, endsAt, translations);
+        return new Normalized(
+                type, dismissible, platform, min, max,
+                ctas.shared(), ctas.ios(), ctas.android(),
+                priority, startsAt, endsAt, translations);
     }
 
     public static boolean ctaResolvable(AppAnnouncementPlatform platform, String ctaUrl, StoreLinks stores) {
-        if (ctaUrl != null && !ctaUrl.isBlank()) {
-            return true;
-        }
-        boolean ios = stores != null && AppAnnouncementUrls.httpsOrNull(stores.ios()) != null;
-        boolean android = stores != null && AppAnnouncementUrls.httpsOrNull(stores.android()) != null;
+        return ctaResolvable(platform, new CtaUrls(ctaUrl, null, null), stores);
+    }
+
+    private static boolean ctaResolvable(AppAnnouncementPlatform platform, CtaUrls ctas, StoreLinks stores) {
+        boolean iosLink = isSet(ctas.ios()) || isSet(ctas.shared());
+        boolean androidLink = isSet(ctas.android()) || isSet(ctas.shared());
+        boolean iosStore = stores != null && AppAnnouncementUrls.httpsOrNull(stores.ios()) != null;
+        boolean androidStore = stores != null && AppAnnouncementUrls.httpsOrNull(stores.android()) != null;
         if (platform == AppAnnouncementPlatform.IOS) {
-            return ios;
+            return iosLink || iosStore;
         }
         if (platform == AppAnnouncementPlatform.ANDROID) {
-            return android;
+            return androidLink || androidStore;
         }
-        return ios && android;
+        return (iosLink || iosStore) && (androidLink || androidStore);
+    }
+
+    /**
+     * tr: ALL iki link saklar. Tek platforma eski {@code ctaUrl} alanında kalır.
+     * en: ALL stores two links. A single platform stays on the legacy {@code ctaUrl} field.
+     */
+    private static CtaUrls normalizeCtas(
+            AppAnnouncementPlatform platform,
+            AppAnnouncementWriteRequest request,
+            Collection<String> hosts
+    ) {
+        String shared = normalizeCta(request.getCtaUrl(), hosts, "ctaUrl");
+        String ios = normalizeCta(request.getCtaUrlIos(), hosts, "ctaUrlIos");
+        String android = normalizeCta(request.getCtaUrlAndroid(), hosts, "ctaUrlAndroid");
+        if (platform == AppAnnouncementPlatform.IOS) {
+            return new CtaUrls(first(ios, shared), null, null);
+        }
+        if (platform == AppAnnouncementPlatform.ANDROID) {
+            return new CtaUrls(first(android, shared), null, null);
+        }
+        if (ios != null || android != null) {
+            return new CtaUrls(null, ios, android);
+        }
+        return new CtaUrls(shared, null, null);
+    }
+
+    private static String first(String preferred, String fallback) {
+        return preferred != null ? preferred : fallback;
+    }
+
+    private static boolean isSet(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private record CtaUrls(String shared, String ios, String android) {
     }
 
     private static List<Translation> translations(List<AppAnnouncementTranslationRequest> raw) {
@@ -154,16 +197,16 @@ public final class AppAnnouncementRules {
         return trimmed;
     }
 
-    private static String normalizeCta(String raw, Collection<String> hosts) {
+    private static String normalizeCta(String raw, Collection<String> hosts, String field) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
         String allowed = AppAnnouncementUrls.allowlistedOrNull(raw, hosts);
         if (allowed == null) {
-            throw new IllegalArgumentException("ctaUrl must be https and on the host allowlist");
+            throw new IllegalArgumentException(field + " must be https and on the host allowlist");
         }
         if (allowed.length() > 512) {
-            throw new IllegalArgumentException("ctaUrl must be at most 512 characters");
+            throw new IllegalArgumentException(field + " must be at most 512 characters");
         }
         return allowed;
     }
