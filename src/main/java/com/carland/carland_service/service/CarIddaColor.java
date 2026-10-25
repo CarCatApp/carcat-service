@@ -4,38 +4,38 @@ import com.carland.carland_service.entity.Car;
 
 /**
  * tr: Katalog colorId fotoğraf promptunda hex (yoksa İngilizce ad) olur.
- *     colorId boşsa colorNameText Azerice ad olarak prompta eklenir.
+ *     colorId boşsa iddaColor Azerice ad olarak prompta eklenir.
  * en: A catalog colorId becomes the hex in the photo prompt (English name when hex is missing).
- *     When colorId is empty, colorNameText is added to the prompt as an Azerbaijani color name.
+ *     When colorId is empty, iddaColor is added to the prompt as an Azerbaijani color name.
  */
-public final class CarColorNameText {
+public final class CarIddaColor {
 
     public static final int MAX_LENGTH = 80;
 
-    private CarColorNameText() {
+    private CarIddaColor() {
     }
 
     /**
-     * tr: Add formundaki renk seçimi. colorId varsa metin silinir.
-     *     Yalnız metin geldiyse eski colorId de silinir; prompt metni kullansın.
-     * en: Color choice on add. Text is cleared when colorId is set.
-     *     Text alone also clears a previous colorId so the prompt uses the text.
+     * tr: Add formundaki renk seçimi. colorId varsa iddaColor silinir.
+     *     Yalnız iddaColor geldiyse eski colorId de silinir; prompt metni kullansın.
+     * en: Color choice on add. iddaColor is cleared when colorId is set.
+     *     iddaColor alone also clears a previous colorId so the prompt uses the text.
      */
-    public static void apply(Car car, Long colorId, String colorNameText) {
+    public static void apply(Car car, Long colorId, String iddaColor) {
         if (car == null) {
             return;
         }
         if (colorId != null) {
             car.setColorId(colorId);
-            car.setColorNameText(null);
+            car.setIddaColor(null);
             return;
         }
-        String stored = normalize(colorNameText);
+        String stored = normalize(iddaColor);
         if (stored == null) {
             return;
         }
         car.setColorId(null);
-        car.setColorNameText(stored);
+        car.setIddaColor(stored);
     }
 
     public static String normalize(String raw) {
@@ -54,8 +54,8 @@ public final class CarColorNameText {
     }
 
     /** tr: Prompttaki kısa Azerice renk cümlesi. Metin yoksa boş. / en: Short Azerbaijani color clause. Empty when there is no text. */
-    public static String azerbaijaniClause(String colorNameText) {
-        String text = normalize(colorNameText);
+    public static String azerbaijaniClause(String iddaColor) {
+        String text = normalize(iddaColor);
         if (text == null) {
             return "";
         }

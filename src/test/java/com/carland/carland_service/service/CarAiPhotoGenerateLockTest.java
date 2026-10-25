@@ -54,22 +54,22 @@ class CarAiPhotoGenerateLockTest {
     }
 
     @Test
-    void colorNameTextChangeIsPromptField() {
+    void iddaColorChangeIsPromptField() {
         Car car = Car.builder()
                 .brand("BMW")
                 .model("X5")
                 .modelYear(2020)
-                .colorNameText("göy")
+                .iddaColor("göy")
                 .plateNumber("10-AA-100")
                 .build();
-        CarRequest req = CarRequest.builder().colorNameText("ağ").build();
+        CarRequest req = CarRequest.builder().iddaColor("ağ").build();
         assertTrue(CarAiPhotoGenerateLock.changesPromptFields(car, req));
     }
 
     @Test
-    void colorNameTextIgnoredWhenCatalogColorStays() {
+    void iddaColorIgnoredWhenCatalogColorStays() {
         Car car = baseCar();
-        CarRequest req = CarRequest.builder().colorId(2L).colorNameText("ağ").build();
+        CarRequest req = CarRequest.builder().colorId(2L).iddaColor("ağ").build();
         assertFalse(CarAiPhotoGenerateLock.changesPromptFields(car, req));
     }
 

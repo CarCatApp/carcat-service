@@ -44,13 +44,13 @@ public class Car {
     private Long colorId;
 
     /**
-     * tr: Katalog dışı renk adı (IDDA Azerice metin). colorId doluysa boş kalır.
+     * tr: IDDA'nın Azerice renk metni. colorId doluysa boş kalır.
      *     Liste carlist:{owner}:* bu alanı taşır. Add ve edit commit sonrası o listeyi siler.
-     * en: Color name outside the catalog (IDDA Azerbaijani text). Empty when colorId is set.
+     * en: IDDA color text in Azerbaijani. Empty when colorId is set.
      *     carlist:{owner}:* carries this field. Add and edit delete that list after commit.
      */
-    @Column(name = "color_name_text", length = 80)
-    private String colorNameText;
+    @Column(name = "idda_color", length = 80)
+    private String iddaColor;
     private String engineType;
     private Long engineTypeId;
     private Integer engineVolume;

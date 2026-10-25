@@ -22,7 +22,7 @@ import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.EngineTypeRepository;
 import com.carland.carland_service.repository.MaintenanceTemplateRepository;
 import com.carland.carland_service.repository.PercentageRepository;
-import com.carland.carland_service.service.CarColorNameText;
+import com.carland.carland_service.service.CarIddaColor;
 import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,7 +117,8 @@ public class IddaCarWriteService {
         if (carRequest.getBodyType() != null && !carRequest.getBodyType().isBlank()) {
             car.setBodyType(carRequest.getBodyType().trim());
         }
-        CarColorNameText.apply(car, carRequest.getColorId(), carRequest.getColorNameText());
+        CarIddaColor.apply(car, carRequest.getColorId(), iddaColorText(snapshot, carRequest));
+        car.setIddaProvidedFields(lockedFields(car));
         if (car.getEngineTypeId() == null && carRequest.getEngineTypeId() != null) {
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
             if (engineType != null) {
@@ -126,7 +127,6 @@ public class IddaCarWriteService {
             }
         }
         car.setFromIdda(true);
-        car.setIddaProvidedFields(new ArrayList<>(IddaProvidedFields.NAMES));
         car.setUpdatedAt(LocalDateTime.now());
         carRepository.save(car);
         attach(customer, car);
@@ -161,9 +161,9 @@ public class IddaCarWriteService {
                 .customer(customer)
                 .maintenanceTemplate(template)
                 .fromIdda(true)
-                .iddaProvidedFields(new ArrayList<>(IddaProvidedFields.NAMES))
                 .build();
-        CarColorNameText.apply(car, carRequest.getColorId(), carRequest.getColorNameText());
+        CarIddaColor.apply(car, carRequest.getColorId(), iddaColorText(snapshot, carRequest));
+        car.setIddaProvidedFields(lockedFields(car));
         try {
             carRepository.save(car);
         } catch (DataIntegrityViolationException ex) {
@@ -257,6 +257,18 @@ public class IddaCarWriteService {
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
         return customer;
+    }
+
+    private static String iddaColorText(IddaPlateCheck snapshot, CarRequest carRequest) {
+        if (CarIddaColor.normalize(carRequest.getIddaColor()) != null) {
+            return carRequest.getIddaColor();
+        }
+        return snapshot == null ? null : snapshot.getColorRaw();
+    }
+
+    private static List<String> lockedFields(Car car) {
+        String color = car.getColorId() == null ? car.getIddaColor() : null;
+        return new ArrayList<>(IddaProvidedFields.names(color));
     }
 
     private static String blankToNull(String value) {

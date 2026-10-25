@@ -22,8 +22,8 @@ public class CarRequest {
     String model;
     Integer modelYear;
     Long colorId;
-    /** tr: Katalog rengi yoksa Azerice renk adı. colorId doluysa yok sayılır. / en: Azerbaijani color name when there is no catalog color. Ignored when colorId is set. */
-    String colorNameText;
+    /** tr: IDDA Azerice renk metni. colorId doluysa yok sayılır. / en: IDDA color text in Azerbaijani. Ignored when colorId is set. */
+    String iddaColor;
     String engineType;
     Long engineTypeId;
     Integer engineVolume;

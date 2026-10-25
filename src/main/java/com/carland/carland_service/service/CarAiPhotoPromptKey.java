@@ -9,9 +9,9 @@ import java.util.HexFormat;
 
 /**
  * tr: AI prompt'una giren araç alanlarının parmak izi (marka, model, yıl, ban, renk, plaka).
- *     Renk: colorId doluysa id, boşsa colorNameText. Mileage gibi prompt dışı alanlar dahil değil.
+ *     Renk: colorId doluysa id, boşsa iddaColor. Mileage gibi prompt dışı alanlar dahil değil.
  * en: Fingerprint of car fields that go into the AI prompt (brand, model, year, body, color, plate).
- *     Color is colorId when set, otherwise colorNameText. Mileage and other non-prompt fields are excluded.
+ *     Color is colorId when set, otherwise iddaColor. Mileage and other non-prompt fields are excluded.
  */
 public final class CarAiPhotoPromptKey {
 
@@ -38,7 +38,7 @@ public final class CarAiPhotoPromptKey {
         if (car.getColorId() != null) {
             return String.valueOf(car.getColorId());
         }
-        return norm(CarColorNameText.normalize(car.getColorNameText()));
+        return norm(CarIddaColor.normalize(car.getIddaColor()));
     }
 
     private static String norm(String value) {

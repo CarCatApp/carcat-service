@@ -44,7 +44,7 @@ public final class CarAiPhotoGenerateLock {
         return Math.max(1L, Duration.between(now, lockedUntil).getSeconds());
     }
 
-    /** brand / model / year / body / color (colorId, or colorNameText when colorId is empty) / plate — mileage and other edit fields are ignored. */
+    /** brand / model / year / body / color (colorId, or iddaColor when colorId is empty) / plate — mileage and other edit fields are ignored. */
     public static boolean changesPromptFields(Car car, CarRequest req) {
         if (car == null || req == null) {
             return false;
@@ -72,11 +72,11 @@ public final class CarAiPhotoGenerateLock {
     }
 
     private static boolean colorTextChanged(Car car, CarRequest req) {
-        if (req.getColorNameText() == null) {
+        if (req.getIddaColor() == null) {
             return false;
         }
-        String next = norm(CarColorNameText.normalize(req.getColorNameText()));
-        String current = norm(CarColorNameText.normalize(car.getColorNameText()));
+        String next = norm(CarIddaColor.normalize(req.getIddaColor()));
+        String current = norm(CarIddaColor.normalize(car.getIddaColor()));
         return !next.equals(current);
     }
 

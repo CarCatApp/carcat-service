@@ -108,7 +108,7 @@ public class CarAiPhotoWorker {
         String model = car.getModel() == null ? "" : car.getModel().trim();
         String colorPart = colorForPrompt(car);
         String colorClause = car.getColorId() == null
-                ? CarColorNameText.azerbaijaniClause(car.getColorNameText())
+                ? CarIddaColor.azerbaijaniClause(car.getIddaColor())
                 : "";
         if (!colorClause.isEmpty()) {
             colorPart = "";

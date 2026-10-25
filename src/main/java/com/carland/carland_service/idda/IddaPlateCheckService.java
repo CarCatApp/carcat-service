@@ -195,7 +195,7 @@ public class IddaPlateCheckService {
                 .iddaColor(row.getColorRaw())
                 .resource("idda")
                 .fromIdda(success)
-                .iddaProvidedFields(success ? IddaProvidedFields.NAMES : Collections.emptyList())
+                .iddaProvidedFields(success ? IddaProvidedFields.names(row.getColorRaw()) : Collections.emptyList())
                 .vinProvidedFields(existing == null || existing.getVinProvidedFields() == null
                         ? Collections.emptyList()
                         : existing.getVinProvidedFields())

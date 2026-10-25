@@ -46,9 +46,7 @@ public class CarResponse {
     private Boolean fromIdda;
     private Boolean engineTypeLocked;
     private Long colorId;
-    /** tr: Katalog dışı Azerice renk. colorId doluysa null. / en: Azerbaijani color outside the catalog. Null when colorId is set. */
-    private String colorNameText;
-    /** tr: IDDA'nın Azerice renk metni. Katalog eşlemesi ayrı iş. / en: IDDA color text in Azerbaijani. Catalog mapping is separate. */
+    /** tr: IDDA'nın Azerice renk metni. Araçta saklanır. colorId doluysa null. / en: IDDA color text in Azerbaijani, stored on the car. Null when colorId is set. */
     private String iddaColor;
     private Integer iddaStatusCode;
     private String iddaStatusName;
