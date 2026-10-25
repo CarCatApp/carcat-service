@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.AdminBannerSaveRequest;
 import com.carland.carland_service.dto.response.AdminBannerBranchOption;
 import com.carland.carland_service.dto.response.AdminBannerRow;
+import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.exceptions.InvalidStatusException;
@@ -83,6 +84,30 @@ class AdminBannerServiceTest {
         AdminBannerRow row = service.create(body("Babek", "  abc", 4L));
 
         assertEquals("abc", row.getDescription());
+    }
+
+    @Test
+    void mobileListIsShowingAndActive() {
+        Banner banner = Banner.builder()
+                .id(4L)
+                .title("hyper babek prospekti")
+                .description("Yağ dəyişimi")
+                .branchId(12L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true)).thenReturn(List.of(banner));
+
+        List<BannerItem> rows = service.visible();
+
+        assertEquals(1, rows.size());
+        assertEquals(4L, rows.get(0).getId());
+        assertEquals("hyper babek prospekti", rows.get(0).getTitle());
+        assertEquals("Yağ dəyişimi", rows.get(0).getDescription());
+        assertEquals(12L, rows.get(0).getBranchId());
+        assertTrue(rows.get(0).isShowing());
+        assertEquals(Banner.ACTIVE, rows.get(0).getStatus());
+        verify(bannerRepository).findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true);
     }
 
     @Test

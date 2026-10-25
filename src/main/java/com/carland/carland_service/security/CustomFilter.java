@@ -76,7 +76,8 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.contains("/test/get")
                         || path.startsWith("/api/v1/user/customer-cars")
                         || path.equals("/api/v1/group/by/get/brand/list/with/models")
-                        || isAppAnnouncementActive(path);
+                        || isAppAnnouncementActive(path)
+                        || isBannerList(path);
 
         if (isPublic) {
             filterChain.doFilter(request, response);
@@ -107,5 +108,14 @@ public class CustomFilter extends OncePerRequestFilter {
     private static boolean isAppAnnouncementActive(String path) {
         return "/api/v1/app-announcements/active".equals(path)
                 || (path != null && path.endsWith("/api/v1/app-announcements/active"));
+    }
+
+    /**
+     * tr: Mobil banner listesi. Bearer yoksa da 401 yazılmaz.
+     * en: Mobile banner list. A missing Bearer must not become 401.
+     */
+    private static boolean isBannerList(String path) {
+        return "/api/v1/banners".equals(path)
+                || (path != null && path.endsWith("/api/v1/banners"));
     }
 }

@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.AdminBannerSaveRequest;
 import com.carland.carland_service.dto.response.AdminBannerBranchOption;
 import com.carland.carland_service.dto.response.AdminBannerRow;
+import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.exceptions.InvalidStatusException;
@@ -19,9 +20,9 @@ import java.util.List;
 
 /**
  * tr: Admin banner yazımı. Şube varlığı kontrol edilmez; title ve branchId birbirinden bağımsızdır.
- *     Redis yok. Mobil uç yok.
+ *     Redis yok. Mobil GET yalnız showing=true ve status=active okur.
  * en: Admin banner writes. Branch existence is not checked; title and branchId are independent.
- *     No Redis. No mobile API.
+ *     No Redis. The mobile GET reads showing=true and status=active only.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,13 @@ public class AdminBannerService {
 
     private final BannerRepository bannerRepository;
     private final BranchRepository branchRepository;
+
+    @Transactional(readOnly = true)
+    public List<BannerItem> visible() {
+        return bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true).stream()
+                .map(this::toItem)
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public List<AdminBannerRow> active() {
@@ -95,6 +103,17 @@ public class AdminBannerService {
             throw MissingFieldException.required("title");
         }
         return toRow(bannerRepository.save(banner));
+    }
+
+    private BannerItem toItem(Banner banner) {
+        return BannerItem.builder()
+                .id(banner.getId())
+                .title(banner.getTitle())
+                .description(banner.getDescription())
+                .branchId(banner.getBranchId())
+                .showing(Boolean.TRUE.equals(banner.getShowing()))
+                .status(banner.getStatus())
+                .build();
     }
 
     private AdminBannerRow toRow(Banner banner) {
