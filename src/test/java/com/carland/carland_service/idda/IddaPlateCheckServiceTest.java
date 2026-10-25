@@ -68,11 +68,13 @@ class IddaPlateCheckServiceTest {
 
         CarResponse response = service.check("77-BU-669", "050", "7", "az");
 
+        assertEquals("77 BU 669", response.getPlateNumber());
         assertEquals(4, response.getIddaStatusCode());
         assertEquals("13e79e85-2e94-4f81-932a-a7b3cccbfb70", response.getRequestIdentifier());
         assertEquals("limit", response.getMessage());
         assertEquals(Boolean.TRUE, response.getIsRestrict());
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(response));
+        assertEquals("77 BU 669", json.path("plateNumber").asText());
         assertTrue(json.path("isRestrict").asBoolean());
         assertFalse(json.has("restrict"));
         assertFalse(Boolean.TRUE.equals(response.getFromIdda()));
@@ -104,6 +106,7 @@ class IddaPlateCheckServiceTest {
         service.check("77BU669", "050", "7", "az");
         CarResponse cached = service.check("77BU669", "050", "7", "az");
 
+        assertEquals("77 BU 669", cached.getPlateNumber());
         assertEquals("idda", cached.getResource());
         verify(digitalFinanceClient, times(1)).exchange(eq("GET"), anyString(), any(), anyString(), any());
     }
@@ -137,6 +140,7 @@ class IddaPlateCheckServiceTest {
 
         CarResponse response = service.check("77BU669", "050", "7", "az");
 
+        assertEquals("77 BU 669", response.getPlateNumber());
         assertEquals("NEWERVIN000000001", response.getVin());
         assertEquals(Boolean.FALSE, response.getIsRestrict());
         verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());

@@ -48,7 +48,7 @@ public class Banner {
     String description;
 
     /** tr: Yalnız service. adds ve info boş kalır. / en: Service only. Empty for adds and info. */
-    @Column(name = "branch_id")
+    @Column(name = "branch_id", nullable = true)
     Long branchId;
 
     /** tr: service, adds veya info. Eski satır null ise service sayılır. / en: service, adds or info. A null legacy row counts as service. */

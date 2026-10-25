@@ -54,6 +54,26 @@ class CarAiPhotoGenerateLockTest {
     }
 
     @Test
+    void colorNameTextChangeIsPromptField() {
+        Car car = Car.builder()
+                .brand("BMW")
+                .model("X5")
+                .modelYear(2020)
+                .colorNameText("göy")
+                .plateNumber("10-AA-100")
+                .build();
+        CarRequest req = CarRequest.builder().colorNameText("ağ").build();
+        assertTrue(CarAiPhotoGenerateLock.changesPromptFields(car, req));
+    }
+
+    @Test
+    void colorNameTextIgnoredWhenCatalogColorStays() {
+        Car car = baseCar();
+        CarRequest req = CarRequest.builder().colorId(2L).colorNameText("ağ").build();
+        assertFalse(CarAiPhotoGenerateLock.changesPromptFields(car, req));
+    }
+
+    @Test
     void bodyChangeIsPromptField() {
         Car car = baseCar();
         CarRequest req = CarRequest.builder().bodyType("SUV").build();

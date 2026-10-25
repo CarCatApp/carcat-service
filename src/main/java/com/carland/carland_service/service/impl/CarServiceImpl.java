@@ -15,6 +15,7 @@ import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.CarAiPhotoGenerateLock;
+import com.carland.carland_service.service.CarColorNameText;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PercentageLifeService;
 import com.carland.carland_service.service.CarService;
@@ -337,6 +338,12 @@ public class CarServiceImpl implements CarService {
 
         if (carRequest.getColorId() != null) {
             car.setColorId(carRequest.getColorId());
+            car.setColorNameText(null);
+        } else if (car.getColorId() == null) {
+            String colorNameText = CarColorNameText.normalize(carRequest.getColorNameText());
+            if (colorNameText != null) {
+                car.setColorNameText(colorNameText);
+            }
         }
 
         if (carRequest.getEngineTypeId() != null) {
@@ -1338,13 +1345,13 @@ public class CarServiceImpl implements CarService {
                     .transmissionType(carRequest.getTransmissionType())
                     .bodyType(carRequest.getBodyType())
                     .mileage(carRequest.getMileage())
-                    .colorId(carRequest.getColorId())
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .customer(customer)
                     .maintenanceTemplate(maintenanceTemplate)
                     .vinProvidedFields(carRequest.getVinProvidedFields())
                     .build();
+            CarColorNameText.apply(newCar, carRequest.getColorId(), carRequest.getColorNameText());
 
             try {
                 carRepository.save(newCar);
@@ -1482,9 +1489,7 @@ public class CarServiceImpl implements CarService {
         if (carRequest.getModelYear() != null) {
             car.setModelYear(carRequest.getModelYear());
         }
-        if (carRequest.getColorId() != null) {
-            car.setColorId(carRequest.getColorId());
-        }
+        CarColorNameText.apply(car, carRequest.getColorId(), carRequest.getColorNameText());
         car.setMileage(carRequest.getMileage());
         car.setEngineType(engineType.getEngineType());
         car.setEngineTypeId(engineType.getEngineTypeId());
@@ -2000,7 +2005,10 @@ public class CarServiceImpl implements CarService {
      */
     private CarResponse convertCarEntityToResponse(Car car, String acceptLanguage, String resource) {
         Color color = colorRepository.findByColorId(car.getColorId());
-        String colorResponse = color != null ? color.nameForLang(acceptLanguage) : "unknown";
+        String colorNameText = car.getColorNameText();
+        String colorResponse = color != null
+                ? color.nameForLang(acceptLanguage)
+                : (colorNameText != null && !colorNameText.isBlank() ? colorNameText : "unknown");
         Customer customer = car.getCustomer();
         return CarResponse.builder()
                 .carId(car.getCarId())
@@ -2031,6 +2039,7 @@ public class CarServiceImpl implements CarService {
                         : car.getIddaProvidedFields())
                 .fromIdda(Boolean.TRUE.equals(car.getFromIdda()))
                 .colorId(car.getColorId())
+                .colorNameText(car.getColorId() == null ? colorNameText : null)
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
                         ? car.getServicedPartnerIds()
                         : Collections.emptyList())

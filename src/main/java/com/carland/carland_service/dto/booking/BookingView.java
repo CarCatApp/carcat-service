@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -52,4 +53,9 @@ public class BookingView {
     String currency;
     String unit;
     Integer unreadCount;
+
+    /** tr: Görüntü formatı. / en: Display format. */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }

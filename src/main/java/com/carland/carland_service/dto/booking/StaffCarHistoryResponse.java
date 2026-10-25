@@ -1,6 +1,7 @@
 package com.carland.carland_service.dto.booking;
 
 import com.carland.carland_service.dto.response.VisitHistoryItemResponse;
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,4 +27,9 @@ public class StaffCarHistoryResponse {
     Long branchId;
     String branchName;
     List<VisitHistoryItemResponse> items;
+
+    /** tr: Görüntü formatı. / en: Display format. */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }

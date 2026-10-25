@@ -103,7 +103,7 @@ class BookingAppointmentServiceTest {
         assertEquals("11:00", response.getStart());
         assertEquals("11:30", response.getEnd());
         assertEquals("VIN15", response.getVin());
-        assertEquals("10-AA-010", response.getPlateNumber());
+        assertEquals("10 AA 010", response.getPlateNumber());
         assertEquals(10L, response.getPackageId());
         assertEquals("Yağ", response.getPackageName());
         assertEquals(4000, response.getPackagePrice());

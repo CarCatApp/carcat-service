@@ -44,7 +44,7 @@ public final class CarAiPhotoGenerateLock {
         return Math.max(1L, Duration.between(now, lockedUntil).getSeconds());
     }
 
-    /** brand / model / year / body / colorId / plate — mileage and other edit fields are ignored. */
+    /** brand / model / year / body / color (colorId, or colorNameText when colorId is empty) / plate — mileage and other edit fields are ignored. */
     public static boolean changesPromptFields(Car car, CarRequest req) {
         if (car == null || req == null) {
             return false;
@@ -64,8 +64,20 @@ public final class CarAiPhotoGenerateLock {
         if (req.getColorId() != null && !req.getColorId().equals(car.getColorId())) {
             return true;
         }
+        if (req.getColorId() == null && car.getColorId() == null && colorTextChanged(car, req)) {
+            return true;
+        }
         return req.getPlateNumber() != null
                 && !plate(req.getPlateNumber()).equals(plate(car.getPlateNumber()));
+    }
+
+    private static boolean colorTextChanged(Car car, CarRequest req) {
+        if (req.getColorNameText() == null) {
+            return false;
+        }
+        String next = norm(CarColorNameText.normalize(req.getColorNameText()));
+        String current = norm(CarColorNameText.normalize(car.getColorNameText()));
+        return !next.equals(current);
     }
 
     private static boolean hasText(String value) {

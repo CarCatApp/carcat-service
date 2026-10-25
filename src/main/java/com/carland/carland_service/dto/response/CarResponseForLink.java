@@ -1,6 +1,7 @@
 package com.carland.carland_service.dto.response;
 
 
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,4 +32,9 @@ public class CarResponseForLink {
     private Long mileage;
     private LocalDateTime updatedAt;
     private String bodyType;
+
+    /** tr: Görüntü formatı. / en: Display format. */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }

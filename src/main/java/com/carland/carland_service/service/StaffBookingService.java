@@ -481,7 +481,8 @@ public class StaffBookingService {
 
     private String colorName(Car car, String lang) {
         if (car.getColorId() == null) {
-            return null;
+            String text = car.getColorNameText();
+            return text == null || text.isBlank() ? null : text;
         }
         Color color = colorRepository.findByColorId(car.getColorId());
         if (color == null) {

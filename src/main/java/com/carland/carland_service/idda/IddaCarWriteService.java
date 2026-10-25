@@ -22,6 +22,7 @@ import com.carland.carland_service.repository.CustomerServiceRecordRepository;
 import com.carland.carland_service.repository.EngineTypeRepository;
 import com.carland.carland_service.repository.MaintenanceTemplateRepository;
 import com.carland.carland_service.repository.PercentageRepository;
+import com.carland.carland_service.service.CarColorNameText;
 import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -116,9 +117,7 @@ public class IddaCarWriteService {
         if (carRequest.getBodyType() != null && !carRequest.getBodyType().isBlank()) {
             car.setBodyType(carRequest.getBodyType().trim());
         }
-        if (carRequest.getColorId() != null) {
-            car.setColorId(carRequest.getColorId());
-        }
+        CarColorNameText.apply(car, carRequest.getColorId(), carRequest.getColorNameText());
         if (car.getEngineTypeId() == null && carRequest.getEngineTypeId() != null) {
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
             if (engineType != null) {
@@ -157,7 +156,6 @@ public class IddaCarWriteService {
                 .engineVolume(snapshot.getEngineCapacity())
                 .bodyType(blankToNull(carRequest.getBodyType()))
                 .mileage(carRequest.getMileage())
-                .colorId(carRequest.getColorId())
                 .createdAt(now)
                 .updatedAt(now)
                 .customer(customer)
@@ -165,6 +163,7 @@ public class IddaCarWriteService {
                 .fromIdda(true)
                 .iddaProvidedFields(new ArrayList<>(IddaProvidedFields.NAMES))
                 .build();
+        CarColorNameText.apply(car, carRequest.getColorId(), carRequest.getColorNameText());
         try {
             carRepository.save(car);
         } catch (DataIntegrityViolationException ex) {

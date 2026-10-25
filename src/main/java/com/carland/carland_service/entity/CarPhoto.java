@@ -29,7 +29,7 @@ public class CarPhoto {
     String photoStatus;
     /** ai_generated | user | default */
     String photoSource;
-    /** SHA-256 of prompt fields (brand/model/year/colorId/plate) when last AI photo became ready. */
+    /** SHA-256 of prompt fields (brand/model/year/body/color/plate) when last AI photo became ready. */
     String promptKey;
 
     @Lob

@@ -1,6 +1,7 @@
 package com.carland.carland_service.dto.response;
 
 
+import com.carland.carland_service.util.PlateNumbers;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
@@ -42,6 +43,8 @@ public class CarResponse {
     private Boolean fromIdda;
     private Boolean engineTypeLocked;
     private Long colorId;
+    /** tr: Katalog dışı Azerice renk. colorId doluysa null. / en: Azerbaijani color outside the catalog. Null when colorId is set. */
+    private String colorNameText;
     /** tr: IDDA'nın Azerice renk metni. Katalog eşlemesi ayrı iş. / en: IDDA color text in Azerbaijani. Catalog mapping is separate. */
     private String iddaColor;
     private Integer iddaStatusCode;
@@ -70,4 +73,12 @@ public class CarResponse {
     private LocalDateTime lockedUntil;
     /** Seconds left until unlock; 0 = not locked. Flutter countdown. */
     private Long remainingSeconds;
+
+    /**
+     * tr: JSON plakayı görüntü formatında verir. Kayıt bitişik kalabilir ({@code 00XX000} → {@code 00 XX 000}).
+     * en: JSON returns the display plate. The stored value may stay concatenated ({@code 00XX000} → {@code 00 XX 000}).
+     */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }

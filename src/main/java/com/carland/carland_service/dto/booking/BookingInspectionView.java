@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,4 +31,9 @@ public class BookingInspectionView {
     String carModel;
     Integer carYear;
     String createdAt;
+
+    /** tr: Görüntü formatı. / en: Display format. */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }

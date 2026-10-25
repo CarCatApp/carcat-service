@@ -2,6 +2,7 @@ package com.carland.carland_service.idda;
 
 import com.carland.carland_service.dto.request.CarRequest;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.Color;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.EngineType;
 import com.carland.carland_service.entity.MaintenanceTemplate;
@@ -136,6 +137,54 @@ class IddaCarWriteServiceTest {
         assertNull(plateCar.getCustomer());
         assertEquals(6L, result.car().getEngineTypeId());
         verify(redisCacheService).evictCarListAfterCommit("4");
+    }
+
+    @Test
+    void colorNameTextReplacesCatalogColor() {
+        Car vinCar = Car.builder()
+                .carId(1L)
+                .vin("19XZE4F54NE012640")
+                .plateNumber("10-AA-100")
+                .colorId(9L)
+                .customer(Customer.builder().userId(3L).build())
+                .build();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(any(), any()))
+                .thenReturn(List.of(snapshot()));
+        when(carRepository.findAllByVinIgnoreCase("19XZE4F54NE012640")).thenReturn(List.of(vinCar));
+        when(carRepository.findByPlateKey("77BU669")).thenReturn(List.of());
+        CarRequest body = request(8L);
+        body.setColorNameText("  tünd göy  ");
+
+        service.add(body, "050", "9", "az");
+
+        assertNull(vinCar.getColorId());
+        assertEquals("tünd göy", vinCar.getColorNameText());
+    }
+
+    @Test
+    void colorIdClearsColorNameText() {
+        Car vinCar = Car.builder()
+                .carId(1L)
+                .vin("19XZE4F54NE012640")
+                .plateNumber("10-AA-100")
+                .colorNameText("göy")
+                .customer(Customer.builder().userId(3L).build())
+                .build();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(any(), any()))
+                .thenReturn(List.of(snapshot()));
+        when(carRepository.findAllByVinIgnoreCase("19XZE4F54NE012640")).thenReturn(List.of(vinCar));
+        when(carRepository.findByPlateKey("77BU669")).thenReturn(List.of());
+        when(colorRepository.findByColorId(4L)).thenReturn(Color.builder().colorId(4L).build());
+        CarRequest body = request(8L);
+        body.setColorId(4L);
+        body.setColorNameText("göy");
+
+        service.add(body, "050", "9", "az");
+
+        assertEquals(4L, vinCar.getColorId());
+        assertNull(vinCar.getColorNameText());
     }
 
     private static CarRequest request(Long engineTypeId) {

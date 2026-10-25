@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,9 @@ public class CarResponseForSlotPanel {
     Integer engineVolume;
     Long mileage;
     String color;
+
+    /** tr: Görüntü formatı. / en: Display format. */
+    public String getPlateNumber() {
+        return PlateNumbers.format(plateNumber);
+    }
 }
