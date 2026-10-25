@@ -20,9 +20,11 @@ import java.util.List;
 
 /**
  * tr: Admin banner yazımı. Şube varlığı kontrol edilmez; title ve branchId birbirinden bağımsızdır.
- *     Redis yok. Mobil GET yalnız showing=true ve status=active okur.
+ *     Redis yok. Aynı anda yalnız bir banner showing=true olur.
+ *     Mobil GET yalnız o kaydı, status=active ise, döner.
  * en: Admin banner writes. Branch existence is not checked; title and branchId are independent.
- *     No Redis. The mobile GET reads showing=true and status=active only.
+ *     No Redis. Only one banner may have showing=true.
+ *     The mobile GET returns that row when its status is active.
  */
 @Service
 @RequiredArgsConstructor
@@ -38,12 +40,14 @@ public class AdminBannerService {
     @Transactional(readOnly = true)
     public List<BannerItem> visible() {
         return bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true).stream()
+                .limit(1)
                 .map(this::toItem)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AdminBannerRow> active() {
+        collapseShowing();
         return bannerRepository.findByStatusOrderByIdDesc(Banner.ACTIVE).stream()
                 .map(this::toRow)
                 .toList();
@@ -98,11 +102,31 @@ public class AdminBannerService {
             banner.setDescription(readDescription(body));
             banner.setBranchId(readBranchId(body));
         } else if (body.getShowing() != null) {
-            banner.setShowing(body.getShowing());
+            if (Boolean.TRUE.equals(body.getShowing())) {
+                showOnly(banner);
+            } else {
+                banner.setShowing(false);
+            }
         } else {
             throw MissingFieldException.required("title");
         }
         return toRow(bannerRepository.save(banner));
+    }
+
+    private void showOnly(Banner chosen) {
+        for (Banner other : bannerRepository.findByShowingTrueOrderByIdDesc()) {
+            if (other.getId() != null && !other.getId().equals(chosen.getId())) {
+                other.setShowing(false);
+            }
+        }
+        chosen.setShowing(true);
+    }
+
+    private void collapseShowing() {
+        List<Banner> shown = bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true);
+        for (int i = 1; i < shown.size(); i++) {
+            shown.get(i).setShowing(false);
+        }
     }
 
     private BannerItem toItem(Banner banner) {

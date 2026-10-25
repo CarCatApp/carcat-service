@@ -12,4 +12,6 @@ public interface BannerRepository extends JpaRepository<Banner, Long> {
     List<Banner> findByStatusOrderByIdDesc(String status);
 
     List<Banner> findByStatusAndShowingOrderByIdDesc(String status, Boolean showing);
+
+    List<Banner> findByShowingTrueOrderByIdDesc();
 }

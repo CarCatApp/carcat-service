@@ -33,7 +33,7 @@ public class BannerController {
     private final AdminBannerService adminBannerService;
 
     @Operation(summary = "Visible banners",
-            description = "Public. No headers required. Items with showing=true and status=active, newest id first. "
+            description = "Public. No headers required. At most one item: showing=true and status=active. "
                     + "Never 401. Empty list is 200 [].")
     @GetMapping(produces = JSON_UTF8)
     public ResponseEntity<List<BannerItem>> list() {

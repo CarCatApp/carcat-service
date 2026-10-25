@@ -135,6 +135,89 @@ class AdminBannerServiceTest {
     }
 
     @Test
+    void turningShowingOnClearsEveryOtherBanner() {
+        Banner chosen = stored(false);
+        Banner other = Banner.builder()
+                .id(2L)
+                .title("Eski")
+                .description("abc")
+                .branchId(8L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findById(1L)).thenReturn(Optional.of(chosen));
+        when(bannerRepository.findByShowingTrueOrderByIdDesc()).thenReturn(List.of(other, chosen));
+        when(bannerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setShowing(true);
+
+        AdminBannerRow row = service.update(1L, body);
+
+        assertTrue(row.getShowing());
+        assertFalse(other.getShowing());
+        assertEquals("Babek", row.getTitle());
+        assertEquals(Banner.ACTIVE, row.getStatus());
+    }
+
+    @Test
+    void openingTheListLeavesOnlyTheNewestShowing() {
+        Banner newer = Banner.builder()
+                .id(5L)
+                .title("Yeni")
+                .description("abc")
+                .branchId(1L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        Banner older = Banner.builder()
+                .id(2L)
+                .title("Eski")
+                .description("abc")
+                .branchId(1L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true))
+                .thenReturn(List.of(newer, older));
+        when(bannerRepository.findByStatusOrderByIdDesc(Banner.ACTIVE)).thenReturn(List.of(newer, older));
+
+        List<AdminBannerRow> rows = service.active();
+
+        assertTrue(newer.getShowing());
+        assertFalse(older.getShowing());
+        assertEquals(2, rows.size());
+        assertTrue(rows.get(0).getShowing());
+        assertFalse(rows.get(1).getShowing());
+    }
+
+    @Test
+    void mobileListKeepsASingleShowingBanner() {
+        Banner newer = Banner.builder()
+                .id(5L)
+                .title("Yeni")
+                .description("abc")
+                .branchId(1L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        Banner older = Banner.builder()
+                .id(2L)
+                .title("Eski")
+                .description("abc")
+                .branchId(1L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true))
+                .thenReturn(List.of(newer, older));
+
+        List<BannerItem> rows = service.visible();
+
+        assertEquals(1, rows.size());
+        assertEquals(5L, rows.get(0).getId());
+    }
+
+    @Test
     void setShowingLeavesTheOtherFields() {
         Banner existing = stored(true);
         when(bannerRepository.findById(1L)).thenReturn(Optional.of(existing));

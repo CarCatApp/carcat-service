@@ -286,8 +286,9 @@
 
   async function loadBanners() {
     const data = await api("/admin/banners/items");
-    if (!data) return;
+    if (!data) return false;
     renderRows(Array.isArray(data) ? data : []);
+    return true;
   }
 
   async function setShowing(row, input) {
@@ -298,13 +299,16 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ showing: next })
     });
-    input.disabled = false;
     if (!saved) {
       input.checked = !next;
+      input.disabled = false;
       return;
     }
-    input.checked = saved.showing === true;
-    row.showing = saved.showing === true;
+    const loaded = await loadBanners();
+    if (!loaded) {
+      input.checked = saved.showing === true;
+      input.disabled = false;
+    }
   }
 
   function openEdit(row) {
