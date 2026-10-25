@@ -7,6 +7,7 @@ import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.ModelRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -67,6 +69,11 @@ class IddaPlateCheckServiceTest {
         CarResponse response = service.check("77-BU-669", "050", "7", "az");
 
         assertEquals(4, response.getIddaStatusCode());
+        assertEquals("limit", response.getMessage());
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(response));
+        assertTrue(json.path("isRestrict").asBoolean());
+        assertFalse(json.has("restrict"));
         assertFalse(Boolean.TRUE.equals(response.getFromIdda()));
         ArgumentCaptor<IddaPlateCheck> saved = ArgumentCaptor.forClass(IddaPlateCheck.class);
         verify(iddaPlateCheckRepository).save(saved.capture());
@@ -130,6 +137,7 @@ class IddaPlateCheckServiceTest {
         CarResponse response = service.check("77BU669", "050", "7", "az");
 
         assertEquals("NEWERVIN000000001", response.getVin());
+        assertEquals(Boolean.FALSE, response.getIsRestrict());
         verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());
     }
 

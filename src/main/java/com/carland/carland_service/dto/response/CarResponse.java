@@ -1,6 +1,8 @@
 package com.carland.carland_service.dto.response;
 
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -45,6 +47,13 @@ public class CarResponse {
     private Integer iddaStatusCode;
     private String iddaStatusName;
     private String iddaStatusMessage;
+    /**
+     * tr: Yalnız {@code /check/plate}. Code 4 və ya {@code ServiceRestrictedByPerson}. Mesaj metnine bakılmaz.
+     * en: Only {@code /check/plate}. Code 4 or {@code ServiceRestrictedByPerson}. The message text is ignored.
+     */
+    @JsonProperty("isRestrict")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean isRestrict;
     /** Partner ids for badge logo fetch ({@code GET /photo/for/partner/badge-logo/get/{partnerId}}). */
     private List<String> servicedPartnerIds;
     private String resource;

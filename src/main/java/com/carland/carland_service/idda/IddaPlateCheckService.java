@@ -201,8 +201,21 @@ public class IddaPlateCheckService {
                 .iddaStatusCode(row.getStatusCode())
                 .iddaStatusName(row.getStatusName())
                 .iddaStatusMessage(row.getStatusMessage())
+                .isRestrict(restricted(row))
                 .message(message)
                 .build();
+    }
+
+    /**
+     * tr: Vatandaş sorguyu kapatmışsa true. IDDA mesajı değişebilir; Code 4 veya status adı esas alınır.
+     * en: True when the citizen blocked the query. The IDDA message can change; Code 4 or the status name is the signal.
+     */
+    private static boolean restricted(IddaPlateCheck row) {
+        if (row.getStatusCode() != null && row.getStatusCode() == 4) {
+            return true;
+        }
+        String name = row.getStatusName();
+        return name != null && name.equalsIgnoreCase("ServiceRestrictedByPerson");
     }
 
     private Car findVin(String vin) {
