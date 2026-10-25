@@ -7,9 +7,12 @@ import lombok.Data;
 @Builder
 public class AdminBannerRow {
     Long id;
+    String type;
     String title;
     String description;
     Long branchId;
+    String url;
+    Integer sortOrder;
     Boolean showing;
     String status;
 }

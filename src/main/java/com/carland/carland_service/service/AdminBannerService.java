@@ -14,17 +14,21 @@ import com.carland.carland_service.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * tr: Admin banner yazımı. Şube varlığı kontrol edilmez; title ve branchId birbirinden bağımsızdır.
- *     Redis yok. Aynı anda yalnız bir banner showing=true olur.
- *     Mobil GET yalnız o kaydı, status=active ise, döner.
- * en: Admin banner writes. Branch existence is not checked; title and branchId are independent.
- *     No Redis. Only one banner may have showing=true.
- *     The mobile GET returns that row when its status is active.
+ * tr: Admin banner. Redis yok. showing=true birden fazla olabilir.
+ *     Sıra sortOrder küçükten büyüğe, aynı sayıda id büyük önde.
+ *     service branchId ister. adds ve info fotoğraf ister, url boş kalabilir.
+ *     Fotoğraf photo:banner:{bannerId}. Yazan replaceBannerPhoto, commit sonrası evict.
+ * en: Admin banner. No Redis. More than one row may have showing=true.
+ *     Order is sortOrder ascending, then larger id first.
+ *     service requires branchId. adds and info require a photo; url may be empty.
+ *     Photo key photo:banner:{bannerId}. replaceBannerPhoto evicts it after commit.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,22 +37,22 @@ public class AdminBannerService {
     static final int TITLE_MAX = 255;
     static final int DESCRIPTION_MAX = 4000;
     static final int DESCRIPTION_MIN = 3;
+    static final int URL_MAX = 2000;
 
     private final BannerRepository bannerRepository;
     private final BranchRepository branchRepository;
+    private final PhotoService photoService;
 
     @Transactional(readOnly = true)
     public List<BannerItem> visible() {
-        return bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true).stream()
-                .limit(1)
+        return bannerRepository.findVisible(Banner.ACTIVE).stream()
                 .map(this::toItem)
                 .toList();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<AdminBannerRow> active() {
-        collapseShowing();
-        return bannerRepository.findByStatusOrderByIdDesc(Banner.ACTIVE).stream()
+        return bannerRepository.findActiveOrdered(Banner.ACTIVE).stream()
                 .map(this::toRow)
                 .toList();
     }
@@ -69,23 +73,45 @@ public class AdminBannerService {
 
     @Transactional
     public AdminBannerRow create(AdminBannerSaveRequest body) {
+        return create(body, null);
+    }
+
+    @Transactional
+    public AdminBannerRow create(AdminBannerSaveRequest body, MultipartFile file) {
+        String type = readType(body == null ? null : body.getType());
+        if (needsPhoto(type) && (file == null || file.isEmpty())) {
+            throw MissingFieldException.required("file");
+        }
         Banner banner = Banner.builder()
                 .title(readTitle(body))
                 .description(readDescription(body))
-                .branchId(readBranchId(body))
+                .type(type)
+                .branchId(readBranchId(type, body))
+                .url(readUrl(type, body == null ? null : body.getUrl()))
+                .sortOrder(readSortOrder(body == null ? null : body.getSortOrder()))
                 .showing(false)
                 .status(Banner.ACTIVE)
                 .build();
-        return toRow(bannerRepository.save(banner));
+        banner = bannerRepository.save(banner);
+        if (needsPhoto(type)) {
+            photoService.replaceBannerPhoto(file, banner.getId());
+        }
+        return toRow(banner);
+    }
+
+    @Transactional
+    public AdminBannerRow replacePhoto(Long id, MultipartFile file) {
+        Banner banner = requireBanner(id);
+        if (!needsPhoto(storedType(banner))) {
+            throw new InvalidStatusException("banner photo is only for adds and info");
+        }
+        photoService.replaceBannerPhoto(file, banner.getId());
+        return toRow(banner);
     }
 
     @Transactional
     public AdminBannerRow update(Long id, AdminBannerSaveRequest body) {
-        if (id == null) {
-            throw new ResourceNotFoundException("banner not found");
-        }
-        Banner banner = bannerRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("banner not found"));
+        Banner banner = requireBanner(id);
         if (body == null) {
             throw new MissingFieldException("body is required");
         }
@@ -96,45 +122,49 @@ public class AdminBannerService {
             banner.setStatus(Banner.DEACTIVE);
             return toRow(bannerRepository.save(banner));
         }
-        boolean text = body.getTitle() != null || body.getDescription() != null || body.getBranchId() != null;
+        boolean text = body.getTitle() != null || body.getDescription() != null || body.getBranchId() != null
+                || body.getSortOrder() != null || body.getUrl() != null;
         if (text) {
+            String type = storedType(banner);
             banner.setTitle(readTitle(body));
             banner.setDescription(readDescription(body));
-            banner.setBranchId(readBranchId(body));
-        } else if (body.getShowing() != null) {
-            if (Boolean.TRUE.equals(body.getShowing())) {
-                showOnly(banner);
-            } else {
-                banner.setShowing(false);
+            if (body.getSortOrder() != null) {
+                banner.setSortOrder(body.getSortOrder());
             }
+            if (Banner.SERVICE.equals(type)) {
+                banner.setBranchId(readBranchId(type, body));
+                banner.setUrl(null);
+            } else {
+                banner.setBranchId(null);
+                if (body.getUrl() != null) {
+                    banner.setUrl(readUrl(type, body.getUrl()));
+                }
+            }
+        } else if (body.getShowing() != null) {
+            banner.setShowing(body.getShowing());
         } else {
             throw MissingFieldException.required("title");
         }
         return toRow(bannerRepository.save(banner));
     }
 
-    private void showOnly(Banner chosen) {
-        for (Banner other : bannerRepository.findByShowingTrueOrderByIdDesc()) {
-            if (other.getId() != null && !other.getId().equals(chosen.getId())) {
-                other.setShowing(false);
-            }
+    private Banner requireBanner(Long id) {
+        if (id == null) {
+            throw new ResourceNotFoundException("banner not found");
         }
-        chosen.setShowing(true);
-    }
-
-    private void collapseShowing() {
-        List<Banner> shown = bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true);
-        for (int i = 1; i < shown.size(); i++) {
-            shown.get(i).setShowing(false);
-        }
+        return bannerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("banner not found"));
     }
 
     private BannerItem toItem(Banner banner) {
         return BannerItem.builder()
                 .id(banner.getId())
+                .type(storedType(banner))
                 .title(banner.getTitle())
                 .description(banner.getDescription())
                 .branchId(banner.getBranchId())
+                .url(banner.getUrl())
+                .sortOrder(banner.getSortOrder())
                 .showing(Boolean.TRUE.equals(banner.getShowing()))
                 .status(banner.getStatus())
                 .build();
@@ -143,12 +173,37 @@ public class AdminBannerService {
     private AdminBannerRow toRow(Banner banner) {
         return AdminBannerRow.builder()
                 .id(banner.getId())
+                .type(storedType(banner))
                 .title(banner.getTitle())
                 .description(banner.getDescription())
                 .branchId(banner.getBranchId())
+                .url(banner.getUrl())
+                .sortOrder(banner.getSortOrder())
                 .showing(Boolean.TRUE.equals(banner.getShowing()))
                 .status(banner.getStatus())
                 .build();
+    }
+
+    static String storedType(Banner banner) {
+        if (banner.getType() == null || banner.getType().isBlank()) {
+            return Banner.SERVICE;
+        }
+        return banner.getType();
+    }
+
+    static boolean needsPhoto(String type) {
+        return Banner.ADDS.equals(type) || Banner.INFO.equals(type);
+    }
+
+    private static String readType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Banner.SERVICE;
+        }
+        String type = raw.trim().toLowerCase(Locale.ROOT);
+        if (!Banner.SERVICE.equals(type) && !Banner.ADDS.equals(type) && !Banner.INFO.equals(type)) {
+            throw new InvalidStatusException("type must be service, adds or info");
+        }
+        return type;
     }
 
     private static String readTitle(AdminBannerSaveRequest body) {
@@ -179,10 +234,34 @@ public class AdminBannerService {
         return description;
     }
 
-    private static Long readBranchId(AdminBannerSaveRequest body) {
+    private static Long readBranchId(String type, AdminBannerSaveRequest body) {
+        if (!Banner.SERVICE.equals(type)) {
+            return null;
+        }
         if (body == null || body.getBranchId() == null) {
             throw MissingFieldException.required("branchId");
         }
         return body.getBranchId();
+    }
+
+    private static String readUrl(String type, String raw) {
+        if (Banner.SERVICE.equals(type)) {
+            return null;
+        }
+        if (raw == null) {
+            return null;
+        }
+        String url = raw.trim();
+        if (url.isEmpty()) {
+            return null;
+        }
+        if (url.length() > URL_MAX) {
+            throw new MissingFieldException("url is too long");
+        }
+        return url;
+    }
+
+    private static Integer readSortOrder(Integer sortOrder) {
+        return sortOrder == null ? 0 : sortOrder;
     }
 }

@@ -6,7 +6,10 @@ import lombok.Data;
 public class AdminBannerSaveRequest {
     String title;
     String description;
+    String type;
     Long branchId;
+    String url;
+    Integer sortOrder;
     Boolean showing;
     String status;
 }

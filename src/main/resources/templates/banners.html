@@ -37,6 +37,7 @@
       border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px;
     }
     .editor-card h2 { color: #111; }
+    input[type="file"] { color: #111; }
     @media (max-width: 720px) {
       .banner-grid { grid-template-columns: 1fr; }
     }
@@ -77,13 +78,27 @@
   <div class="page-head">
     <div>
       <h1>banner</h1>
-      <p class="muted">Şube adına basınca title ve branchId dolar. İkisini yaratırken ve düzeltirken elle değiştirebilirsin.</p>
+      <p class="muted">service şube ile kalır. adds və info foto + url götürür. sortOrder kiçikdən böyüyə slayt sırasıdır. showing eyni anda birdən çox ola bilər.</p>
     </div>
   </div>
   <div class="error-box" id="errBox" hidden></div>
-  <div class="branch-picks" id="branchPicks"></div>
+  <div id="serviceFields">
+    <div class="branch-picks" id="branchPicks"></div>
+  </div>
   <form id="createForm">
     <div class="banner-grid">
+      <div class="field">
+        <label for="type">type</label>
+        <select id="type">
+          <option value="service">service</option>
+          <option value="adds">adds</option>
+          <option value="info">info</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sortOrder">sortOrder</label>
+        <input id="sortOrder" inputmode="numeric" autocomplete="off" value="0">
+      </div>
       <div class="field full">
         <label for="title">title</label>
         <input id="title" autocomplete="off">
@@ -92,9 +107,17 @@
         <label for="description">description</label>
         <textarea id="description"></textarea>
       </div>
-      <div class="field">
+      <div class="field" id="branchField">
         <label for="branchId">branchId</label>
         <input id="branchId" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="field full" id="urlField" hidden>
+        <label for="url">url</label>
+        <input id="url" autocomplete="off" placeholder="boş qala bilər">
+      </div>
+      <div class="field full" id="fileField" hidden>
+        <label for="file">banner photo</label>
+        <input id="file" type="file" accept="image/*">
       </div>
       <button class="btn btn-primary" id="createBtn" type="submit">Yarat</button>
     </div>
@@ -105,9 +128,12 @@
       <table class="data-table">
         <thead>
         <tr>
+          <th>sort</th>
+          <th>type</th>
           <th>title</th>
           <th>description</th>
           <th>branchId</th>
+          <th>url</th>
           <th>showing</th>
           <th>status</th>
           <th></th>
@@ -133,8 +159,20 @@
         <textarea id="editDescription"></textarea>
       </div>
       <div class="field">
+        <label for="editSortOrder">sortOrder</label>
+        <input id="editSortOrder" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="field" id="editBranchField">
         <label for="editBranchId">branchId</label>
         <input id="editBranchId" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="field full" id="editUrlField" hidden>
+        <label for="editUrl">url</label>
+        <input id="editUrl" autocomplete="off">
+      </div>
+      <div class="field full" id="editFileField" hidden>
+        <label for="editFile">banner photo</label>
+        <input id="editFile" type="file" accept="image/*">
       </div>
     </div>
     <div style="display:flex; gap:8px; margin-top:16px;">
@@ -178,16 +216,41 @@
     return body;
   }
 
-  function readFields(titleEl, descriptionEl, branchEl) {
+  function readSort(el) {
+    const raw = el.value.trim();
+    if (!/^-?\d+$/.test(raw)) return { error: "sortOrder is required" };
+    const sortOrder = Number(raw);
+    if (!Number.isSafeInteger(sortOrder)) return { error: "sortOrder is required" };
+    return { sortOrder };
+  }
+
+  function isMedia(type) {
+    return type === "adds" || type === "info";
+  }
+
+  function applyType(type) {
+    const media = isMedia(type);
+    document.getElementById("serviceFields").hidden = media;
+    document.getElementById("branchField").hidden = media;
+    document.getElementById("urlField").hidden = !media;
+    document.getElementById("fileField").hidden = !media;
+  }
+
+  function readFields(titleEl, descriptionEl, branchEl, type, sortEl) {
     const title = titleEl.value.trim();
     const description = descriptionEl.value.trim();
-    const branchRaw = branchEl.value.trim();
+    const sort = readSort(sortEl);
+    if (sort.error) return sort;
     if (!title) return { error: "title is required" };
     if (description.length < 3) return { error: "description must be at least 3 characters" };
-    if (!/^-?\d+$/.test(branchRaw)) return { error: "branchId is required" };
-    const branchId = Number(branchRaw);
-    if (!Number.isSafeInteger(branchId)) return { error: "branchId is required" };
-    return { title, description, branchId };
+    if (!isMedia(type)) {
+      const branchRaw = branchEl.value.trim();
+      if (!/^-?\d+$/.test(branchRaw)) return { error: "branchId is required" };
+      const branchId = Number(branchRaw);
+      if (!Number.isSafeInteger(branchId)) return { error: "branchId is required" };
+      return { title, description, branchId, sortOrder: sort.sortOrder, type };
+    }
+    return { title, description, sortOrder: sort.sortOrder, type, url: document.getElementById(sortEl.id === "editSortOrder" ? "editUrl" : "url").value.trim() };
   }
 
   function clearPick() {
@@ -224,7 +287,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
-      td.colSpan = 6;
+      td.colSpan = 9;
       td.className = "muted";
       td.textContent = "active banner yoxdur";
       tr.appendChild(td);
@@ -233,9 +296,12 @@
     }
     rows.forEach((row) => {
       const tr = document.createElement("tr");
+      tr.appendChild(textCell(row.sortOrder == null ? "" : String(row.sortOrder)));
+      tr.appendChild(textCell(row.type || "service"));
       tr.appendChild(textCell(row.title));
       tr.appendChild(textCell(row.description));
       tr.appendChild(textCell(row.branchId == null ? "" : String(row.branchId)));
+      tr.appendChild(textCell(row.url || ""));
 
       const showingTd = document.createElement("td");
       const label = document.createElement("label");
@@ -317,7 +383,14 @@
     document.getElementById("editId").value = row.id;
     document.getElementById("editTitle").value = row.title || "";
     document.getElementById("editDescription").value = row.description || "";
+    document.getElementById("editSortOrder").value = row.sortOrder == null ? "0" : String(row.sortOrder);
     document.getElementById("editBranchId").value = row.branchId == null ? "" : String(row.branchId);
+    document.getElementById("editUrl").value = row.url || "";
+    document.getElementById("editFile").value = "";
+    const media = isMedia(row.type || "service");
+    document.getElementById("editBranchField").hidden = media;
+    document.getElementById("editUrlField").hidden = !media;
+    document.getElementById("editFileField").hidden = !media;
     editor.hidden = false;
   }
 
@@ -337,59 +410,85 @@
   document.getElementById("title").addEventListener("input", clearPick);
   document.getElementById("branchId").addEventListener("input", clearPick);
 
+  document.getElementById("type").addEventListener("change", () => applyType(document.getElementById("type").value));
+
   document.getElementById("createForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const type = document.getElementById("type").value;
     const fields = readFields(
       document.getElementById("title"),
       document.getElementById("description"),
-      document.getElementById("branchId")
+      document.getElementById("branchId"),
+      type,
+      document.getElementById("sortOrder")
     );
     if (fields.error) {
       showErr(fields.error);
       return;
     }
+    const file = document.getElementById("file").files[0];
+    if (isMedia(type) && !file) {
+      showErr("banner photo is required");
+      return;
+    }
     showErr("");
     const btn = document.getElementById("createBtn");
     btn.disabled = true;
-    const saved = await api("/admin/banners", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: fields.title,
-        description: fields.description,
-        branchId: fields.branchId
-      })
-    });
+    const data = new FormData();
+    data.append("title", fields.title);
+    data.append("description", fields.description);
+    data.append("type", type);
+    data.append("sortOrder", String(fields.sortOrder));
+    if (!isMedia(type)) data.append("branchId", String(fields.branchId));
+    if (isMedia(type) && fields.url) data.append("url", fields.url);
+    if (file) data.append("file", file);
+    const saved = await api("/admin/banners", { method: "POST", body: data });
     btn.disabled = false;
     if (!saved) return;
     document.getElementById("createForm").reset();
+    document.getElementById("sortOrder").value = "0";
+    applyType("service");
     clearPick();
     await loadBanners();
   });
 
   document.getElementById("editForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const id = document.getElementById("editId").value;
+    const row = rows.find((item) => String(item.id) === String(id));
+    const type = row && row.type ? row.type : "service";
     const fields = readFields(
       document.getElementById("editTitle"),
       document.getElementById("editDescription"),
-      document.getElementById("editBranchId")
+      document.getElementById("editBranchId"),
+      type,
+      document.getElementById("editSortOrder")
     );
     if (fields.error) {
       showErr(fields.error);
       return;
     }
     showErr("");
-    const id = document.getElementById("editId").value;
+    const payload = {
+      title: fields.title,
+      description: fields.description,
+      sortOrder: fields.sortOrder
+    };
+    if (!isMedia(type)) payload.branchId = fields.branchId;
+    else payload.url = fields.url || "";
     const saved = await api("/admin/banners/" + id, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: fields.title,
-        description: fields.description,
-        branchId: fields.branchId
-      })
+      body: JSON.stringify(payload)
     });
     if (!saved) return;
+    const file = document.getElementById("editFile").files[0];
+    if (file && isMedia(type)) {
+      const photo = new FormData();
+      photo.append("file", file);
+      const uploaded = await api("/admin/banners/" + id + "/photo", { method: "POST", body: photo });
+      if (!uploaded) return;
+    }
     editor.hidden = true;
     await loadBanners();
   });
@@ -398,6 +497,7 @@
     editor.hidden = true;
   });
 
+  applyType("service");
   loadBranches();
   loadBanners();
 </script>

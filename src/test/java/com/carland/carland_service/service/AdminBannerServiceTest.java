@@ -18,6 +18,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -36,12 +38,13 @@ class AdminBannerServiceTest {
 
     @Mock BannerRepository bannerRepository;
     @Mock BranchRepository branchRepository;
+    @Mock PhotoService photoService;
 
     AdminBannerService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminBannerService(bannerRepository, branchRepository);
+        service = new AdminBannerService(bannerRepository, branchRepository, photoService);
     }
 
     @Test
@@ -61,6 +64,8 @@ class AdminBannerServiceTest {
         verify(bannerRepository).save(saved.capture());
         assertFalse(saved.getValue().getShowing());
         assertEquals(Banner.ACTIVE, saved.getValue().getStatus());
+        assertEquals(Banner.SERVICE, saved.getValue().getType());
+        assertEquals(0, saved.getValue().getSortOrder());
         assertEquals("hyper babek prospekti", row.getTitle());
         assertEquals("aci", row.getDescription());
         assertEquals(99L, row.getBranchId());
@@ -96,7 +101,7 @@ class AdminBannerServiceTest {
                 .showing(true)
                 .status(Banner.ACTIVE)
                 .build();
-        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true)).thenReturn(List.of(banner));
+        when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(banner));
 
         List<BannerItem> rows = service.visible();
 
@@ -105,18 +110,19 @@ class AdminBannerServiceTest {
         assertEquals("hyper babek prospekti", rows.get(0).getTitle());
         assertEquals("Yağ dəyişimi", rows.get(0).getDescription());
         assertEquals(12L, rows.get(0).getBranchId());
+        assertEquals(Banner.SERVICE, rows.get(0).getType());
         assertTrue(rows.get(0).isShowing());
         assertEquals(Banner.ACTIVE, rows.get(0).getStatus());
-        verify(bannerRepository).findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true);
+        verify(bannerRepository).findVisible(Banner.ACTIVE);
     }
 
     @Test
     void listReadsActiveOnly() {
-        when(bannerRepository.findByStatusOrderByIdDesc(Banner.ACTIVE)).thenReturn(List.of());
+        when(bannerRepository.findActiveOrdered(Banner.ACTIVE)).thenReturn(List.of());
 
         service.active();
 
-        verify(bannerRepository).findByStatusOrderByIdDesc(Banner.ACTIVE);
+        verify(bannerRepository).findActiveOrdered(Banner.ACTIVE);
     }
 
     @Test
@@ -135,7 +141,7 @@ class AdminBannerServiceTest {
     }
 
     @Test
-    void turningShowingOnClearsEveryOtherBanner() {
+    void turningShowingOnLeavesTheOtherBannerShowing() {
         Banner chosen = stored(false);
         Banner other = Banner.builder()
                 .id(2L)
@@ -146,7 +152,6 @@ class AdminBannerServiceTest {
                 .status(Banner.ACTIVE)
                 .build();
         when(bannerRepository.findById(1L)).thenReturn(Optional.of(chosen));
-        when(bannerRepository.findByShowingTrueOrderByIdDesc()).thenReturn(List.of(other, chosen));
         when(bannerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         AdminBannerSaveRequest body = new AdminBannerSaveRequest();
         body.setShowing(true);
@@ -154,13 +159,13 @@ class AdminBannerServiceTest {
         AdminBannerRow row = service.update(1L, body);
 
         assertTrue(row.getShowing());
-        assertFalse(other.getShowing());
+        assertTrue(other.getShowing());
         assertEquals("Babek", row.getTitle());
         assertEquals(Banner.ACTIVE, row.getStatus());
     }
 
     @Test
-    void openingTheListLeavesOnlyTheNewestShowing() {
+    void openingTheListKeepsEveryShowingBanner() {
         Banner newer = Banner.builder()
                 .id(5L)
                 .title("Yeni")
@@ -177,44 +182,45 @@ class AdminBannerServiceTest {
                 .showing(true)
                 .status(Banner.ACTIVE)
                 .build();
-        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true))
-                .thenReturn(List.of(newer, older));
-        when(bannerRepository.findByStatusOrderByIdDesc(Banner.ACTIVE)).thenReturn(List.of(newer, older));
+        when(bannerRepository.findActiveOrdered(Banner.ACTIVE)).thenReturn(List.of(older, newer));
 
         List<AdminBannerRow> rows = service.active();
 
         assertTrue(newer.getShowing());
-        assertFalse(older.getShowing());
+        assertTrue(older.getShowing());
         assertEquals(2, rows.size());
-        assertTrue(rows.get(0).getShowing());
-        assertFalse(rows.get(1).getShowing());
     }
 
     @Test
-    void mobileListKeepsASingleShowingBanner() {
-        Banner newer = Banner.builder()
-                .id(5L)
-                .title("Yeni")
-                .description("abc")
-                .branchId(1L)
-                .showing(true)
-                .status(Banner.ACTIVE)
-                .build();
-        Banner older = Banner.builder()
+    void mobileListReturnsEveryShowingBannerInRepositoryOrder() {
+        Banner first = Banner.builder()
                 .id(2L)
                 .title("Eski")
                 .description("abc")
                 .branchId(1L)
+                .sortOrder(1)
                 .showing(true)
                 .status(Banner.ACTIVE)
                 .build();
-        when(bannerRepository.findByStatusAndShowingOrderByIdDesc(Banner.ACTIVE, true))
-                .thenReturn(List.of(newer, older));
+        Banner second = Banner.builder()
+                .id(5L)
+                .title("Yeni")
+                .description("abc")
+                .type(Banner.ADDS)
+                .url("https://carland.az")
+                .sortOrder(2)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(first, second));
 
         List<BannerItem> rows = service.visible();
 
-        assertEquals(1, rows.size());
-        assertEquals(5L, rows.get(0).getId());
+        assertEquals(2, rows.size());
+        assertEquals(2L, rows.get(0).getId());
+        assertEquals(5L, rows.get(1).getId());
+        assertEquals(Banner.ADDS, rows.get(1).getType());
+        assertEquals("https://carland.az", rows.get(1).getUrl());
     }
 
     @Test
@@ -278,6 +284,41 @@ class AdminBannerServiceTest {
         when(bannerRepository.findById(9L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.update(9L, body("A", "abc", 1L)));
+    }
+
+    @Test
+    void addsCreateStoresOptionalUrlAndRequiresAPhoto() {
+        when(bannerRepository.save(any())).thenAnswer(invocation -> {
+            Banner banner = invocation.getArgument(0);
+            banner.setId(8L);
+            return banner;
+        });
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setType(Banner.ADDS);
+        body.setTitle("Kampanya");
+        body.setDescription("yaz kampanyasi");
+        body.setUrl("  ");
+        body.setSortOrder(3);
+
+        AdminBannerRow row = service.create(body, file);
+
+        assertEquals(Banner.ADDS, row.getType());
+        assertEquals(null, row.getBranchId());
+        assertEquals(null, row.getUrl());
+        assertEquals(3, row.getSortOrder());
+        verify(photoService).replaceBannerPhoto(file, 8L);
+    }
+
+    @Test
+    void addsWithoutPhotoIsRejected() {
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setType(Banner.INFO);
+        body.setTitle("Melumat");
+        body.setDescription("qisa metn");
+
+        assertThrows(MissingFieldException.class, () -> service.create(body, null));
     }
 
     private static AdminBannerSaveRequest body(String title, String description, Long branchId) {

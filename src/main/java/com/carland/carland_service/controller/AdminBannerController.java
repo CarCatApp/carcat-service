@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -69,6 +71,40 @@ public class AdminBannerController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(adminBannerService.create(body));
+    }
+
+    @PostMapping(value = "/admin/banners", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseBody
+    public ResponseEntity<AdminBannerRow> createMultipart(@RequestParam String title,
+                                                         @RequestParam String description,
+                                                         @RequestParam(required = false) String type,
+                                                         @RequestParam(required = false) Long branchId,
+                                                         @RequestParam(required = false) String url,
+                                                         @RequestParam(required = false) Integer sortOrder,
+                                                         @RequestParam(required = false) MultipartFile file,
+                                                         HttpServletRequest request) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setTitle(title);
+        body.setDescription(description);
+        body.setType(type);
+        body.setBranchId(branchId);
+        body.setUrl(url);
+        body.setSortOrder(sortOrder);
+        return ResponseEntity.ok(adminBannerService.create(body, file));
+    }
+
+    @PostMapping(value = "/admin/banners/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseBody
+    public ResponseEntity<AdminBannerRow> replacePhoto(@PathVariable Long id,
+                                                       @RequestParam("file") MultipartFile file,
+                                                       HttpServletRequest request) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(adminBannerService.replacePhoto(id, file));
     }
 
     @PutMapping(value = "/admin/banners/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)

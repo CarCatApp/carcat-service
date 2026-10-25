@@ -46,6 +46,8 @@ public class PhotoServiceImpl implements PhotoService {
     private final UserPhotoRepository userPhotoRepository;
     private final PartnerRepository partnerRepository;
     private final PartnerPhotoRepository partnerPhotoRepository;
+    private final BannerRepository bannerRepository;
+    private final BannerPhotoRepository bannerPhotoRepository;
     private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
     private final PercentagePhotoRepository percentagePhotoRepository;
     private final PercentageEmptyPhotoRepository percentageEmptyPhotoRepository;
@@ -334,6 +336,85 @@ public class PhotoServiceImpl implements PhotoService {
         byte[] bytes = partnerPhoto.getImageData();
         if (bytes != null && bytes.length > 0) {
             redisCacheService.putPartnerPhoto(partnerId, mediaType, bytes);
+        }
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .body(bytes);
+    }
+
+    /**
+     * tr: adds veya info banner fotoğrafını değiştirir. service tipine yazılmaz.
+     *     Redis: commit sonrası photo:banner:{bannerId} silinir. Put yok.
+     * en: Replaces the adds or info banner photo. A service banner is rejected.
+     *     Redis: photo:banner:{bannerId} is deleted after commit. No put.
+     */
+    @Override
+    @Transactional
+    public PhotoResponse replaceBannerPhoto(MultipartFile file, Long bannerId) {
+        if (file == null || file.isEmpty() || bannerId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        Banner banner = bannerRepository.findById(bannerId)
+                .orElseThrow(() -> new ResourceNotFoundException("banner not found"));
+        String type = banner.getType() == null || banner.getType().isBlank() ? Banner.SERVICE : banner.getType();
+        if (Banner.SERVICE.equals(type)) {
+            throw new InvalidStatusException("banner photo is only for adds and info");
+        }
+        try {
+            checkAttack(file, null);
+            BannerPhoto existing = bannerPhotoRepository.findByBannerId(bannerId);
+            if (existing != null) {
+                bannerPhotoRepository.delete(existing);
+            }
+            Tika tika = new Tika();
+            String detectedType = tika.detect(file.getBytes());
+            if (!detectedType.startsWith("image/")) {
+                throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
+            }
+            BannerPhoto photo = BannerPhoto.builder()
+                    .fileName("banner " + bannerId + " image")
+                    .fileType(detectedType.substring("image/".length()))
+                    .bannerId(bannerId)
+                    .imageData(file.getBytes())
+                    .build();
+            bannerPhotoRepository.save(photo);
+            redisCacheService.evictBannerPhotoAfterCommit(bannerId);
+            return PhotoResponse.builder()
+                    .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
+                    .build();
+        } catch (IOException e) {
+            throw new FileStorageException(MessagesLangValues.FILE_CANT_SET.getMessageByLang(null));
+        }
+    }
+
+    /**
+     * tr: Banner fotoğrafını döner. Cache photo:banner:{bannerId}. Miss DB'den dolar.
+     * en: Returns the banner photo. Cache photo:banner:{bannerId}. A miss loads from the DB.
+     */
+    @Override
+    public ResponseEntity<byte[]> getBannerPhotoById(Long bannerId) {
+        if (bannerId == null) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
+        }
+        ResponseEntity<byte[]> cached = redisCacheService.getBannerPhoto(bannerId);
+        if (cached != null) {
+            return cached;
+        }
+        BannerPhoto photo = bannerPhotoRepository.findByBannerId(bannerId);
+        if (photo == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+        }
+        String fileType = photo.getFileType();
+        if (fileType == null || fileType.isBlank()) {
+            fileType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+        if (!fileType.contains("/")) {
+            fileType = "image/" + fileType.toLowerCase();
+        }
+        MediaType mediaType = MediaType.parseMediaType(fileType);
+        byte[] bytes = photo.getImageData();
+        if (bytes != null && bytes.length > 0) {
+            redisCacheService.putBannerPhoto(bannerId, mediaType, bytes);
         }
         return ResponseEntity.ok()
                 .contentType(mediaType)

@@ -238,6 +238,24 @@ public class RedisCacheService {
     }
 
     /**
+     * tr: Banner fotoğrafı. Key photo:banner:{bannerId}. Yazan: PhotoServiceImpl.replaceBannerPhoto → evict after commit.
+     *     Put yalnız GET miss sonrası.
+     * en: Banner photo. Key photo:banner:{bannerId}. Writer: PhotoServiceImpl.replaceBannerPhoto evicts after commit.
+     *     Put only after a GET miss.
+     */
+    public ResponseEntity<byte[]> getBannerPhoto(Long bannerId) {
+        return getPhoto("photo:banner:" + bannerId, "banner-photo bannerId=" + bannerId);
+    }
+
+    public void putBannerPhoto(Long bannerId, MediaType mediaType, byte[] bytes) {
+        putPhoto("photo:banner:" + bannerId, mediaType, bytes);
+    }
+
+    public void evictBannerPhotoAfterCommit(Long bannerId) {
+        runAfterCommit(() -> deletePhoto("photo:banner:" + bannerId));
+    }
+
+    /**
      * tr: Marka logosu. Key photo:brand:{brandId}. Yazan: PhotoServiceImpl.uploadBrandLogo → evict after commit.
      *     Put yalnız GET miss sonrası.
      * en: Brand logo. Key photo:brand:{brandId}. Writer: PhotoServiceImpl.uploadBrandLogo evicts after commit.

@@ -15,9 +15,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BannerItem {
     private Long id;
+    private String type;
     private String title;
     private String description;
     private Long branchId;
+    private String url;
+    private Integer sortOrder;
     private boolean showing;
     private String status;
 }

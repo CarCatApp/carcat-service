@@ -33,6 +33,9 @@ public class Banner {
 
     public static final String ACTIVE = "active";
     public static final String DEACTIVE = "deactive";
+    public static final String SERVICE = "service";
+    public static final String ADDS = "adds";
+    public static final String INFO = "info";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,8 +47,21 @@ public class Banner {
     @Column(nullable = false, length = 4000)
     String description;
 
-    @Column(name = "branch_id", nullable = false)
+    /** tr: Yalnız service. adds ve info boş kalır. / en: Service only. Empty for adds and info. */
+    @Column(name = "branch_id")
     Long branchId;
+
+    /** tr: service, adds veya info. Eski satır null ise service sayılır. / en: service, adds or info. A null legacy row counts as service. */
+    @Column(name = "banner_type", length = 16)
+    String type;
+
+    /** tr: adds ve info. Boş olabilir. / en: adds and info. May be empty. */
+    @Column(length = 2000)
+    String url;
+
+    /** tr: Slayt sırası. Küçük sayı önde. Boş olanlar sonda. / en: Slide order. Smaller numbers come first. Nulls go last. */
+    @Column(name = "sort_order")
+    Integer sortOrder;
 
     @Builder.Default
     @Column(nullable = false)
@@ -62,6 +78,9 @@ public class Banner {
         }
         if (status == null || status.isBlank()) {
             status = ACTIVE;
+        }
+        if (type == null || type.isBlank()) {
+            type = SERVICE;
         }
     }
 }

@@ -127,6 +127,15 @@ public class PhotoController {
     }
 
     /**
+     * tr: Banner fotoğrafını döner. adds ve info. bannerId path'tedir.
+     * en: Returns the banner photo. adds and info. bannerId is in the path.
+     */
+    @GetMapping(value = "/for/banner/get/{bannerId}", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getBannerPhotoById(@PathVariable("bannerId") Long bannerId) {
+        return photoService.getBannerPhotoById(bannerId);
+    }
+
+    /**
      * tr: Multipart "file" bölümündeki rozet logosunu verilen partnerId'ye ait partnere yükler ve sonucu döner.
      * en: Uploads the badge logo from the multipart "file" part to the partner identified by partnerId and returns the result.
      */
