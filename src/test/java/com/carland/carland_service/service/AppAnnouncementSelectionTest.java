@@ -93,6 +93,9 @@ class AppAnnouncementSelectionTest {
         );
         assertEquals(ios, select(List.of(row), "az", null, "IOS").get(0).getCtaUrl());
         assertEquals(android, select(List.of(row), "az", null, "ANDROID").get(0).getCtaUrl());
+        AppAnnouncementActiveItem either = select(List.of(row), "az", null, "IOS").get(0);
+        assertEquals(ios, either.getCtaUrlIos());
+        assertEquals(android, either.getCtaUrlAndroid());
     }
 
     @Test
@@ -174,7 +177,7 @@ class AppAnnouncementSelectionTest {
 
         ObjectMapper mapper = new ObjectMapper();
         JsonNode node = mapper.readTree(mapper.writeValueAsString(item));
-        assertEquals(Set.of("id", "type", "dismissible", "title", "body", "ctaLabel", "ctaUrl"),
+        assertEquals(Set.of("id", "type", "dismissible", "title", "body", "ctaLabel", "ctaUrl", "ctaUrlIos", "ctaUrlAndroid"),
                 Set.copyOf(iterable(node.fieldNames())));
         assertTrue(node.get("id").isNumber());
         assertFalse(node.get("id").isTextual());

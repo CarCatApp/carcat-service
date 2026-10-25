@@ -24,7 +24,7 @@ Duyuruyu panel kurar (`/admin/app-announcements`). Flutter’da oluşturma / dü
 | Sıralı listenin ilk uygun kaydını göster (aşağıda) | Listeyi tek elemana indirmek veya kendi sıranı kurmak |
 | Görüldü’yü cihazda `id` ile tut | User id / telefon ile “görüldü” tutmak |
 | `dismissible: false` ise sheet kapanmasın | Zorunlu duyuruyu “görüldü” deyip bir daha hiç göstermemek |
-| `ctaUrl` varsa onu aç (https) | Mağaza linkini uygulamada sabitlemek |
+| `ctaUrl` varsa onu aç (https). `ctaUrlIos` / `ctaUrlAndroid` varsa cihazın mağazasını onlar arasından seç | Mağaza linkini uygulamada sabitlemek |
 | `ctaLabel` null ise kendi varsayılan buton metnin | Boş buton basmak |
 | Bu path’te `401` olursa **logout etme** | Global interceptor’ın oturumu kapatması |
 | Hata olursa sessizce devam et | Snackbar / dialog |
@@ -87,7 +87,9 @@ Dolu:
     "title": "Yeniləmə tələb olunur",
     "body": "Davam etmək üçün tətbiqi yeniləyin.",
     "ctaLabel": "Yenilə",
-    "ctaUrl": "https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat"
+    "ctaUrl": "https://apps.apple.com/app/id000",
+    "ctaUrlIos": "https://apps.apple.com/app/id000",
+    "ctaUrlAndroid": "https://play.google.com/store/apps/details?id=com.nematmirzayev.carcat"
   },
   {
     "id": 13,
@@ -96,7 +98,9 @@ Dolu:
     "title": "Xidmət saatları",
     "body": "Bayram günü mərkəzlər bağlıdır.",
     "ctaLabel": null,
-    "ctaUrl": null
+    "ctaUrl": null,
+    "ctaUrlIos": null,
+    "ctaUrlAndroid": null
   }
 ]
 ```
@@ -111,9 +115,11 @@ Dolu:
 | `title` | string | Düz metin, boş değil |
 | `body` | string | Düz metin. Satır sonu `\n`. Markdown / HTML yok |
 | `ctaLabel` | string veya null | Buton yazısı. Null veya alan yok = senin varsayılan metnin (UPDATE için) |
-| `ctaUrl` | string veya null | Yalnız `https`. Varsa dışarı aç. Panelde platform ALL ise sunucu `X-Platform` için iOS ya da Android linkini bu tek alana koyar |
+| `ctaUrl` | string veya null | İsteyen platformun linki (`X-Platform`). Eski uygulama bunu açar |
+| `ctaUrlIos` | string veya null | App Store. ALL kaydında `cta_url_ios`. Boş UPDATE’te sunucunun iOS mağaza linki |
+| `ctaUrlAndroid` | string veya null | Play Store. ALL kaydında `cta_url_android`. Boş UPDATE’te sunucunun Android mağaza linki |
 
-`ctaLabel` / `ctaUrl` JSON’da `null` gelebilir. Alan hiç gelmezse de null say.
+`ctaLabel` / `ctaUrl` / `ctaUrlIos` / `ctaUrlAndroid` JSON’da `null` gelebilir. Alan hiç gelmezse de null say.
 
 Bu cevapta **olmayan** alanlar: `platform`, `minAppVersion`, `maxAppVersion`, `startsAt`, `endsAt`, `priority`, `active`. Sunucu bunları uygulamadan önce elemiştir.
 
@@ -133,7 +139,8 @@ Kullanıcı kapatırsa yalnız o `id`’yi cihaza yaz (uygulama verisi, hesaba b
 
 CTA:
 
-- `ctaUrl` doluysa aç.
+- `ctaUrlIos` ve `ctaUrlAndroid` ikisi de gelebilir. Cihazın mağazasını aç.
+- `ctaUrl` doluysa ve platform linki yoksa onu aç.
 - `UPDATE` ve `ctaLabel` null ise varsayılan “Yenilə” / “Update” / “Обновить”.
 - İkisi de null ise buton koyma (`INFO` / `MAINTENANCE` böyle gelebilir).
 

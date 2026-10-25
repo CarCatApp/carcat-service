@@ -50,11 +50,11 @@ public final class AppAnnouncementSelection {
             if (text == null) {
                 continue;
             }
-            String ctaUrl = resolveCta(candidate, ctx.platform(), stores, ctaHosts);
-            if (candidate.type() == AppAnnouncementType.UPDATE && ctaUrl == null) {
+            ResolvedCtas ctas = resolveCtas(candidate, ctx.platform(), stores, ctaHosts);
+            if (candidate.type() == AppAnnouncementType.UPDATE && ctas.selected() == null) {
                 continue;
             }
-            matches.add(new Match(candidate, text, ctaUrl));
+            matches.add(new Match(candidate, text, ctas));
         }
         matches.sort(ORDER);
         if (matches.size() > LIMIT) {
@@ -69,7 +69,9 @@ public final class AppAnnouncementSelection {
                     .title(match.text().title().trim())
                     .body(match.text().body().trim())
                     .ctaLabel(blankToNull(match.text().ctaLabel()))
-                    .ctaUrl(match.ctaUrl())
+                    .ctaUrl(match.ctas().selected())
+                    .ctaUrlIos(match.ctas().ios())
+                    .ctaUrlAndroid(match.ctas().android())
                     .build());
         }
         return List.copyOf(items);
@@ -137,34 +139,57 @@ public final class AppAnnouncementSelection {
         return null;
     }
 
-    private static String resolveCta(
+    /**
+     * tr: {@code selected} isteyen platformun linkidir ve eski {@code ctaUrl} alanıdır.
+     *     {@code ios} / {@code android} her zaman döner; ALL kaydında iki kolon da doluysa ikisi de gelir.
+     * en: {@code selected} is the requesting platform's link and stays on the legacy {@code ctaUrl} field.
+     *     {@code ios} / {@code android} are always returned; an ALL row with both columns sends both.
+     */
+    private static ResolvedCtas resolveCtas(
             AppAnnouncementCandidate candidate,
             AppAnnouncementPlatform requestPlatform,
             StoreLinks stores,
             Collection<String> ctaHosts
     ) {
-        String explicit = AppAnnouncementUrls.allowlistedOrNull(platformCta(candidate, requestPlatform), ctaHosts);
-        if (explicit == null) {
-            explicit = AppAnnouncementUrls.allowlistedOrNull(candidate.ctaUrl(), ctaHosts);
+        String ios = sideUrl(candidate, AppAnnouncementPlatform.IOS, stores, ctaHosts);
+        String android = sideUrl(candidate, AppAnnouncementPlatform.ANDROID, stores, ctaHosts);
+        String selected = requestPlatform == AppAnnouncementPlatform.IOS
+                ? ios
+                : requestPlatform == AppAnnouncementPlatform.ANDROID
+                ? android
+                : AppAnnouncementUrls.allowlistedOrNull(candidate.ctaUrl(), ctaHosts);
+        return new ResolvedCtas(selected, ios, android);
+    }
+
+    private static String sideUrl(
+            AppAnnouncementCandidate candidate,
+            AppAnnouncementPlatform side,
+            StoreLinks stores,
+            Collection<String> ctaHosts
+    ) {
+        if (candidate.platform() != null
+                && candidate.platform() != AppAnnouncementPlatform.ALL
+                && candidate.platform() != side) {
+            return null;
         }
+        String column = side == AppAnnouncementPlatform.IOS ? candidate.ctaUrlIos() : candidate.ctaUrlAndroid();
+        String explicit = AppAnnouncementUrls.allowlistedOrNull(column, ctaHosts);
         if (explicit != null) {
             return explicit;
         }
-        if (candidate.type() != AppAnnouncementType.UPDATE || requestPlatform == null || stores == null) {
+        String shared = AppAnnouncementUrls.allowlistedOrNull(candidate.ctaUrl(), ctaHosts);
+        if (shared != null && (candidate.platform() == side || bothColumnsEmpty(candidate))) {
+            return shared;
+        }
+        if (candidate.type() != AppAnnouncementType.UPDATE || stores == null) {
             return null;
         }
-        String store = requestPlatform == AppAnnouncementPlatform.IOS ? stores.ios() : stores.android();
+        String store = side == AppAnnouncementPlatform.IOS ? stores.ios() : stores.android();
         return AppAnnouncementUrls.httpsOrNull(store);
     }
 
-    private static String platformCta(AppAnnouncementCandidate candidate, AppAnnouncementPlatform requestPlatform) {
-        if (requestPlatform == AppAnnouncementPlatform.IOS) {
-            return candidate.ctaUrlIos();
-        }
-        if (requestPlatform == AppAnnouncementPlatform.ANDROID) {
-            return candidate.ctaUrlAndroid();
-        }
-        return null;
+    private static boolean bothColumnsEmpty(AppAnnouncementCandidate candidate) {
+        return !isSet(candidate.ctaUrlIos()) && !isSet(candidate.ctaUrlAndroid());
     }
 
     private static boolean isSet(String value) {
@@ -197,6 +222,9 @@ public final class AppAnnouncementSelection {
             ).reversed())
             .thenComparing(Comparator.comparingLong((Match match) -> match.candidate().id()).reversed());
 
-    private record Match(AppAnnouncementCandidate candidate, AppAnnouncementCandidate.Text text, String ctaUrl) {
+    private record Match(AppAnnouncementCandidate candidate, AppAnnouncementCandidate.Text text, ResolvedCtas ctas) {
+    }
+
+    private record ResolvedCtas(String selected, String ios, String android) {
     }
 }

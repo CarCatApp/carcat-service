@@ -20,5 +20,10 @@ public class AppAnnouncementActiveItem {
     private String title;
     private String body;
     private String ctaLabel;
+    /** İsteyen platformun linki. Eski uygulama bunu açar. */
     private String ctaUrl;
+    /** App Store. Platform ALL kaydında {@code cta_url_ios}, yoksa mağaza linki. */
+    private String ctaUrlIos;
+    /** Play Store. Platform ALL kaydında {@code cta_url_android}, yoksa mağaza linki. */
+    private String ctaUrlAndroid;
 }
