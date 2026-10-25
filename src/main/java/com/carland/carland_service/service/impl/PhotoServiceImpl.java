@@ -48,7 +48,8 @@ public class PhotoServiceImpl implements PhotoService {
     private final PartnerPhotoRepository partnerPhotoRepository;
     private final BannerRepository bannerRepository;
     private final BannerPhotoRepository bannerPhotoRepository;
-    private final PartnerBadgeLogoRepository partnerBadgeLogoRepository;
+    private final BranchBadgeLogoRepository branchBadgeLogoRepository;
+    private final BranchRepository branchRepository;
     private final PercentagePhotoRepository percentagePhotoRepository;
     private final PercentageEmptyPhotoRepository percentageEmptyPhotoRepository;
     private final ServiceCategoryPhotoRepository serviceCategoryPhotoRepository;
@@ -422,45 +423,37 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: Partner badge (rozet) logosunu yükler; mevcut logo varsa siler, Tika ile içerik tipini kontrol eder (görsel değilse InvalidStatusException) ve yenisini kaydeder. file/partnerId eksikse MissingFieldException, partner bulunamazsa ResourceNotFoundException, IO hatasında FileStorageException fırlatır.
-     * en: Uploads the partner badge logo; deletes the existing logo if present, verifies the content type with Tika (InvalidStatusException if not an image), and saves the new one. Throws MissingFieldException when file/partnerId is missing, ResourceNotFoundException when the partner is not found, and FileStorageException on IO errors.
+     * tr: Şube rozetini yükler; varsa eskisini siler. file/branchId yoksa MissingFieldException, şube yoksa ResourceNotFoundException, görsel değilse InvalidStatusException.
+     * en: Uploads the branch badge and replaces the previous one. MissingFieldException when file/branchId is missing, ResourceNotFoundException when the branch is missing, InvalidStatusException when the file is not an image.
      */
     @Override
     @Transactional
-    public PhotoResponse uploadPartnerBadgeLogo(MultipartFile file, Long partnerId) {
-        if (file == null || partnerId == null) {
+    public PhotoResponse uploadBranchBadgeLogo(MultipartFile file, Long branchId) {
+        if (file == null || branchId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
-        Partner partner = partnerRepository.findById(partnerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Avto Servis tapilmadi"));
+        if (branchRepository.findById(branchId).isEmpty()) {
+            throw new ResourceNotFoundException("Şöbə tapılmadı");
+        }
 
         try {
             checkAttack(file, null);
 
-            PartnerBadgeLogo existLogo = partnerBadgeLogoRepository.findByPartnerId(partner.getId());
-
-            if (existLogo != null) {
-                partnerBadgeLogoRepository.delete(existLogo);
-            }
-
             Tika tika = new Tika();
             String detectedType = tika.detect(file.getBytes());
-
             if (!detectedType.startsWith("image/")) {
                 throw new InvalidStatusException(MessagesLangValues.INVALID_PHOTO_FORMAT.getMessageByLang(null));
             }
 
-            String fileType = detectedType.substring("image/".length());
-
-            PartnerBadgeLogo partnerBadgeLogo = PartnerBadgeLogo.builder()
-                    .fileName("partner " + partner.getId() + " badge logo")
-                    .fileType(fileType)
-                    .partnerId(partner.getId())
-                    .imageData(file.getBytes())
-                    .build();
-
-            partnerBadgeLogoRepository.save(partnerBadgeLogo);
+            BranchBadgeLogo badge = branchBadgeLogoRepository.findByBranchId(branchId);
+            if (badge == null) {
+                badge = BranchBadgeLogo.builder().branchId(branchId).build();
+            }
+            badge.setFileName("branch " + branchId + " badge logo");
+            badge.setFileType(detectedType.substring("image/".length()));
+            badge.setImageData(file.getBytes());
+            branchBadgeLogoRepository.save(badge);
 
             return PhotoResponse.builder()
                     .message(MessagesLangValues.SUCCESS.getMessageByLang(null))
@@ -471,39 +464,31 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: Verilen partnerId'ye ait badge logosunu uygun Content-Type ile döner. partnerId null ise MissingFieldException, logo yoksa ResourceNotFoundException fırlatır.
-     * en: Returns the badge logo for the given partnerId with the proper Content-Type. Throws MissingFieldException if partnerId is null and ResourceNotFoundException if the logo does not exist.
+     * tr: Şube rozetini Content-Type ile döner. branchId null ise MissingFieldException, logo yoksa ResourceNotFoundException.
+     * en: Returns the branch badge with its Content-Type. MissingFieldException when branchId is null, ResourceNotFoundException when the logo is missing.
      */
     @Override
-    public ResponseEntity<byte[]> getPartnerBadgeLogoById(Long partnerId) {
-        if (partnerId == null) {
+    public ResponseEntity<byte[]> getBranchBadgeLogoById(Long branchId) {
+        if (branchId == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(null));
         }
 
-        PartnerBadgeLogo partnerBadgeLogo = partnerBadgeLogoRepository.findByPartnerId(partnerId);
-
-        if (partnerBadgeLogo == null) {
-            throw new ResourceNotFoundException(
-                    MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
+        BranchBadgeLogo badge = branchBadgeLogoRepository.findByBranchId(branchId);
+        if (badge == null) {
+            throw new ResourceNotFoundException(MessagesLangValues.PHOTO_NOT_FOUND.getMessageByLang(null));
         }
 
-        String fileType = partnerBadgeLogo.getFileType();
-        log.info("file type ============================== {}", fileType);
-
+        String fileType = badge.getFileType();
         if (fileType == null || fileType.isBlank()) {
             fileType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
         }
-
         if (!fileType.contains("/")) {
             fileType = "image/" + fileType.toLowerCase();
         }
 
-        MediaType mediaType = MediaType.parseMediaType(fileType);
-        log.info("media type file type ================= {}", mediaType.getType());
-
         return ResponseEntity.ok()
-                .contentType(mediaType)
-                .body(partnerBadgeLogo.getImageData());
+                .contentType(MediaType.parseMediaType(fileType))
+                .body(badge.getImageData());
     }
 
     /**

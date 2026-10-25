@@ -18,6 +18,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
+import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitIngestService;
 import com.carland.carland_service.service.RedisCacheService;
@@ -33,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -221,19 +221,14 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     }
 
     /**
-     * tr: Aracın servicedPartnerIds listesini tüm ziyaretlerden (en yeniden eskiye) yeniden kurar ve kaydeder.
-     * en: Rebuilds and persists the car's servicedPartnerIds list from all visits (newest to oldest).
+     * tr: Ziyaretlerden partner ve şube rozet id'lerini yazar. Çağıran commit sonrası carlist ve history siler.
+     * en: Writes partner and branch badge ids from visits. The caller drops carlist and history after commit.
      */
     private void refreshServicedPartnerIds(Car car) {
         List<Visit> allVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
-        LinkedHashSet<String> orderedPartnerIds = new LinkedHashSet<>();
-        for (Visit visit : allVisits) {
-            if (visit.getServiceCenterId() != null) {
-                orderedPartnerIds.add(String.valueOf(visit.getServiceCenterId()));
-            }
+        if (ServicedBadgeIds.applyIfChanged(car, allVisits)) {
+            carRepository.save(car);
         }
-        car.setServicedPartnerIds(new ArrayList<>(orderedPartnerIds));
-        carRepository.save(car);
     }
 
     /**

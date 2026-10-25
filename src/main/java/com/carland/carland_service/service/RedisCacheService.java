@@ -62,6 +62,11 @@ public class RedisCacheService {
     public List<CarResponse> getOrLoadCarList(String userId, String lang, Supplier<List<CarResponse>> loader) {
         String key = "carlist:" + userId + ":" + langKey(lang);
         List<CarResponse> hit = getJson(key, new TypeReference<>() {}, "carlist userId=" + userId);
+        if (hit != null && missingServicedBranchIds(hit)) {
+            log.info("REDIS_EVICT carlist userId={} reason=servicedBranchIds", userId);
+            evictCarList(userId);
+            hit = null;
+        }
         if (hit != null) {
             refreshLockCountdowns(hit);
             return hit;
@@ -82,6 +87,16 @@ public class RedisCacheService {
             }
             car.setRemainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getLockedUntil()));
         }
+    }
+
+    /** Old carlist JSON has no servicedBranchIds. Drop it so the next put comes from the database. */
+    private static boolean missingServicedBranchIds(List<CarResponse> cars) {
+        for (CarResponse car : cars) {
+            if (car != null && car.getServicedBranchIds() == null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void evictCarList(String userId) {

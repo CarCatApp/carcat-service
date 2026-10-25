@@ -92,16 +92,16 @@ public interface PhotoService {
     ResponseEntity<byte[]> getBannerPhotoById(Long bannerId);
 
     /**
-     * tr: Partner rozet (badge) logosunu yükler ve sonucu döner.
-     * en: Uploads the partner badge logo and returns the result.
+     * tr: Şube rozetini yükler. Eski satırı siler. Redis'te tutulmaz.
+     * en: Uploads the branch badge. Deletes the previous row. Not stored in Redis.
      */
-    PhotoResponse uploadPartnerBadgeLogo(MultipartFile file, Long partnerId);
+    PhotoResponse uploadBranchBadgeLogo(MultipartFile file, Long branchId);
 
     /**
-     * tr: Partner rozet (badge) logosunu byte dizisi olarak döner.
-     * en: Returns the partner badge logo as a byte array.
+     * tr: Şube rozetini byte olarak döner. {@code branchId} şubenin id'sidir.
+     * en: Returns the branch badge bytes. {@code branchId} is the branch id.
      */
-    ResponseEntity<byte[]> getPartnerBadgeLogoById(Long partnerId);
+    ResponseEntity<byte[]> getBranchBadgeLogoById(Long branchId);
 
     /**
      * tr: Sahiplik kontrolü olmadan aracın fotoğrafını siler (admin/temizlik amaçlı) ve sonucu döner.

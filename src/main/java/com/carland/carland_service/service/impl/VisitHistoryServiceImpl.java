@@ -29,6 +29,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
+import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.RedisCacheService;
 import com.carland.carland_service.service.VisitHistoryService;
@@ -53,7 +54,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -96,7 +96,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * second branch or partner 1 is refactored.
      * history:v2 TTL is temporarily 2 minutes.
      */
-    private static final long HYPER_TEMPORARY_BRANCH_ID = 10L;
+    private static final long HYPER_TEMPORARY_BRANCH_ID = ServicedBadgeIds.HYPER_TEMPORARY_BRANCH_ID;
 
     private static final ConcurrentHashMap<Long, Object> CAR_PERSIST_LOCKS = new ConcurrentHashMap<>();
 
@@ -215,10 +215,10 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
-     * tr: Aracın servicedPartnerIds alanını kayıtlı ziyaretlerle senkron tutar; partner sırası en yeni
-     *     ziyaretten en eskiye doğrudur, değişiklik yoksa DB'ye yazmaz.
-     * en: Keeps {@link Car#getServicedPartnerIds()} in sync with persisted visits; partners are ordered
-     *     by most recent service date and no DB write happens when unchanged.
+     * tr: Ziyaretlerden partner ve şube rozet id'lerini yeniler. Değişiklik yoksa yazmaz.
+     *     Yazar ve commit sonrası sahibin carlist:{owner}:* anahtarını siler.
+     * en: Refreshes partner and branch badge ids from visits. Skips the write when nothing changed.
+     *     After commit, drops carlist:{owner}:*.
      */
     private void refreshServicedPartnerIds(Car car) {
         if (!visitRepository.existsByCar(car)) {
@@ -226,24 +226,14 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         }
 
         List<Visit> allVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
-        LinkedHashSet<String> orderedPartnerIds = new LinkedHashSet<>();
-        for (Visit visit : allVisits) {
-            Long partnerId = visit.getServiceCenterId();
-            if (partnerId != null) {
-                orderedPartnerIds.add(String.valueOf(partnerId));
-            }
-        }
-
-        List<String> updated = new ArrayList<>(orderedPartnerIds);
-        List<String> current = car.getServicedPartnerIds();
-        if (current != null && current.equals(updated)) {
+        if (!ServicedBadgeIds.applyIfChanged(car, allVisits)) {
             return;
         }
 
-        car.setServicedPartnerIds(updated);
         carRepository.save(car);
         redisCacheService.evictCarListAfterCommit(redisCacheService.ownerUserId(car));
-        log.info("Updated servicedPartnerIds | carId={}, partnerIds={}", car.getCarId(), updated);
+        log.info("Updated serviced badge ids | carId={} partnerIds={} branchIds={}",
+                car.getCarId(), car.getServicedPartnerIds(), car.getServicedBranchIds());
     }
 
     /**

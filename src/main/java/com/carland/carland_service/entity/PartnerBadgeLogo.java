@@ -8,8 +8,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import java.sql.Types;
 
 /**
- * tr: "partner_badge_logos" tablosunu modelleyen entity; iş ortağının rozet (badge) logosunu ikili veri olarak saklar.
- * en: Entity modeling the "partner_badge_logos" table; stores a partner's badge logo as binary data.
+ * tr: "partner_badge_logos" tablosunu modelleyen eski entity. Yeni rozetler {@code branch_badge_logos} tablosundadır.
+ * en: Legacy entity for "partner_badge_logos". New badges live in {@code branch_badge_logos}.
  */
 @Entity
 @Data

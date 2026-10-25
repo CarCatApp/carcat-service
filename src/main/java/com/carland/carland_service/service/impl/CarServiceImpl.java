@@ -26,6 +26,7 @@ import com.carland.carland_service.idda.IddaProvidedFields;
 import com.carland.carland_service.idda.IddaCarWriteService;
 import com.carland.carland_service.idda.IddaPlateKey;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ import java.util.stream.Stream;
 public class CarServiceImpl implements CarService {
 
     private final CarRepository carRepository;
+    private final VisitRepository visitRepository;
     private final CustomerRepository customerRepository;
     private final MaintenanceTemplateRepository maintenanceTemplateRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
@@ -1658,6 +1660,8 @@ public class CarServiceImpl implements CarService {
                 throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
             }
 
+            backfillServicedBranchIds(carList);
+
             List<CarResponse> responses = carList.stream().map(car -> convertCarEntityToResponse(car, acceptLanguage, "null")).collect(Collectors.toList());
             Log log1 = new Log();
             List<Long> carIds = responses.stream().map(CarResponse::getCarId).toList();
@@ -2006,6 +2010,24 @@ public class CarServiceImpl implements CarService {
     }
 
     /**
+     * tr: carlist miss'te serviced_branch_ids hâlâ null ise ziyaretlerden bir kez yazar.
+     *     Bu loader taze JSON'u cache'e koyar; burada evict yok.
+     * en: On a carlist miss, writes serviced_branch_ids from visits once while the column is still null.
+     *     This loader puts the fresh JSON; it does not evict.
+     */
+    private void backfillServicedBranchIds(List<Car> cars) {
+        for (Car car : cars) {
+            if (car.getServicedBranchIds() != null || !visitRepository.existsByCar(car)) {
+                continue;
+            }
+            List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+            if (ServicedBadgeIds.applyIfChanged(car, visits)) {
+                carRepository.save(car);
+            }
+        }
+    }
+
+    /**
      * tr: Tarihi formatlayıp az dili için ay adının baş harfini büyütür; tarih null ise null döner.
      * en: Formats the date and capitalizes the month name for the az locale; returns null for a null date.
      */
@@ -2056,6 +2078,9 @@ public class CarServiceImpl implements CarService {
                 .iddaColor(car.getColorId() == null ? iddaColor : null)
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
                         ? car.getServicedPartnerIds()
+                        : Collections.emptyList())
+                .servicedBranchIds(car.getServicedBranchIds() != null
+                        ? car.getServicedBranchIds()
                         : Collections.emptyList())
                 .allTimeCost(car.getAllTimeCost())
                 .resource(resource)

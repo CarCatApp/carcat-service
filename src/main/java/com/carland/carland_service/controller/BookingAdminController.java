@@ -2,21 +2,28 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.StaffProvisionResponse;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.BookingOrgService;
 import com.carland.carland_service.service.BookingStaffAuditService;
 import com.carland.carland_service.service.BranchWorkingHours;
+import com.carland.carland_service.service.PhotoService;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Hidden
@@ -30,6 +37,7 @@ public class BookingAdminController {
     private final AdminAccessService adminAccessService;
     private final BookingOrgService bookingOrgService;
     private final BookingStaffAuditService staffAuditService;
+    private final PhotoService photoService;
 
     @GetMapping(value = "/admin/booking-partners", produces = MediaType.TEXT_HTML_VALUE)
     public String list(HttpServletRequest request, Model model) {
@@ -195,6 +203,49 @@ public class BookingAdminController {
             bookingOrgService.setBranchCompletion(id, branchId, panel);
             redirect.addFlashAttribute("detailMessage",
                     panel ? "Şöbə detailed tamamlama rejiminə keçdi" : "Şöbə webhook rejiminə keçdi");
+        } catch (RuntimeException ex) {
+            redirect.addFlashAttribute("detailError", ex.getMessage());
+        }
+        return "redirect:" + ADMIN_URL + "/admin/booking-partners/" + id;
+    }
+
+    @GetMapping("/admin/booking-partners/{id}/branches/{branchId}/badge")
+    public ResponseEntity<byte[]> branchBadge(
+            @PathVariable Long id,
+            @PathVariable Long branchId,
+            HttpServletRequest request
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            bookingOrgService.requireBranch(id, branchId);
+            ResponseEntity<byte[]> logo = photoService.getBranchBadgeLogoById(branchId);
+            return ResponseEntity.status(logo.getStatusCode())
+                    .headers(logo.getHeaders())
+                    .cacheControl(CacheControl.noStore())
+                    .body(logo.getBody());
+        } catch (ResourceNotFoundException | MissingFieldException ex) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping(value = "/admin/booking-partners/{id}/branches/{branchId}/badge",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public String uploadBranchBadge(
+            @PathVariable Long id,
+            @PathVariable Long branchId,
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request,
+            RedirectAttributes redirect
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        try {
+            bookingOrgService.requireBranch(id, branchId);
+            photoService.uploadBranchBadgeLogo(file, branchId);
+            redirect.addFlashAttribute("detailMessage", "Badge yükləndi");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
         }

@@ -65,8 +65,13 @@ public class CarResponse {
     @JsonProperty("isRestrict")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean isRestrict;
-    /** Partner ids for badge logo fetch ({@code GET /photo/for/partner/badge-logo/get/{partnerId}}). */
+    /** Partner ids where this car was serviced. */
     private List<String> servicedPartnerIds;
+    /**
+     * Branch ids for the badge photo.
+     * Mobile: {@code GET /api/v1/photo/for/branch/badge-logo/get/{branchId}}.
+     */
+    private List<String> servicedBranchIds;
     private String resource;
     private BigDecimal allTimeCost;
     private Long engineTypeId;

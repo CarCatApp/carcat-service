@@ -43,7 +43,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -443,15 +442,15 @@ public class BookingCompletionService {
         return BigDecimal.valueOf(booking.getPackagePrice()).divide(HUNDRED, 2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * tr: Panel ziyareti sonrası partner ve şube rozet id'leri. Çağıran commit sonrası carlist ve history siler.
+     * en: Partner and branch badge ids after a panel visit. The caller drops carlist and history after commit.
+     */
     private void refreshServicedPartnerIds(Car car) {
-        LinkedHashSet<String> ordered = new LinkedHashSet<>();
-        for (Visit visit : visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)) {
-            if (visit.getServiceCenterId() != null) {
-                ordered.add(String.valueOf(visit.getServiceCenterId()));
-            }
+        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        if (ServicedBadgeIds.applyIfChanged(car, visits)) {
+            carRepository.save(car);
         }
-        car.setServicedPartnerIds(new ArrayList<>(ordered));
-        carRepository.save(car);
     }
 
     private String text(String titleJson, String lang) {

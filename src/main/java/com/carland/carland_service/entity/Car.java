@@ -97,11 +97,20 @@ public class Car {
     @Column(name = "idda_provided_fields")
     private List<String> iddaProvidedFields;
 
-    /** Partner ids ({@code partners.id}) where this car received service — used for badge logos on car list. */
+    /** Partner ids ({@code partners.id}) where this car received service. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "serviced_partner_ids")
     @Builder.Default
     private List<String> servicedPartnerIds = new ArrayList<>();
+
+    /**
+     * Branch ids for the car-list badges.
+     * Mobile: {@code GET /api/v1/photo/for/branch/badge-logo/get/{branchId}}.
+     * Null means not filled yet. Empty means filled and there is no branch badge.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "serviced_branch_ids")
+    private List<String> servicedBranchIds;
 
     @PrePersist
     @PreUpdate

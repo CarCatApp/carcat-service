@@ -96,6 +96,10 @@
           <th>serviced_partner_ids</th>
           <td th:text="${car.servicedPartnerIds != null && !car.servicedPartnerIds.isEmpty()} ? ${car.servicedPartnerIds} : '[]'">[]</td>
         </tr>
+        <tr>
+          <th>serviced_branch_ids</th>
+          <td th:text="${car.servicedBranchIds != null && !car.servicedBranchIds.isEmpty()} ? ${car.servicedBranchIds} : '[]'">[]</td>
+        </tr>
       </table>
     </div>
 

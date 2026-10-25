@@ -74,6 +74,15 @@ public class BookingOrgService {
         return branchRepository.findByPartnerIdOrderByIdAsc(partnerId);
     }
 
+    @Transactional(readOnly = true)
+    public Branch requireBranch(Long partnerId, Long branchId) {
+        if (branchId == null) {
+            throw new MissingFieldException("Şöbə seçilməyib");
+        }
+        return branchRepository.findByIdAndPartner_Id(branchId, partnerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Şöbə tapılmadı"));
+    }
+
     @Transactional
     public Partner createPartner(String name, boolean active, String photo, String contactPhone, String contactEmail) {
         if (name == null || name.isBlank()) {

@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 /**
  * tr: Fotoğraf REST controller'ı; araç fotoğrafı, partner logosu/rozet logosu, kullanıcı profil fotoğrafı
  *     bakım kalemi (percentage), hizmet kategorisi ve offered service ikonları için yükleme/getirme uçlarını sunar.
- * en: REST controller for photos; exposes upload/fetch for car photos, partner logos/badge logos,
+ * en: REST controller for photos; exposes upload/fetch for car photos, partner logos, branch badge logos,
  *     user profile pictures, maintenance-item (percentage) icons, service-category icons, and offered-service icons.
  */
 @RestController
@@ -136,22 +136,22 @@ public class PhotoController {
     }
 
     /**
-     * tr: Multipart "file" bölümündeki rozet logosunu verilen partnerId'ye ait partnere yükler ve sonucu döner.
-     * en: Uploads the badge logo from the multipart "file" part to the partner identified by partnerId and returns the result.
+     * tr: Multipart "file" ile şube rozetini yükler. {@code branchId} şubenin id'sidir.
+     * en: Uploads the branch badge from the multipart "file" part. {@code branchId} is the branch id.
      */
-    @PostMapping(value = "/for/partner/badge-logo/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public PhotoResponse uploadPartnerBadgeLogo(@RequestPart("file") MultipartFile file,
-                                                @RequestParam("partnerId") Long partnerId) {
-        return photoService.uploadPartnerBadgeLogo(file, partnerId);
+    @PostMapping(value = "/for/branch/badge-logo/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadBranchBadgeLogo(@RequestPart("file") MultipartFile file,
+                                               @RequestParam("branchId") Long branchId) {
+        return photoService.uploadBranchBadgeLogo(file, branchId);
     }
 
     /**
-     * tr: Path'teki partnerId'ye ait partner rozet logosunu byte dizisi olarak döner.
-     * en: Returns the partner badge logo for the partnerId in the path as a byte array.
+     * tr: Path'teki branchId'ye ait şube rozetini byte olarak döner.
+     * en: Returns the branch badge for the branchId in the path.
      */
-    @GetMapping(value = "/for/partner/badge-logo/get/{partnerId}", produces = MediaType.ALL_VALUE)
-    public ResponseEntity<byte[]> getPartnerBadgeLogoById(@PathVariable("partnerId") Long partnerId) {
-        return photoService.getPartnerBadgeLogoById(partnerId);
+    @GetMapping(value = "/for/branch/badge-logo/get/{branchId}", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<byte[]> getBranchBadgeLogoById(@PathVariable("branchId") Long branchId) {
+        return photoService.getBranchBadgeLogoById(branchId);
     }
 
     /**
