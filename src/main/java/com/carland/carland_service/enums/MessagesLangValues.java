@@ -609,6 +609,12 @@ public enum MessagesLangValues {
             "Dövlət reyestrinə indi çatılmır. Yenidən cəhd edin",
             "The state registry is unreachable right now. Try again",
             "Государственный реестр сейчас недоступен. Повторите попытку"
+    ),
+
+    AA_PLATE_NOT_ALLOWED(
+            "AA qeydiyyat nişanı icazəsi yoxdur",
+            "AA registration plates are not allowed",
+            "Регистрационные номера AA не допускаются"
     );
 
     private final String azMessage;

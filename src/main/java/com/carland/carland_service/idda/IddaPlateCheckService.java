@@ -10,6 +10,7 @@ import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
 import com.carland.carland_service.repository.BrandRepository;
@@ -36,11 +37,13 @@ import java.util.UUID;
 /**
  * tr: Plaka check. Code 0 bir ay saklanır.
  *     Geçici test: aynı müşteri + plaka ayda 5 canlı, plaka geneli ayda 10 canlı.
- *     Code 4 ve timeout hakka yazılmaz. Check araç satırı açmaz, sahip değiştirmez.
+ *     Code 4 ve timeout hakka yazılmaz. Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
+ *     Check araç satırı açmaz, sahip değiştirmez.
  *     Redis: bu servis carlist yazmaz. Araç yazısı IddaCarWriteService içindedir, orada evict vardır.
  * en: Plate check. Code 0 is kept for one month.
  *     Temporary test caps: 5 live calls per customer and plate, 10 live calls per plate.
- *     Code 4 and timeouts do not count. The check does not insert a car or change an owner.
+ *     Code 4 and timeouts do not count. A plate with two adjacent A's (10AA000) never calls IDDA.
+ *     The check does not insert a car or change an owner.
  *     Redis: this service does not write carlist. Car writes and evicts live in IddaCarWriteService.
  */
 @Slf4j
@@ -69,6 +72,9 @@ public class IddaPlateCheckService {
         String plateKey = IddaPlateKey.of(plate);
         if (plateKey.isEmpty()) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        if (plateKey.contains("AA")) {
+            throw new ForbiddenException(MessagesLangValues.AA_PLATE_NOT_ALLOWED.getMessageByLang(acceptLanguage));
         }
         Customer customer = requireCustomer(phoneNumber, userIdHeader, acceptLanguage);
         LocalDateTime since = LocalDateTime.now().minusMonths(1);

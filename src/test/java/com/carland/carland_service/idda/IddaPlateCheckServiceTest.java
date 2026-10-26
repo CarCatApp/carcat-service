@@ -1,6 +1,7 @@
 package com.carland.carland_service.idda;
 
 import com.carland.carland_service.digitalfinance.DigitalFinanceClient;
+import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.dto.response.CarResponse;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.repository.BrandRepository;
@@ -55,6 +56,22 @@ class IddaPlateCheckServiceTest {
                 brandRepository,
                 modelRepository,
                 new ObjectMapper());
+    }
+
+    @Test
+    void adjacentAaPlateIsRejectedBeforeIdda() throws Exception {
+        for (String plate : List.of("10AA000", "10-AA-000", "10 AA 000", "99aa123")) {
+            ForbiddenException ex = assertThrows(ForbiddenException.class,
+                    () -> service.check(plate, "050", "7", "az"));
+            assertEquals("AA qeydiyyat nişanı icazəsi yoxdur", ex.getMessage());
+        }
+        ForbiddenException en = assertThrows(ForbiddenException.class,
+                () -> service.check("10AA000", "050", "7", "en"));
+        assertEquals("AA registration plates are not allowed", en.getMessage());
+        verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());
+        verify(iddaPlateCheckRepository, never())
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any());
+        verify(customerRepository, never()).findByUserIdAndPhoneNumberAndStatus(any(), any(), any());
     }
 
     @Test
