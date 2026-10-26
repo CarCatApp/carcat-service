@@ -2,7 +2,6 @@ package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
-import com.carland.carland_service.dto.response.NameSurname;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
@@ -16,7 +15,6 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
-import com.carland.carland_service.feign.NameSurnameFeign;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
 import com.carland.carland_service.service.UserService;
@@ -28,8 +26,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * tr: Kullanıcı işlemlerini yöneten servis; yeni kullanıcı detaylarını dış servisten (Feign) alınan ad-soyad ile oluşturur/kontrol eder ve kullanıcının bildirim listesini döner.
- * en: Service managing user operations; creates/verifies user details using the name and surname fetched from an external service (Feign), and returns the user's notification list.
+ * tr: Kullanıcı işlemlerini yöneten servis; müşteri satırını header'daki id ve telefonla oluşturur/kontrol eder ve kullanıcının bildirim listesini döner.
+ * en: Service managing user operations; creates/verifies the customer row from the header id and phone, and returns the user's notification list.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,11 +42,10 @@ public class UserServiceImpl implements UserService {
     private final Helper helper;
     private final CustomerRepository customerRepository;
     private final NotificationRepository notificationRepository;
-    private final NameSurnameFeign nameSurnameFeign;
 
     /**
-     * tr: Kullanıcı detaylarını ekler: ad-soyadı Feign ile dış servisten alır ve role göre kullanıcıyı kontrol eder/oluşturur (davet eden inviterId dahil). userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda mesajlı UserResponse döner.
-     * en: Adds user details: fetches name and surname from an external service via Feign and checks/creates the user by role (including the inviterId). Throws MissingFieldException if userId, role, phoneNumber, or timezone is missing; returns a UserResponse with a success message.
+     * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda mesajlı UserResponse döner.
+     * en: Adds user details: checks/creates the customer by role. Name and surname are not written here. Throws MissingFieldException if userId, role, phoneNumber, or timezone is missing; returns a UserResponse with a success message.
      */
     @Override
     public UserResponse userAddDetails(Long userId, String role, String phoneNumber,
@@ -59,9 +56,7 @@ public class UserServiceImpl implements UserService {
         }
 
 
-        NameSurname nameSurname = nameSurnameFeign.getNameSurname(userId);
-        log.info("name surname feign response : {}", nameSurname);
-        helper.checkOrCreateUserByRole(userId, role, phoneNumber, nameSurname.getName(), nameSurname.getSurname(), acceptLanguage, inviterId);
+        helper.checkOrCreateUserByRole(userId, role, phoneNumber, null, null, acceptLanguage, inviterId);
 
         return UserResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
