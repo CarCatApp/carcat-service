@@ -119,6 +119,10 @@ hyper:
 brevo:
   api-key: ${BREVO_API_KEY}
 
+booking:
+  notify:
+    emails: ${BOOKING_NOTIFY_EMAILS:azadisali@gmail.com,niftalizadeaziz@gmail.com,nemat.mirzayev@gmail.com,Nemat.Mirzayev@carcat.app}
+
 access:
   token:
     secret-key: ${ACCESS_TOKEN_SECRET_KEY}

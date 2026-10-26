@@ -169,6 +169,8 @@ public class BookingCreateService {
         staffBookingLiveService.publishAfterCommit(StaffBookingArrival.builder()
                 .bookingId(booking.getId())
                 .branchId(prepared.branch.getId())
+                .partnerName(prepared.branch.getPartner() == null ? null : prepared.branch.getPartner().getName())
+                .branchName(prepared.branch.getName())
                 .ref(booking.getRef())
                 .bookingMode(mode)
                 .status(status)

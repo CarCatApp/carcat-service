@@ -16,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * tr: Şube başına açık ekran bağlantıları. Cron yok. Rezervasyon commit olunca o şubeye bir satır gider.
- * en: Open screen connections per branch. No cron. One line goes to that branch after the booking commits.
+ * tr: Şube başına açık ekran bağlantıları. Cron yok. Rezervasyon commit olunca o şubeye bir satır gider və əməliyyat poçtuna mail düşür.
+ * en: Open screen connections per branch. No cron. One line goes to that branch after the booking commits, and the ops mailbox is mailed.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +28,7 @@ public class StaffBookingLiveService {
     private static final String FLUSH = "x".repeat(32 * 1024);
 
     private final ObjectMapper objectMapper;
+    private final BookingCreatedMailService bookingCreatedMailService;
     private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> open = new ConcurrentHashMap<>();
 
     public SseEmitter listen(Long branchId) {
@@ -49,7 +50,10 @@ public class StaffBookingLiveService {
         if (arrival == null || arrival.getBranchId() == null || arrival.getBookingId() == null) {
             return;
         }
-        afterCommit(() -> deliver(arrival));
+        afterCommit(() -> {
+            bookingCreatedMailService.send(arrival);
+            deliver(arrival);
+        });
     }
 
     /**

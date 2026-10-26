@@ -23,6 +23,8 @@ public class StaffBookingArrival {
 
     Long bookingId;
     Long branchId;
+    String partnerName;
+    String branchName;
     String ref;
     String bookingMode;
     String status;
