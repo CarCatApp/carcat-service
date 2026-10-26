@@ -75,6 +75,26 @@ class BookingCreatedMailServiceTest {
     }
 
     @Test
+    void branchTenAlsoGetsTheSameLetter() {
+        BookingCreatedMailService service = new BookingCreatedMailService(
+                mailService, BookingCreatedMailService.DEFAULT_RECIPIENTS);
+        StaffBookingArrival arrival = StaffBookingArrival.builder()
+                .bookingId(10L)
+                .branchId(10L)
+                .branchName("Bayramov")
+                .ref("BK10")
+                .build();
+
+        service.send(arrival);
+
+        ArgumentCaptor<String> to = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
+        verify(mailService, times(5)).sendPlainMail(to.capture(), eq("Yeni rezervasiya BK10 — Bayramov"), html.capture());
+        assertEquals("bayramovanermin02@icloud.com", to.getAllValues().get(4));
+        assertEquals(html.getAllValues().get(0), html.getAllValues().get(4));
+    }
+
+    @Test
     void oneBadAddressDoesNotStopTheOthers() {
         BookingCreatedMailService service = new BookingCreatedMailService(mailService, "a@x.com,b@x.com");
         doThrow(new RuntimeException("brevo"))

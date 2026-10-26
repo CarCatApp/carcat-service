@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * tr: Hər yeni rezervasiya commit olandan sonra eyni məktub sabit ünvanlara gedir. Şöbə fərq etmir. Brevo xətası rezervasiyanı geri almır.
- * en: After every new booking commits, the same letter goes to a fixed address list. The branch does not matter. A Brevo failure does not undo the booking.
+ * tr: Hər yeni rezervasiya commit olandan sonra eyni məktub sabit ünvanlara gedir. 10-cu filial əlavə bir qutuya da gedir. Brevo xətası rezervasiyanı geri almır.
+ * en: After every new booking commits, the same letter goes to a fixed address list. Branch 10 also goes to one extra inbox. A Brevo failure does not undo the booking.
  */
 @Service
 @Slf4j
@@ -19,6 +19,9 @@ public class BookingCreatedMailService {
 
     static final String DEFAULT_RECIPIENTS =
             "azadisali@gmail.com,niftalizadeaziz@gmail.com,nemat.mirzayev@gmail.com,Nemat.Mirzayev@carcat.app";
+    /** Bu filialın rezervasiyası dörd ünvana əlavə olaraq bu qutuya da gedir. */
+    static final long BRANCH_EXTRA_ID = 10L;
+    static final String BRANCH_EXTRA_EMAIL = "bayramovanermin02@icloud.com";
 
     private final MailService mailService;
     private final List<String> recipients;
@@ -36,12 +39,16 @@ public class BookingCreatedMailService {
      */
     @Async
     public void send(StaffBookingArrival arrival) {
-        if (arrival == null || arrival.getBookingId() == null || recipients.isEmpty()) {
+        if (arrival == null || arrival.getBookingId() == null) {
+            return;
+        }
+        List<String> toList = recipientsOf(arrival);
+        if (toList.isEmpty()) {
             return;
         }
         String subject = subject(arrival);
         String html = body(arrival);
-        for (String to : recipients) {
+        for (String to : toList) {
             try {
                 mailService.sendPlainMail(to, subject, html);
             } catch (Exception ex) {
@@ -49,6 +56,16 @@ public class BookingCreatedMailService {
                         arrival.getBookingId(), arrival.getRef(), to, ex.getClass().getSimpleName());
             }
         }
+    }
+
+    private List<String> recipientsOf(StaffBookingArrival arrival) {
+        List<String> to = new ArrayList<>(recipients);
+        if (arrival.getBranchId() != null
+                && arrival.getBranchId() == BRANCH_EXTRA_ID
+                && !to.contains(BRANCH_EXTRA_EMAIL)) {
+            to.add(BRANCH_EXTRA_EMAIL);
+        }
+        return to;
     }
 
     static List<String> parse(String raw) {
