@@ -10,7 +10,6 @@ import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
-import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
 import com.carland.carland_service.repository.BrandRepository;
@@ -73,9 +72,7 @@ public class IddaPlateCheckService {
         if (plateKey.isEmpty()) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
-        if (plateKey.contains("AA")) {
-            throw new ForbiddenException(MessagesLangValues.AA_PLATE_NOT_ALLOWED.getMessageByLang(acceptLanguage));
-        }
+        IddaPlateKey.rejectAdjacentAa(plate, acceptLanguage);
         Customer customer = requireCustomer(phoneNumber, userIdHeader, acceptLanguage);
         LocalDateTime since = LocalDateTime.now().minusMonths(1);
         List<IddaPlateCheck> recent = iddaPlateCheckRepository

@@ -73,6 +73,7 @@ public class IddaCarWriteService {
         if (plateKey.isEmpty()) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
         }
+        IddaPlateKey.rejectAdjacentAa(carRequest.getPlateNumber(), acceptLanguage);
         if (carRequest.getColorId() != null && colorRepository.findByColorId(carRequest.getColorId()) == null) {
             throw new ResourceNotFoundException(MessagesLangValues.COLOR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }

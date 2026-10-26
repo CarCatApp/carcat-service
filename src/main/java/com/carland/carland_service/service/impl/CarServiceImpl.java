@@ -337,6 +337,7 @@ public class CarServiceImpl implements CarService {
         }
 
         if (carRequest.getPlateNumber() != null) {
+            IddaPlateKey.rejectAdjacentAa(carRequest.getPlateNumber(), acceptLanguage);
             car.setPlateNumber(carRequest.getPlateNumber());
         }
 
@@ -1238,6 +1239,7 @@ public class CarServiceImpl implements CarService {
                         "plateNumber is blank after trim",
                         new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
+            IddaPlateKey.rejectAdjacentAa(plateNumber, acceptLanguage);
 
             if (carRequest.getMileage() == null) {
                 throwAddCarFailure(logUserId,
