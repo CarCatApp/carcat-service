@@ -21,7 +21,7 @@ public class BookingCreatedMailService {
             "azadisali@gmail.com,niftalizadeaziz@gmail.com,nemat.mirzayev@gmail.com,Nemat.Mirzayev@carcat.app";
     /** Bu filialın rezervasiyası dörd ünvana əlavə olaraq bu qutuya da gedir. */
     static final long BRANCH_EXTRA_ID = 10L;
-    static final String BRANCH_EXTRA_EMAIL = "bayramovanermin02@icloud.com";
+    static final String BRANCH_EXTRA_EMAIL = "bayramovanarmin3@gmail.com";
 
     private final MailService mailService;
     private final List<String> recipients;

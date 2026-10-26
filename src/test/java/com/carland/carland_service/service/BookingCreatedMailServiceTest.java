@@ -90,7 +90,7 @@ class BookingCreatedMailServiceTest {
         ArgumentCaptor<String> to = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> html = ArgumentCaptor.forClass(String.class);
         verify(mailService, times(5)).sendPlainMail(to.capture(), eq("Yeni rezervasiya BK10 — Bayramov"), html.capture());
-        assertEquals("bayramovanermin02@icloud.com", to.getAllValues().get(4));
+        assertEquals("bayramovanarmin3@gmail.com", to.getAllValues().get(4));
         assertEquals(html.getAllValues().get(0), html.getAllValues().get(4));
     }
 
