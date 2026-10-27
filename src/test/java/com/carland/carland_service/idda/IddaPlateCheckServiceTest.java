@@ -1,6 +1,7 @@
 package com.carland.carland_service.idda;
 
 import com.carland.carland_service.digitalfinance.DigitalFinanceClient;
+import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.dto.response.CarResponse;
 import com.carland.carland_service.entity.Customer;
@@ -24,6 +25,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +92,9 @@ class IddaPlateCheckServiceTest {
         assertEquals("13e79e85-2e94-4f81-932a-a7b3cccbfb70", response.getRequestIdentifier());
         assertEquals("limit", response.getMessage());
         assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertNull(response.getVin());
+        assertNull(response.getBrand());
+        assertNull(response.getCarId());
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(response));
         assertEquals("77 BU 669", json.path("plateNumber").asText());
         assertTrue(json.path("isRestrict").asBoolean());
@@ -102,10 +107,34 @@ class IddaPlateCheckServiceTest {
 
         service.check("77BU669", "050", "7", "az");
         verify(digitalFinanceClient, times(2)).exchange(eq("GET"), anyString(), any(), anyString(), any());
+        verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
     }
 
     @Test
-    void fifthOwnSuccessStillCallsIddaAndSixthUsesTheStoredRow() throws Exception {
+    void permissionDeniedHidesIddaPayloadAndTheStoredCar() throws Exception {
+        customer();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
+                .thenReturn(List.of(successRow(7L)));
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", code4WithCar()));
+        when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CarResponse response = service.check("77BU669", "050", "7", "az");
+
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertEquals(4, response.getIddaStatusCode());
+        assertNull(response.getVin());
+        assertNull(response.getBrand());
+        assertNull(response.getModel());
+        assertNull(response.getCarId());
+        assertNull(response.getCustomerId());
+        assertNull(response.getMileage());
+        verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
+    }
+
+    @Test
+    void liveSuccessIsOpenAndTheSixthQueryIsRestrictedWithoutIdda() throws Exception {
         customer();
         List<IddaPlateCheck> four = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L));
         List<IddaPlateCheck> five = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L), successRow(7L));
@@ -120,16 +149,23 @@ class IddaPlateCheckServiceTest {
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.check("77BU669", "050", "7", "az");
-        CarResponse cached = service.check("77BU669", "050", "7", "az");
+        CarResponse live = service.check("77BU669", "050", "7", "az");
+        CarResponse capped = service.check("77BU669", "050", "7", "az");
 
-        assertEquals("77 BU 669", cached.getPlateNumber());
-        assertEquals("idda", cached.getResource());
+        assertEquals("19XZE4F54NE012640", live.getVin());
+        assertEquals(Boolean.FALSE, live.getIsRestrict());
+        assertEquals("77 BU 669", capped.getPlateNumber());
+        assertEquals(Boolean.TRUE, capped.getIsRestrict());
+        assertNull(capped.getVin());
+        assertNull(capped.getBrand());
+        assertNull(capped.getCarId());
+        assertEquals(MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang("az"), capped.getMessage());
         verify(digitalFinanceClient, times(1)).exchange(eq("GET"), anyString(), any(), anyString(), any());
+        verify(carRepository, times(1)).findAllByVinIgnoreCase(anyString());
     }
 
     @Test
-    void timeoutDoesNotSave() throws Exception {
+    void timeoutDoesNotSaveAndIsRestricted() throws Exception {
         customer();
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any()))
@@ -137,12 +173,17 @@ class IddaPlateCheckServiceTest {
         when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
                 .thenThrow(new IOException("timed out"));
 
-        assertThrows(IddaUnavailableException.class, () -> service.check("77BU669", "050", "7", "az"));
+        CarResponse response = service.check("77BU669", "050", "7", "az");
+
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertNull(response.getVin());
+        assertEquals(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang("az"), response.getMessage());
         verify(iddaPlateCheckRepository, never()).save(any());
+        verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
     }
 
     @Test
-    void eleventhPlateQueryUsesTheLatestStoredSuccess() throws Exception {
+    void eleventhPlateQueryIsRestrictedAndHidesTheStoredCar() throws Exception {
         customer();
         List<IddaPlateCheck> ten = new java.util.ArrayList<>();
         for (int i = 0; i < 9; i++) {
@@ -158,9 +199,13 @@ class IddaPlateCheckServiceTest {
         CarResponse response = service.check("77BU669", "050", "7", "az");
 
         assertEquals("77 BU 669", response.getPlateNumber());
-        assertEquals("NEWERVIN000000001", response.getVin());
-        assertEquals(Boolean.FALSE, response.getIsRestrict());
+        assertNull(response.getVin());
+        assertNull(response.getBrand());
+        assertNull(response.getCarId());
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertEquals(MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang("az"), response.getMessage());
         verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());
+        verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
     }
 
     private void customer() {
@@ -193,6 +238,12 @@ class IddaPlateCheckServiceTest {
     private static byte[] code4() {
         return """
                 {"RequestIdentifier":"13e79e85-2e94-4f81-932a-a7b3cccbfb70","Status":{"Name":"ServiceRestrictedByPerson","Code":4,"Message":"limit"},"Response":null}
+                """.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] code4WithCar() {
+        return """
+                {"RequestIdentifier":"13e79e85-2e94-4f81-932a-a7b3cccbfb70","Status":{"Name":"ServiceRestrictedByPerson","Code":4,"Message":"limit"},"Response":{"Car":{"NumberPlate":"77BU669","Mark":"HONDA INSIGHT MINIK","BodyNumber":"19XZE4F54NE012640","ManufactoringYear":"2022","Color":"Gümüşü metallik","EngineCapacity":"1496"}}}
                 """.getBytes(StandardCharsets.UTF_8);
     }
 }

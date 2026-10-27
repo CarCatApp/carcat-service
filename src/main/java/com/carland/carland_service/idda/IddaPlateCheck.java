@@ -17,10 +17,10 @@ import lombok.AccessLevel;
 import java.time.LocalDateTime;
 
 /**
- * tr: Canlı IDDA plaka sorgusunun kaydı. Ay içindeki tekrar ve plaka başına 2 hak buradan okunur.
- *     Adres ham JSON'da durur, API cevabına konmaz. DB'den dönüş yeni satır açmaz.
- * en: A live IDDA plate check. The one-month repeat and the two-calls-per-plate cap read this table.
- *     The address stays in the raw JSON and is not returned by the API. A database replay does not insert a row.
+ * tr: Canlı IDDA plaka sorgusunun kaydı. Aylık hak buradan sayılır.
+ *     Kayıtlı satır plate check cevabına araç olarak basılmaz. Adres ham JSON'da durur.
+ * en: A live IDDA plate check. The monthly cap is counted from this table.
+ *     A stored row is not returned as the plate-check car. The address stays in the raw JSON.
  */
 @Entity
 @Data

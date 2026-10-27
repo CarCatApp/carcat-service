@@ -143,9 +143,11 @@ public class CarController {
     }
 
     /**
-     * tr: Plakayı IDDA'dan okur. Code 4 ve timeout hak yazmaz. Başarılı cevap bir ay DB'den döner.
+     * tr: Plakayı IDDA'dan okur. Araç yalnız bu isteğin canlı başarılı cevabında döner.
+     *     İzin yok, limit, hata ve diğer statusler isRestrict true döner, araç taşımaz.
      *     Bu uç araç kaydı açmaz.
-     * en: Reads the plate from IDDA. Code 4 and timeouts do not count. A success is replayed from the DB for one month.
+     * en: Reads the plate from IDDA. The car is returned only on this request's live success.
+     *     No permission, the cap, errors and any other status return isRestrict true and no car.
      *     This endpoint does not insert a car.
      */
     @GetMapping("/check/plate")

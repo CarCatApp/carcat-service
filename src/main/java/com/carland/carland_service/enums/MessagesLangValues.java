@@ -611,6 +611,12 @@ public enum MessagesLangValues {
             "Государственный реестр сейчас недоступен. Повторите попытку"
     ),
 
+    PLATE_QUERY_LIMIT(
+            "Bu DQN üzrə sorğulama limitini keçmisiniz, xahiş edirik BAN nömrəsi ilə davam edin",
+            "You have exceeded the query limit for this plate. Please continue with the BAN number",
+            "Вы превысили лимит запросов по этому номеру. Продолжите с номером BAN"
+    ),
+
     AA_PLATE_NOT_ALLOWED(
             "AA qeydiyyat nişanı icazəsi yoxdur",
             "AA registration plates are not allowed",

@@ -34,12 +34,16 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * tr: Plaka check. Code 0 bir ay saklanır.
+ * tr: Plaka check. Araç yalnız bu isteğin canlı IDDA başarısında döner, isRestrict false.
+ *     İzin yok, dolu limit, hata ve diğer her status isRestrict true döner ve araç taşımaz.
+ *     Eski Code 0 limite sayılır, ekrana basılmaz.
  *     Geçici test: aynı müşteri + plaka ayda 5 canlı, plaka geneli ayda 10 canlı.
  *     Code 4 ve timeout hakka yazılmaz. Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
  *     Check araç satırı açmaz, sahip değiştirmez.
  *     Redis: bu servis carlist yazmaz. Araç yazısı IddaCarWriteService içindedir, orada evict vardır.
- * en: Plate check. Code 0 is kept for one month.
+ * en: Plate check. The car is returned only from this request's live IDDA success, with isRestrict false.
+ *     No permission, a full cap, errors and every other status return isRestrict true and no car.
+ *     An old Code 0 still counts toward the cap and is not shown.
  *     Temporary test caps: 5 live calls per customer and plate, 10 live calls per plate.
  *     Code 4 and timeouts do not count. A plate with two adjacent A's (10AA000) never calls IDDA.
  *     The check does not insert a car or change an owner.
@@ -81,15 +85,9 @@ public class IddaPlateCheckService {
         List<IddaPlateCheck> ownRows = recent.stream()
                 .filter(row -> customer.getUserId().equals(row.getQuerierUserId()))
                 .toList();
-        if (ownRows.size() >= USER_LIVE_CAP) {
-            IddaPlateCheck own = ownRows.get(0);
-            log.info("IDDA plate check user cap plateKey={} count={} checkId={}", plateKey, ownRows.size(), own.getId());
-            return toResponse(own, acceptLanguage);
-        }
-        if (recent.size() >= PLATE_LIVE_CAP) {
-            IddaPlateCheck latest = recent.get(0);
-            log.info("IDDA plate check cap plateKey={} checkId={}", plateKey, latest.getId());
-            return toResponse(latest, acceptLanguage);
+        if (ownRows.size() >= USER_LIVE_CAP || recent.size() >= PLATE_LIVE_CAP) {
+            log.info("IDDA plate check cap plateKey={} own={} plate={}", plateKey, ownRows.size(), recent.size());
+            return restricted(plate, MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang(acceptLanguage));
         }
         return live(plateKey, customer, acceptLanguage);
     }
@@ -102,25 +100,28 @@ public class IddaPlateCheckService {
             upstream = digitalFinanceClient.exchange("GET", path, null, requestId, null);
         } catch (IOException | IllegalStateException ex) {
             log.warn("IDDA plate check unreachable plateKey={}", plateKey);
-            throw new IddaUnavailableException(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
         }
         JsonNode root;
         try {
             root = objectMapper.readTree(upstream.body());
         } catch (IOException ex) {
             log.warn("IDDA plate check unreadable plateKey={} http={}", plateKey, upstream.statusCode());
-            throw new IddaUnavailableException(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
         }
         JsonNode status = root.path("Status");
         int code = status.path("Code").asInt(-1);
         if (code < 0) {
             log.warn("IDDA plate check missing status plateKey={} http={}", plateKey, upstream.statusCode());
-            throw new IddaUnavailableException(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
         }
         IddaPlateCheck row = mapRow(root, plateKey, customer, requestId, code);
         iddaPlateCheckRepository.save(row);
         log.info("IDDA plate check live plateKey={} status={} counts={}", plateKey, code, row.isCountsTowardLimit());
-        return toResponse(row, acceptLanguage);
+        if (row.isCountsTowardLimit()) {
+            return toResponse(row, acceptLanguage);
+        }
+        return restrictedLive(row, acceptLanguage);
     }
 
     private IddaPlateCheck mapRow(JsonNode root, String plateKey, Customer customer, String requestId, int code) {
@@ -134,14 +135,17 @@ public class IddaPlateCheckService {
         String numberPlate = text(car, "NumberPlate");
         String rawMark = text(car, "Mark");
         String typeDescription = text(type, "Description");
-        boolean success = code == 0 && vin != null;
+        String statusName = text(status, "Name");
+        boolean blocked = code == 4
+                || (statusName != null && statusName.equalsIgnoreCase("ServiceRestrictedByPerson"));
+        boolean success = code == 0 && vin != null && !blocked;
         IddaMarkSplit split = success
                 ? IddaMarkSplitter.split(rawMark, typeDescription, loadBrands(), loadModels())
                 : new IddaMarkSplit(null, null);
         String storedVin = vin == null ? null : vin.trim().toUpperCase(Locale.ROOT);
         return IddaPlateCheck.builder()
                 .requestIdentifier(text(root, "RequestIdentifier") == null ? requestId : text(root, "RequestIdentifier"))
-                .statusName(text(status, "Name"))
+                .statusName(statusName)
                 .statusCode(code)
                 .statusMessage(text(status, "Message"))
                 .plateKey(plateKey)
@@ -206,21 +210,52 @@ public class IddaPlateCheckService {
                 .iddaStatusName(row.getStatusName())
                 .iddaStatusMessage(row.getStatusMessage())
                 .requestIdentifier(row.getRequestIdentifier())
-                .isRestrict(restricted(row))
+                .isRestrict(false)
                 .message(message)
                 .build();
     }
 
     /**
-     * tr: Vatandaş sorguyu kapatmışsa true. IDDA mesajı değişebilir; Code 4 veya status adı esas alınır.
-     * en: True when the citizen blocked the query. The IDDA message can change; Code 4 or the status name is the signal.
+     * tr: Araç yok. Limit, IDDA'ya ulaşılamama ve eksik gövde bu cevabı kullanır.
+     * en: No car. The cap, an unreachable IDDA and an unreadable body use this response.
      */
-    private static boolean restricted(IddaPlateCheck row) {
-        if (row.getStatusCode() != null && row.getStatusCode() == 4) {
-            return true;
+    private CarResponse restricted(String plate, String message) {
+        return CarResponse.builder()
+                .plateNumber(plate)
+                .resource("idda")
+                .fromIdda(false)
+                .iddaProvidedFields(Collections.emptyList())
+                .vinProvidedFields(Collections.emptyList())
+                .isRestrict(true)
+                .message(message)
+                .build();
+    }
+
+    /**
+     * tr: IDDA cevap verdi ama başarı değil. Status durur, araç alanları boş kalır. cars tablosuna bakılmaz.
+     * en: IDDA answered and it is not a success. The status stays, vehicle fields stay empty. The cars table is not read.
+     */
+    private CarResponse restrictedLive(IddaPlateCheck row, String acceptLanguage) {
+        String message = row.getStatusMessage();
+        if (message == null || message.isBlank()) {
+            message = row.getStatusName();
         }
-        String name = row.getStatusName();
-        return name != null && name.equalsIgnoreCase("ServiceRestrictedByPerson");
+        if (message == null || message.isBlank()) {
+            message = MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage);
+        }
+        return CarResponse.builder()
+                .plateNumber(row.getPlateNumber())
+                .resource("idda")
+                .fromIdda(false)
+                .iddaProvidedFields(Collections.emptyList())
+                .vinProvidedFields(Collections.emptyList())
+                .iddaStatusCode(row.getStatusCode())
+                .iddaStatusName(row.getStatusName())
+                .iddaStatusMessage(row.getStatusMessage())
+                .requestIdentifier(row.getRequestIdentifier())
+                .isRestrict(true)
+                .message(message)
+                .build();
     }
 
     private Car findVin(String vin) {
