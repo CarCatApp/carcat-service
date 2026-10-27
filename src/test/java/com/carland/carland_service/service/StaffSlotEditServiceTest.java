@@ -8,6 +8,7 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.Calendar;
+import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
@@ -28,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,8 +75,8 @@ class StaffSlotEditServiceTest {
                 .status(BookingStaffStatus.ACTIVE.name())
                 .build();
         calendar = Calendar.builder().calendarId(1L).day(LocalDate.of(2026, 10, 7)).branch(branch).build();
-        lenient().when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(staff);
-        lenient().when(bookingStaffAccess.requireWritableBranch(staff, 5L, "az")).thenReturn(branch);
+        lenient().when(bookingStaffAccess.requireStaff(eq(9L), eq(false), any())).thenReturn(staff);
+        lenient().when(bookingStaffAccess.requireWritableBranch(eq(staff), eq(5L), any())).thenReturn(branch);
     }
 
     @Test
@@ -231,6 +233,156 @@ class StaffSlotEditServiceTest {
     }
 
     @Test
+    void deleteFromTodayClearsOnePackageOnEveryRemainingDay() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        BranchCarePackage oil = BranchCarePackage.builder().id(10L).name("Yağ").build();
+        BranchCarePackage air = BranchCarePackage.builder().id(11L).name("Filtr").build();
+        IndividualService brake = IndividualService.builder().id(20L).build();
+
+        Range pastOil = target(11L, StaffSlotTargets.PACKAGE, oil);
+        Calendar past = calendarOn(2L, today.minusDays(1), pastOil);
+
+        Range hiddenOil = target(12L, StaffSlotTargets.PACKAGE, oil);
+        hiddenOil.setStatus(RangeStatus.HIDDEN.name());
+        Range repair = target(13L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        Calendar todayCal = calendarOn(3L, today, hiddenOil, repair);
+
+        Range booked = target(14L, StaffSlotTargets.PACKAGE, oil);
+        Range emptyOil = target(15L, StaffSlotTargets.PACKAGE, oil);
+        Range otherPackage = target(16L, StaffSlotTargets.PACKAGE, air);
+        Range individual = target(18L, StaffSlotTargets.INDIVIDUAL, null);
+        individual.setIndividualService(brake);
+        Calendar later = calendarOn(4L, today.plusDays(3), booked, emptyOil, otherPackage, individual);
+
+        Range onlyOil = target(17L, StaffSlotTargets.PACKAGE, oil);
+        Calendar last = calendarOn(5L, today.plusDays(10), onlyOil);
+
+        when(calendarRepository.findLatestDayFrom(5L, today)).thenReturn(last.getDay());
+        when(calendarRepository.findByBranchIdAndDayBetween(5L, today, last.getDay()))
+                .thenReturn(List.of(past, todayCal, later, last));
+        lock(hiddenOil, booked, emptyOil, onlyOil);
+        Booking waiting = Booking.builder().id(31L).range(booked).status(BookingStatus.PENDING.apiValue()).build();
+        Booking accepted = Booking.builder().id(32L).range(booked).status(BookingStatus.AUTO_ACCEPTED.apiValue()).build();
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
+                List.of(12L, 14L, 15L, 17L), BookingStatus.holdingCarOnRange()))
+                .thenReturn(List.of(waiting, accepted));
+        lenient().when(bookingRepository.existsByRange_RangeIdIn(List.of(14L))).thenReturn(true);
+
+        String message = service.deleteFromToday(9L, false, 5L, 10L, null, null, "az");
+
+        assertEquals("Xidmətin slotları silindi, rezervasiyalar rədd edildi", message);
+        for (Booking booking : List.of(waiting, accepted)) {
+            assertEquals(BookingStatus.REJECTED.apiValue(), booking.getStatus());
+            assertEquals(BookingSystemNotes.CALENDAR_DELETED, booking.getCancelReasonCode());
+            assertEquals("Xidmət təqvimi silindi", booking.getCancelNote());
+        }
+        verify(bookingPushService, times(2)).rejected(any());
+        assertEquals(List.of(pastOil), past.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), pastOil.getStatus());
+        assertEquals(List.of(repair), todayCal.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), repair.getStatus());
+        assertEquals(RangeStatus.DELETED.name(), booked.getStatus());
+        assertEquals(List.of(booked, otherPackage, individual), later.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), otherPackage.getStatus());
+        assertEquals(RangeStatus.AVAILABLE.name(), individual.getStatus());
+        verify(calendarRepository).delete(last);
+        verify(calendarRepository, never()).delete(past);
+        verify(calendarRepository, never()).delete(todayCal);
+        verify(calendarRepository, never()).delete(later);
+        verify(rangeRepository, never()).lockByRangeId(11L);
+        verify(rangeRepository, never()).lockByRangeId(13L);
+        verify(rangeRepository, never()).lockByRangeId(16L);
+        verify(rangeRepository, never()).lockByRangeId(18L);
+    }
+
+    @Test
+    void deleteFromTodayDropsRepairHoursAndAnEmptyCalendar() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        BranchCarePackage oil = BranchCarePackage.builder().id(10L).name("Yağ").build();
+        Range repairToday = target(21L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        Range packageToday = target(22L, StaffSlotTargets.PACKAGE, oil);
+        Calendar todayCal = calendarOn(6L, today, repairToday, packageToday);
+        Range repairLater = target(23L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        Calendar later = calendarOn(7L, today.plusDays(1), repairLater);
+        when(calendarRepository.findLatestDayFrom(5L, today)).thenReturn(later.getDay());
+        when(calendarRepository.findByBranchIdAndDayBetween(5L, today, later.getDay()))
+                .thenReturn(List.of(todayCal, later));
+        lock(repairToday, repairLater);
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
+                List.of(21L, 23L), BookingStatus.holdingCarOnRange())).thenReturn(List.of());
+
+        String message = service.deleteFromToday(9L, false, null, null, null, true, "az");
+
+        assertEquals("Xidmətin slotları silindi", message);
+        assertEquals(List.of(packageToday), todayCal.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), packageToday.getStatus());
+        verify(calendarRepository).delete(later);
+        verify(calendarRepository, never()).delete(todayCal);
+        verify(bookingPushService, never()).rejected(any());
+        verify(rangeRepository, never()).lockByRangeId(22L);
+    }
+
+    @Test
+    void deleteFromTodayClearsOneIndividualService() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        IndividualService brake = IndividualService.builder().id(20L).build();
+        IndividualService other = IndividualService.builder().id(21L).build();
+        Range brakeHour = target(31L, StaffSlotTargets.INDIVIDUAL, null);
+        brakeHour.setIndividualService(brake);
+        Range otherHour = target(32L, StaffSlotTargets.INDIVIDUAL, null);
+        otherHour.setIndividualService(other);
+        Calendar todayCal = calendarOn(8L, today, brakeHour, otherHour);
+        when(calendarRepository.findLatestDayFrom(5L, today)).thenReturn(today);
+        when(calendarRepository.findByBranchIdAndDayBetween(5L, today, today)).thenReturn(List.of(todayCal));
+        lock(brakeHour);
+        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
+                List.of(31L), BookingStatus.holdingCarOnRange())).thenReturn(List.of());
+        when(appointmentRepository.existsByRange_RangeIdIn(List.of(31L))).thenReturn(true);
+
+        String message = service.deleteFromToday(9L, false, 5L, null, 20L, null, "en");
+
+        assertEquals("The service slots were deleted", message);
+        assertEquals(RangeStatus.DELETED.name(), brakeHour.getStatus());
+        assertEquals(List.of(brakeHour, otherHour), todayCal.getTimeRanges());
+        assertEquals(RangeStatus.AVAILABLE.name(), otherHour.getStatus());
+        verify(calendarRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteFromTodayNeedsExactlyOneService() {
+        assertThrows(MissingFieldException.class,
+                () -> service.deleteFromToday(9L, false, 5L, null, null, null, "az"));
+        assertThrows(MissingFieldException.class,
+                () -> service.deleteFromToday(9L, false, 5L, 10L, 20L, null, "az"));
+        verify(calendarRepository, never()).findLatestDayFrom(any(), any());
+    }
+
+    @Test
+    void deleteFromTodayWithoutThisServiceIsNotFound() {
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        Range repair = target(41L, StaffSlotTargets.REPAIR_INSPECTION, null);
+        Calendar todayCal = calendarOn(9L, today, repair);
+        when(calendarRepository.findLatestDayFrom(eq(5L), any(LocalDate.class))).thenReturn(today);
+        when(calendarRepository.findByBranchIdAndDayBetween(5L, today, today)).thenReturn(List.of(todayCal));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.deleteFromToday(9L, false, 5L, 10L, null, null, "az"));
+        assertEquals(List.of(repair), todayCal.getTimeRanges());
+        verify(calendarRepository, never()).delete(any());
+        verify(rangeRepository, never()).lockByRangeId(any());
+    }
+
+    @Test
+    void deleteFromTodayWithoutAnyFutureDayIsNotFound() {
+        when(calendarRepository.findLatestDayFrom(eq(5L), any(LocalDate.class))).thenReturn(null);
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.deleteFromToday(9L, false, 5L, null, 20L, null, "az"));
+        verify(calendarRepository, never()).findByBranchIdAndDayBetween(any(), any(), any());
+        verify(rangeRepository, never()).lockByRangeId(any());
+    }
+
+    @Test
     void deletedHourCannotBeEdited() {
         Range range = range(8L, 2);
         range.setStatus(RangeStatus.DELETED.name());
@@ -247,8 +399,21 @@ class StaffSlotEditServiceTest {
     }
 
     private void dayOf(Range... ranges) {
-        calendar.setTimeRanges(new java.util.ArrayList<>(List.of(ranges)));
+        calendar.setTimeRanges(new ArrayList<>(List.of(ranges)));
         when(calendarRepository.findById(1L)).thenReturn(Optional.of(calendar));
+    }
+
+    private Calendar calendarOn(Long id, LocalDate day, Range... ranges) {
+        Calendar row = Calendar.builder()
+                .calendarId(id)
+                .day(day)
+                .branch(branch)
+                .timeRanges(new ArrayList<>(List.of(ranges)))
+                .build();
+        for (Range range : ranges) {
+            range.setCalendar(row);
+        }
+        return row;
     }
 
     private void lock(Range... ranges) {

@@ -24,7 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * tr: Panelden yer sayısı, saat gizleme ve seçili hizmetin gününü gizleme.
@@ -163,6 +168,52 @@ public class StaffSlotEditService {
             throw new MissingFieldException(sentence(lang, "Təqvimi seçin.",
                     "Select the calendar.", "Выберите календарь."));
         }
+        requireOneTarget(packageId, individualServiceId, repairInspection, lang);
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, lang);
+        Calendar calendar = calendarRepository.findById(calendarId)
+                .filter(c -> c.getBranch() != null)
+                .orElseThrow(() -> new ResourceNotFoundException(sentence(lang, "Təqvim tapılmadı.",
+                        "Calendar was not found.", "Календарь не найден.")));
+        bookingStaffAccess.requireWritableBranch(staff, calendar.getBranch().getId(), lang);
+        removeTargets(List.of(calendar), null, packageId, individualServiceId, repairInspection,
+                sentence(lang, "Bu gün üçün slot yoxdur.",
+                        "There is no slot for this day.", "На этот день слота нет."));
+    }
+
+    /**
+     * tr: Bu şubede, bugünden itibaren seçili hizmetin bütün saatlerini siler. Geçmiş gün durur.
+     *     Saat başına silme kuralı deleteCalendar ile aynıdır. Panelde gösterilen tek cümleyi döner.
+     * en: Deletes every remaining hour of the selected service in this branch from today on. Past days stay.
+     *     Each hour follows the same rule as deleteCalendar. Returns the one sentence shown in the panel.
+     */
+    @Transactional
+    public String deleteFromToday(Long userId, boolean mustChangePassword, Long branchId, Long packageId,
+                                  Long individualServiceId, Boolean repairInspection, String acceptLanguage) {
+        String lang = lang(acceptLanguage);
+        requireOneTarget(packageId, individualServiceId, repairInspection, lang);
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, lang);
+        Branch branch = branch(staff, branchId, lang);
+        LocalDate today = LocalDate.now(StaffSlotWindows.ZONE);
+        LocalDate latest = calendarRepository.findLatestDayFrom(branch.getId(), today);
+        List<Calendar> calendars = latest == null
+                ? List.of()
+                : calendarRepository.findByBranchIdAndDayBetween(branch.getId(), today, latest);
+        boolean rejected = removeTargets(calendars, today, packageId, individualServiceId, repairInspection,
+                sentence(lang, "Bu xidmət üçün slot yoxdur.",
+                        "There is no slot for this service.", "Для этой услуги слота нет."));
+        if (rejected) {
+            return sentence(lang,
+                    "Xidmətin slotları silindi, rezervasiyalar rədd edildi",
+                    "The service slots were deleted, and the reservations were rejected",
+                    "Слоты услуги удалены, брони отклонены");
+        }
+        return sentence(lang,
+                "Xidmətin slotları silindi",
+                "The service slots were deleted",
+                "Слоты услуги удалены");
+    }
+
+    private void requireOneTarget(Long packageId, Long individualServiceId, Boolean repairInspection, String lang) {
         int picked = (packageId != null ? 1 : 0)
                 + (individualServiceId != null ? 1 : 0)
                 + (Boolean.TRUE.equals(repairInspection) ? 1 : 0);
@@ -170,50 +221,75 @@ public class StaffSlotEditService {
             throw new MissingFieldException(sentence(lang, "Bir xidmət seçin.",
                     "Select one service.", "Выберите одну услугу."));
         }
-        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, lang);
-        Calendar calendar = calendarRepository.findById(calendarId)
-                .filter(c -> c.getBranch() != null)
-                .orElseThrow(() -> new ResourceNotFoundException(sentence(lang, "Təqvim tapılmadı.",
-                        "Calendar was not found.", "Календарь не найден.")));
-        bookingStaffAccess.requireWritableBranch(staff, calendar.getBranch().getId(), lang);
-        List<Long> rangeIds = new ArrayList<>();
-        if (calendar.getTimeRanges() != null) {
-            for (Range range : calendar.getTimeRanges()) {
-                if (range.getRangeId() != null && !deleted(range)
-                        && sameTarget(range, packageId, individualServiceId, repairInspection)) {
-                    rangeIds.add(range.getRangeId());
+    }
+
+    /**
+     * @param earliest when set, days before it are left alone. Null keeps every loaded day.
+     * @return true when at least one holding booking was rejected
+     */
+    private boolean removeTargets(List<Calendar> calendars, LocalDate earliest, Long packageId,
+                                  Long individualServiceId, Boolean repairInspection, String missing) {
+        Set<Long> rangeIds = new LinkedHashSet<>();
+        Map<Long, Calendar> ownerByRange = new LinkedHashMap<>();
+        if (calendars != null) {
+            for (Calendar calendar : calendars) {
+                if (calendar == null || calendar.getTimeRanges() == null || calendar.getCalendarId() == null) {
+                    continue;
+                }
+                if (earliest != null && (calendar.getDay() == null || calendar.getDay().isBefore(earliest))) {
+                    continue;
+                }
+                for (Range range : calendar.getTimeRanges()) {
+                    if (range.getRangeId() == null || deleted(range)
+                            || !sameTarget(range, packageId, individualServiceId, repairInspection)) {
+                        continue;
+                    }
+                    if (rangeIds.add(range.getRangeId())) {
+                        ownerByRange.put(range.getRangeId(), calendar);
+                    }
                 }
             }
         }
         if (rangeIds.isEmpty()) {
-            throw new ResourceNotFoundException(sentence(lang, "Bu gün üçün slot yoxdur.",
-                    "There is no slot for this day.", "На этот день слота нет."));
+            throw new ResourceNotFoundException(missing);
         }
+        List<Long> ids = new ArrayList<>(rangeIds);
+        ids.sort(Comparator.naturalOrder());
         List<Range> ranges = new ArrayList<>();
-        for (Long rangeId : rangeIds) {
+        for (Long rangeId : ids) {
             rangeRepository.lockByRangeId(rangeId).ifPresent(ranges::add);
         }
         List<Booking> active = bookingRepository.findByRange_RangeIdInAndStatusIn(
-                rangeIds, BookingStatus.holdingCarOnRange());
+                ids, BookingStatus.holdingCarOnRange());
+        boolean rejected = false;
         if (active != null) {
             for (Booking booking : active) {
                 booking.setStatus(BookingStatus.REJECTED.apiValue());
                 booking.setCancelReasonCode(BookingSystemNotes.CALENDAR_DELETED);
                 booking.setCancelNote(BookingSystemNotes.text(BookingSystemNotes.CALENDAR_DELETED, "az"));
                 notifyRejected(booking);
+                rejected = true;
             }
         }
         for (Range range : ranges) {
+            Calendar owner = ownerByRange.get(range.getRangeId());
             List<Long> one = List.of(range.getRangeId());
             if (bookingRepository.existsByRange_RangeIdIn(one) || appointmentRepository.existsByRange_RangeIdIn(one)) {
                 range.setStatus(RangeStatus.DELETED.name());
-            } else {
-                calendar.getTimeRanges().removeIf(row -> range.getRangeId().equals(row.getRangeId()));
+            } else if (owner != null && owner.getTimeRanges() != null) {
+                owner.getTimeRanges().removeIf(row -> range.getRangeId().equals(row.getRangeId()));
             }
         }
-        if (calendar.getTimeRanges().isEmpty()) {
-            calendarRepository.delete(calendar);
+        Set<Long> emptied = new LinkedHashSet<>();
+        for (Calendar owner : ownerByRange.values()) {
+            if (owner.getCalendarId() == null || !emptied.add(owner.getCalendarId())) {
+                continue;
+            }
+            if (owner.getTimeRanges() != null && owner.getTimeRanges().isEmpty()) {
+                calendarRepository.delete(owner);
+            }
         }
+        return rejected;
     }
 
     /**

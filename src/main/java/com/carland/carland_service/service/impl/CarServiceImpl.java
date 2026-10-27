@@ -26,6 +26,7 @@ import com.carland.carland_service.idda.IddaProvidedFields;
 import com.carland.carland_service.idda.IddaCarWriteService;
 import com.carland.carland_service.idda.IddaPlateKey;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.VinBrandCatalog;
 import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +68,7 @@ public class CarServiceImpl implements CarService {
     private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final ServiceEntityRepository serviceEntityRepository;
     private final VinService vinService;
+    private final BrandRepository brandRepository;
     private final ColorRepository colorRepository;
     private final ColorSortService colorSortService;
     private final PercentageRepository percentageRepository;
@@ -88,12 +90,14 @@ public class CarServiceImpl implements CarService {
     /**
      * tr: VIN'i kontrol eder: araç DB'de bir müşteriye bağlıysa AlreadyExistsException fırlatır;
      *     müşterisiz kayıtlıysa DB'deki verilerle ("fromDb"), hiç yoksa NHTSA decoder sonucuyla
-     *     ("fromDecoderTool") doldurulmuş CarResponse döner. VIN'den elde edilen alanlar
+     *     ("fromDecoderTool") doldurulmuş CarResponse döner. NHTSA markası katalog adıyla birebir
+     *     örtüşmezse brand null döner; MERCEDES-BENZ katalogdaki Mercedes olur. VIN'den elde edilen alanlar
      *     vinProvidedFields listesinde işaretlenir.
      * en: Checks the VIN: throws AlreadyExistsException when the car is already linked to a customer in
      *     the DB; returns a CarResponse filled from the DB record ("fromDb") when it exists without a
-     *     customer, otherwise from the NHTSA decoder result ("fromDecoderTool"). Fields resolved from
-     *     the VIN are flagged in the vinProvidedFields list.
+     *     customer, otherwise from the NHTSA decoder result ("fromDecoderTool"). An NHTSA make that does
+     *     not exactly match a catalog brand comes back as null brand; MERCEDES-BENZ becomes catalog Mercedes.
+     *     Fields resolved from the VIN are flagged in the vinProvidedFields list.
      */
     @Override
     public CarResponse checkVin(String vin, String acceptLanguage) {
@@ -144,7 +148,7 @@ public class CarServiceImpl implements CarService {
 
             List<String> vinProvidedFields = new ArrayList<>();
 
-            String brand = decodeVin.get("brand");
+            String brand = VinBrandCatalog.match(decodeVin.get("brand"), activeBrands());
             if (hasValue(brand)) vinProvidedFields.add("brand");
 
             String model = decodeVin.get("model");
@@ -2128,6 +2132,18 @@ public class CarServiceImpl implements CarService {
                 + parts[1].substring(1);
 
         return String.join(" ", parts);
+    }
+
+    /**
+     * tr: Add-car marka listesi. Yeni set (isnew = ".") varsa yalnız o set, yoksa bütün markalar.
+     *     GroupByServiceImpl ile aynı filtre; check VIN cevabı uygulamanın gördüğü ada otursun.
+     * en: Add-car brand list. The new set (isnew = ".") when present, otherwise every brand.
+     *     Same filter as GroupByServiceImpl, so the VIN check name is one the app can resolve.
+     */
+    private List<Brand> activeBrands() {
+        return brandRepository.existsByIsnew(".")
+                ? brandRepository.findAllByIsnew(".")
+                : brandRepository.findAll();
     }
 
     private boolean hasValue(String value) {

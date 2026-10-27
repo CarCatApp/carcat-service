@@ -2,6 +2,7 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.StaffSlotCoverageResponse;
 import com.carland.carland_service.dto.booking.StaffSlotDayResponse;
+import com.carland.carland_service.dto.booking.StaffSlotDeleteResponse;
 import com.carland.carland_service.dto.booking.StaffSlotGenerateResponse;
 import com.carland.carland_service.dto.request.StaffSlotCapacityRequest;
 import com.carland.carland_service.dto.request.StaffSlotDayHiddenRequest;
@@ -133,6 +134,31 @@ public class BookingStaffSlotController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
                 acceptLanguage);
+    }
+
+    /**
+     * tr: Bu şubede bugünden itibaren seçili hizmetin bütün saatlerini siler. Geçmiş gün durur.
+     *     Saat başına kural gün silme ile aynıdır. Cevaptaki message panelde gösterilir.
+     * en: Deletes every remaining hour of the selected service in this branch from today on. Past days stay.
+     *     Each hour follows the same rule as deleting one day. The response message is shown in the panel.
+     */
+    @DeleteMapping("/api/v1/booking/staff/slots/from-today")
+    public StaffSlotDeleteResponse deleteFromToday(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) Long packageId,
+            @RequestParam(required = false) Long individualServiceId,
+            @RequestParam(required = false) Boolean repairInspection,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        String message = staffSlotEditService.deleteFromToday(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                branchId,
+                packageId,
+                individualServiceId,
+                repairInspection,
+                acceptLanguage);
+        return StaffSlotDeleteResponse.builder().message(message).build();
     }
 
     /**
