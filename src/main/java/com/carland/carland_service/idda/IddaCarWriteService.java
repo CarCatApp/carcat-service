@@ -118,7 +118,7 @@ public class IddaCarWriteService {
         if (carRequest.getBodyType() != null && !carRequest.getBodyType().isBlank()) {
             car.setBodyType(carRequest.getBodyType().trim());
         }
-        CarIddaColor.apply(car, carRequest.getColorId(), iddaColorText(snapshot, carRequest));
+        applyRegistryColor(car, snapshot, carRequest);
         car.setIddaProvidedFields(lockedFields(car));
         if (car.getEngineTypeId() == null && carRequest.getEngineTypeId() != null) {
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
@@ -163,7 +163,7 @@ public class IddaCarWriteService {
                 .maintenanceTemplate(template)
                 .fromIdda(true)
                 .build();
-        CarIddaColor.apply(car, carRequest.getColorId(), iddaColorText(snapshot, carRequest));
+        applyRegistryColor(car, snapshot, carRequest);
         car.setIddaProvidedFields(lockedFields(car));
         try {
             carRepository.save(car);
@@ -260,11 +260,19 @@ public class IddaCarWriteService {
         return customer;
     }
 
-    private static String iddaColorText(IddaPlateCheck snapshot, CarRequest carRequest) {
-        if (CarIddaColor.normalize(carRequest.getIddaColor()) != null) {
-            return carRequest.getIddaColor();
+    /**
+     * tr: IDDA renk metni varsa katalog colorId silinir ve iddaColor kilitlenir.
+     *     Metin yoksa istekteki colorId katalog rengi olarak kalır.
+     * en: An IDDA color name clears catalog colorId and locks iddaColor.
+     *     Without that text, the request colorId stays the catalog color.
+     */
+    private static void applyRegistryColor(Car car, IddaPlateCheck snapshot, CarRequest carRequest) {
+        String fromRegistry = snapshot == null ? null : CarIddaColor.normalize(snapshot.getColorRaw());
+        if (fromRegistry != null) {
+            CarIddaColor.apply(car, null, fromRegistry);
+            return;
         }
-        return snapshot == null ? null : snapshot.getColorRaw();
+        CarIddaColor.apply(car, carRequest.getColorId(), carRequest.getIddaColor());
     }
 
     private static List<String> lockedFields(Car car) {

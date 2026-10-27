@@ -35,4 +35,25 @@ public final class IddaProvidedFields {
         names.add(IDDA_COLOR);
         return List.copyOf(names);
     }
+
+    /**
+     * tr: Liste rengi. iddaColor kilitliyse IDDA metni katalog adının önüne geçer.
+     * en: List color. A locked iddaColor replaces the catalog name.
+     */
+    public static String listColor(List<String> provided, String iddaColor, String catalogName) {
+        if (showsIddaColor(provided, iddaColor)) {
+            return CarIddaColor.normalize(iddaColor);
+        }
+        if (catalogName != null && !catalogName.isBlank()) {
+            return catalogName;
+        }
+        String text = CarIddaColor.normalize(iddaColor);
+        return text == null ? "unknown" : text;
+    }
+
+    public static boolean showsIddaColor(List<String> provided, String iddaColor) {
+        return provided != null
+                && provided.contains(IDDA_COLOR)
+                && CarIddaColor.normalize(iddaColor) != null;
+    }
 }

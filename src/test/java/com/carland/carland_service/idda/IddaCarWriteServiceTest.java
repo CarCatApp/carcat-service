@@ -210,6 +210,31 @@ class IddaCarWriteServiceTest {
         assertFalse(vinCar.getIddaProvidedFields().contains("iddaColor"));
     }
 
+    @Test
+    void registryColorReplacesTheCatalogColorSentByTheApp() {
+        when(carRepository.findAllByVinIgnoreCase("19XZE4F54NE012640")).thenReturn(List.of());
+        when(carRepository.findByPlateKey("77BU669")).thenReturn(List.of());
+        EngineType engine = EngineType.builder().engineTypeId(6L).engineType("Hybrid").build();
+        ServiceEntity serviceEntity = ServiceEntity.builder().id(1L).serviceName("Oil").important(false).build();
+        MaintenanceTemplate template = MaintenanceTemplate.builder().id(1L).services(List.of(serviceEntity)).build();
+        when(engineTypeRepository.findByEngineTypeId(6L)).thenReturn(engine);
+        when(maintenanceTemplateRepository.findByEngineType(engine)).thenReturn(Optional.of(template));
+        when(colorRepository.findByColorId(16L)).thenReturn(Color.builder().colorId(16L).build());
+        IddaPlateCheck row = snapshot();
+        row.setColorRaw("Gümüşü metallik");
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(any(), any()))
+                .thenReturn(List.of(row));
+        CarRequest body = request(6L);
+        body.setColorId(16L);
+
+        IddaAddResult result = service.add(body, "050", "9", "az");
+
+        assertNull(result.car().getColorId());
+        assertEquals("Gümüşü metallik", result.car().getIddaColor());
+        assertTrue(result.car().getIddaProvidedFields().contains("iddaColor"));
+    }
+
     private static CarRequest request(Long engineTypeId) {
         return CarRequest.builder()
                 .resource("idda")

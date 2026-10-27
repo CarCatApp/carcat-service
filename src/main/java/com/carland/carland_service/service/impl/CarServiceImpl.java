@@ -2046,11 +2046,13 @@ public class CarServiceImpl implements CarService {
      * en: Converts a Car entity into a CarResponse DTO, including color/engine/body type translations.
      */
     private CarResponse convertCarEntityToResponse(Car car, String acceptLanguage, String resource) {
-        Color color = colorRepository.findByColorId(car.getColorId());
         String iddaColor = car.getIddaColor();
-        String colorResponse = color != null
-                ? color.nameForLang(acceptLanguage)
-                : (iddaColor != null && !iddaColor.isBlank() ? iddaColor : "unknown");
+        boolean showIddaColor = IddaProvidedFields.showsIddaColor(car.getIddaProvidedFields(), iddaColor);
+        Color color = showIddaColor ? null : colorRepository.findByColorId(car.getColorId());
+        String colorResponse = IddaProvidedFields.listColor(
+                car.getIddaProvidedFields(),
+                iddaColor,
+                color == null ? null : color.nameForLang(acceptLanguage));
         Customer customer = car.getCustomer();
         return CarResponse.builder()
                 .carId(car.getCarId())
@@ -2080,8 +2082,8 @@ public class CarServiceImpl implements CarService {
                         ? Collections.emptyList()
                         : car.getIddaProvidedFields())
                 .fromIdda(Boolean.TRUE.equals(car.getFromIdda()))
-                .colorId(car.getColorId())
-                .iddaColor(car.getColorId() == null ? iddaColor : null)
+                .colorId(showIddaColor ? null : car.getColorId())
+                .iddaColor(showIddaColor || car.getColorId() == null ? iddaColor : null)
                 .servicedPartnerIds(car.getServicedPartnerIds() != null
                         ? car.getServicedPartnerIds()
                         : Collections.emptyList())
