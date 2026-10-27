@@ -40,6 +40,7 @@ import java.util.Set;
 public class BranchCarePackageService {
 
     private static final int NAME_MAX = 80;
+    private static final int PACKAGE_INFO_MAX = 400;
     private static final int PRICE_MAX = 1_000_000;
     private static final int MAX_ACTIVE_PACKAGES = 3;
 
@@ -70,8 +71,8 @@ public class BranchCarePackageService {
     }
 
     /**
-     * tr: Seçilen xidmətlerle paket oluşturur. Paket bu şubeye yazılır.
-     * en: Creates a package from the selected services. The package is stored on this branch.
+     * tr: Seçilen xidmətlerle paket oluşturur. packageInfo boşsa null kalır.
+     * en: Creates a package from the selected services. Blank packageInfo stays null.
      */
     @Transactional
     public StaffCarePackageView create(Long userId, boolean mustChangePassword, StaffCarePackageSaveRequest body,
@@ -91,6 +92,7 @@ public class BranchCarePackageService {
         BranchCarePackage row = packageRepository.save(BranchCarePackage.builder()
                 .branch(branch)
                 .name(name)
+                .packageInfo(optionalPackageInfo(body.getPackageInfo()))
                 .price(price)
                 .active(active)
                 .build());
@@ -99,8 +101,8 @@ public class BranchCarePackageService {
     }
 
     /**
-     * tr: Ad, fiyat ve açık xidmətləri günceller. Listede olmayan eski satır enabled false olur.
-     * en: Updates name, price, and the services switched on. Older lines missing from the list become enabled false.
+     * tr: Ad, packageInfo, fiyat ve açık xidmətləri günceller. Boş packageInfo null olur.
+     * en: Updates name, packageInfo, price, and the services switched on. Blank packageInfo becomes null.
      */
     @Transactional
     public StaffCarePackageView update(Long userId, boolean mustChangePassword, Long packageId,
@@ -112,6 +114,7 @@ public class BranchCarePackageService {
         Branch branch = resolveBranch(staff, body.getBranchId(), acceptLanguage);
         BranchCarePackage row = requirePackage(packageId, branch.getId());
         row.setName(requireName(body.getName()));
+        row.setPackageInfo(optionalPackageInfo(body.getPackageInfo()));
         row.setPrice(requirePrice(body.getPrice()));
         if (body.getActive() != null) {
             if (Boolean.TRUE.equals(body.getActive()) && !Boolean.TRUE.equals(row.getActive())) {
@@ -210,6 +213,7 @@ public class BranchCarePackageService {
                 .id(row.getId())
                 .branchId(row.getBranch() == null ? null : row.getBranch().getId())
                 .name(row.getName())
+                .packageInfo(row.getPackageInfo())
                 .price(row.getPrice())
                 .currency(row.getCurrency())
                 .active(row.getActive())
@@ -251,6 +255,17 @@ public class BranchCarePackageService {
         String trimmed = name.trim();
         if (trimmed.length() > NAME_MAX) {
             throw new MissingFieldException("name is too long");
+        }
+        return trimmed;
+    }
+
+    private static String optionalPackageInfo(String packageInfo) {
+        if (packageInfo == null || packageInfo.isBlank()) {
+            return null;
+        }
+        String trimmed = packageInfo.trim();
+        if (trimmed.length() > PACKAGE_INFO_MAX) {
+            throw new MissingFieldException("packageInfo is too long");
         }
         return trimmed;
     }

@@ -50,7 +50,8 @@ class BookingCarePackageCatalogServiceTest {
         Partner partner = Partner.builder().id(1L).active(true).build();
         Branch branch = Branch.builder().id(12L).active(true).partner(partner).build();
         BranchCarePackage extra = BranchCarePackage.builder()
-                .id(5L).branch(branch).name("Hyper extra").price(129).currency("AZN").active(true).build();
+                .id(5L).branch(branch).name("Hyper extra").packageInfo("Yağ və filtr")
+                .price(129).currency("AZN").active(true).build();
         BranchCarePackage closed = BranchCarePackage.builder()
                 .id(6L).branch(branch).name("Kapalı").price(50).active(false).build();
         ServiceBehavior replace = ServiceBehavior.builder()
@@ -88,6 +89,7 @@ class BookingCarePackageCatalogServiceTest {
         assertEquals(12L, az.getBranchId());
         assertEquals(1, az.getPackages().size());
         assertEquals("Hyper extra", az.getPackages().get(0).getName());
+        assertEquals("Yağ və filtr", az.getPackages().get(0).getPackageInfo());
         assertEquals(129, az.getPackages().get(0).getPrice());
         assertEquals(3, az.getPackages().get(0).getCount());
         assertTrue(az.getPackages().stream().noneMatch(pkg -> pkg.getId().equals(6L)));

@@ -19,6 +19,7 @@ public class StaffCarePackageView {
     Long id;
     Long branchId;
     String name;
+    String packageInfo;
     Integer price;
     String currency;
     Boolean active;

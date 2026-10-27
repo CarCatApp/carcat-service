@@ -70,6 +70,7 @@ public class BookingCarePackageCatalogService {
             packages.add(BookingCarePackageView.builder()
                     .id(row.getId())
                     .name(row.getName())
+                    .packageInfo(blankToNull(row.getPackageInfo()))
                     .price(row.getPrice())
                     .currency(row.getCurrency() == null ? "AZN" : row.getCurrency())
                     .count(count)
@@ -136,6 +137,13 @@ public class BookingCarePackageCatalogService {
 
     private static int sortOf(Integer sortOrder) {
         return sortOrder == null ? 0 : sortOrder;
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private record Line(OfferedService service, ServiceBehavior behavior) {

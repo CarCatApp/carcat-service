@@ -12,6 +12,8 @@ import java.util.List;
 public class StaffCarePackageSaveRequest {
     Long branchId;
     String name;
+    /** Optional. Stored and returned as packageInfo. Blank clears it. */
+    String packageInfo;
     Integer price;
     Boolean active;
     List<Long> serviceIds;

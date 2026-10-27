@@ -47,6 +47,10 @@ public class BranchCarePackage {
     @Column(nullable = false, length = 80)
     String name;
 
+    /** Optional text under the name. Empty stays null. */
+    @Column(name = "package_info", length = 400)
+    String packageInfo;
+
     /** Whole manat, the number typed on the create form. */
     @Column(nullable = false)
     Integer price;
