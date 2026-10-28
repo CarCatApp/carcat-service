@@ -128,17 +128,31 @@ public class BookingOrgService {
     }
 
     /**
-     * tr: Mövcud şöbənin verified və həftə içi / şənbə / bazar saatını yazır.
-     * en: Updates verified and weekday / Saturday / Sunday hours on an existing branch.
+     * tr: Mövcud şöbənin ad, ünvan, telefon, məkan, verified və saatını yazır.
+     * en: Updates name, address, phone, place, verified, and hours on an existing branch.
      */
     @Transactional
     public Branch updateBranchHours(Long partnerId, Long branchId, boolean verified,
-                                    String weekday, String saturday, String sunday) {
+                                    String weekday, String saturday, String sunday,
+                                    String name, String address, String contactPhone,
+                                    Double lat, Double lng) {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("branch not found"));
         if (branch.getPartner() == null || !partnerId.equals(branch.getPartner().getId())) {
             throw new ResourceNotFoundException("branch not found");
         }
+        if (name == null || name.isBlank()) {
+            throw new MissingFieldException("Branch adı boş ola bilməz");
+        }
+        String phone = blankToNull(contactPhone);
+        if (phone != null && phone.length() > 32) {
+            throw new MissingFieldException("Telefon 32 simvoldan uzun ola bilməz");
+        }
+        branch.setName(name.trim());
+        branch.setAddress(blankToNull(address));
+        branch.setContactPhone(phone);
+        branch.setLat(lat);
+        branch.setLng(lng);
         branch.setVerified(verified);
         BranchWorkingHours.apply(branch, blankToNull(weekday), blankToNull(saturday), blankToNull(sunday));
         return branchRepository.save(branch);

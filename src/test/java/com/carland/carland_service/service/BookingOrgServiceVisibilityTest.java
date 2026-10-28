@@ -8,6 +8,7 @@ import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
 import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.exceptions.ForbiddenException;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.feign.AuthStaffFeign;
 import com.carland.carland_service.repository.BookingStaffRepository;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -183,6 +185,38 @@ class BookingOrgServiceVisibilityTest {
 
         assertEquals(BranchCompletion.DETAILED, service.setBranchCompletion(1L, 7L, true).getCompletionMode());
         assertEquals(BranchCompletion.WEBHOOK, service.setBranchCompletion(1L, 7L, false).getCompletionMode());
+    }
+
+    @Test
+    void updateBranchWritesNameAddressPhoneAndPlace() {
+        Partner partner = Partner.builder().id(1L).name("HS").build();
+        Branch branch = Branch.builder().id(10L).name("Old").partner(partner).verified(false).build();
+        when(branchRepository.findById(10L)).thenReturn(Optional.of(branch));
+        when(branchRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Branch saved = service.updateBranchHours(1L, 10L, true,
+                "09:00-18:00", "10:00-16:00", null,
+                "  Yeni  ", "  Nizami  ", " +994701112233 ",
+                40.37, 49.83);
+
+        assertEquals("Yeni", saved.getName());
+        assertEquals("Nizami", saved.getAddress());
+        assertEquals("+994701112233", saved.getContactPhone());
+        assertEquals(40.37, saved.getLat());
+        assertEquals(49.83, saved.getLng());
+        assertTrue(saved.getVerified());
+        assertEquals("09:00-18:00", saved.getWorkingHoursWeekday());
+    }
+
+    @Test
+    void updateBranchRejectsBlankName() {
+        Partner partner = Partner.builder().id(1L).build();
+        Branch branch = Branch.builder().id(10L).name("Old").partner(partner).build();
+        when(branchRepository.findById(10L)).thenReturn(Optional.of(branch));
+
+        assertThrows(MissingFieldException.class, () -> service.updateBranchHours(
+                1L, 10L, false, null, null, null, "  ", null, null, null, null));
+        verify(branchRepository, never()).save(any());
     }
 
     @Test

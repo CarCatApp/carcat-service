@@ -130,6 +130,11 @@ public class BookingAdminController {
             @RequestParam(required = false) String sundayStart,
             @RequestParam(required = false) String sundayEnd,
             @RequestParam(required = false) String verified,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String address,
+            @RequestParam(required = false) String contactPhone,
+            @RequestParam(required = false) String lat,
+            @RequestParam(required = false) String lng,
             HttpServletRequest request,
             RedirectAttributes redirect
     ) {
@@ -140,7 +145,8 @@ public class BookingAdminController {
             bookingOrgService.updateBranchHours(id, branchId, "true".equals(verified),
                     BranchWorkingHours.range(weekdayStart, weekdayEnd, "weekday"),
                     BranchWorkingHours.range(saturdayStart, saturdayEnd, "saturday"),
-                    BranchWorkingHours.range(sundayStart, sundayEnd, "sunday"));
+                    BranchWorkingHours.range(sundayStart, sundayEnd, "sunday"),
+                    name, address, contactPhone, parseCoordinate(lat, "Lat"), parseCoordinate(lng, "Lng"));
             redirect.addFlashAttribute("detailMessage", "Şöbə yeniləndi");
         } catch (RuntimeException ex) {
             redirect.addFlashAttribute("detailError", ex.getMessage());
@@ -311,6 +317,17 @@ public class BookingAdminController {
             return Double.valueOf(raw.trim().replace(",", "."));
         } catch (NumberFormatException ex) {
             return null;
+        }
+    }
+
+    private static Double parseCoordinate(String raw, String label) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.valueOf(raw.trim().replace(",", "."));
+        } catch (NumberFormatException ex) {
+            throw new MissingFieldException(label + " rəqəm olmalıdır");
         }
     }
 }
