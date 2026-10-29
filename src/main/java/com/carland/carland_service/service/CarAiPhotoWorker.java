@@ -33,14 +33,13 @@ public class CarAiPhotoWorker {
     private final PlatformTransactionManager transactionManager;
 
     @Async
-    public void generate(Long carId, String userIdHeader) {
-        CarPhoto photo = carPhotoRepository.findByCarId(carId);
-        if (photo == null || !CarPhotoStatus.isPending(photo.getPhotoStatus())) {
+    public void generate(Long carId, String userIdHeader, String attemptKey) {
+        if (!ownsAttempt(carId, attemptKey)) {
             return;
         }
         Car car = carRepository.findById(carId).orElse(null);
         if (car == null) {
-            markFailed(carId, userIdHeader);
+            markFailed(carId, userIdHeader, attemptKey);
             return;
         }
 
@@ -50,27 +49,27 @@ public class CarAiPhotoWorker {
             bytes = openAiImageClient.generateWebp(prompt);
         } catch (Exception ex) {
             log.warn("AI car photo OpenAI failed | carId={}, reason={}", carId, ex.getMessage());
-            markFailed(carId, userIdHeader);
+            markFailed(carId, userIdHeader, attemptKey);
             return;
         }
         if (bytes == null || bytes.length == 0) {
             log.warn("AI car photo empty bytes | carId={}", carId);
-            markFailed(carId, userIdHeader);
+            markFailed(carId, userIdHeader, attemptKey);
             return;
         }
-        persistReady(carId, userIdHeader, bytes);
+        persistReady(carId, userIdHeader, attemptKey, bytes);
     }
 
-    private void persistReady(Long carId, String userIdHeader, byte[] bytes) {
+    private void persistReady(Long carId, String userIdHeader, String attemptKey, byte[] bytes) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> {
+        Boolean wrote = tx.execute(status -> {
             CarPhoto photo = carPhotoRepository.findByCarId(carId);
-            if (photo == null || !CarPhotoStatus.isPending(photo.getPhotoStatus())) {
-                return;
+            if (!owns(photo, attemptKey)) {
+                return false;
             }
             Car car = carRepository.findById(carId).orElse(null);
             if (car == null) {
-                return;
+                return false;
             }
             photo.setImageData(bytes);
             photo.setFileType("webp");
@@ -83,24 +82,44 @@ public class CarAiPhotoWorker {
             int used = car.getAiPhotoGenerateCount() == null ? 0 : car.getAiPhotoGenerateCount();
             car.setAiPhotoGenerateCount(used + 1);
             carRepository.save(car);
+            return true;
         });
+        if (!Boolean.TRUE.equals(wrote)) {
+            return;
+        }
         redisCacheService.evictCarPhoto(carId);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
         log.info("AI car photo ready | carId={}", carId);
     }
 
-    private void markFailed(Long carId, String userIdHeader) {
+    private void markFailed(Long carId, String userIdHeader, String attemptKey) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> {
+        Boolean wrote = tx.execute(status -> {
             CarPhoto photo = carPhotoRepository.findByCarId(carId);
-            if (photo == null || !CarPhotoStatus.isPending(photo.getPhotoStatus())) {
-                return;
+            if (!owns(photo, attemptKey)) {
+                return false;
             }
             photo.setPhotoStatus(CarPhotoStatus.FAILED);
             carPhotoRepository.save(photo);
+            return true;
         });
+        if (!Boolean.TRUE.equals(wrote)) {
+            return;
+        }
         redisCacheService.evictCarPhoto(carId);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
+    }
+
+    private boolean ownsAttempt(Long carId, String attemptKey) {
+        return owns(carPhotoRepository.findByCarId(carId), attemptKey);
+    }
+
+    /** A newer generate replaces the attempt key. A stale job must not write ready or failed. */
+    private static boolean owns(CarPhoto photo, String attemptKey) {
+        return photo != null
+                && attemptKey != null
+                && attemptKey.equals(photo.getPromptKey())
+                && CarPhotoStatus.isPending(photo.getPhotoStatus());
     }
 
     private String buildPrompt(Car car) {

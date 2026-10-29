@@ -29,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 
 /**
@@ -170,16 +171,13 @@ public class PhotoServiceImpl implements PhotoService {
 
         Car car = requireOwnedCar(carId, phoneNumber, userIdHeader, acceptLanguage);
         CarPhoto photo = carPhotoRepository.findByCarId(carId);
-
-        if (photo != null && CarPhotoStatus.isPending(photo.getPhotoStatus())) {
-            return pendingResponse(car, acceptLanguage, photo.getPhotoSource());
-        }
+        boolean takeOverPending = photo != null && CarPhotoStatus.isPending(photo.getPhotoStatus());
 
         if (canSkipOpenAi(photo, car)) {
             return readyResponse(car, acceptLanguage, photo.getPhotoSource());
         }
 
-        if (CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())) {
+        if (!takeOverPending && CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())) {
             throw new TooManyRequestsException(
                     MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage),
                     car.getAiPhotoGenerateLockedUntil(),
@@ -191,10 +189,15 @@ public class PhotoServiceImpl implements PhotoService {
                     .carId(carId)
                     .fileName("car " + carId + " image")
                     .fileType("webp")
-                    .imageData(null)
                     .build();
         }
+        String attemptKey = "gen:" + UUID.randomUUID();
         photo.setPhotoStatus(CarPhotoStatus.PENDING);
+        photo.setImageData(null);
+        photo.setFileType("webp");
+        photo.setFileName("car " + carId + " image");
+        photo.setPhotoSource(null);
+        photo.setPromptKey(attemptKey);
         carPhotoRepository.save(photo);
         LocalDateTime now = LocalDateTime.now();
         car.setAiPhotoLastGenerateAt(now);
@@ -202,7 +205,7 @@ public class PhotoServiceImpl implements PhotoService {
         carRepository.save(car);
         redisCacheService.evictCarPhoto(carId);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
-        enqueueGenerateAfterCommit(carId, userIdHeader);
+        enqueueGenerateAfterCommit(carId, userIdHeader, attemptKey);
         return pendingResponse(car, acceptLanguage, photo.getPhotoSource());
     }
 
@@ -1045,8 +1048,8 @@ public class PhotoServiceImpl implements PhotoService {
         return stored != null && !stored.isBlank() && stored.equals(CarAiPhotoPromptKey.of(car));
     }
 
-    private void enqueueGenerateAfterCommit(Long carId, String userIdHeader) {
-        Runnable job = () -> carAiPhotoWorker.generate(carId, userIdHeader);
+    private void enqueueGenerateAfterCommit(Long carId, String userIdHeader, String attemptKey) {
+        Runnable job = () -> carAiPhotoWorker.generate(carId, userIdHeader, attemptKey);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
