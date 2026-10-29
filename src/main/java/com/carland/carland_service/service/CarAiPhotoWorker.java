@@ -8,6 +8,7 @@ import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.repository.CarPhotoRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
+import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -113,7 +114,8 @@ public class CarAiPhotoWorker {
         if (!colorClause.isEmpty()) {
             colorPart = "";
         }
-        String plate = car.getPlateNumber() == null ? "" : car.getPlateNumber().trim();
+        String rawPlate = car.getPlateNumber() == null ? "" : car.getPlateNumber().trim();
+        String plate = rawPlate.isEmpty() ? "" : PlateNumbers.format(rawPlate);
         String body = car.getBodyType() == null ? "" : car.getBodyType().trim();
         String vehicle = (year + " " + colorPart + " " + brand + " " + model + (body.isEmpty() ? "" : " " + body))
                 .replaceAll(" +", " ")
