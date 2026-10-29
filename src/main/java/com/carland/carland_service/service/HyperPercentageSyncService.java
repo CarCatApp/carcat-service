@@ -154,12 +154,24 @@ public class HyperPercentageSyncService {
             PercentageStatus current = PercentageStatus.fromStored(percentage.getStatus());
             String matchedRecordId = recordIdOf(match.visit());
 
+            boolean sameRecord = matchedRecordId != null
+                    && matchedRecordId.equals(percentage.getPartnerRecordId());
             if (!forceReapply && current == PercentageStatus.EDITED_BY_PARTNER) {
-                boolean sameRecord = matchedRecordId != null
-                        && matchedRecordId.equals(percentage.getPartnerRecordId());
                 if (sameRecord || !isNewerThanApplied(match.visit(), percentage)) {
                     continue;
                 }
+            }
+            // A forced history reload still must not roll a newer panel write back to an older visit.
+            // The same Hyper record may refresh its own numbers.
+            if (forceReapply && current == PercentageStatus.EDITED_BY_PARTNER
+                    && !sameRecord && !isNewerThanApplied(match.visit(), percentage)) {
+                log.info(
+                        "Skipping percentage sync — stored service is newer | carId={}, nameEn={}, recordId={}",
+                        car.getCarId(),
+                        nameEn,
+                        matchedRecordId
+                );
+                continue;
             }
 
             applyPartnerData(car, percentage, match, matchedRecordId);

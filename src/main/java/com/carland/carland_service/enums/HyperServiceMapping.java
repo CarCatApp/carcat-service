@@ -110,6 +110,29 @@ public enum HyperServiceMapping {
         return valueOf(code.trim().toUpperCase(java.util.Locale.ROOT)).name();
     }
 
+    /**
+     * tr: Bu şablon adına karşılık gelen Hyper kimliği. Geçmiş eşlemesi bu kimliği görür.
+     *     Ad eşlemede yoksa null.
+     * en: Hyper id for this template name. History matching sees this id.
+     *     Null when the name is not in the mapping.
+     */
+    public static String canonicalId(String nameEn) {
+        if (nameEn == null || nameEn.isBlank()) {
+            return null;
+        }
+        String trimmed = nameEn.trim();
+        for (HyperServiceMapping mapping : values()) {
+            if (!mapping.nameEn.equalsIgnoreCase(trimmed)) {
+                continue;
+            }
+            if (mapping.hyperIdMatches(mapping.name())) {
+                return mapping.name();
+            }
+            return mapping.nameEn;
+        }
+        return null;
+    }
+
     private boolean hyperIdMatches(String hyperId) {
         if (nameEn.equalsIgnoreCase(hyperId)) {
             return true;

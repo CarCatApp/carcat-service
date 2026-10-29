@@ -74,15 +74,18 @@ class DetailedPercentageServiceTest {
         when(percentageRepository.save(any(Percentage.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Visit visit = visit();
-        visit.addService(VisitServiceLine.builder()
+        VisitServiceLine line = VisitServiceLine.builder()
                 .kind("individual")
                 .individualServiceId(20L)
                 .doneDate(LocalDate.of(2026, 10, 20))
                 .doneKm(42580)
                 .nextServiceMileage(50000)
-                .build());
+                .build();
+        visit.addService(line);
 
         service.applyFromVisit(car, booking, visit);
+
+        assertEquals("ENGINE_OIL", line.getUniversalServiceId());
 
         ArgumentCaptor<Percentage> saved = ArgumentCaptor.forClass(Percentage.class);
         verify(percentageRepository).save(saved.capture());
@@ -141,10 +144,12 @@ class DetailedPercentageServiceTest {
                 .doneKm(40000)
                 .build());
 
+        VisitServiceLine line = visit.getServices().get(0);
         service.applyFromVisit(car, booking, visit);
 
         verify(percentageRepository, never()).save(any());
         assertEquals(50000, existing.getLastServiceKm());
+        assertEquals(null, line.getUniversalServiceId());
     }
 
     @Test
@@ -156,6 +161,120 @@ class DetailedPercentageServiceTest {
         service.applyFromVisit(car, booking, visit);
 
         verify(percentageRepository, never()).findByServiceIdAndCarId(any(), any());
+    }
+
+    @Test
+    void lineHyperIdResolvesWhenTheCatalogCodeIsBlank() {
+        when(individualLineRepository.findByBooking_IdOrderByIdAsc(50L)).thenReturn(List.of(
+                BookingIndividualLine.builder().individualServiceId(20L).build()));
+        when(individualServiceRepository.findById(20L)).thenReturn(Optional.of(
+                IndividualService.builder().id(20L).build()));
+        when(snapshot.resolve(car, "ENGINE_OIL")).thenReturn(9L);
+        Percentage existing = Percentage.builder().serviceId(9L).carId(5L).intervalKm(10_000L).intervalMonth(12)
+                .serviceNameEn("Engine oil & filter").status(PercentageStatus.CREATED.name()).build();
+        when(percentageRepository.findByServiceIdAndCarId(9L, 5L)).thenReturn(existing);
+        when(percentageRepository.save(any(Percentage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Visit visit = visit();
+        visit.addService(VisitServiceLine.builder()
+                .kind("individual")
+                .individualServiceId(20L)
+                .universalServiceId("ENGINE_OIL")
+                .doneDate(LocalDate.of(2026, 10, 20))
+                .doneKm(42580)
+                .build());
+
+        service.applyFromVisit(car, booking, visit);
+
+        assertEquals(52580, existing.getNextServiceKm());
+        assertEquals(PercentageStatus.EDITED_BY_PARTNER.name(), existing.getStatus());
+    }
+
+    @Test
+    void catalogCodeIsUsedWhenTheCopiedIdIsNotOnThisCar() {
+        when(individualLineRepository.findByBooking_IdOrderByIdAsc(50L)).thenReturn(List.of(
+                BookingIndividualLine.builder().individualServiceId(20L).percentageServiceId(99L).build()));
+        when(percentageRepository.findByServiceIdAndCarId(99L, 5L)).thenReturn(null);
+        when(serviceEntityRepository.findById(99L)).thenReturn(Optional.empty());
+        when(individualServiceRepository.findById(20L)).thenReturn(Optional.of(
+                IndividualService.builder().id(20L).maintenanceCode("ENGINE_OIL").build()));
+        when(snapshot.resolve(car, "ENGINE_OIL")).thenReturn(9L);
+        Percentage existing = Percentage.builder().serviceId(9L).carId(5L).intervalKm(10_000L).intervalMonth(12)
+                .status(PercentageStatus.CREATED.name()).build();
+        when(percentageRepository.findByServiceIdAndCarId(9L, 5L)).thenReturn(existing);
+        when(percentageRepository.save(any(Percentage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Visit visit = visit();
+        visit.addService(VisitServiceLine.builder()
+                .kind("individual")
+                .individualServiceId(20L)
+                .doneDate(LocalDate.of(2026, 10, 20))
+                .doneKm(42580)
+                .build());
+
+        service.applyFromVisit(car, booking, visit);
+
+        assertEquals(52580, existing.getNextServiceKm());
+        assertEquals(9L, existing.getServiceId());
+    }
+
+    @Test
+    void missingIntervalIsTakenFromTheTemplate() {
+        when(individualLineRepository.findByBooking_IdOrderByIdAsc(50L)).thenReturn(List.of(
+                BookingIndividualLine.builder().individualServiceId(20L).percentageServiceId(9L).build()));
+        ServiceEntity oil = ServiceEntity.builder().id(9L).nameEn("Engine oil & filter")
+                .intervalKm(8_000L).intervalMonth(6).maintenanceTemplate(template).build();
+        when(serviceEntityRepository.findById(9L)).thenReturn(Optional.of(oil));
+        Percentage existing = Percentage.builder().serviceId(9L).carId(5L)
+                .status(PercentageStatus.CREATED.name()).build();
+        when(percentageRepository.findByServiceIdAndCarId(9L, 5L)).thenReturn(existing);
+        when(percentageRepository.save(any(Percentage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Visit visit = visit();
+        VisitServiceLine line = VisitServiceLine.builder()
+                .kind("individual")
+                .individualServiceId(20L)
+                .doneDate(LocalDate.of(2026, 10, 20))
+                .doneKm(42580)
+                .build();
+        visit.addService(line);
+
+        service.applyFromVisit(car, booking, visit);
+
+        assertEquals(8_000L, existing.getIntervalKm());
+        assertEquals(6, existing.getIntervalMonth());
+        assertEquals(50580, existing.getNextServiceKm());
+        assertEquals(LocalDate.of(2027, 4, 20), existing.getNextServiceDate());
+        assertEquals("ENGINE_OIL", line.getUniversalServiceId());
+    }
+
+    @Test
+    void otherItemsKmLifeFollowsTheCarMileage() {
+        when(individualLineRepository.findByBooking_IdOrderByIdAsc(50L)).thenReturn(List.of(
+                BookingIndividualLine.builder().individualServiceId(20L).percentageServiceId(9L).build()));
+        ServiceEntity oil = ServiceEntity.builder().id(9L).nameEn("Engine oil & filter")
+                .intervalKm(10_000L).intervalMonth(12).maintenanceTemplate(template).build();
+        when(serviceEntityRepository.findById(9L)).thenReturn(Optional.of(oil));
+        Percentage oilRow = Percentage.builder().serviceId(9L).carId(5L).intervalKm(10_000L).intervalMonth(12)
+                .status(PercentageStatus.CREATED.name()).build();
+        Percentage brakes = Percentage.builder().serviceId(11L).carId(5L)
+                .lastServiceKm(40_000).nextServiceKm(50_000).kmPercentage(10).remainingKm(9_999).build();
+        when(percentageRepository.findByServiceIdAndCarId(9L, 5L)).thenReturn(oilRow);
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(oilRow, brakes));
+        when(percentageRepository.save(any(Percentage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Visit visit = visit();
+        visit.addService(VisitServiceLine.builder()
+                .kind("individual")
+                .individualServiceId(20L)
+                .doneDate(LocalDate.of(2026, 10, 20))
+                .doneKm(42580)
+                .build());
+
+        service.applyFromVisit(car, booking, visit);
+
+        assertEquals(74, brakes.getKmPercentage());
+        assertEquals(7420, brakes.getRemainingKm());
     }
 
     private Visit visit() {

@@ -34,21 +34,17 @@ public class BookingPercentageSnapshot {
 
     /**
      * tr: Kod boş, bilinmeyen veya bu şablonda karşılığı yoksa null. Book'u düşürmez.
+     *     Enum adı (ENGINE_OIL), Hyper takma adı ve şablonun İngilizce adı kabul edilir.
      * en: Null when the code is blank, unknown, or absent from this template. Does not fail the booking.
+     *     An enum name (ENGINE_OIL), a Hyper alias and the template's English name are all accepted.
      */
     public Long resolve(Car car, String maintenanceCode) {
         if (car == null || maintenanceCode == null || maintenanceCode.isBlank()) {
             return null;
         }
-        String nameEn;
-        try {
-            String code = HyperServiceMapping.normalizeCode(maintenanceCode);
-            nameEn = code == null ? null : HyperServiceMapping.toNameEn(code).orElse(null);
-        } catch (IllegalArgumentException ex) {
-            log.info("percentage code unknown | carId={} code={}", car.getCarId(), maintenanceCode);
-            return null;
-        }
+        String nameEn = HyperServiceMapping.toNameEn(maintenanceCode).orElse(null);
         if (nameEn == null) {
+            log.info("percentage code unknown | carId={} code={}", car.getCarId(), maintenanceCode);
             return null;
         }
         MaintenanceTemplate template = car.getMaintenanceTemplate();

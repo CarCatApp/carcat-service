@@ -50,6 +50,7 @@ class BookingPercentageSnapshotTest {
                 ServiceEntity.builder().id(10L).nameEn("Brake pads").build()));
 
         assertEquals(9L, snapshot.resolve(car, "ENGINE_OIL"));
+        assertEquals(9L, snapshot.resolve(car, "Engine oil & filter"));
         assertEquals(10L, snapshot.resolve(car, "brake_pads"));
         assertNull(snapshot.resolve(car, "NOT_A_CODE"));
         assertNull(snapshot.resolve(car, " "));
