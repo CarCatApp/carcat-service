@@ -125,7 +125,7 @@ public class IddaPlateCheckService {
         IddaPlateCheck row = mapRow(root, plateKey, customer, requestId, code);
         iddaPlateCheckRepository.save(row);
         log.info("IDDA plate check live plateKey={} status={} counts={}", plateKey, code, row.isCountsTowardLimit());
-        if (vehicleSuccess(row)) {
+        if (row.isVehicleSuccess()) {
             return toResponse(row, acceptLanguage);
         }
         return restrictedLive(row, acceptLanguage);
@@ -185,16 +185,8 @@ public class IddaPlateCheckService {
         return GUIDE_PLATE_KEY.equals(plateKey) && Long.valueOf(GUIDE_USER_ID).equals(userId);
     }
 
-    private static boolean vehicleSuccess(IddaPlateCheck row) {
-        if (row.getStatusCode() == null || row.getStatusCode() != 0 || row.getVin() == null || row.getVin().isBlank()) {
-            return false;
-        }
-        String name = row.getStatusName();
-        return name == null || !name.equalsIgnoreCase("ServiceRestrictedByPerson");
-    }
-
     private CarResponse toResponse(IddaPlateCheck row, String acceptLanguage) {
-        boolean success = vehicleSuccess(row);
+        boolean success = row.isVehicleSuccess();
         Car existing = success && row.getVin() != null ? findVin(row.getVin()) : null;
         boolean engineLocked = existing != null && existing.getEngineTypeId() != null;
         String message = row.getStatusMessage();

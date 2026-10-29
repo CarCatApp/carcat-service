@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>IDDA — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    col.c-id       { width: 70px; }
+    col.c-time     { width: 160px; }
+    col.c-customer { width: 110px; }
+    col.c-querier  { width: 140px; }
+    col.c-plate    { width: 120px; }
+    col.c-vin      { width: 180px; }
+    col.c-status   { width: 220px; }
+    col.c-message  { width: 200px; }
+    col.c-limit    { width: 80px; }
+    col.c-brand    { width: 110px; }
+    col.c-model    { width: 120px; }
+    col.c-year     { width: 70px; }
+    col.c-color    { width: 140px; }
+    col.c-owner    { width: 180px; }
+    .data-table { min-width: 1860px; }
+    .vin-input { font-family: ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; }
+    .cell-desc-td.is-open {
+      white-space: normal;
+      overflow: visible;
+      height: auto;
+      vertical-align: top;
+    }
+    .cell-desc {
+      display: block;
+      max-width: 200px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .cell-desc:hover { color: var(--text); }
+    .cell-desc.is-open {
+      max-width: 360px;
+      white-space: pre-wrap;
+      overflow: visible;
+      text-overflow: unset;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link active" href="/admin/idda">IDDA</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/fuel-intervals">Aralıqlar</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>IDDA</h1>
+      <p class="muted">Status dönen plaka sorguları. Limit dolu, timeout ve okunamayan cevap bu listede yok.</p>
+    </div>
+    <span class="total">Toplam <strong th:text="${checks.totalElements}">0</strong> kayıt</span>
+  </div>
+
+  <form class="filter-bar" method="get" action="/admin/idda">
+    <div class="filter-field">
+      <label for="customerId">Customer ID</label>
+      <input type="text" id="customerId" name="customerId" inputmode="numeric" autocomplete="off"
+             placeholder="7" th:value="${filterCustomerId}">
+    </div>
+    <div class="filter-field">
+      <label for="plate">Plate</label>
+      <input type="text" id="plate" name="plate" autocomplete="off"
+             placeholder="77 BU 669" th:value="${filterPlate}">
+    </div>
+    <div class="filter-field">
+      <label for="vin">VIN</label>
+      <input class="vin-input" type="text" id="vin" name="vin" maxlength="17" spellcheck="false" autocomplete="off"
+             placeholder="WBAJA9C5…" th:value="${filterVin}">
+    </div>
+    <button class="btn btn-filter" type="submit">Filtrele</button>
+    <a class="btn btn-clear"
+       th:if="${filterCustomerId != null || filterPlate != null || filterVin != null}"
+       href="/admin/idda">Temizle</a>
+  </form>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table" id="iddaTable">
+        <colgroup>
+          <col class="c-id">
+          <col class="c-time">
+          <col class="c-customer">
+          <col class="c-querier">
+          <col class="c-plate">
+          <col class="c-vin">
+          <col class="c-status">
+          <col class="c-message">
+          <col class="c-limit">
+          <col class="c-brand">
+          <col class="c-model">
+          <col class="c-year">
+          <col class="c-color">
+          <col class="c-owner">
+        </colgroup>
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>Queried at</th>
+          <th>Customer ID</th>
+          <th>Querier</th>
+          <th>Plate</th>
+          <th>VIN</th>
+          <th>Status</th>
+          <th>Message</th>
+          <th title="Aylık hakka sayılır">Limit</th>
+          <th>Brand</th>
+          <th>Model</th>
+          <th>Year</th>
+          <th>Color</th>
+          <th>Owner</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${checks}">
+          <td th:text="${row.id}"></td>
+          <td class="muted"
+              th:text="${row.queriedAt != null ? #temporals.format(row.queriedAt.plusHours(4), 'dd MMM yyyy, HH:mm') : '—'}"></td>
+          <td>
+            <a th:if="${row.querierUserId != null}"
+               th:href="@{/admin/cars(userId=${row.querierUserId})}"
+               th:text="${row.querierUserId}"></a>
+            <span class="muted" th:if="${row.querierUserId == null}">—</span>
+          </td>
+          <td th:text="${#strings.isEmpty(#strings.trim((row.querierName != null ? row.querierName : '') + ' ' + (row.querierSurname != null ? row.querierSurname : ''))) ? '—' : #strings.trim((row.querierName != null ? row.querierName : '') + ' ' + (row.querierSurname != null ? row.querierSurname : ''))}"></td>
+          <td th:text="${T(com.carland.carland_service.util.PlateNumbers).format(row.plateNumber != null ? row.plateNumber : row.plateKey) ?: '—'}"></td>
+          <td class="vin" th:text="${row.vin ?: '—'}" th:title="${row.vin}"></td>
+          <td>
+            <span class="badge"
+                  th:if="${row.statusCode != null}"
+                  th:classappend="${row.vehicleSuccess} ? 'badge-success' : 'badge-danger'"
+                  th:text="${row.statusCode + (row.statusName != null ? ' ' + row.statusName : '')}">0 Successful</span>
+            <span class="muted" th:if="${row.statusCode == null}">—</span>
+          </td>
+          <td class="cell-desc-td">
+            <button type="button" class="cell-desc"
+                    th:if="${!#strings.isEmpty(row.statusMessage)}"
+                    th:text="${row.statusMessage}"
+                    aria-label="Show full message"
+                    aria-expanded="false"></button>
+            <span class="muted" th:if="${#strings.isEmpty(row.statusMessage)}">—</span>
+          </td>
+          <td>
+            <span class="badge badge-success" th:if="${row.countsTowardLimit}">Yes</span>
+            <span class="badge badge-neutral" th:unless="${row.countsTowardLimit}">No</span>
+          </td>
+          <td th:text="${row.brand ?: '—'}"></td>
+          <td th:text="${row.model ?: '—'}"></td>
+          <td th:text="${row.modelYear ?: '—'}"></td>
+          <td th:text="${row.colorRaw ?: '—'}"></td>
+          <td th:text="${#strings.isEmpty(#strings.trim((row.ownerName != null ? row.ownerName : '') + ' ' + (row.ownerSurname != null ? row.ownerSurname : '') + ' ' + (row.ownerPatronymic != null ? row.ownerPatronymic : ''))) ? '—' : #strings.trim((row.ownerName != null ? row.ownerName : '') + ' ' + (row.ownerSurname != null ? row.ownerSurname : '') + ' ' + (row.ownerPatronymic != null ? row.ownerPatronymic : ''))}"></td>
+        </tr>
+        <tr class="empty-row" th:if="${checks.empty}">
+          <td colspan="14">Kayıt bulunamadı</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-bar">
+      <span class="page-info">
+        Sayfa <strong th:text="${currentPage}">1</strong> / <span th:text="${totalPages}">1</span>
+      </span>
+      <nav class="pages">
+        <a class="page-arrow"
+           th:classappend="${currentPage == 1} ? 'disabled'"
+           th:href="@{/admin/idda(page=${currentPage - 1}, customerId=${filterCustomerId}, plate=${filterPlate}, vin=${filterVin})}">
+          &#8592; Previous
+        </a>
+        <a class="page-link" th:if="${windowStart > 1}"
+           th:href="@{/admin/idda(page=1, customerId=${filterCustomerId}, plate=${filterPlate}, vin=${filterVin})}">1</a>
+        <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
+        <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
+           class="page-link"
+           th:classappend="${p == currentPage} ? 'active'"
+           th:href="@{/admin/idda(page=${p}, customerId=${filterCustomerId}, plate=${filterPlate}, vin=${filterVin})}"
+           th:text="${p}">1</a>
+        <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
+        <a class="page-link" th:if="${windowEnd < totalPages}"
+           th:href="@{/admin/idda(page=${totalPages}, customerId=${filterCustomerId}, plate=${filterPlate}, vin=${filterVin})}"
+           th:text="${totalPages}"></a>
+        <a class="page-arrow"
+           th:classappend="${currentPage >= totalPages} ? 'disabled'"
+           th:href="@{/admin/idda(page=${currentPage + 1}, customerId=${filterCustomerId}, plate=${filterPlate}, vin=${filterVin})}">
+          Next &#8594;
+        </a>
+      </nav>
+    </div>
+  </div>
+</main>
+
+<script src="/admin/admin.js?v=premium2"></script>
+<script>
+  CarlandAdmin.initColumnToggle(
+    document.getElementById("iddaTable"),
+    "carland-admin-cols-idda",
+    ["ID", "Queried at", "Customer ID", "Querier", "Plate", "VIN", "Status", "Message", "Limit", "Brand", "Model", "Year", "Color", "Owner"],
+    []
+  );
+  CarlandAdmin.initExpandCells(".cell-desc");
+</script>
+</body>
+</html>

@@ -81,4 +81,15 @@ public class IddaPlateCheck {
      */
     @Column(nullable = false)
     boolean countsTowardLimit;
+
+    /**
+     * tr: Code 0, VIN dolu ve kişi kısıtı yok. Aylık hak ayrıca countsTowardLimit.
+     * en: Code 0, a VIN, and no person restriction. The monthly cap is countsTowardLimit.
+     */
+    public boolean isVehicleSuccess() {
+        if (statusCode == null || statusCode != 0 || vin == null || vin.isBlank()) {
+            return false;
+        }
+        return statusName == null || !statusName.equalsIgnoreCase("ServiceRestrictedByPerson");
+    }
 }
