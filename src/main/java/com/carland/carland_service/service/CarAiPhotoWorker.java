@@ -32,9 +32,11 @@ public class CarAiPhotoWorker {
     private final RedisCacheService redisCacheService;
     private final PlatformTransactionManager transactionManager;
 
-    @Async
+    @Async("carPhotoExecutor")
     public void generate(Long carId, String userIdHeader, String attemptKey) {
+        log.info("AI car photo worker start | carId={} thread={}", carId, Thread.currentThread().getName());
         if (!ownsAttempt(carId, attemptKey)) {
+            log.info("AI car photo worker dropped | carId={} reason=stale-attempt", carId);
             return;
         }
         Car car = carRepository.findById(carId).orElse(null);

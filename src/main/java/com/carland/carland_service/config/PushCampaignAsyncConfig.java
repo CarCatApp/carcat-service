@@ -23,4 +23,15 @@ public class PushCampaignAsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "carPhotoExecutor")
+    public Executor carPhotoExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(20);
+        executor.setThreadNamePrefix("car-photo-");
+        executor.initialize();
+        return executor;
+    }
 }

@@ -11,7 +11,6 @@ import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.*;
 import com.carland.carland_service.repository.*;
 import com.carland.carland_service.service.CarAiPhotoGenerateLock;
-import com.carland.carland_service.service.CarAiPhotoPromptKey;
 import com.carland.carland_service.service.CarAiPhotoWorker;
 import com.carland.carland_service.service.PhotoService;
 import com.carland.carland_service.service.RedisCacheService;
@@ -150,12 +149,15 @@ public class PhotoServiceImpl implements PhotoService {
         }
         MediaType mediaType = MediaType.parseMediaType(fileType);
         byte[] bytes = carPhoto.getImageData() == null ? new byte[0] : carPhoto.getImageData();
+        boolean ready = CarPhotoStatus.READY.equalsIgnoreCase(status);
+        log.info("photo v2 | carId={} status={} storedBytes={} sentBytes={}",
+                carId, status, bytes.length, ready ? bytes.length : 0);
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .header("X-Photo-Status", status)
                 .header("X-Photo-Source", source)
-                .body(CarPhotoStatus.READY.equalsIgnoreCase(status) ? bytes : new byte[0]);
+                .body(ready ? bytes : new byte[0]);
     }
 
     @Override
@@ -171,18 +173,9 @@ public class PhotoServiceImpl implements PhotoService {
 
         Car car = requireOwnedCar(carId, phoneNumber, userIdHeader, acceptLanguage);
         CarPhoto photo = carPhotoRepository.findByCarId(carId);
-        boolean takeOverPending = photo != null && CarPhotoStatus.isPending(photo.getPhotoStatus());
-
-        if (canSkipOpenAi(photo, car)) {
-            return readyResponse(car, acceptLanguage, photo.getPhotoSource());
-        }
-
-        if (!takeOverPending && CarAiPhotoGenerateLock.isLocked(car.getAiPhotoGenerateLockedUntil())) {
-            throw new TooManyRequestsException(
-                    MessagesLangValues.PHOTO_AI_GENERATE_LIMIT.getMessageByLang(acceptLanguage),
-                    car.getAiPhotoGenerateLockedUntil(),
-                    CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()));
-        }
+        int storedBytes = photo == null || photo.getImageData() == null ? 0 : photo.getImageData().length;
+        log.info("generate restart | carId={} previousStatus={} storedBytes={}",
+                carId, photo == null ? null : photo.getPhotoStatus(), storedBytes);
 
         if (photo == null) {
             photo = CarPhoto.builder()
@@ -1012,40 +1005,6 @@ public class PhotoServiceImpl implements PhotoService {
                 .lockedUntil(car.getAiPhotoGenerateLockedUntil())
                 .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
                 .build();
-    }
-
-    private static GeneratePhotoResponse readyResponse(Car car, String acceptLanguage, String photoSource) {
-        return GeneratePhotoResponse.builder()
-                .carId(car.getCarId())
-                .photoStatus(CarPhotoStatus.READY)
-                .photoSource(photoSource == null || photoSource.isBlank()
-                        ? CarPhotoSource.AI_GENERATED
-                        : photoSource)
-                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
-                .lockedUntil(car.getAiPhotoGenerateLockedUntil())
-                .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
-                .build();
-    }
-
-    /**
-     * Skip OpenAI only when a ready AI photo already matches the current prompt fields.
-     * Customer uploads always regenerate. Missing promptKey (legacy AI row) regenerates once.
-     */
-    private static boolean canSkipOpenAi(CarPhoto photo, Car car) {
-        if (photo == null || photo.getImageData() == null || photo.getImageData().length == 0) {
-            return false;
-        }
-        if (CarPhotoStatus.isPending(photo.getPhotoStatus())) {
-            return false;
-        }
-        if (CarPhotoStatus.FAILED.equalsIgnoreCase(photo.getPhotoStatus())) {
-            return false;
-        }
-        if (!CarPhotoSource.AI_GENERATED.equalsIgnoreCase(photo.getPhotoSource())) {
-            return false;
-        }
-        String stored = photo.getPromptKey();
-        return stored != null && !stored.isBlank() && stored.equals(CarAiPhotoPromptKey.of(car));
     }
 
     private void enqueueGenerateAfterCommit(Long carId, String userIdHeader, String attemptKey) {
