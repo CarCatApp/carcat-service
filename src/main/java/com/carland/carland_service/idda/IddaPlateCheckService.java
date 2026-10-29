@@ -61,6 +61,12 @@ public class IddaPlateCheckService {
      */
     private static final int USER_LIVE_CAP = 5;
     private static final int PLATE_LIVE_CAP = 10;
+    /**
+     * tr: Geçici kullanım kılavuzu. Bu müşteri bu plakada limite takılmaz ve hak yazmaz.
+     * en: Temporary guide. This customer on this plate skips the cap and does not count.
+     */
+    private static final long GUIDE_USER_ID = 55L;
+    private static final String GUIDE_PLATE_KEY = "77BU669";
 
     private final DigitalFinanceClient digitalFinanceClient;
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
@@ -85,7 +91,8 @@ public class IddaPlateCheckService {
         List<IddaPlateCheck> ownRows = recent.stream()
                 .filter(row -> customer.getUserId().equals(row.getQuerierUserId()))
                 .toList();
-        if (ownRows.size() >= USER_LIVE_CAP || recent.size() >= PLATE_LIVE_CAP) {
+        if (!guideDemo(plateKey, customer.getUserId())
+                && (ownRows.size() >= USER_LIVE_CAP || recent.size() >= PLATE_LIVE_CAP)) {
             log.info("IDDA plate check cap plateKey={} own={} plate={}", plateKey, ownRows.size(), recent.size());
             return restricted(plate, MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang(acceptLanguage));
         }
@@ -118,7 +125,7 @@ public class IddaPlateCheckService {
         IddaPlateCheck row = mapRow(root, plateKey, customer, requestId, code);
         iddaPlateCheckRepository.save(row);
         log.info("IDDA plate check live plateKey={} status={} counts={}", plateKey, code, row.isCountsTowardLimit());
-        if (row.isCountsTowardLimit()) {
+        if (vehicleSuccess(row)) {
             return toResponse(row, acceptLanguage);
         }
         return restrictedLive(row, acceptLanguage);
@@ -170,12 +177,24 @@ public class IddaPlateCheckService {
                 .querierName(customer.getName())
                 .querierSurname(customer.getSurname())
                 .queriedAt(LocalDateTime.now())
-                .countsTowardLimit(success)
+                .countsTowardLimit(success && !guideDemo(plateKey, customer.getUserId()))
                 .build();
     }
 
+    private static boolean guideDemo(String plateKey, Long userId) {
+        return GUIDE_PLATE_KEY.equals(plateKey) && Long.valueOf(GUIDE_USER_ID).equals(userId);
+    }
+
+    private static boolean vehicleSuccess(IddaPlateCheck row) {
+        if (row.getStatusCode() == null || row.getStatusCode() != 0 || row.getVin() == null || row.getVin().isBlank()) {
+            return false;
+        }
+        String name = row.getStatusName();
+        return name == null || !name.equalsIgnoreCase("ServiceRestrictedByPerson");
+    }
+
     private CarResponse toResponse(IddaPlateCheck row, String acceptLanguage) {
-        boolean success = row.isCountsTowardLimit();
+        boolean success = vehicleSuccess(row);
         Car existing = success && row.getVin() != null ? findVin(row.getVin()) : null;
         boolean engineLocked = existing != null && existing.getEngineTypeId() != null;
         String message = row.getStatusMessage();

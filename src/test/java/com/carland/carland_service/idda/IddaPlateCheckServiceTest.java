@@ -183,6 +183,35 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
+    void guideUserOnDemoPlateSkipsTheFullCapAndDoesNotCount() throws Exception {
+        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(55L, "050", "ACTIVE"))
+                .thenReturn(Customer.builder().userId(55L).name("N").surname("M").phoneNumber("050").build());
+        List<IddaPlateCheck> ten = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            ten.add(successRow(55L));
+        }
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
+                .thenReturn(ten);
+        when(brandRepository.existsByIsnew(".")).thenReturn(false);
+        when(brandRepository.findAll()).thenReturn(List.of());
+        when(modelRepository.findAll()).thenReturn(List.of());
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
+        when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CarResponse response = service.check("77-BU-669", "050", "55", "az");
+
+        assertEquals(Boolean.FALSE, response.getIsRestrict());
+        assertEquals("19XZE4F54NE012640", response.getVin());
+        assertEquals(Boolean.TRUE, response.getFromIdda());
+        ArgumentCaptor<IddaPlateCheck> saved = ArgumentCaptor.forClass(IddaPlateCheck.class);
+        verify(iddaPlateCheckRepository).save(saved.capture());
+        assertFalse(saved.getValue().isCountsTowardLimit());
+        verify(digitalFinanceClient, times(1)).exchange(eq("GET"), anyString(), any(), anyString(), any());
+    }
+
+    @Test
     void eleventhPlateQueryIsRestrictedAndHidesTheStoredCar() throws Exception {
         customer();
         List<IddaPlateCheck> ten = new java.util.ArrayList<>();
