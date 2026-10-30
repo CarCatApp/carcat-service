@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -338,4 +339,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Object[]> countGroupByStatusAndCarId(@Param("userId") Long userId, @Param("carId") Long carId);
 
     boolean existsByRange_RangeIdIn(Collection<Long> rangeIds);
+
+    /**
+     * tr: Xatırlatma pəncərəsi. Status yalnız confirmed və auto_accepted gəlir; start yarım-açıq aralıqdadır.
+     * en: Reminder window. Status is only confirmed and auto_accepted; start is a half-open range.
+     */
+    @Query("""
+            select b from Booking b
+            join fetch b.range r
+            join fetch b.branch
+            where b.status in :statuses
+              and r.start >= :from
+              and r.start < :to
+            """)
+    List<Booking> findReadyForReminder(
+            @Param("statuses") Collection<String> statuses,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
 }

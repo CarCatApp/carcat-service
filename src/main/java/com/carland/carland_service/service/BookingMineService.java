@@ -329,15 +329,15 @@ public class BookingMineService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(code);
         booking.setCancelNote(note);
-        notifyCancelled(booking);
+        notifyCancelled(booking, status);
         Branch ownerBranch = booking.getBranch();
         staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return detail(customerUserId, String.valueOf(booking.getId()), timezoneHeader, acceptLanguage);
     }
 
-    private void notifyCancelled(Booking booking) {
+    private void notifyCancelled(Booking booking, String statusBefore) {
         try {
-            bookingPushService.cancelled(booking);
+            bookingPushService.cancelled(booking, statusBefore);
         } catch (Exception ex) {
             log.warn("booking cancel push skipped id={}", booking == null ? null : booking.getId());
         }

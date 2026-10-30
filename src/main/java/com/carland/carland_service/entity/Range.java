@@ -18,7 +18,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Table(name = "ranges")
+@Table(name = "ranges", indexes = {
+        @Index(name = "idx_ranges_start_time", columnList = "start_time")
+})
 public class Range {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

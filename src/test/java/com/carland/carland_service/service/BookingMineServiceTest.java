@@ -495,6 +495,7 @@ class BookingMineServiceTest {
         assertEquals(1, out.getCanceledReason().getTitle().size());
         assertEquals("Plan dəyişdi", out.getCanceledReason().getNote());
         verify(staffBookingLiveService).refreshAfterCommit(7L);
+        verify(bookingPushService).cancelled(booking, "auto_accepted");
     }
 
     @Test

@@ -122,6 +122,9 @@ brevo:
 booking:
   notify:
     emails: ${BOOKING_NOTIFY_EMAILS:azadisali@gmail.com,niftalizadeaziz@gmail.com,nemat.mirzayev@gmail.com,Nemat.Mirzayev@carcat.app}
+  reminder:
+    # Scan period and the selection window, in minutes. 1–60. A change needs a service restart.
+    slack-minutes: ${BOOKING_REMINDER_SLACK_MINUTES:10}
 
 access:
   token:

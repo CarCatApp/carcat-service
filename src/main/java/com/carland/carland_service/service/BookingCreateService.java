@@ -83,6 +83,7 @@ public class BookingCreateService {
     private final BookingCapacityService bookingCapacityService;
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPercentageSnapshot percentageSnapshot;
+    private final BookingPushService bookingPushService;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
@@ -192,6 +193,9 @@ public class BookingCreateService {
                 .createdAt(StaffBookingArrival.stamp(booking.getCreatedAt()))
                 .pendingExpiresAt(StaffBookingArrival.stamp(booking.getPendingExpiresAt()))
                 .build());
+        if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            bookingPushService.accepted(booking);
+        }
         return BookingView.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())

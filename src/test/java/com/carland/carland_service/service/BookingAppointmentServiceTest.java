@@ -109,6 +109,7 @@ class BookingAppointmentServiceTest {
         assertEquals(4000, response.getPackagePrice());
         assertEquals(4000, response.getPriceMin());
         assertEquals("qepik", response.getUnit());
+        verify(bookingPushService).accepted(any());
     }
 
     @Test
@@ -131,6 +132,7 @@ class BookingAppointmentServiceTest {
 
         assertEquals("pending", response.getStatus());
         assertEquals("approval", response.getBookingMode());
+        verify(bookingPushService, never()).accepted(any());
     }
 
     @Test
@@ -194,6 +196,7 @@ class BookingAppointmentServiceTest {
         assertEquals("plan dəyişdi", booking.getCancelNote());
         assertEquals(BookingAppointmentService.CUSTOMER_REASON, booking.getCancelReasonCode());
         verify(live).refreshAfterCommit(7L);
+        verify(bookingPushService).cancelled(booking, "auto_accepted");
     }
 
     @Test

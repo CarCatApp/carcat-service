@@ -10,6 +10,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PushNotificationServiceImplTest {
@@ -22,6 +23,18 @@ class PushNotificationServiceImplTest {
         assertTrue(contains(single, "Başlıq"), "title");
         assertTrue(contains(single, PushNotificationServiceImpl.IOS_SOUND), describe(single));
         assertTrue(contains(batch, PushNotificationServiceImpl.IOS_SOUND), describe(batch));
+        assertFalse(contains(single, "bookingId"), describe(single));
+    }
+
+    @Test
+    void bookingMessageCarriesTheIds() {
+        Message message = PushNotificationServiceImpl.buildMessage(
+                "Başlıq", "Mətn", "token-1", Map.of("bookingId", "4", "branchId", "1"));
+
+        assertTrue(contains(message, "bookingId"), describe(message));
+        assertTrue(contains(message, "4"), describe(message));
+        assertTrue(contains(message, "branchId"), describe(message));
+        assertTrue(contains(message, "1"), describe(message));
     }
 
     private static boolean contains(Object value, String needle) {

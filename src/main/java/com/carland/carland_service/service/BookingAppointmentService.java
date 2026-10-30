@@ -184,6 +184,9 @@ public class BookingAppointmentService {
                 .createdAt(StaffBookingArrival.stamp(booking.getCreatedAt()))
                 .pendingExpiresAt(StaffBookingArrival.stamp(booking.getPendingExpiresAt()))
                 .build());
+        if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            bookingPushService.accepted(booking);
+        }
         return BookingAppointmentResponse.builder()
                 .bookingId(booking.getId())
                 .ref(booking.getRef())
@@ -250,7 +253,7 @@ public class BookingAppointmentService {
         booking.setStatus(BookingStatus.CANCELLED.apiValue());
         booking.setCancelReasonCode(CUSTOMER_REASON);
         booking.setCancelNote(reason);
-        notifyCancelled(booking);
+        notifyCancelled(booking, status);
         Branch ownerBranch = booking.getBranch();
         staffBookingLiveService.refreshAfterCommit(ownerBranch == null ? null : ownerBranch.getId());
         return BookingAppointmentCancelResponse.builder()
@@ -270,9 +273,9 @@ public class BookingAppointmentService {
         return selectionWriter.price(branch, body.getIndividualServiceIds(), body.getIssue());
     }
 
-    private void notifyCancelled(Booking booking) {
+    private void notifyCancelled(Booking booking, String statusBefore) {
         try {
-            bookingPushService.cancelled(booking);
+            bookingPushService.cancelled(booking, statusBefore);
         } catch (Exception ex) {
             log.warn("booking cancel push skipped id={}", booking == null ? null : booking.getId());
         }

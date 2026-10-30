@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * tr: Firebase Cloud Messaging (FCM) üzerinden mobil cihazlara push bildirim gönderen servis.
@@ -36,7 +37,12 @@ public class PushNotificationServiceImpl implements PushNotificationService {
      */
     @Override
     public void send(String title, String body, String deviceToken) {
-        Message message = buildMessage(title, body, deviceToken);
+        send(title, body, deviceToken, null);
+    }
+
+    @Override
+    public void send(String title, String body, String deviceToken, Map<String, String> data) {
+        Message message = buildMessage(title, body, deviceToken, data);
 
         try {
             String response = FirebaseMessaging.getInstance().send(message);
@@ -78,11 +84,18 @@ public class PushNotificationServiceImpl implements PushNotificationService {
     }
 
     static Message buildMessage(String title, String body, String deviceToken) {
-        return Message.builder()
+        return buildMessage(title, body, deviceToken, null);
+    }
+
+    static Message buildMessage(String title, String body, String deviceToken, Map<String, String> data) {
+        Message.Builder builder = Message.builder()
                 .setToken(deviceToken)
                 .setNotification(display(title, body))
-                .setApnsConfig(iosSound())
-                .build();
+                .setApnsConfig(iosSound());
+        if (data != null && !data.isEmpty()) {
+            builder.putAllData(data);
+        }
+        return builder.build();
     }
 
     static MulticastMessage buildMulticast(String title, String body, List<String> deviceTokens) {

@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +44,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BookingPushServiceTest {
+
+    private static final Map<String, String> PUSH_IDS = Map.of("bookingId", "4", "branchId", "1");
 
     @Mock DeviceTokenRepository deviceTokenRepository;
     @Mock CustomerRepository customerRepository;
@@ -69,15 +72,15 @@ class BookingPushServiceTest {
 
         ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"));
+        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"), eq(PUSH_IDS));
         assertEquals(List.of(
-                "Rezervasiya təsdiqləndi",
+                "Növbə təsdiqləndi",
                 "Booking confirmed",
                 "Запись подтверждена"), title.getAllValues());
         assertEquals(List.of(
-                "Nərimanov filialı 12 okt, 14:30 üçün rezervasiyanızı qəbul etdi. CC-104821",
-                "Nərimanov branch accepted your booking for 12 Oct, 14:30. CC-104821",
-                "Филиал Nərimanov принял вашу запись на 12 окт, 14:30. CC-104821"), body.getAllValues());
+                "Nərimanov: Növbəniz təsdiqləndi. Vaxt: 12.10.2026, 14:30. Sizi gözləyirik!",
+                "Nərimanov: Your booking is confirmed. Time: 12.10.2026, 14:30. See you soon!",
+                "Nərimanov: Ваша запись подтверждена. Время: 12.10.2026, 14:30. Ждём вас!"), body.getAllValues());
 
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(3)).save(saved.capture());
@@ -99,15 +102,15 @@ class BookingPushServiceTest {
 
         ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"));
+        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"), eq(PUSH_IDS));
         assertEquals(List.of(
-                "Növbə sorğusu ləğv edildi",
-                "Appointment request cancelled",
-                "Запрос на запись отменён"), title.getAllValues());
+                "Servis sorğunu qəbul etmədi",
+                "Service declined your request",
+                "Сервис отклонил заявку"), title.getAllValues());
         assertEquals(List.of(
-                "Nərimanov: Növbə sorğunuz ləğv edildi. Səbəb: Bu gün yer yoxdur.",
-                "Nərimanov: Your appointment request was cancelled. Reason: Bu gün yer yoxdur.",
-                "Nərimanov: Ваш запрос на запись отменён."), body.getAllValues());
+                "Nərimanov: Növbə sorğunuz servis tərəfindən qəbul edilmədi. Səbəb: Bu gün yer yoxdur.",
+                "Nərimanov: The service declined your booking request. Reason: Bu gün yer yoxdur.",
+                "Nərimanov: Сервис отклонил вашу заявку на запись."), body.getAllValues());
 
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(3)).save(saved.capture());
@@ -122,17 +125,43 @@ class BookingPushServiceTest {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
         when(customerRepository.findByUserId(5L)).thenReturn(customer("az"), customer("en"), customer("ru"));
 
-        service.noShow(sample(null));
-        service.cancelled(sample(null));
-        service.noShow(sample("ignored"));
+        service.noShow(sample("Müştəri təyin olunmuş vaxtda gəlmədi"));
+        service.cancelled(sample(null), "pending");
+        service.cancelled(confirmed(), "auto_accepted");
 
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(pushNotificationService, times(3)).send(any(), body.capture(), eq("tok-1"));
+        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"), eq(PUSH_IDS));
         assertEquals(List.of(
-                "Nərimanov: Təyin edilmiş vaxtda yaxınlaşmadığınız üçün növbəniz ləğv edildi (No-show).",
-                "Nərimanov: Your appointment was cancelled. You can book again whenever you like.",
-                "Nərimanov: Ваша запись отменена, так как вы не пришли в назначенное время (No-show)."
+                "Servis növbəni ləğv etdi",
+                "You cancelled your request",
+                "Вы отменили запись"), title.getAllValues());
+        assertEquals(List.of(
+                "Nərimanov: Növbəniz (12.10.2026, 14:30) servis tərəfindən ləğv edildi. Səbəb: Müştəri təyin olunmuş vaxtda gəlmədi.",
+                "Nərimanov: You cancelled your booking request. You can book again at any time.",
+                "Nərimanov: Вы отменили запись (12.10.2026, 14:30). При необходимости вы можете выбрать новое время."
         ), body.getAllValues());
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(3)).save(saved.capture());
+        assertEquals(BookingPushService.TYPE_NO_SHOW, saved.getAllValues().get(0).getType());
+        assertEquals(BookingPushService.TYPE_CANCELLED, saved.getAllValues().get(1).getType());
+        assertEquals(BookingPushService.TYPE_CANCELLED, saved.getAllValues().get(2).getType());
+    }
+
+    @Test
+    void longReasonIsCutAtEightyCharacters() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
+        String reason = "a".repeat(81);
+
+        service.rejected(sample(reason));
+
+        String shown = "a".repeat(77) + "...";
+        verify(pushNotificationService).send(
+                eq("Servis sorğunu qəbul etmədi"),
+                eq("Nərimanov: Növbə sorğunuz servis tərəfindən qəbul edilmədi. Səbəb: " + shown + "."),
+                eq("tok-1"), eq(PUSH_IDS));
     }
 
     @Test
@@ -146,15 +175,15 @@ class BookingPushServiceTest {
 
         ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"));
+        verify(pushNotificationService, times(3)).send(title.capture(), body.capture(), eq("tok-1"), eq(PUSH_IDS));
         assertEquals(List.of(
-                "Növbə tamamlandı",
-                "Appointment completed",
-                "Запись завершена"), title.getAllValues());
+                "Xidmət tamamlandı",
+                "Service completed",
+                "Услуга выполнена"), title.getAllValues());
         assertEquals(List.of(
-                "Nərimanov: Növbəniz uğurla tamamlandı.",
-                "Nərimanov: Your appointment was completed.",
-                "Nərimanov: Ваша запись успешно завершена."), body.getAllValues());
+                "Nərimanov: Xidmət tamamlandı. Bizi seçdiyiniz üçün təşəkkür edirik! Görülən işlərə servis tarixçəsində baxa bilərsiniz.",
+                "Nərimanov: Your service is complete. Thank you for choosing us! You can see the work done in your service history.",
+                "Nərimanov: Услуга выполнена. Спасибо, что выбрали нас! Выполненные работы можно посмотреть в истории обслуживания."), body.getAllValues());
 
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(3)).save(saved.capture());
@@ -172,9 +201,9 @@ class BookingPushServiceTest {
         service.accepted(sample(null));
 
         verify(pushNotificationService).send(
-                eq("Rezervasiya təsdiqləndi"),
-                eq("Nərimanov filialı 12 okt, 14:30 üçün rezervasiyanızı qəbul etdi. CC-104821"),
-                eq("tok-1"));
+                eq("Növbə təsdiqləndi"),
+                eq("Nərimanov: Növbəniz təsdiqləndi. Vaxt: 12.10.2026, 14:30. Sizi gözləyirik!"),
+                eq("tok-1"), eq(PUSH_IDS));
     }
 
     @Test
@@ -188,8 +217,8 @@ class BookingPushServiceTest {
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(saved.capture());
         assertInbox(saved.getValue(), BookingPushService.TYPE_ACCEPTED,
-                "Rezervasiya təsdiqləndi",
-                "Nərimanov filialı 12 okt, 14:30 üçün rezervasiyanızı qəbul etdi. CC-104821");
+                "Növbə təsdiqləndi",
+                "Nərimanov: Növbəniz təsdiqləndi. Vaxt: 12.10.2026, 14:30. Sizi gözləyirik!");
     }
 
     @Test
@@ -206,7 +235,7 @@ class BookingPushServiceTest {
     void fcmFailureDoesNotEscape() {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
         when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
-        doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any());
+        doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any(), any());
 
         assertDoesNotThrow(() -> service.accepted(sample(null)));
         assertDoesNotThrow(() -> service.rejected(sample("yer yoxdur")));
@@ -220,24 +249,69 @@ class BookingPushServiceTest {
     }
 
     @Test
+    void reminderCopyFollowsCustomerLanguage() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(
+                customer("az"), customer("en"), customer("ru"),
+                customer("az"), customer("en"), customer("ru"));
+
+        service.remindDayBefore(confirmed());
+        service.remindDayBefore(confirmed());
+        service.remindDayBefore(confirmed());
+        service.remindSoon(confirmed());
+        service.remindSoon(confirmed());
+        service.remindSoon(confirmed());
+
+        ArgumentCaptor<String> title = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(pushNotificationService, times(6)).send(title.capture(), body.capture(), eq("tok-1"), eq(PUSH_IDS));
+        assertEquals(List.of(
+                "Xatırlatma", "Reminder", "Напоминание",
+                "Xatırlatma", "Reminder", "Напоминание"), title.getAllValues());
+        assertEquals(List.of(
+                "Nərimanov: Sabah növbəniz var. Vaxt: 12.10.2026, 14:30. Sizi gözləyirik!",
+                "Nərimanov: You have a booking tomorrow. Time: 12.10.2026, 14:30. See you soon!",
+                "Nərimanov: Завтра у вас запись. Время: 12.10.2026, 14:30. Ждём вас!",
+                "Nərimanov: Növbənizə təxminən 3 saat qalıb. Vaxt: bu gün, 14:30. Sizi gözləyirik!",
+                "Nərimanov: Your booking is in about 3 hours. Time: today, 14:30. See you soon!",
+                "Nərimanov: До вашей записи осталось примерно 3 часа. Время: сегодня, 14:30. Ждём вас!"),
+                body.getAllValues());
+
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(6)).save(saved.capture());
+        List<Notification> rows = saved.getAllValues();
+        assertInbox(rows.get(0), BookingPushService.TYPE_REMIND_24H, title.getAllValues().get(0), body.getAllValues().get(0));
+        assertInbox(rows.get(3), BookingPushService.TYPE_REMIND_3H, title.getAllValues().get(3), body.getAllValues().get(3));
+    }
+
+    @Test
+    void reminderWithoutStartDoesNotSend() {
+        Booking booking = confirmed();
+        booking.setRange(null);
+        service.remindDayBefore(booking);
+        service.remindSoon(booking);
+        verifyNoInteractions(pushNotificationService);
+    }
+
+    @Test
     void sendWaitsUntilAfterCommit() {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
         when(customerRepository.findByUserId(5L)).thenReturn(customer("en"));
         TransactionSynchronizationManager.initSynchronization();
         try {
             service.accepted(sample(null));
-            verify(pushNotificationService, never()).send(any(), any(), any());
+            verify(pushNotificationService, never()).send(any(), any(), any(), any());
             verify(notificationRepository, never()).save(any());
 
-            doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any());
+            doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any(), any());
             for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
                 assertDoesNotThrow(sync::afterCommit);
             }
             verify(notificationRepository).save(any(Notification.class));
             verify(pushNotificationService).send(
                     eq("Booking confirmed"),
-                    eq("Nərimanov branch accepted your booking for 12 Oct, 14:30. CC-104821"),
-                    eq("tok-1"));
+                    eq("Nərimanov: Your booking is confirmed. Time: 12.10.2026, 14:30. See you soon!"),
+                    eq("tok-1"), eq(PUSH_IDS));
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
@@ -258,6 +332,12 @@ class BookingPushServiceTest {
                 .cancelNote(note)
                 .status("pending")
                 .build();
+    }
+
+    private static Booking confirmed() {
+        Booking booking = sample(null);
+        booking.setStatus("auto_accepted");
+        return booking;
     }
 
     private static Customer customer(String language) {
