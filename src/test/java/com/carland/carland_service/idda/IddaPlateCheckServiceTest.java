@@ -212,6 +212,79 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
+    void guideUser92OnOwnPlatesSkipsTheFullCapAndDoesNotCount() throws Exception {
+        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(92L, "050", "ACTIVE"))
+                .thenReturn(Customer.builder().userId(92L).name("N").surname("M").phoneNumber("050").build());
+        when(brandRepository.existsByIsnew(".")).thenReturn(false);
+        when(brandRepository.findAll()).thenReturn(List.of());
+        when(modelRepository.findAll()).thenReturn(List.of());
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
+        when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        for (String plate : List.of("77 RK 011", "10-SS-001")) {
+            String key = IddaPlateKey.of(plate);
+            List<IddaPlateCheck> ten = new java.util.ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                ten.add(successRow(92L));
+            }
+            when(iddaPlateCheckRepository
+                    .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq(key), any()))
+                    .thenReturn(ten);
+
+            CarResponse response = service.check(plate, "050", "92", "az");
+
+            assertEquals(Boolean.FALSE, response.getIsRestrict(), plate);
+            assertEquals(Boolean.TRUE, response.getFromIdda(), plate);
+        }
+
+        ArgumentCaptor<IddaPlateCheck> saved = ArgumentCaptor.forClass(IddaPlateCheck.class);
+        verify(iddaPlateCheckRepository, times(2)).save(saved.capture());
+        assertEquals("77RK011", saved.getAllValues().get(0).getPlateKey());
+        assertEquals("10SS001", saved.getAllValues().get(1).getPlateKey());
+        assertFalse(saved.getAllValues().get(0).isCountsTowardLimit());
+        assertFalse(saved.getAllValues().get(1).isCountsTowardLimit());
+        verify(digitalFinanceClient, times(2)).exchange(eq("GET"), anyString(), any(), anyString(), any());
+    }
+
+    @Test
+    void guideUserOnAnotherPlateStillHitsTheCap() throws Exception {
+        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(92L, "050", "ACTIVE"))
+                .thenReturn(Customer.builder().userId(92L).name("N").surname("M").phoneNumber("050").build());
+        List<IddaPlateCheck> ten = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            ten.add(successRow(92L));
+        }
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
+                .thenReturn(ten);
+
+        CarResponse response = service.check("77BU669", "050", "92", "az");
+
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertEquals(MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang("az"), response.getMessage());
+        verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    void otherUserOnGuidePlateStillHitsTheCap() throws Exception {
+        customer();
+        List<IddaPlateCheck> ten = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            ten.add(successRow(1L));
+        }
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77RK011"), any()))
+                .thenReturn(ten);
+
+        CarResponse response = service.check("77 RK 011", "050", "7", "az");
+
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertEquals(MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang("az"), response.getMessage());
+        verify(digitalFinanceClient, never()).exchange(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
     void eleventhPlateQueryIsRestrictedAndHidesTheStoredCar() throws Exception {
         customer();
         List<IddaPlateCheck> ten = new java.util.ArrayList<>();

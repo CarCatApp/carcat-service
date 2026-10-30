@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -62,11 +63,19 @@ public class IddaPlateCheckService {
     private static final int USER_LIVE_CAP = 5;
     private static final int PLATE_LIVE_CAP = 10;
     /**
-     * tr: Geçici kullanım kılavuzu. Bu müşteri bu plakada limite takılmaz ve hak yazmaz.
-     * en: Temporary guide. This customer on this plate skips the cap and does not count.
+     * tr: Geçici kullanım kılavuzu. Bu müşteri + plaka çiftleri limite takılmaz ve hak yazmaz.
+     *     55 / 77BU669, 92 / 77RK011, 92 / 10SS001. Araç (plaka) ve kişi (müşteri) hakları ikisi de.
+     * en: Temporary guide. These customer and plate pairs skip the cap and do not count.
+     *     55 / 77BU669, 92 / 77RK011, 92 / 10SS001. Both the plate cap and the customer cap.
      */
-    private static final long GUIDE_USER_ID = 55L;
-    private static final String GUIDE_PLATE_KEY = "77BU669";
+    private static final Set<GuideDemo> GUIDE_DEMOS = Set.of(
+            new GuideDemo(55L, "77BU669"),
+            new GuideDemo(92L, "77RK011"),
+            new GuideDemo(92L, "10SS001")
+    );
+
+    private record GuideDemo(long userId, String plateKey) {
+    }
 
     private final DigitalFinanceClient digitalFinanceClient;
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
@@ -182,7 +191,7 @@ public class IddaPlateCheckService {
     }
 
     private static boolean guideDemo(String plateKey, Long userId) {
-        return GUIDE_PLATE_KEY.equals(plateKey) && Long.valueOf(GUIDE_USER_ID).equals(userId);
+        return userId != null && GUIDE_DEMOS.contains(new GuideDemo(userId, plateKey));
     }
 
     private CarResponse toResponse(IddaPlateCheck row, String acceptLanguage) {
