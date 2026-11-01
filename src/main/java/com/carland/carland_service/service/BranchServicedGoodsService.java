@@ -38,16 +38,29 @@ public class BranchServicedGoodsService {
 
     @Transactional(readOnly = true)
     public BookingBrandModelsResponse list(Long userId, boolean mustChangePassword, String acceptLanguage) {
+        return list(userId, mustChangePassword, null, acceptLanguage);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingBrandModelsResponse list(Long userId, boolean mustChangePassword, Long branchId,
+                                           String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         return bookingBranchBrandsService.groups(branch.getId(), acceptLanguage, true);
     }
 
     @Transactional
     public BookingBrandModelsResponse add(Long userId, boolean mustChangePassword, Long headingId,
                                           StaffServicedGoodSaveRequest body, String acceptLanguage) {
+        return add(userId, mustChangePassword, headingId, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingBrandModelsResponse add(Long userId, boolean mustChangePassword, Long headingId,
+                                          StaffServicedGoodSaveRequest body, Long branchId,
+                                          String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BrandModelService heading = heading(headingId);
         String name = requireName(body);
         rejectDuplicate(branch.getId(), heading.getId(), name, null);
@@ -63,8 +76,15 @@ public class BranchServicedGoodsService {
     @Transactional
     public BookingBrandModelsResponse update(Long userId, boolean mustChangePassword, Long headingId, Long goodId,
                                              StaffServicedGoodSaveRequest body, String acceptLanguage) {
+        return update(userId, mustChangePassword, headingId, goodId, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingBrandModelsResponse update(Long userId, boolean mustChangePassword, Long headingId, Long goodId,
+                                             StaffServicedGoodSaveRequest body, Long branchId,
+                                             String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BranchServicedGood good = owned(branch, headingId, goodId);
         String name = requireName(body);
         rejectDuplicate(branch.getId(), headingId, name, good.getId());
@@ -77,8 +97,14 @@ public class BranchServicedGoodsService {
     @Transactional
     public BookingBrandModelsResponse delete(Long userId, boolean mustChangePassword, Long headingId, Long goodId,
                                              String acceptLanguage) {
+        return delete(userId, mustChangePassword, headingId, goodId, null, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingBrandModelsResponse delete(Long userId, boolean mustChangePassword, Long headingId, Long goodId,
+                                             Long branchId, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         servicedGoodRepository.delete(owned(branch, headingId, goodId));
         return bookingBranchBrandsService.groups(branch.getId(), acceptLanguage, true);
     }
@@ -137,7 +163,10 @@ public class BranchServicedGoodsService {
         return name;
     }
 
-    private Branch resolveBranch(BookingStaff staff) {
+    private Branch resolveBranch(BookingStaff staff, Long branchId, String acceptLanguage) {
+        if (branchId != null) {
+            return bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
+        }
         if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");

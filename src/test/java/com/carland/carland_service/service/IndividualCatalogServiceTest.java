@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -126,6 +127,33 @@ class IndividualCatalogServiceTest {
         assertEquals(30, captor.getValue().getPriceComplex());
         assertFalse(saved.getActive());
         assertEquals(25, saved.getPriceMedium());
+    }
+
+    @Test
+    void setActiveUsesTheBranchThePartnerAdminPicked() {
+        Branch chosen = Branch.builder().id(20L).partner(staff.getPartner()).build();
+        BranchIndividualService row = BranchIndividualService.builder()
+                .id(8L)
+                .branch(chosen)
+                .individualService(catalog)
+                .active(true)
+                .priceSimple(20)
+                .priceMedium(25)
+                .priceComplex(30)
+                .build();
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 20L, "az")).thenReturn(chosen);
+        when(individualServiceRepository.findById(4L)).thenReturn(Optional.of(catalog));
+        when(branchServiceRepository.findByBranch_IdAndIndividualService_Id(20L, 4L)).thenReturn(Optional.of(row));
+        when(branchServiceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.setActive(9L, false, 4L, false, 20L, "az");
+
+        ArgumentCaptor<BranchIndividualService> captor = ArgumentCaptor.forClass(BranchIndividualService.class);
+        verify(branchServiceRepository).save(captor.capture());
+        assertEquals(20L, captor.getValue().getBranch().getId());
+        assertFalse(captor.getValue().getActive());
+        verify(branchRepository, never()).findByPartnerOrderByIdAsc(any());
     }
 
     @Test

@@ -33,9 +33,11 @@ import java.util.Set;
 
 /**
  * tr: Şube fotoğrafı ve staff fotoğrafı. Partner logosu değildir.
- *     Şube yüklemesi yalnızca şube adminidir. Staff fotoğrafı photo:staff:{userId} cache'ini commit sonrası siler.
+ *     Şube fotoğrafını branch admin kendi şubesine, partner admin kendi partnerinin şubesine yükler.
+ *     Staff fotoğrafı photo:staff:{userId} cache'ini commit sonrası siler.
  * en: Branch photo and staff photo. Not the partner logo.
- *     Only a branch admin uploads the branch photo. Staff photo evicts photo:staff:{userId} after commit.
+ *     A branch admin uploads their own branch. A partner admin uploads one branch of their partner.
+ *     Staff photo evicts photo:staff:{userId} after commit.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,33 +52,29 @@ public class StaffMediaService {
     private final RedisCacheService redisCacheService;
 
     /**
-     * tr: Şubenin tek fotoğrafını yazar. Partner admin yasaktır.
-     * en: Writes the branch's single photo. Partner admin is rejected.
+     * tr: Şubenin tek fotoğrafını yazar. branchId partner adminin seçtiği şubedir.
+     *     Branch admin boş branchId ile kendi şubesine yazar. Cache photo:branch commit sonrası düşer.
+     * en: Writes the branch's single photo. branchId is the branch a partner admin picked.
+     *     A branch admin with an empty branchId writes their own branch. photo:branch is evicted after commit.
      */
     @Transactional
     public PhotoResponse uploadBranchPhoto(Long userId, boolean mustChangePassword, MultipartFile file,
-                                            String acceptLanguage) {
+                                            Long branchId, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        if (BookingStaffRole.PARTNER_ADMIN.name().equals(staff.getRole())) {
-            throw new ForbiddenException("Partner admin cannot upload a branch photo");
-        }
-        if (staff.getBranch() == null) {
-            throw new ForbiddenException("branch required");
-        }
+        Branch branch = branchForPhoto(staff, branchId, acceptLanguage);
         byte[] bytes = imageBytes(file);
         String fileType = fileType(bytes, acceptLanguage);
-        BranchPhoto existing = branchPhotoRepository.findByBranchId(staff.getBranch().getId());
+        BranchPhoto existing = branchPhotoRepository.findByBranchId(branch.getId());
         if (existing != null) {
             branchPhotoRepository.delete(existing);
             branchPhotoRepository.flush();
         }
         branchPhotoRepository.save(BranchPhoto.builder()
-                .branchId(staff.getBranch().getId())
-                .fileName("branch " + staff.getBranch().getId())
+                .branchId(branch.getId())
+                .fileName("branch " + branch.getId())
                 .fileType(fileType)
                 .imageData(bytes)
                 .build());
-        Branch branch = staff.getBranch();
         branch.setPhoto("/api/v1/photo/for/branch/get/" + branch.getId());
         branchRepository.save(branch);
         redisCacheService.evictBranchPhotoAfterCommit(branch.getId());
@@ -206,6 +204,16 @@ public class StaffMediaService {
         MediaType mediaType = mediaType(userPhoto.getFileType());
         redisCacheService.putUserPhoto(userKey, mediaType, userPhoto.getImageData());
         return ResponseEntity.ok().contentType(mediaType).body(userPhoto.getImageData());
+    }
+
+    private Branch branchForPhoto(BookingStaff staff, Long branchId, String acceptLanguage) {
+        if (branchId != null) {
+            return bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
+        }
+        if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole()) && staff.getBranch() != null) {
+            return staff.getBranch();
+        }
+        throw MissingFieldException.required("branchId");
     }
 
     private static byte[] imageBytes(MultipartFile file) {

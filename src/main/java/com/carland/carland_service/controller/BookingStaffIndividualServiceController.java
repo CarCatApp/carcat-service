@@ -52,6 +52,7 @@ public class BookingStaffIndividualServiceController {
     public StaffIndividualServiceView setActive(
             HttpServletRequest request,
             @PathVariable Long serviceId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffIndividualServiceActiveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return individualCatalogService.setActive(
@@ -59,6 +60,7 @@ public class BookingStaffIndividualServiceController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 serviceId,
                 body == null ? null : body.getActive(),
+                branchId,
                 acceptLanguage);
     }
 
@@ -70,6 +72,7 @@ public class BookingStaffIndividualServiceController {
     public StaffIndividualServiceView updatePrices(
             HttpServletRequest request,
             @PathVariable Long serviceId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffIndividualServicePricesRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return individualCatalogService.updatePrices(
@@ -77,6 +80,7 @@ public class BookingStaffIndividualServiceController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 serviceId,
                 body,
+                branchId,
                 acceptLanguage);
     }
 }

@@ -86,11 +86,17 @@ public class IndividualCatalogService {
     @Transactional
     public StaffIndividualServiceView setActive(Long userId, boolean mustChangePassword, Long serviceId,
                                                  Boolean active, String acceptLanguage) {
+        return setActive(userId, mustChangePassword, serviceId, active, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffIndividualServiceView setActive(Long userId, boolean mustChangePassword, Long serviceId,
+                                                 Boolean active, Long branchId, String acceptLanguage) {
         if (active == null) {
             throw MissingFieldException.required("active");
         }
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, null, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         IndividualService catalog = requireOffered(serviceId);
         BranchIndividualService row = branchRow(branch, catalog);
         row.setActive(active);
@@ -104,11 +110,18 @@ public class IndividualCatalogService {
     @Transactional
     public StaffIndividualServiceView updatePrices(Long userId, boolean mustChangePassword, Long serviceId,
                                                     StaffIndividualServicePricesRequest body, String acceptLanguage) {
+        return updatePrices(userId, mustChangePassword, serviceId, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffIndividualServiceView updatePrices(Long userId, boolean mustChangePassword, Long serviceId,
+                                                    StaffIndividualServicePricesRequest body, Long branchId,
+                                                    String acceptLanguage) {
         if (body == null) {
             throw MissingFieldException.required("priceSimple");
         }
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, null, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         IndividualService catalog = requireOffered(serviceId);
         BranchIndividualService row = branchRow(branch, catalog);
         row.setPriceSimple(price(body.getPriceSimple(), "priceSimple"));

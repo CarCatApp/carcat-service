@@ -288,17 +288,19 @@ public class PhotoController {
     }
 
     /**
-     * tr: Şubenin tek fotoğrafını yükler. Partner admin reddedilir. Partner logosu değildir.
-     * en: Uploads the branch's single photo. Partner admin is rejected. This is not the partner logo.
+     * tr: Şubenin tek fotoğrafını yükler. branchId partner adminin seçtiği şubedir. Partner logosu değildir.
+     * en: Uploads the branch's single photo. branchId is the branch a partner admin picked. This is not the partner logo.
      */
     @PostMapping(value = "/for/branch/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public PhotoResponse uploadBranchPhoto(HttpServletRequest request,
                                            @RequestPart("file") MultipartFile file,
+                                           @RequestParam(value = "branchId", required = false) Long branchId,
                                            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return staffMediaService.uploadBranchPhoto(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 file,
+                branchId,
                 acceptLanguage);
     }
 

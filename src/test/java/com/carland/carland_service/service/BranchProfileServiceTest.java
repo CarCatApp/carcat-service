@@ -5,11 +5,11 @@ import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchPhoto;
 import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.BrandModelService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStaffRole;
-import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingRepository;
@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
@@ -104,14 +105,50 @@ class BranchProfileServiceTest {
                 .id(2L).titleJson("{\"az\":\"Filtrlər\",\"en\":\"Filters\",\"ru\":\"Фильтры\"}").oil(false).sortOrder(2).build();
     }
 
-    @Test
-    void partnerAdminCannotUploadBranchPhoto() {
-        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
-        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", new byte[] {1, 2, 3});
+    private static final byte[] PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
 
-        assertThrows(ForbiddenException.class,
-                () -> media.uploadBranchPhoto(9L, false, file, "az"));
+    @Test
+    void partnerAdminUploadsPhotoForAChosenBranch() {
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
+        when(bookingStaffAccess.requireWritableBranch(partnerAdmin, 12L, "az")).thenReturn(branch);
+        when(branchPhotoRepository.findByBranchId(12L)).thenReturn(null);
+        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", PNG);
+
+        media.uploadBranchPhoto(9L, false, file, 12L, "az");
+
+        ArgumentCaptor<BranchPhoto> captor = ArgumentCaptor.forClass(BranchPhoto.class);
+        verify(branchPhotoRepository).save(captor.capture());
+        assertEquals(12L, captor.getValue().getBranchId());
+        verify(branchRepository).save(branch);
+        verify(redisCacheService).evictBranchPhotoAfterCommit(12L);
+    }
+
+    @Test
+    void partnerAdminPhotoRequiresABranch() {
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
+        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", PNG);
+
+        assertThrows(MissingFieldException.class,
+                () -> media.uploadBranchPhoto(9L, false, file, null, "az"));
         verify(branchPhotoRepository, never()).save(any());
+    }
+
+    @Test
+    void partnerAdminReadsTheChosenBranchAndMayUploadItsPhoto() {
+        Branch second = Branch.builder().id(20L).partner(branch.getPartner()).name("Ganja").build();
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
+        when(bookingStaffAccess.requireWritableBranch(partnerAdmin, 20L, "az")).thenReturn(second);
+        when(brandModelServiceRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of());
+        when(brandModelRepository.findByBranch_IdOrderByIdAsc(20L)).thenReturn(List.of());
+        when(branchPhotoRepository.existsByBranchId(20L)).thenReturn(false);
+        when(staffPhotoRepository.existsByUserId(9L)).thenReturn(false);
+
+        StaffBranchProfileView view = profile.get(9L, false, 20L, "az");
+
+        assertEquals(20L, view.getBranchId());
+        assertEquals("Ganja", view.getName());
+        assertEquals(Boolean.TRUE, view.getCanUploadBranchPhoto());
     }
 
     @Test

@@ -41,8 +41,12 @@ public class BookingStaffSlotController {
     @PostMapping("/api/v1/booking/staff/slots/generate")
     public StaffSlotGenerateResponse generate(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffSlotGenerateRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        if (body != null && branchId != null) {
+            body.setBranchId(branchId);
+        }
         return staffSlotGenerateService.generate(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
@@ -127,8 +131,12 @@ public class BookingStaffSlotController {
     @PostMapping("/api/v1/booking/staff/slots/day-hidden")
     public void dayHidden(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffSlotDayHiddenRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        if (body != null && branchId != null) {
+            body.setBranchId(branchId);
+        }
         staffSlotEditService.dayHidden(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),

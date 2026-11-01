@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -25,10 +26,12 @@ public class BookingStaffServicedGoodsController {
     @GetMapping("/api/v1/booking/staff/branch/serviced-goods")
     public BookingBrandModelsResponse list(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchServicedGoodsService.list(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
+                branchId,
                 acceptLanguage);
     }
 
@@ -36,6 +39,7 @@ public class BookingStaffServicedGoodsController {
     public BookingBrandModelsResponse add(
             HttpServletRequest request,
             @PathVariable Long headingId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffServicedGoodSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchServicedGoodsService.add(
@@ -43,6 +47,7 @@ public class BookingStaffServicedGoodsController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 headingId,
                 body,
+                branchId,
                 acceptLanguage);
     }
 
@@ -51,6 +56,7 @@ public class BookingStaffServicedGoodsController {
             HttpServletRequest request,
             @PathVariable Long headingId,
             @PathVariable Long goodId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffServicedGoodSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchServicedGoodsService.update(
@@ -59,6 +65,7 @@ public class BookingStaffServicedGoodsController {
                 headingId,
                 goodId,
                 body,
+                branchId,
                 acceptLanguage);
     }
 
@@ -67,12 +74,14 @@ public class BookingStaffServicedGoodsController {
             HttpServletRequest request,
             @PathVariable Long headingId,
             @PathVariable Long goodId,
+            @RequestParam(required = false) Long branchId,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchServicedGoodsService.delete(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 headingId,
                 goodId,
+                branchId,
                 acceptLanguage);
     }
 }

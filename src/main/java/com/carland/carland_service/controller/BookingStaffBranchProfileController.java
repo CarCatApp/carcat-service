@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,58 +33,68 @@ public class BookingStaffBranchProfileController {
     @GetMapping("/api/v1/booking/staff/branch/profile")
     public StaffBranchProfileView get(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.get(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
+                branchId,
                 acceptLanguage);
     }
 
     @PatchMapping("/api/v1/booking/staff/branch/profile")
     public StaffBranchProfileView updateProfile(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffBranchProfileSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateProfile(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
+                branchId,
                 acceptLanguage);
     }
 
     @PatchMapping("/api/v1/booking/staff/branch/working-hours")
     public StaffBranchProfileView updateWorkingHours(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffBranchWorkingHoursRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateWorkingHours(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
+                branchId,
                 acceptLanguage);
     }
 
     @PatchMapping("/api/v1/booking/staff/branch/profile/email")
     public StaffBranchProfileView updateContactEmail(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffBranchProfileSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateContactEmail(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
+                branchId,
                 acceptLanguage);
     }
 
     @PatchMapping("/api/v1/booking/staff/me")
     public StaffBranchProfileView updateStaffName(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffNameSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateStaffName(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 body,
+                branchId,
                 acceptLanguage);
     }
 
@@ -91,6 +102,7 @@ public class BookingStaffBranchProfileController {
     public StaffBranchProfileView addBrandModel(
             HttpServletRequest request,
             @PathVariable Long serviceId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffBrandModelSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.addBrandModel(
@@ -98,6 +110,7 @@ public class BookingStaffBranchProfileController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 serviceId,
                 body,
+                branchId,
                 acceptLanguage);
     }
 
@@ -106,6 +119,7 @@ public class BookingStaffBranchProfileController {
             HttpServletRequest request,
             @PathVariable Long serviceId,
             @PathVariable Long modelId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffBrandModelSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.updateBrandModel(
@@ -114,6 +128,7 @@ public class BookingStaffBranchProfileController {
                 serviceId,
                 modelId,
                 body,
+                branchId,
                 acceptLanguage);
     }
 
@@ -122,12 +137,14 @@ public class BookingStaffBranchProfileController {
             HttpServletRequest request,
             @PathVariable Long serviceId,
             @PathVariable Long modelId,
+            @RequestParam(required = false) Long branchId,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchProfileService.deleteBrandModel(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 serviceId,
                 modelId,
+                branchId,
                 acceptLanguage);
     }
 }

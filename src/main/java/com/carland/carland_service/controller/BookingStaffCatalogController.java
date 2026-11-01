@@ -50,15 +50,16 @@ public class BookingStaffCatalogController {
     public StaffCatalogCategoryView toggle(
             HttpServletRequest request,
             @PathVariable Long categoryId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffCatalogCategoryToggleRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
-        Long branchId = body == null ? null : body.getBranchId();
+        Long chosen = branchId != null ? branchId : (body == null ? null : body.getBranchId());
         Boolean active = body == null ? null : body.getActive();
         return serviceCategoryService.toggle(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
                 categoryId,
-                branchId,
+                chosen,
                 active,
                 acceptLanguage);
     }

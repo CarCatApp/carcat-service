@@ -134,11 +134,17 @@ public class BranchCarePackageService {
     @Transactional
     public StaffCarePackageView setActive(Long userId, boolean mustChangePassword, Long packageId,
                                           Boolean active, String acceptLanguage) {
+        return setActive(userId, mustChangePassword, packageId, active, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffCarePackageView setActive(Long userId, boolean mustChangePassword, Long packageId,
+                                          Boolean active, Long branchId, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         if (active == null) {
             throw MissingFieldException.required("active");
         }
-        Branch branch = resolveBranch(staff, null, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BranchCarePackage row = requirePackage(packageId, branch.getId());
         if (Boolean.TRUE.equals(active) && !Boolean.TRUE.equals(row.getActive())) {
             requireActiveRoom(branch.getId());

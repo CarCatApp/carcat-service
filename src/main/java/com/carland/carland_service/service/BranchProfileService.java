@@ -53,15 +53,32 @@ public class BranchProfileService {
 
     @Transactional(readOnly = true)
     public StaffBranchProfileView get(Long userId, boolean mustChangePassword, String acceptLanguage) {
+        return get(userId, mustChangePassword, null, acceptLanguage);
+    }
+
+    /**
+     * tr: branchId doluysa o şube (partner admin kendi şubelerinden birini seçer). Boşsa eski çözüm.
+     * en: A branchId selects that branch. Partner admin may pick one of their own. Empty keeps the old resolution.
+     */
+    @Transactional(readOnly = true)
+    public StaffBranchProfileView get(Long userId, boolean mustChangePassword, Long branchId,
+                                       String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        return view(staff, resolveBranch(staff, acceptLanguage), acceptLanguage);
+        return view(staff, resolveBranch(staff, branchId, acceptLanguage), acceptLanguage);
     }
 
     @Transactional
     public StaffBranchProfileView updateProfile(Long userId, boolean mustChangePassword,
                                                  StaffBranchProfileSaveRequest body, String acceptLanguage) {
+        return updateProfile(userId, mustChangePassword, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateProfile(Long userId, boolean mustChangePassword,
+                                                 StaffBranchProfileSaveRequest body, Long branchId,
+                                                 String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         if (body == null) {
             throw MissingFieldException.required("name");
         }
@@ -79,8 +96,15 @@ public class BranchProfileService {
     @Transactional
     public StaffBranchProfileView updateWorkingHours(Long userId, boolean mustChangePassword,
                                                       StaffBranchWorkingHoursRequest body, String acceptLanguage) {
+        return updateWorkingHours(userId, mustChangePassword, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateWorkingHours(Long userId, boolean mustChangePassword,
+                                                      StaffBranchWorkingHoursRequest body, Long branchId,
+                                                      String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         StaffBranchWorkingHoursRequest hours = body == null ? new StaffBranchWorkingHoursRequest() : body;
         BranchWorkingHours.write(branch,
                 hours.getWeekdayStart(), hours.getWeekdayEnd(),
@@ -97,8 +121,15 @@ public class BranchProfileService {
     @Transactional
     public StaffBranchProfileView updateContactEmail(Long userId, boolean mustChangePassword,
                                                       StaffBranchProfileSaveRequest body, String acceptLanguage) {
+        return updateContactEmail(userId, mustChangePassword, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateContactEmail(Long userId, boolean mustChangePassword,
+                                                      StaffBranchProfileSaveRequest body, Long branchId,
+                                                      String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         branch.setContactEmail(email(body == null ? null : body.getContactEmail()));
         branchRepository.save(branch);
         return view(staff, branch, acceptLanguage);
@@ -107,6 +138,13 @@ public class BranchProfileService {
     @Transactional
     public StaffBranchProfileView updateStaffName(Long userId, boolean mustChangePassword,
                                                    StaffNameSaveRequest body, String acceptLanguage) {
+        return updateStaffName(userId, mustChangePassword, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateStaffName(Long userId, boolean mustChangePassword,
+                                                   StaffNameSaveRequest body, Long branchId,
+                                                   String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         if (body == null) {
             throw MissingFieldException.required("name");
@@ -119,14 +157,21 @@ public class BranchProfileService {
         }
         staff.setName(name);
         staff.setSurname(surname);
-        return view(staff, resolveBranch(staff, acceptLanguage), acceptLanguage);
+        return view(staff, resolveBranch(staff, branchId, acceptLanguage), acceptLanguage);
     }
 
     @Transactional
     public StaffBranchProfileView addBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
                                                  StaffBrandModelSaveRequest body, String acceptLanguage) {
+        return addBrandModel(userId, mustChangePassword, serviceId, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView addBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
+                                                 StaffBrandModelSaveRequest body, Long branchId,
+                                                 String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BrandModelService heading = heading(serviceId);
         if (body == null) {
             throw MissingFieldException.required("name");
@@ -152,8 +197,15 @@ public class BranchProfileService {
     public StaffBranchProfileView updateBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
                                                     Long modelId, StaffBrandModelSaveRequest body,
                                                     String acceptLanguage) {
+        return updateBrandModel(userId, mustChangePassword, serviceId, modelId, body, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView updateBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
+                                                    Long modelId, StaffBrandModelSaveRequest body, Long branchId,
+                                                    String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BrandModelService heading = heading(serviceId);
         BrandModel model = ownedModel(branch, heading, modelId);
         if (body == null) {
@@ -174,8 +226,14 @@ public class BranchProfileService {
     @Transactional
     public StaffBranchProfileView deleteBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
                                                     Long modelId, String acceptLanguage) {
+        return deleteBrandModel(userId, mustChangePassword, serviceId, modelId, null, acceptLanguage);
+    }
+
+    @Transactional
+    public StaffBranchProfileView deleteBrandModel(Long userId, boolean mustChangePassword, Long serviceId,
+                                                    Long modelId, Long branchId, String acceptLanguage) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
-        Branch branch = resolveBranch(staff, acceptLanguage);
+        Branch branch = resolveBranch(staff, branchId, acceptLanguage);
         BrandModelService heading = heading(serviceId);
         brandModelRepository.delete(ownedModel(branch, heading, modelId));
         return view(staff, branch, acceptLanguage);
@@ -210,7 +268,6 @@ public class BranchProfileService {
                     .build());
         }
         BookingStaff named = staffOnBranch(staff.getUserId(), branch, staff);
-        boolean partnerAdmin = BookingStaffRole.PARTNER_ADMIN.name().equals(staff.getRole());
         return StaffBranchProfileView.builder()
                 .branchId(branch.getId())
                 .completionMode(BranchCompletion.shown(branch.getCompletionMode()))
@@ -221,7 +278,7 @@ public class BranchProfileService {
                 .workingHoursSaturday(BranchWorkingHours.display(BranchWorkingHours.saturdayOf(branch)))
                 .workingHoursSunday(BranchWorkingHours.display(BranchWorkingHours.sundayOf(branch)))
                 .hasPhoto(branchPhotoRepository.existsByBranchId(branch.getId()))
-                .canUploadBranchPhoto(!partnerAdmin)
+                .canUploadBranchPhoto(true)
                 .staffName(named.getName())
                 .staffSurname(named.getSurname())
                 .staffRole(named.getRole())
@@ -257,7 +314,10 @@ public class BranchProfileService {
         return model;
     }
 
-    private Branch resolveBranch(BookingStaff staff, String acceptLanguage) {
+    private Branch resolveBranch(BookingStaff staff, Long branchId, String acceptLanguage) {
+        if (branchId != null) {
+            return bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
+        }
         if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");

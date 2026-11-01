@@ -52,8 +52,10 @@ public class BookingStaffCarePackageController {
     @PostMapping("/api/v1/booking/staff/catalog/care-packages")
     public StaffCarePackageView create(
             HttpServletRequest request,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffCarePackageSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        pinBranch(body, branchId);
         return branchCarePackageService.create(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
@@ -69,8 +71,10 @@ public class BookingStaffCarePackageController {
     public StaffCarePackageView update(
             HttpServletRequest request,
             @PathVariable Long packageId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffCarePackageSaveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        pinBranch(body, branchId);
         return branchCarePackageService.update(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
@@ -87,6 +91,7 @@ public class BookingStaffCarePackageController {
     public StaffCarePackageView setActive(
             HttpServletRequest request,
             @PathVariable Long packageId,
+            @RequestParam(required = false) Long branchId,
             @RequestBody StaffCarePackageActiveRequest body,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         return branchCarePackageService.setActive(
@@ -94,6 +99,14 @@ public class BookingStaffCarePackageController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 packageId,
                 body == null ? null : body.getActive(),
+                branchId,
                 acceptLanguage);
+    }
+
+    /** Query branchId is the branch the partner admin picked. It wins over a missing body id. */
+    private static void pinBranch(StaffCarePackageSaveRequest body, Long branchId) {
+        if (body != null && branchId != null) {
+            body.setBranchId(branchId);
+        }
     }
 }

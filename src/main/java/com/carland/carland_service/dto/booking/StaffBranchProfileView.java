@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * tr: Şube profili. canUploadBranchPhoto partner adminde false.
- * en: Branch profile. canUploadBranchPhoto is false for a partner admin.
+ * tr: Şube profili. canUploadBranchPhoto, bu şubeyi yazabilen staff için true.
+ * en: Branch profile. canUploadBranchPhoto is true when this staff may write the branch.
  */
 @Data
 @Builder
