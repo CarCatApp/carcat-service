@@ -1360,6 +1360,7 @@ public class CarServiceImpl implements CarService {
                     .customer(customer)
                     .maintenanceTemplate(maintenanceTemplate)
                     .vinProvidedFields(carRequest.getVinProvidedFields())
+                    .path(Car.PATH_VIN)
                     .build();
             CarIddaColor.apply(newCar, carRequest.getColorId(), carRequest.getIddaColor());
 
@@ -1515,6 +1516,7 @@ public class CarServiceImpl implements CarService {
         if (carRequest.getVinProvidedFields() != null) {
             car.setVinProvidedFields(carRequest.getVinProvidedFields());
         }
+        car.setPath(Car.PATH_VIN);
         car.setUpdatedAt(LocalDateTime.now());
         log.info("[addCar] applied request onto existing car | carId={}, colorId={}, plateNumber={}, brand={}, model={}",
                 car.getCarId(), car.getColorId(), car.getPlateNumber(), car.getBrand(), car.getModel());

@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/admin/admin.css?v=brand1">
   <style>
     col.c-hist     { width: 100px; }
+    col.c-owner    { width: 220px; }
+    col.c-path     { width: 72px; }
     col.c-vin      { width: 165px; }
     col.c-hyper    { width: 118px; }
     col.c-plate    { width: 105px; }
@@ -20,7 +22,7 @@
     col.c-mileage  { width: 90px; }
     col.c-created  { width: 160px; }
     col.c-updated  { width: 160px; }
-    .data-table { min-width: 1300px; }
+    .data-table { min-width: 1580px; }
     .vin-input { font-family: ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; }
   </style>
 </head>
@@ -54,7 +56,7 @@
   </div>
   <div class="topbar-actions">
     <a class="btn btn-excel"
-       th:href="@{/admin/cars/export(userId=${filterUserId}, vin=${filterVin})}">
+       th:href="@{/admin/cars/export(userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}">
       <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Excel
     </a>
@@ -72,7 +74,7 @@
 
   <div class="filter-banner" th:if="${filterUserId != null}">
     <span>Sadece <strong th:text="'User #' + ${filterUserId}"></strong> kullanıcısının araçları gösteriliyor</span>
-    <a th:href="@{/admin/cars(vin=${filterVin})}">Tüm araçları göster &#215;</a>
+    <a th:href="@{/admin/cars(vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}">Tüm araçları göster &#215;</a>
     <a href="/admin/users">&#8592; Users listesine dön</a>
   </div>
 
@@ -83,8 +85,29 @@
       <input class="vin-input" type="text" id="vin" name="vin" maxlength="17" spellcheck="false" autocomplete="off"
              placeholder="WBAJA9C5…" th:value="${filterVin}">
     </div>
+    <div class="filter-field">
+      <label for="plate">Plate</label>
+      <input class="vin-input" type="text" id="plate" name="plate" maxlength="32" spellcheck="false" autocomplete="off"
+             placeholder="10 BB 110" th:value="${filterPlate}">
+    </div>
+    <div class="filter-field">
+      <label for="owner">Owner</label>
+      <select id="owner" name="owner">
+        <option value="all" th:selected="${filterOwner == 'all'}">all</option>
+        <option value="sahipli" th:selected="${filterOwner == 'sahipli'}">sahipli</option>
+        <option value="sahipsiz" th:selected="${filterOwner == 'sahipsiz'}">sahipsiz</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="path">Path</label>
+      <select id="path" name="path">
+        <option value="all" th:selected="${filterPath == 'all'}">all</option>
+        <option value="vin" th:selected="${filterPath == 'vin'}">vin</option>
+        <option value="plate" th:selected="${filterPath == 'plate'}">plate</option>
+      </select>
+    </div>
     <button class="btn btn-filter" type="submit">Ara</button>
-    <a class="btn btn-clear" th:if="${filterVin != null}"
+    <a class="btn btn-clear" th:if="${filterVin != null || filterPlate != null || filterOwner != 'all' || filterPath != 'all'}"
        th:href="${filterUserId != null} ? @{/admin/cars(userId=${filterUserId})} : @{/admin/cars}">Temizle</a>
   </form>
 
@@ -93,6 +116,8 @@
       <table class="data-table" id="carsTable">
         <colgroup>
           <col class="c-hist">
+          <col class="c-owner">
+          <col class="c-path">
           <col class="c-vin">
           <col class="c-hyper">
           <col class="c-plate">
@@ -109,6 +134,8 @@
         <thead>
         <tr>
           <th></th>
+          <th>Owner</th>
+          <th>Path</th>
           <th>VIN</th>
           <th title="Partner 1, branch 10. A Hyper visit with an empty branch counts.">Hyper visited</th>
           <th>Plate Number</th>
@@ -128,6 +155,8 @@
           <td>
             <a class="btn-cars" th:href="@{/admin/cars/{id}/history(id=${car.carId})}">History</a>
           </td>
+          <td th:text="${T(com.carland.carland_service.util.AdminCarLabels).ownerLine(car.customer)}"></td>
+          <td th:text="${T(com.carland.carland_service.util.AdminCarLabels).pathOf(car)}"></td>
           <td class="vin" th:text="${car.vin}" th:title="${car.vin}"></td>
           <td>
             <span class="badge badge-success" th:if="${hyperVisitedCarIds.contains(car.carId)}">Yes</span>
@@ -155,7 +184,7 @@
               th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
         </tr>
         <tr class="empty-row" th:if="${cars.content.isEmpty()}">
-          <td colspan="13">Kayıt bulunamadı</td>
+          <td colspan="15">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -168,24 +197,24 @@
       <nav class="pages">
         <a class="page-arrow"
            th:classappend="${currentPage == 1} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage - 1}, userId=${filterUserId}, vin=${filterVin})}">
+           th:href="@{/admin/cars(page=${currentPage - 1}, userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}">
           &#8592; Previous
         </a>
         <a class="page-link" th:if="${windowStart > 1}"
-           th:href="@{/admin/cars(page=1, userId=${filterUserId}, vin=${filterVin})}">1</a>
+           th:href="@{/admin/cars(page=1, userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}">1</a>
         <span class="ellipsis" th:if="${windowStart > 2}">&#8230;</span>
         <a th:each="p : ${#numbers.sequence(windowStart, windowEnd)}"
            class="page-link"
            th:classappend="${p == currentPage} ? 'active'"
-           th:href="@{/admin/cars(page=${p}, userId=${filterUserId}, vin=${filterVin})}"
+           th:href="@{/admin/cars(page=${p}, userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}"
            th:text="${p}">1</a>
         <span class="ellipsis" th:if="${windowEnd < totalPages - 1}">&#8230;</span>
         <a class="page-link" th:if="${windowEnd < totalPages}"
-           th:href="@{/admin/cars(page=${totalPages}, userId=${filterUserId}, vin=${filterVin})}"
+           th:href="@{/admin/cars(page=${totalPages}, userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}"
            th:text="${totalPages}"></a>
         <a class="page-arrow"
            th:classappend="${currentPage >= totalPages} ? 'disabled'"
-           th:href="@{/admin/cars(page=${currentPage + 1}, userId=${filterUserId}, vin=${filterVin})}">
+           th:href="@{/admin/cars(page=${currentPage + 1}, userId=${filterUserId}, vin=${filterVin}, plate=${filterPlate}, owner=${filterOwner}, path=${filterPath})}">
           Next &#8594;
         </a>
       </nav>
@@ -196,8 +225,8 @@
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("carsTable"),
-    "carland-admin-cols-cars-v3",
-    ["History", "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
+    "carland-admin-cols-cars-v4",
+    ["History", "Owner", "Path", "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
     []
   );
   CarlandAdmin.initExpandCells(".cell-clip");

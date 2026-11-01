@@ -23,6 +23,7 @@ import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.repository.PartnerRepository;
+import com.carland.carland_service.util.AdminCarLabels;
 import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
@@ -170,9 +171,13 @@ public class AdminController {
     // ==================== CARS ====================
 
     /**
-     * tr: Araç listesini sayfa sayfa gösterir; VIN / userId filtresi, carId DESC (yeni kayıt üstte).
+     * tr: Araç listesini sayfa sayfa gösterir; VIN / plaka / sahip / path / userId filtresi, carId DESC (yeni kayıt üstte).
+     *     Plaka: 10-BB-110, 10BB110 ve 10 BB 110 aynı aracı bulur.
+     *     Sahip: sahipli, sahipsiz, all. Path: vin, plate, all. Boş path vin sayılır.
      *     Hyper visited: partner 1 ve şube 10 (boş branch_id dahil) en az bir visit. Redis yok, DB.
-     * en: Paginated car list; VIN / userId filters, carId DESC (newest first).
+     * en: Paginated car list; VIN / plate / owner / path / userId filters, carId DESC (newest first).
+     *     Plate: 10-BB-110, 10BB110 and 10 BB 110 find the same car.
+     *     Owner: sahipli, sahipsiz, all. Path: vin, plate, all. A blank path counts as vin.
      *     Hyper visited: at least one visit for partner 1 and branch 10 (null branch_id included). DB, not Redis.
      */
     @GetMapping("/admin/cars")
@@ -180,6 +185,9 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String vin,
+            @RequestParam(required = false) String plate,
+            @RequestParam(defaultValue = "all") String owner,
+            @RequestParam(defaultValue = "all") String path,
             HttpServletRequest request,
             Model model
     ) {
@@ -193,8 +201,12 @@ public class AdminController {
         if (vinFilter != null) {
             vinFilter = vinFilter.replace(" ", "");
         }
+        String plateFilter = blankToNull(plate);
+        String ownerFilter = ownerLabel(owner);
+        String pathFilter = pathLabel(path);
         Pageable pageable = PageRequest.of(pageIndex, PAGE_SIZE, Sort.by(Sort.Direction.DESC, "carId"));
-        Page<Car> carPage = carRepository.findAll(CarSpec.filters(userId, vinFilter), pageable);
+        Page<Car> carPage = carRepository.findAll(
+                CarSpec.filters(userId, vinFilter, plateFilter, ownerFilter, pathFilter), pageable);
         List<Long> carIds = carPage.getContent().stream().map(Car::getCarId).toList();
 
         addPaginationAttributes(model, carPage.getTotalPages(), pageIndex);
@@ -202,6 +214,9 @@ public class AdminController {
         model.addAttribute("cars", carPage);
         model.addAttribute("filterUserId", userId);
         model.addAttribute("filterVin", vinFilter);
+        model.addAttribute("filterPlate", plateFilter);
+        model.addAttribute("filterOwner", ownerFilter);
+        model.addAttribute("filterPath", pathFilter);
         model.addAttribute("hyperVisitedCarIds", visitHistoryService.carIdsWithHyperBranchVisit(carIds));
 
         return "cars";
@@ -216,6 +231,9 @@ public class AdminController {
     public void exportCars(
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String vin,
+            @RequestParam(required = false) String plate,
+            @RequestParam(defaultValue = "all") String owner,
+            @RequestParam(defaultValue = "all") String path,
             HttpServletRequest request,
             HttpServletResponse response
     ) throws IOException {
@@ -229,8 +247,11 @@ public class AdminController {
         if (vinFilter != null) {
             vinFilter = vinFilter.replace(" ", "");
         }
+        String plateFilter = blankToNull(plate);
+        String ownerFilter = ownerLabel(owner);
+        String pathFilter = pathLabel(path);
         List<Car> cars = carRepository.findAll(
-                CarSpec.filters(userId, vinFilter),
+                CarSpec.filters(userId, vinFilter, plateFilter, ownerFilter, pathFilter),
                 Sort.by(Sort.Direction.DESC, "carId"));
         Set<Long> hyperVisited = hyperVisitedIds(cars);
 
@@ -239,7 +260,7 @@ public class AdminController {
             Sheet sheet = workbook.createSheet("Cars");
 
             String[] headers = {
-                    "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Model Year",
+                    "VIN", "Path", "Owner", "Phone", "Hyper visited", "Plate Number", "Brand", "Model", "Model Year",
                     "Engine Type", "Engine Type ID", "Engine Volume",
                     "Transmission Type", "Body Type", "Mileage",
                     "Created At", "Updated At"
@@ -251,24 +272,30 @@ public class AdminController {
             for (Car car : cars) {
 
                 Row row = sheet.createRow(rowIndex++);
+                Customer carOwner = car.getCustomer();
 
                 setCell(row, 0, car.getVin());
-                setCell(row, 1, hyperVisited.contains(car.getCarId()) ? "Yes" : "No");
-                setCell(row, 2, PlateNumbers.format(car.getPlateNumber()));
-                setCell(row, 3, car.getBrand());
-                setCell(row, 4, car.getModel());
-                setNumericCell(row, 5, car.getModelYear());
-                setCell(row, 6, car.getEngineType());
-                setNumericCell(row, 7, car.getEngineTypeId());
-                setNumericCell(row, 8, car.getEngineVolume());
-                setCell(row, 9, car.getTransmissionType());
-                setCell(row, 10, car.getBodyType());
-                setNumericCell(row, 11, car.getMileage());
-                setCell(row, 12, formatDate(car.getCreatedAt()));
-                setCell(row, 13, formatDate(car.getUpdatedAt()));
+                setCell(row, 1, AdminCarLabels.pathOf(car));
+                setCell(row, 2, AdminCarLabels.ownerName(carOwner));
+                setCell(row, 3, AdminCarLabels.ownerPhone(carOwner));
+                setCell(row, 4, hyperVisited.contains(car.getCarId()) ? "Yes" : "No");
+                setCell(row, 5, PlateNumbers.format(car.getPlateNumber()));
+                setCell(row, 6, car.getBrand());
+                setCell(row, 7, car.getModel());
+                setNumericCell(row, 8, car.getModelYear());
+                setCell(row, 9, car.getEngineType());
+                setNumericCell(row, 10, car.getEngineTypeId());
+                setNumericCell(row, 11, car.getEngineVolume());
+                setCell(row, 12, car.getTransmissionType());
+                setCell(row, 13, car.getBodyType());
+                setNumericCell(row, 14, car.getMileage());
+                setCell(row, 15, formatDate(car.getCreatedAt()));
+                setCell(row, 16, formatDate(car.getUpdatedAt()));
             }
 
-            String baseName = (userId != null || vinFilter != null) ? "cars-filtered" : "cars";
+            String baseName = (userId != null || vinFilter != null || plateFilter != null
+                    || !CarSpec.OWNER_ALL.equals(ownerFilter) || !CarSpec.PATH_ALL.equals(pathFilter))
+                    ? "cars-filtered" : "cars";
             writeWorkbook(workbook, sheet, headers.length, baseName, response);
         }
     }
@@ -534,6 +561,7 @@ public class AdminController {
         model.addAttribute("users", pageContent);
         model.addAttribute("simaByUserId", simaByUserId);
         model.addAttribute("totalUsers", allUsers.size());
+        model.addAttribute("activeUsers", countActiveUsers(allUsers));
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         model.addAttribute("filterPhone", phoneFilter);
@@ -878,6 +906,28 @@ public class AdminController {
         }
         String v = withPhoto.trim();
         return "1".equals(v) || "true".equalsIgnoreCase(v) || "on".equalsIgnoreCase(v);
+    }
+
+    /** tr: all dışındaki sahip filtresi. Bilinmeyen değer all olur. / en: Owner filter other than all. An unknown value becomes all. */
+    private static String ownerLabel(String raw) {
+        String key = CarSpec.ownerKey(raw);
+        return key == null ? CarSpec.OWNER_ALL : key;
+    }
+
+    /** tr: all dışındaki path filtresi. Bilinmeyen değer all olur. / en: Path filter other than all. An unknown value becomes all. */
+    private static String pathLabel(String raw) {
+        String key = CarSpec.pathKey(raw);
+        return key == null ? CarSpec.PATH_ALL : key;
+    }
+
+    private static int countActiveUsers(List<AuthUser> users) {
+        int active = 0;
+        for (AuthUser user : users) {
+            if (user != null && "ACTIVE".equals(user.getStatus())) {
+                active++;
+            }
+        }
+        return active;
     }
 
     private static String blankToNull(String raw) {

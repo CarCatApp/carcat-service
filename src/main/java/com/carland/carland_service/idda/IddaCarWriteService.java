@@ -120,6 +120,7 @@ public class IddaCarWriteService {
         }
         applyRegistryColor(car, snapshot, carRequest);
         car.setIddaProvidedFields(lockedFields(car));
+        car.setPath(Car.PATH_PLATE);
         if (car.getEngineTypeId() == null && carRequest.getEngineTypeId() != null) {
             EngineType engineType = engineTypeRepository.findByEngineTypeId(carRequest.getEngineTypeId());
             if (engineType != null) {
@@ -162,6 +163,7 @@ public class IddaCarWriteService {
                 .customer(customer)
                 .maintenanceTemplate(template)
                 .fromIdda(true)
+                .path(Car.PATH_PLATE)
                 .build();
         applyRegistryColor(car, snapshot, carRequest);
         car.setIddaProvidedFields(lockedFields(car));

@@ -101,6 +101,7 @@ class IddaCarWriteServiceTest {
         assertEquals(5L, vinCar.getEngineTypeId());
         assertEquals(9L, vinCar.getCustomer().getUserId());
         assertTrue(vinCar.getFromIdda());
+        assertEquals("plate", vinCar.getPath());
         assertNull(plateCar.getCustomer());
         verify(redisCacheService).evictCarListAfterCommit("4");
         verify(redisCacheService).evictCarListAfterCommit("3");
@@ -132,6 +133,7 @@ class IddaCarWriteServiceTest {
         IddaAddResult result = service.add(request(6L), "050", "9", "az");
 
         assertTrue(result.created());
+        assertEquals("plate", result.car().getPath());
         assertEquals("19XZE4F54NE012640", result.car().getVin());
         assertEquals("OLDVIN", plateCar.getVin());
         assertNull(plateCar.getCustomer());

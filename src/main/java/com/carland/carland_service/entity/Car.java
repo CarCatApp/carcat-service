@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -25,6 +26,11 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Table(name = "cars")
 public class Car {
+
+    /** VIN add car. */
+    public static final String PATH_VIN = "vin";
+    /** Plate check add car. */
+    public static final String PATH_PLATE = "plate";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -97,6 +103,19 @@ public class Car {
     @Column(name = "idda_provided_fields")
     private List<String> iddaProvidedFields;
 
+    /**
+     * tr: Son ekleme yolu. {@code vin} = VIN add, {@code plate} = plate check.
+     *     Kolon varsayılanı vin. Eski satırda idda_provided_fields doluysa plate.
+     *     Bundan sonra yazan akış (VIN add veya plate check) bu alanı kendi değeriyle ezer.
+     * en: Last add path. {@code vin} = VIN add, {@code plate} = plate check.
+     *     Column default is vin. An older row with idda_provided_fields set is plate.
+     *     From now on the writing flow (VIN add or plate check) overwrites this with its own value.
+     */
+    @Column(name = "path", nullable = false, length = 16)
+    @ColumnDefault("'vin'")
+    @Builder.Default
+    private String path = PATH_VIN;
+
     /** Partner ids ({@code partners.id}) where this car received service. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "serviced_partner_ids")
@@ -120,6 +139,9 @@ public class Car {
         }
         if (servicedPartnerIds == null) {
             servicedPartnerIds = new ArrayList<>();
+        }
+        if (path == null || path.isBlank()) {
+            path = PATH_VIN;
         }
     }
 
