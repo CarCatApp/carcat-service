@@ -115,6 +115,10 @@ public class StaffBookingService {
             result = board
                     ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, BOARD_STATUSES, pageable)
                     : bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(branchId, wanted, pageable);
+        } else if (BookingStaffRole.HEAD_ADMIN.name().equals(staff.getRole())) {
+            result = board
+                    ? bookingRepository.findVisibleOnActiveBranchesAndStatusIn(BOARD_STATUSES, pageable)
+                    : bookingRepository.findVisibleOnActiveBranchesAndStatus(wanted, pageable);
         } else if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");

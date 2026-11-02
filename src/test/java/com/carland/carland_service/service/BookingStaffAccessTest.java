@@ -46,6 +46,22 @@ class BookingStaffAccessTest {
     }
 
     @Test
+    void headAdminCanWriteAnotherPartnersActiveBranch() {
+        Partner home = Partner.builder().id(1L).name("Anchor").active(true).build();
+        Partner other = Partner.builder().id(4L).name("Other").active(true).build();
+        Branch branch = Branch.builder().id(20L).name("Ganja").partner(other).active(true).build();
+        BookingStaff staff = BookingStaff.builder()
+                .userId(18L)
+                .partner(home)
+                .role(BookingStaffRole.HEAD_ADMIN.name())
+                .status(BookingStaffStatus.ACTIVE.name())
+                .build();
+        when(branchRepository.findById(20L)).thenReturn(Optional.of(branch));
+
+        assertEquals(branch, access.requireWritableBranch(staff, 20L, "az"));
+    }
+
+    @Test
     void branchAdminCannotWriteOtherBranch() {
         Partner partner = Partner.builder().id(1L).name("HS").build();
         Branch mine = Branch.builder().id(10L).name("Mine").partner(partner).build();

@@ -184,7 +184,9 @@ public class StaffMediaService {
         if (customerUserId == null) {
             throw MissingFieldException.required("userId");
         }
-        boolean allowed = BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())
+        boolean allowed = BookingStaffRole.HEAD_ADMIN.name().equals(staff.getRole())
+                ? bookingRepository.existsByCustomerUserId(customerUserId)
+                : BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())
                 ? staff.getBranch() != null && bookingRepository.existsByCustomerUserIdAndBranch_Id(
                         customerUserId, staff.getBranch().getId())
                 : staff.getPartner() != null && bookingRepository.existsByCustomerUserIdAndBranch_Partner_Id(

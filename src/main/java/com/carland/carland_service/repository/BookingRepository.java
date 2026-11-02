@@ -120,6 +120,52 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
     Page<Booking> findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(
             @Param("partnerId") Long partnerId, @Param("statuses") Collection<String> statuses, Pageable pageable);
 
+    /**
+     * tr: Head admin tahtası. Aktif şube ve aktif partner. Gizli satır yok.
+     * en: Head-admin board. Active branch and active partner. Hidden rows stay out.
+     */
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                      and (b.branch.active is null or b.branch.active = true)
+                      and (b.branch.partner.active is null or b.branch.partner.active = true)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.status = :status
+                      and (b.staffHidden is null or b.staffHidden = false)
+                      and (b.branch.active is null or b.branch.active = true)
+                      and (b.branch.partner.active is null or b.branch.partner.active = true)
+                    """
+    )
+    Page<Booking> findVisibleOnActiveBranchesAndStatus(
+            @Param("status") String status, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                      and (b.branch.active is null or b.branch.active = true)
+                      and (b.branch.partner.active is null or b.branch.partner.active = true)
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.status in :statuses
+                      and (b.staffHidden is null or b.staffHidden = false)
+                      and (b.branch.active is null or b.branch.active = true)
+                      and (b.branch.partner.active is null or b.branch.partner.active = true)
+                    """
+    )
+    Page<Booking> findVisibleOnActiveBranchesAndStatusIn(
+            @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    boolean existsByCustomerUserId(Long customerUserId);
+
     List<Booking> findByRange_RangeIdAndStatus(Long rangeId, String status);
 
     List<Booking> findByRange_RangeIdInAndStatusIn(Collection<Long> rangeIds, Collection<String> statuses);

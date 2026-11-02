@@ -41,7 +41,8 @@ public class Helper {
             return;
         }
         if (UserRoles.PARTNER_ADMIN.name().equals(normalized)
-                || UserRoles.BRANCH_ADMIN.name().equals(normalized)) {
+                || UserRoles.BRANCH_ADMIN.name().equals(normalized)
+                || UserRoles.HEAD_ADMIN.name().equals(normalized)) {
             log.info("Service-side {} row skipped; booking_staff/auth users own this role userId={}",
                     normalized, userId);
             return;

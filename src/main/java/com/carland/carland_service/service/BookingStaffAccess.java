@@ -76,14 +76,18 @@ public class BookingStaffAccess {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessagesLangValues.AUTO_SERVICE_NOT_FOUND.getMessageByLang(acceptLanguage)));
-        if (!branch.getPartner().getId().equals(staff.getPartner().getId())) {
+        String role = staff.getRole();
+        boolean head = BookingStaffRole.HEAD_ADMIN.name().equals(role);
+        if (!head && (staff.getPartner() == null
+                || !branch.getPartner().getId().equals(staff.getPartner().getId()))) {
             throw new ConflictException(MessagesLangValues.INVALID_ROLE_PERMISSION.getMessageByLang(acceptLanguage));
         }
-        if (Boolean.FALSE.equals(branch.getActive()) || Boolean.FALSE.equals(branch.getPartner().getActive())) {
+        if (branch.getPartner() == null
+                || Boolean.FALSE.equals(branch.getActive())
+                || Boolean.FALSE.equals(branch.getPartner().getActive())) {
             throw new ForbiddenException(MessagesLangValues.COOPERATION_SUSPENDED.getMessageByLang(acceptLanguage));
         }
-        String role = staff.getRole();
-        if (BookingStaffRole.PARTNER_ADMIN.name().equals(role)) {
+        if (head || BookingStaffRole.PARTNER_ADMIN.name().equals(role)) {
             return branch;
         }
         if (BookingStaffRole.BRANCH_ADMIN.name().equals(role)) {

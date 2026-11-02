@@ -6,5 +6,7 @@ package com.carland.carland_service.enums;
  */
 public enum BookingStaffRole {
     PARTNER_ADMIN,
-    BRANCH_ADMIN
+    BRANCH_ADMIN,
+    /** Whole company. Sees every active branch on the partner dashboard. */
+    HEAD_ADMIN
 }
