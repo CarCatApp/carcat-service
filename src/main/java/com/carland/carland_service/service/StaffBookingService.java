@@ -213,14 +213,16 @@ public class StaffBookingService {
             }
         }
         tab.sort((left, right) -> compareBooking(left, right, newest));
+        boolean wholeList = everyStatus;
         int totalForTab = tab.size();
-        int totalPages = totalForTab == 0 ? 1 : (totalForTab + HEAD_PAGE - 1) / HEAD_PAGE;
+        int totalPages = wholeList || totalForTab == 0 ? 1 : (totalForTab + HEAD_PAGE - 1) / HEAD_PAGE;
         int requested = page == null || page < 1 ? 1 : page;
-        int safePage = Math.min(requested, totalPages);
-        int fromIndex = Math.min((safePage - 1) * HEAD_PAGE, totalForTab);
-        int toIndex = Math.min(fromIndex + HEAD_PAGE, totalForTab);
+        int safePage = wholeList ? 1 : Math.min(requested, totalPages);
+        int fromIndex = wholeList ? 0 : Math.min((safePage - 1) * HEAD_PAGE, totalForTab);
+        int toIndex = wholeList ? totalForTab : Math.min(fromIndex + HEAD_PAGE, totalForTab);
         List<Booking> pageRows = new ArrayList<>(tab.subList(fromIndex, toIndex));
-        return respond(pageRows, safePage, HEAD_PAGE, timezone, acceptLanguage, newest,
+        return respond(pageRows, safePage, wholeList ? Math.max(pageRows.size(), 1) : HEAD_PAGE,
+                timezone, acceptLanguage, newest,
                 pending, confirmed, completed, rejected, totalPages);
     }
 
