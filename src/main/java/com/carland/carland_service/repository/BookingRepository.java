@@ -233,6 +233,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
             @Param("phone") String phone,
             Pageable pageable);
 
+    /**
+     * tr: Head sayaç. Like ve tekrar eden parametre yok; o sayım 0 dönüyordu, liste ise satır getiriyordu.
+     * en: Head counter. No like and no repeated parameters; that count returned 0 while the list returned rows.
+     */
+    @Query("""
+            select count(b) from Booking b
+            where b.status in :statuses
+              and (b.staffHidden is null or b.staffHidden = false)
+              and (b.branch.active is null or b.branch.active = true)
+              and (b.branch.partner.active is null or b.branch.partner.active = true)
+            """)
+    long countHeadOpen(@Param("statuses") Collection<String> statuses);
+
     @Query("select count(b) from Booking b " + HEAD_WHERE)
     long countHead(
             @Param("statuses") Collection<String> statuses,

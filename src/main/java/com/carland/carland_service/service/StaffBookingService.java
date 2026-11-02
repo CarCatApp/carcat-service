@@ -187,16 +187,19 @@ public class StaffBookingService {
         String firstNeedle = textNeedle(firstName);
         String lastNeedle = textNeedle(lastName);
         String phoneNeedle = phoneNeedle(phone);
-        long pending = bookingRepository.countHead(PENDING_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long confirmed = bookingRepository.countHead(CONFIRMED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long completed = bookingRepository.countHead(COMPLETED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long rejected = bookingRepository.countHead(REJECTED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        boolean open = vinNeedle.isEmpty() && plateNeedle.isEmpty() && firstNeedle.isEmpty()
+                && lastNeedle.isEmpty() && phoneNeedle.isEmpty()
+                && DAY_MIN.equals(from) && DAY_MAX.equals(to);
+        long pending = headCount(open, PENDING_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long confirmed = headCount(open, CONFIRMED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long completed = headCount(open, COMPLETED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long rejected = headCount(open, REJECTED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
         long total = switch (wanted) {
             case "pending" -> pending;
             case "confirmed" -> confirmed;
             case "completed" -> completed;
             case "rejected" -> rejected;
-            default -> bookingRepository.countHead(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+            default -> headCount(open, statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
         };
         int totalPages = total == 0 ? 1 : (int) ((total + HEAD_PAGE - 1) / HEAD_PAGE);
         int requested = page == null || page < 1 ? 1 : page;
@@ -207,6 +210,14 @@ public class StaffBookingService {
                 : bookingRepository.findHeadByDayAsc(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle, pageable);
         return respond(result.getContent(), safePage, HEAD_PAGE, timezone, acceptLanguage, newest,
                 pending, confirmed, completed, rejected, totalPages);
+    }
+
+    private long headCount(boolean open, List<String> statuses, LocalDate from, LocalDate to,
+                           String vin, String plate, String firstName, String lastName, String phone) {
+        if (open) {
+            return bookingRepository.countHeadOpen(statuses);
+        }
+        return bookingRepository.countHead(statuses, from, to, vin, plate, firstName, lastName, phone);
     }
 
     private long countBranch(Long branchId, Long partnerId, List<String> statuses) {

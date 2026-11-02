@@ -178,7 +178,7 @@ class StaffBookingServiceTest {
     void headAdminPagesEveryActiveBranchByDay() {
         staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
-        when(bookingRepository.countHead(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+        when(bookingRepository.countHeadOpen(any())).thenAnswer(invocation -> {
             Collection<?> statuses = invocation.getArgument(0);
             if (statuses.size() == 1 && statuses.contains("pending")) {
                 return 2L;
