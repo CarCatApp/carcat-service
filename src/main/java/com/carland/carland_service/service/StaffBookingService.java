@@ -71,6 +71,8 @@ public class StaffBookingService {
     static final String DEFAULT_TZ = "Asia/Baku";
     static final String BOARD = "board";
     private static final int HEAD_PAGE = 20;
+    /** tr: Sayacı ayrı sorgudan almıyoruz. Listeyi dolduran select'in kendisini sayıyoruz. */
+    private static final int HEAD_LOAD = 5000;
     private static final LocalDate DAY_MIN = LocalDate.of(1970, 1, 1);
     private static final LocalDate DAY_MAX = LocalDate.of(9999, 12, 31);
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
@@ -187,54 +189,79 @@ public class StaffBookingService {
         String firstNeedle = textNeedle(firstName);
         String lastNeedle = textNeedle(lastName);
         String phoneNeedle = phoneNeedle(phone);
-        long[] totals = headStatusTotals();
-        long pending = totals[0];
-        long confirmed = totals[1];
-        long completed = totals[2];
-        long rejected = totals[3];
-        long total = switch (wanted) {
-            case "pending" -> pending;
-            case "confirmed" -> confirmed;
-            case "completed" -> completed;
-            case "rejected" -> rejected;
-            default -> pending + confirmed + completed + rejected;
-        };
-        int totalPages = total == 0 ? 1 : (int) ((total + HEAD_PAGE - 1) / HEAD_PAGE);
-        int requested = page == null || page < 1 ? 1 : page;
-        int safePage = Math.min(requested, totalPages);
-        PageRequest pageable = PageRequest.of(safePage - 1, HEAD_PAGE);
-        Page<Booking> result = newest
-                ? bookingRepository.findHeadByDayDesc(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle, pageable)
-                : bookingRepository.findHeadByDayAsc(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle, pageable);
-        return respond(result.getContent(), safePage, HEAD_PAGE, timezone, acceptLanguage, newest,
-                pending, confirmed, completed, rejected, totalPages);
-    }
-
-    /** tr: 0 pending, 1 confirmed (auto_accepted dahil), 2 completed, 3 rejected. */
-    private long[] headStatusTotals() {
+        List<Booking> all = bookingRepository.findHeadByDayAsc(
+                BOARD_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle,
+                PageRequest.of(0, HEAD_LOAD)).getContent();
         long pending = 0;
         long confirmed = 0;
         long completed = 0;
         long rejected = 0;
-        List<Object[]> rows = bookingRepository.countHeadByStatus();
-        if (rows != null) {
-            for (Object[] row : rows) {
-                if (row == null || row.length < 2 || !(row[1] instanceof Number number)) {
-                    continue;
-                }
-                String status = row[0] == null ? "" : row[0].toString().trim().toLowerCase(Locale.ROOT);
-                long n = number.longValue();
-                switch (status) {
-                    case "pending" -> pending += n;
-                    case "confirmed", "auto_accepted", "accepted" -> confirmed += n;
-                    case "completed" -> completed += n;
-                    case "rejected", "cancelled", "canceled", "no_show" -> rejected += n;
-                    default -> {
-                    }
+        List<Booking> tab = new ArrayList<>();
+        boolean everyStatus = "all".equals(wanted) || BOARD.equals(wanted);
+        for (Booking booking : all) {
+            String rowStatus = booking.getStatus() == null ? "" : booking.getStatus().trim().toLowerCase(Locale.ROOT);
+            switch (rowStatus) {
+                case "pending" -> pending++;
+                case "confirmed", "auto_accepted", "accepted" -> confirmed++;
+                case "completed" -> completed++;
+                case "rejected", "cancelled", "canceled", "no_show" -> rejected++;
+                default -> {
                 }
             }
+            if (everyStatus || statuses.contains(rowStatus)) {
+                tab.add(booking);
+            }
         }
-        return new long[] { pending, confirmed, completed, rejected };
+        tab.sort((left, right) -> compareBooking(left, right, newest));
+        int totalForTab = tab.size();
+        int totalPages = totalForTab == 0 ? 1 : (totalForTab + HEAD_PAGE - 1) / HEAD_PAGE;
+        int requested = page == null || page < 1 ? 1 : page;
+        int safePage = Math.min(requested, totalPages);
+        int fromIndex = Math.min((safePage - 1) * HEAD_PAGE, totalForTab);
+        int toIndex = Math.min(fromIndex + HEAD_PAGE, totalForTab);
+        List<Booking> pageRows = new ArrayList<>(tab.subList(fromIndex, toIndex));
+        return respond(pageRows, safePage, HEAD_PAGE, timezone, acceptLanguage, newest,
+                pending, confirmed, completed, rejected, totalPages);
+    }
+
+    private static int compareBooking(Booking left, Booking right, boolean newest) {
+        String leftDay = appointmentDay(left);
+        String rightDay = appointmentDay(right);
+        int day = compareDay(leftDay, rightDay);
+        if (newest && leftDay != null && rightDay != null) {
+            day = -day;
+        }
+        if (day != 0) {
+            return day;
+        }
+        OffsetDateTime leftStart = left.getRange() == null ? null : left.getRange().getStart();
+        OffsetDateTime rightStart = right.getRange() == null ? null : right.getRange().getStart();
+        if (leftStart == null && rightStart == null) {
+            return Long.compare(idOf(left), idOf(right));
+        }
+        if (leftStart == null) {
+            return 1;
+        }
+        if (rightStart == null) {
+            return -1;
+        }
+        int start = leftStart.compareTo(rightStart);
+        if (start != 0) {
+            return start;
+        }
+        return Long.compare(idOf(left), idOf(right));
+    }
+
+    private static String appointmentDay(Booking booking) {
+        if (booking.getRange() == null || booking.getRange().getCalendar() == null
+                || booking.getRange().getCalendar().getDay() == null) {
+            return null;
+        }
+        return booking.getRange().getCalendar().getDay().toString();
+    }
+
+    private static long idOf(Booking booking) {
+        return booking.getId() == null ? Long.MAX_VALUE : booking.getId();
     }
 
     private long countBranch(Long branchId, Long partnerId, List<String> statuses) {

@@ -233,22 +233,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
             @Param("phone") String phone,
             Pageable pageable);
 
-    /**
-     * tr: Head sayaç. JPQL count 0 dönüyordu, select satır getiriyordu. Düz SQL, status başına adet.
-     * en: Head counters. JPQL count returned 0 while select returned rows. Plain SQL, one count per status.
-     */
-    @Query(value = """
-            select b.status, count(*)
-            from bookings b
-            join branches br on br.id = b.branch_id
-            join partners p on p.id = br.partner_id
-            where (b.staff_hidden is null or b.staff_hidden = false)
-              and (br.active is null or br.active = true)
-              and (p.active is null or p.active = true)
-            group by b.status
-            """, nativeQuery = true)
-    List<Object[]> countHeadByStatus();
-
     @Query("select count(b) from Booking b " + HEAD_WHERE)
     long countHead(
             @Param("statuses") Collection<String> statuses,

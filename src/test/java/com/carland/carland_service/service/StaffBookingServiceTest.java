@@ -177,29 +177,28 @@ class StaffBookingServiceTest {
     void headAdminPagesEveryActiveBranchByDay() {
         staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
-        when(bookingRepository.countHeadByStatus()).thenReturn(List.of(
-                new Object[] {"pending", 2L},
-                new Object[] {"confirmed", 3L},
-                new Object[] {"auto_accepted", 1L},
-                new Object[] {"completed", 7L},
-                new Object[] {"rejected", 8L},
-                new Object[] {"no_show", 1L}
-        ));
+        Booking confirmed = Booking.builder().id(2L).ref("CC-2").status("confirmed").branch(branch)
+                .range(booking.getRange()).currency("AZN").build();
+        Booking completed = Booking.builder().id(3L).ref("CC-3").status("completed").branch(branch)
+                .range(booking.getRange()).currency("AZN").build();
+        Booking rejected = Booking.builder().id(4L).ref("CC-4").status("no_show").branch(branch)
+                .range(booking.getRange()).currency("AZN").build();
         when(bookingRepository.findHeadByDayAsc(any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .thenAnswer(invocation -> {
                     Pageable pageable = invocation.getArgument(8);
-                    assertEquals(20, pageable.getPageSize());
-                    assertEquals(0, pageable.getPageNumber());
-                    return new PageImpl<>(List.of(booking), pageable, 2);
+                    assertEquals(5000, pageable.getPageSize());
+                    return new PageImpl<>(List.of(booking, confirmed, completed, rejected), pageable, 4);
                 });
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
 
         BookingInboxResponse out = service.inbox(9L, false, "pending", null, 1, 20, "Asia/Baku", "az");
 
-        assertEquals(2L, out.getPending());
-        assertEquals(4L, out.getConfirmed());
-        assertEquals(7L, out.getCompleted());
-        assertEquals(9L, out.getRejected());
+        assertEquals(1L, out.getPending());
+        assertEquals(1L, out.getConfirmed());
+        assertEquals(1L, out.getCompleted());
+        assertEquals(1L, out.getRejected());
+        assertEquals(1, out.getItems().size());
+        assertEquals(1L, out.getItems().get(0).getBookingId());
         assertEquals(1, out.getTotalPages());
         assertEquals(20, out.getPageSize());
         verify(bookingStaffAccess, never()).requireWritableBranch(any(), any(), any());
