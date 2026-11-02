@@ -106,6 +106,7 @@ class StaffBookingServiceTest {
                 .priceMin(12900)
                 .priceMax(12900)
                 .currency("AZN")
+                .createdAt(OffsetDateTime.parse("2026-11-02T02:16:30Z"))
                 .build();
     }
 
@@ -123,6 +124,7 @@ class StaffBookingServiceTest {
         assertEquals(1, out.getItems().size());
         assertEquals("CC-959345", out.getItems().get(0).getRef());
         assertEquals("pkg:hyper-extra", out.getItems().get(0).getServiceKeys().get(0));
+        assertEquals("2026-11-02T02:16:30Z", out.getItems().get(0).getCreatedAt());
         assertNull(out.getItems().get(0).getCar());
     }
 

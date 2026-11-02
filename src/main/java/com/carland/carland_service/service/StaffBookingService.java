@@ -68,6 +68,7 @@ public class StaffBookingService {
     static final String DEFAULT_TZ = "Asia/Baku";
     static final String BOARD = "board";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter CREATED = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
     private static final List<String> BOARD_STATUSES = List.of(
             BookingStatus.PENDING.apiValue(),
             BookingStatus.CONFIRMED.apiValue(),
@@ -557,6 +558,7 @@ public class StaffBookingService {
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
+                .createdAt(createdStamp(booking.getCreatedAt()))
                 .build();
     }
 
@@ -663,6 +665,10 @@ public class StaffBookingService {
             return -1;
         }
         return left.compareTo(right);
+    }
+
+    private static String createdStamp(OffsetDateTime time) {
+        return time == null ? null : CREATED.format(time);
     }
 
     private static String clock(OffsetDateTime utc, String timezone) {

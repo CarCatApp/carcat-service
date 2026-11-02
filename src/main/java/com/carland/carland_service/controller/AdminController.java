@@ -16,6 +16,9 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.feign.AuthNewUsersFeign;
 import com.carland.carland_service.feign.AuthUsersFeign;
+import com.carland.carland_service.idda.IddaPlateCheck;
+import com.carland.carland_service.idda.IddaPlateCheckRepository;
+import com.carland.carland_service.idda.IddaRawFields;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CarSpec;
 import com.carland.carland_service.repository.CustomerRepository;
@@ -61,6 +64,7 @@ import java.time.format.DateTimeFormatter;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -107,6 +111,8 @@ public class AdminController {
     private final AdminCarPurgeService adminCarPurgeService;
 
     private final VisitHistoryService visitHistoryService;
+
+    private final IddaPlateCheckRepository iddaPlateCheckRepository;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -175,10 +181,12 @@ public class AdminController {
      *     Plaka: 10-BB-110, 10BB110 ve 10 BB 110 aynı aracı bulur.
      *     Sahip: sahipli, sahipsiz, all. Path: vin, plate, all. Boş path vin sayılır.
      *     Hyper visited: partner 1 ve şube 10 (boş branch_id dahil) en az bir visit. Redis yok, DB.
+     *     IDDA fields: aynı VIN'in idda_plate_checks sayısı. Ham JSON ayrı sayfada.
      * en: Paginated car list; VIN / plate / owner / path / userId filters, carId DESC (newest first).
      *     Plate: 10-BB-110, 10BB110 and 10 BB 110 find the same car.
      *     Owner: sahipli, sahipsiz, all. Path: vin, plate, all. A blank path counts as vin.
      *     Hyper visited: at least one visit for partner 1 and branch 10 (null branch_id included). DB, not Redis.
+     *     IDDA fields: how many idda_plate_checks share the VIN. The raw JSON is a separate page.
      */
     @GetMapping("/admin/cars")
     public String cars(
@@ -218,6 +226,7 @@ public class AdminController {
         model.addAttribute("filterOwner", ownerFilter);
         model.addAttribute("filterPath", pathFilter);
         model.addAttribute("hyperVisitedCarIds", visitHistoryService.carIdsWithHyperBranchVisit(carIds));
+        model.addAttribute("iddaFieldCounts", iddaFieldCounts(carPage.getContent()));
 
         return "cars";
     }
@@ -225,7 +234,9 @@ public class AdminController {
 
     /**
      * tr: Araçları XLSX indirir. Hyper visited, listedekiyle aynı kural: partner 1 ve şube 10, boş branch dahil. Yes/No.
+     *     Son kolon IDDA fields: aynı VIN'in bütün raw_json yaprakları, metin.
      * en: Downloads cars as XLSX. Hyper visited uses the same rule as the list: partner 1 and branch 10, including a null branch. Yes/No.
+     *     The last column, IDDA fields, is the text of every raw_json leaf for that VIN.
      */
     @GetMapping("/admin/cars/export")
     public void exportCars(
@@ -254,16 +265,20 @@ public class AdminController {
                 CarSpec.filters(userId, vinFilter, plateFilter, ownerFilter, pathFilter),
                 Sort.by(Sort.Direction.DESC, "carId"));
         Set<Long> hyperVisited = hyperVisitedIds(cars);
+        Map<String, String> iddaText = iddaExcelText(cars);
 
         try (Workbook workbook = new XSSFWorkbook()) {
 
             Sheet sheet = workbook.createSheet("Cars");
+            CellStyle iddaStyle = workbook.createCellStyle();
+            iddaStyle.setWrapText(true);
+            iddaStyle.setVerticalAlignment(VerticalAlignment.TOP);
 
             String[] headers = {
                     "VIN", "Path", "Owner", "Phone", "Hyper visited", "Plate Number", "Brand", "Model", "Model Year",
                     "Engine Type", "Engine Type ID", "Engine Volume",
                     "Transmission Type", "Body Type", "Mileage",
-                    "Created At", "Updated At"
+                    "Created At", "Updated At", "IDDA fields"
             };
 
             createHeaderRow(workbook, sheet, headers);
@@ -291,12 +306,14 @@ public class AdminController {
                 setNumericCell(row, 14, car.getMileage());
                 setCell(row, 15, formatDate(car.getCreatedAt()));
                 setCell(row, 16, formatDate(car.getUpdatedAt()));
+                String vinKey = vinKey(car.getVin());
+                setWrappedCell(row, 17, vinKey == null ? "" : iddaText.getOrDefault(vinKey, ""), iddaStyle);
             }
 
             String baseName = (userId != null || vinFilter != null || plateFilter != null
                     || !CarSpec.OWNER_ALL.equals(ownerFilter) || !CarSpec.PATH_ALL.equals(pathFilter))
                     ? "cars-filtered" : "cars";
-            writeWorkbook(workbook, sheet, headers.length, baseName, response);
+            writeWorkbook(workbook, sheet, headers.length, baseName, response, headers.length - 1);
         }
     }
 
@@ -365,6 +382,36 @@ public class AdminController {
         model.addAttribute("visitCountByPartnerId", visitCountByPartnerId);
         model.addAttribute("customerPhone", phone);
         return "car-history";
+    }
+
+    /**
+     * tr: Aracın VIN'ine ait bütün IDDA sorgularının ham JSON yaprakları. Yeniden eskiye. Redis yok.
+     * en: Raw JSON leaves of every IDDA check for the car's VIN. Newest first. No Redis.
+     */
+    @GetMapping("/admin/cars/{carId:\\d+}/idda")
+    public String carIdda(
+            @PathVariable Long carId,
+            HttpServletRequest request,
+            Model model
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+
+        Car car = carRepository.findByCarId(carId);
+        if (car == null) {
+            model.addAttribute("carMissing", true);
+            return "car-idda";
+        }
+
+        String key = vinKey(car.getVin());
+        List<IddaPlateCheck> rows = key == null
+                ? List.of()
+                : iddaPlateCheckRepository.findByVinNewestFirst(key);
+        model.addAttribute("carMissing", false);
+        model.addAttribute("car", car);
+        model.addAttribute("snapshots", IddaRawFields.snapshots(rows));
+        return "car-idda";
     }
 
     /**
@@ -1193,9 +1240,28 @@ public class AdminController {
             String baseName,
             HttpServletResponse response
     ) throws IOException {
+        writeWorkbook(workbook, sheet, columnCount, baseName, response, -1);
+    }
+
+    /**
+     * tr: fixedColumn autosize edilmez; IDDA fields metni kolonu şişirmesin.
+     * en: fixedColumn is not autosized, so the IDDA fields text does not widen the sheet.
+     */
+    private void writeWorkbook(
+            Workbook workbook,
+            Sheet sheet,
+            int columnCount,
+            String baseName,
+            HttpServletResponse response,
+            int fixedColumn
+    ) throws IOException {
 
         for (int i = 0; i < columnCount; i++) {
-            sheet.autoSizeColumn(i);
+            if (i == fixedColumn) {
+                sheet.setColumnWidth(i, 90 * 256);
+            } else {
+                sheet.autoSizeColumn(i);
+            }
         }
 
         String fileName = baseName + "-" + LocalDateTime.now()
@@ -1209,6 +1275,99 @@ public class AdminController {
 
     private void setCell(Row row, int column, String value) {
         row.createCell(column).setCellValue(value != null ? value : "");
+    }
+
+    private void setWrappedCell(Row row, int column, String value, CellStyle style) {
+        String text = IddaRawFields.fitExcel(value);
+        Cell cell = row.createCell(column);
+        cell.setCellValue(text);
+        cell.setCellStyle(style);
+        int lines = 1;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                lines++;
+            }
+        }
+        if (lines > 1) {
+            row.setHeightInPoints(Math.min(lines, 12) * 15f);
+        }
+    }
+
+    /**
+     * tr: Sayfadaki her araç için IDDA sorgu sayısı. Anahtar carId metni. Redis yok.
+     * en: IDDA check count for each car on the page. The key is the carId text. No Redis.
+     */
+    private Map<String, Long> iddaFieldCounts(List<Car> cars) {
+        Map<String, Long> byVin = new LinkedHashMap<>();
+        for (List<String> slice : vinBatches(cars)) {
+            for (Object[] row : iddaPlateCheckRepository.countGroupedByVin(slice)) {
+                String key = vinKey(row[0] == null ? null : row[0].toString());
+                if (key != null && row[1] instanceof Number number) {
+                    byVin.put(key, number.longValue());
+                }
+            }
+        }
+        Map<String, Long> byCar = new LinkedHashMap<>();
+        if (cars == null) {
+            return byCar;
+        }
+        for (Car car : cars) {
+            String key = vinKey(car.getVin());
+            Long count = key == null ? null : byVin.get(key);
+            if (car.getCarId() != null && count != null && count > 0) {
+                byCar.put(car.getCarId().toString(), count);
+            }
+        }
+        return byCar;
+    }
+
+    /**
+     * tr: Excel hücresi. Aynı VIN'in bütün sorguları, yeniden eskiye.
+     * en: Excel cell. Every check for that VIN, newest first.
+     */
+    private Map<String, String> iddaExcelText(List<Car> cars) {
+        Map<String, List<IddaPlateCheck>> grouped = new LinkedHashMap<>();
+        for (List<String> slice : vinBatches(cars)) {
+            for (IddaPlateCheck check : iddaPlateCheckRepository.findByVinInNewestFirst(slice)) {
+                String key = vinKey(check.getVin());
+                if (key == null) {
+                    continue;
+                }
+                grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(check);
+            }
+        }
+        Map<String, String> text = new LinkedHashMap<>();
+        for (Map.Entry<String, List<IddaPlateCheck>> entry : grouped.entrySet()) {
+            text.put(entry.getKey(), IddaRawFields.excelText(entry.getValue()));
+        }
+        return text;
+    }
+
+    private static List<List<String>> vinBatches(List<Car> cars) {
+        if (cars == null || cars.isEmpty()) {
+            return List.of();
+        }
+        List<String> vins = cars.stream()
+                .map(car -> vinKey(car.getVin()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (vins.isEmpty()) {
+            return List.of();
+        }
+        List<List<String>> batches = new ArrayList<>();
+        int batch = 500;
+        for (int i = 0; i < vins.size(); i += batch) {
+            batches.add(vins.subList(i, Math.min(i + batch, vins.size())));
+        }
+        return batches;
+    }
+
+    private static String vinKey(String vin) {
+        if (vin == null || vin.isBlank()) {
+            return null;
+        }
+        return vin.trim().toUpperCase(Locale.ROOT);
     }
 
     private void setNumericCell(Row row, int column, Number value) {

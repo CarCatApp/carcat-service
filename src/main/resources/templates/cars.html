@@ -19,10 +19,12 @@
     col.c-engine   { width: 105px; }
     col.c-volume   { width: 85px; }
     col.c-body     { width: 72px; }
+    col.c-idda     { width: 210px; }
+    .data-table tbody td.idda-cell { overflow: visible; text-overflow: clip; }
     col.c-mileage  { width: 90px; }
     col.c-created  { width: 160px; }
     col.c-updated  { width: 160px; }
-    .data-table { min-width: 1580px; }
+    .data-table { min-width: 1790px; }
     .vin-input { font-family: ui-monospace, "SF Mono", Consolas, monospace; letter-spacing: 0.04em; text-transform: uppercase; }
   </style>
 </head>
@@ -128,6 +130,7 @@
           <col class="c-engine">
           <col class="c-volume">
           <col class="c-body">
+          <col class="c-idda">
           <col class="c-mileage">
           <col class="c-created">
           <col class="c-updated">
@@ -146,6 +149,7 @@
           <th>Engine Type</th>
           <th>Volume</th>
           <th>Body</th>
+          <th>IDDA fields</th>
           <th>Mileage</th>
           <th>Created At</th>
           <th>Updated At</th>
@@ -178,6 +182,12 @@
                     aria-expanded="false"></button>
             <span class="muted" th:if="${#strings.isEmpty(car.bodyType)}">—</span>
           </td>
+          <td class="idda-cell" th:with="iddaCount=${iddaFieldCounts.get(car.carId.toString())}">
+            <a class="btn-cars" th:if="${iddaCount != null}"
+               th:href="@{/admin/cars/{id}/idda(id=${car.carId})}"
+               th:text="|IDDA fields (${iddaCount})|">IDDA fields</a>
+            <span class="muted" th:if="${iddaCount == null}">—</span>
+          </td>
           <td th:text="${car.mileage}"></td>
           <td class="muted"
               th:text="${car.createdAt != null ? #temporals.format(car.createdAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
@@ -185,7 +195,7 @@
               th:text="${car.updatedAt != null ? #temporals.format(car.updatedAt.plusHours(4), 'dd MMM yyyy, HH:mm') : ''}"></td>
         </tr>
         <tr class="empty-row" th:if="${cars.content.isEmpty()}">
-          <td colspan="15">Kayıt bulunamadı</td>
+          <td colspan="16">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -226,8 +236,8 @@
 <script>
   CarlandAdmin.initColumnToggle(
     document.getElementById("carsTable"),
-    "carland-admin-cols-cars-v4",
-    ["History", "Owner", "Path", "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "Mileage", "Created At", "Updated At"],
+    "carland-admin-cols-cars-v5",
+    ["History", "Owner", "Path", "VIN", "Hyper visited", "Plate Number", "Brand", "Model", "Year", "Engine Type", "Volume", "Body", "IDDA fields", "Mileage", "Created At", "Updated At"],
     []
   );
   CarlandAdmin.initExpandCells(".cell-clip");

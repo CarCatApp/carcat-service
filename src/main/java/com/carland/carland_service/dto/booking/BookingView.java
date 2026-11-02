@@ -60,6 +60,9 @@ public class BookingView {
     String currency;
     String unit;
     Integer unreadCount;
+    /** tr: Rezervasyon satırının yazıldığı an. / en: When the booking row was saved. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String createdAt;
 
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
