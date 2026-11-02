@@ -35,7 +35,7 @@ public class Customer {
     @Column(name = "pin", length = 7)
     String pin;
     /**
-     * True after a SIMA citizen/foreign attempt passed isSuccess + both scores &gt;= 0.90.
+     * True after a SIMA citizen/foreign/passport attempt passed isSuccess + both scores &gt;= 0.90.
      * Locks name, surname and FIN on PUT /user/information.
      */
     @Column(name = "sima_verified", nullable = false)
@@ -54,7 +54,7 @@ public class Customer {
     LocalDateTime simaDailyLimitResetAt;
     /**
      * Attempts with createdAt after this instant do not count toward the lifetime attempt limit.
-     * Null = count every CITIZEN/FOREIGN row.
+     * Null = count every CITIZEN/FOREIGN/PASSPORT row.
      */
     @Column(name = "sima_ever_limit_reset_at")
     LocalDateTime simaEverLimitResetAt;

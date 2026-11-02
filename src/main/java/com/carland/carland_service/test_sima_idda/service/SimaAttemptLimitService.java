@@ -21,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SimaAttemptLimitService {
 
-    public static final List<String> ATTEMPT_CHANNELS = List.of("CITIZEN", "FOREIGN");
+    public static final List<String> ATTEMPT_CHANNELS = List.of("CITIZEN", "FOREIGN", "PASSPORT");
 
     private final SimaKycRecordRepository simaKycRecordRepository;
     private final SimaIddaProperties simaIddaProperties;

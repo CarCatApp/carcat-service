@@ -28,6 +28,16 @@
     .balance-block { margin-top: 18px; }
     .result-fold { margin-top: 16px; }
     .mono { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px; }
+    .time-hint { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .pager {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 16px;
+    }
+    .pager-label { font-size: 14px; font-weight: 700; color: var(--text); }
+    .pager .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -66,7 +76,7 @@
   <div class="page-head">
     <div>
       <h1>iddaBalanceInfo</h1>
-      <p class="muted">Digital Finance bilgi servisleri. Header ve body alanlarını elle yaz, sonra Sorgula.</p>
+      <p class="muted">Digital Finance bilgi servisleri. Günü takvimden seç, Sorgula.</p>
     </div>
   </div>
 
@@ -85,9 +95,10 @@
   <p class="field-note"><code th:text="${upstream}">POST /api/v1/Info/Expenses</code></p>
   <p class="field-note" th:if="${tab == 'balance'}">Header: RequestIdentifier. Body yok.</p>
   <p class="field-note" th:if="${tab != 'balance'}">Header: RequestIdentifier. Body: StartDate, EndDate, Offset, Limit.</p>
-  <p class="field-note">ApiKey sunucuda kalır. Boş RequestIdentifier sunucuda üretilir. Boş body alanı JSON'a yazılmaz. Tarih örneği <code>2026-10-01 00:00:00</code>.</p>
+  <p class="field-note">ApiKey sunucuda kalır. Boş RequestIdentifier sunucuda üretilir.</p>
+  <p class="field-note" th:if="${tab != 'balance'}">Gün takvimden seçilir. Başlangıç <code>00:00:00</code>, bitiş <code>23:59:59</code>. Boş gün JSON'a yazılmaz. Sorgula 1. sayfayı açar.</p>
 
-  <form class="filter-bar" method="post" action="/admin/idda-balance">
+  <form class="filter-bar" id="idda-query" method="post" action="/admin/idda-balance">
     <input type="hidden" name="tab" th:value="${tab}">
     <div class="filter-field wide">
       <label for="requestIdentifier">RequestIdentifier</label>
@@ -95,33 +106,40 @@
              th:value="${requestIdentifier}">
     </div>
     <div class="filter-field" th:if="${tab != 'balance'}">
-      <label for="startDate">StartDate</label>
-      <input type="text" id="startDate" name="StartDate" spellcheck="false" autocomplete="off"
-             placeholder="2026-10-01 00:00:00" th:value="${startDate}">
+      <label for="startDate">Başlangıç</label>
+      <input type="date" id="startDate" name="StartDate" th:value="${startDate}">
+      <span class="time-hint">00:00:00</span>
     </div>
     <div class="filter-field" th:if="${tab != 'balance'}">
-      <label for="endDate">EndDate</label>
-      <input type="text" id="endDate" name="EndDate" spellcheck="false" autocomplete="off"
-             placeholder="2026-10-21 23:59:59" th:value="${endDate}">
+      <label for="endDate">Bitiş</label>
+      <input type="date" id="endDate" name="EndDate" th:value="${endDate}">
+      <span class="time-hint">23:59:59</span>
     </div>
     <div class="filter-field" th:if="${tab != 'balance'}">
-      <label for="offset">Offset</label>
-      <input type="text" id="offset" name="Offset" inputmode="numeric" spellcheck="false" autocomplete="off"
-             placeholder="0" th:value="${offset}">
+      <label for="limit">Sayfa başı</label>
+      <select id="limit" name="Limit">
+        <option value="20" th:selected="${limit == '20'}">20</option>
+        <option value="50" th:selected="${limit == '50' or limit == ''}">50</option>
+        <option value="100" th:selected="${limit == '100'}">100</option>
+      </select>
     </div>
-    <div class="filter-field" th:if="${tab != 'balance'}">
-      <label for="limit">Limit</label>
-      <input type="text" id="limit" name="Limit" inputmode="numeric" spellcheck="false" autocomplete="off"
-             placeholder="20" th:value="${limit}">
-    </div>
+    <input type="hidden" th:if="${tab != 'balance'}" name="Offset" th:value="${offset}">
     <input type="hidden" th:if="${tab == 'balance'}" name="StartDate" th:value="${startDate}">
     <input type="hidden" th:if="${tab == 'balance'}" name="EndDate" th:value="${endDate}">
     <input type="hidden" th:if="${tab == 'balance'}" name="Offset" th:value="${offset}">
     <input type="hidden" th:if="${tab == 'balance'}" name="Limit" th:value="${limit}">
-    <button class="btn btn-filter" type="submit">Sorgula</button>
+    <button class="btn btn-filter" type="submit" name="nav" value="search">Sorgula</button>
   </form>
 
   <div class="error-box" th:if="${error != null}" th:text="${error}"></div>
+
+  <div class="pager" th:if="${showPager}">
+    <button class="btn btn-ghost" type="submit" name="nav" value="prev" form="idda-query"
+            th:disabled="${!hasPrev}">Önceki</button>
+    <span class="pager-label" th:text="${pageLabel}">1–50 / 50</span>
+    <button class="btn btn-ghost" type="submit" name="nav" value="next" form="idda-query"
+            th:disabled="${!hasNext}">Sonraki</button>
+  </div>
 
   <div class="create-card result-block" th:if="${queried}">
     <h2 th:text="'HTTP ' + ${httpStatus}">HTTP 200</h2>

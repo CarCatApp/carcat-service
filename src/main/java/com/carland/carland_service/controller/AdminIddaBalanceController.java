@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +42,7 @@ import java.util.UUID;
 public class AdminIddaBalanceController {
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
+    private static final long DEFAULT_PAGE_SIZE = 50L;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AdminAccessService adminAccessService;
@@ -69,8 +72,8 @@ public class AdminIddaBalanceController {
     }
 
     /**
-     * tr: Doldurulan header ve body ile DigitalFinanceClient.exchange çağırır.
-     * en: Calls DigitalFinanceClient.exchange with the header and body the operator typed.
+     * tr: Günü 00:00:00 / 23:59:59 yapar. Sayfa boyutunu ve Offset'i hesaplayıp DigitalFinanceClient.exchange çağırır.
+     * en: Expands a day to 00:00:00 / 23:59:59, computes page size and Offset, then calls DigitalFinanceClient.exchange.
      */
     @PostMapping(value = "/admin/idda-balance", produces = MediaType.TEXT_HTML_VALUE)
     public String query(
@@ -80,6 +83,7 @@ public class AdminIddaBalanceController {
             @RequestParam(name = "EndDate", required = false) String endDate,
             @RequestParam(name = "Offset", required = false) String offset,
             @RequestParam(name = "Limit", required = false) String limit,
+            @RequestParam(name = "nav", required = false) String nav,
             HttpServletRequest request,
             Model model
     ) {
@@ -87,25 +91,70 @@ public class AdminIddaBalanceController {
             return "redirect:" + ADMIN_URL + "/admin/";
         }
         Tab selected = Tab.from(tab);
-        fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
         clearResult(model);
 
-        Long offsetValue = null;
-        Long limitValue = null;
+        long pageOffset = 0L;
+        long pageSize = DEFAULT_PAGE_SIZE;
+        LocalDate startDay = null;
+        LocalDate endDay = null;
         if (selected != Tab.BALANCE) {
             try {
-                offsetValue = parseWhole(offset);
-            } catch (NumberFormatException ex) {
-                model.addAttribute("error", "Offset tam sayı olmalı.");
+                startDay = parseDay(startDate);
+            } catch (DateTimeParseException ex) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Başlangıç günü yyyy-MM-dd olmalı.");
                 return "idda-balance";
             }
             try {
-                limitValue = parseWhole(limit);
-            } catch (NumberFormatException ex) {
-                model.addAttribute("error", "Limit tam sayı olmalı.");
+                endDay = parseDay(endDate);
+            } catch (DateTimeParseException ex) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Bitiş günü yyyy-MM-dd olmalı.");
                 return "idda-balance";
             }
+            if (startDay != null && endDay != null && endDay.isBefore(startDay)) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Bitiş, başlangıçtan önce olamaz.");
+                return "idda-balance";
+            }
+            try {
+                pageSize = parsePageSize(limit);
+            } catch (NumberFormatException ex) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Sayfa başı 20, 50 veya 100 olmalı.");
+                return "idda-balance";
+            }
+            boolean paging = "next".equals(nav) || "prev".equals(nav);
+            if (paging) {
+                try {
+                    pageOffset = parseOffset(offset);
+                } catch (NumberFormatException ex) {
+                    fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                    model.addAttribute("error", "Offset tam sayı olmalı.");
+                    return "idda-balance";
+                }
+                if ("next".equals(nav)) {
+                    if (pageOffset > Long.MAX_VALUE - pageSize) {
+                        fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                        model.addAttribute("error", "Sonraki sayfa yok.");
+                        return "idda-balance";
+                    }
+                    pageOffset = pageOffset + pageSize;
+                } else {
+                    pageOffset = pageOffset < pageSize ? 0L : pageOffset - pageSize;
+                }
+            }
         }
+
+        fillForm(
+                model,
+                selected,
+                requestIdentifier,
+                startDay == null ? startDate : startDay.toString(),
+                endDay == null ? endDate : endDay.toString(),
+                selected == Tab.BALANCE ? offset : Long.toString(pageOffset),
+                selected == Tab.BALANCE ? limit : Long.toString(pageSize)
+        );
 
         String requestId = blankToNull(requestIdentifier);
         if (requestId == null) {
@@ -116,14 +165,14 @@ public class AdminIddaBalanceController {
         byte[] body = null;
         if (selected != Tab.BALANCE) {
             ObjectNode node = MAPPER.createObjectNode();
-            putText(node, "StartDate", startDate);
-            putText(node, "EndDate", endDate);
-            if (offsetValue != null) {
-                node.put("Offset", offsetValue);
+            if (startDay != null) {
+                node.put("StartDate", startDay + " 00:00:00");
             }
-            if (limitValue != null) {
-                node.put("Limit", limitValue);
+            if (endDay != null) {
+                node.put("EndDate", endDay + " 23:59:59");
             }
+            node.put("Offset", pageOffset);
+            node.put("Limit", pageSize);
             try {
                 body = MAPPER.writeValueAsBytes(node);
                 model.addAttribute("sentBody", MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node));
@@ -142,6 +191,9 @@ public class AdminIddaBalanceController {
             return "idda-balance";
         }
         applyUpstream(model, upstream);
+        if (selected != Tab.BALANCE) {
+            bindPager(model, pageOffset, pageSize);
+        }
         return "idda-balance";
     }
 
@@ -150,10 +202,10 @@ public class AdminIddaBalanceController {
         model.addAttribute("tab", tab.key());
         model.addAttribute("upstream", tab.label());
         model.addAttribute("requestIdentifier", empty(requestIdentifier));
-        model.addAttribute("startDate", empty(startDate));
-        model.addAttribute("endDate", empty(endDate));
-        model.addAttribute("offset", empty(offset));
-        model.addAttribute("limit", empty(limit));
+        model.addAttribute("startDate", displayDay(startDate));
+        model.addAttribute("endDate", displayDay(endDate));
+        model.addAttribute("offset", displayOffset(offset));
+        model.addAttribute("limit", displayLimit(limit));
     }
 
     private static void clearResult(Model model) {
@@ -173,6 +225,10 @@ public class AdminIddaBalanceController {
         model.addAttribute("paymentRows", List.of());
         model.addAttribute("rawJson", null);
         model.addAttribute("sentBody", null);
+        model.addAttribute("showPager", false);
+        model.addAttribute("hasPrev", false);
+        model.addAttribute("hasNext", false);
+        model.addAttribute("pageLabel", "");
     }
 
     private static void applyUpstream(Model model, DigitalFinanceClient.Upstream upstream) {
@@ -237,22 +293,112 @@ public class AdminIddaBalanceController {
         }
     }
 
-    private static void putText(ObjectNode node, String field, String raw) {
-        String value = blankToNull(raw);
-        if (value != null) {
-            node.put(field, value);
+    private static void bindPager(Model model, long offset, long pageSize) {
+        Long count = countOrNull(model.getAttribute("count"));
+        if (count == null) {
+            return;
+        }
+        long from = 0L;
+        long to = 0L;
+        if (count > 0 && offset < count) {
+            from = offset + 1;
+            to = Math.min(offset + pageSize, count);
+        }
+        String label = count == 0 || from == 0
+                ? "0 / " + count
+                : from + "–" + to + " / " + count;
+        model.addAttribute("showPager", true);
+        model.addAttribute("hasPrev", offset > 0);
+        model.addAttribute("hasNext", offset + pageSize < count);
+        model.addAttribute("pageLabel", label);
+    }
+
+    private static Long countOrNull(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = raw.toString().trim();
+        if (!text.matches("\\d+")) {
+            return null;
+        }
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 
-    private static Long parseWhole(String raw) {
+    /**
+     * tr: Boş gün yok sayılır. yyyy-MM-dd veya yyyy-MM-dd HH:mm:ss kabul edilir; saat kısmı atılır.
+     * en: A blank day is absent. Accepts yyyy-MM-dd or yyyy-MM-dd HH:mm:ss and drops the clock time.
+     */
+    private static LocalDate parseDay(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
         String trimmed = raw.trim();
-        if (!trimmed.matches("-?\\d+")) {
+        String day = trimmed.length() >= 10 ? trimmed.substring(0, 10) : trimmed;
+        if (!day.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw new DateTimeParseException("day", trimmed, 0);
+        }
+        if (trimmed.length() > 10 && !trimmed.substring(10).matches(" \\d{2}:\\d{2}:\\d{2}")) {
+            throw new DateTimeParseException("time", trimmed, 10);
+        }
+        return LocalDate.parse(day);
+    }
+
+    private static long parsePageSize(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.matches("\\d+")) {
+            throw new NumberFormatException(trimmed);
+        }
+        long value = Long.parseLong(trimmed);
+        if (value != 20L && value != 50L && value != 100L) {
+            throw new NumberFormatException(trimmed);
+        }
+        return value;
+    }
+
+    private static long parseOffset(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0L;
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.matches("\\d+")) {
             throw new NumberFormatException(trimmed);
         }
         return Long.parseLong(trimmed);
+    }
+
+    private static String displayDay(String raw) {
+        try {
+            LocalDate day = parseDay(raw);
+            return day == null ? "" : day.toString();
+        } catch (DateTimeParseException ex) {
+            return "";
+        }
+    }
+
+    private static String displayOffset(String raw) {
+        try {
+            return Long.toString(parseOffset(raw));
+        } catch (NumberFormatException ex) {
+            return "0";
+        }
+    }
+
+    private static String displayLimit(String raw) {
+        try {
+            if (raw == null || raw.isBlank()) {
+                return "";
+            }
+            return Long.toString(parsePageSize(raw));
+        } catch (NumberFormatException ex) {
+            return "";
+        }
     }
 
     private static String manat(String qepik) {

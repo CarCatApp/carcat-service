@@ -1,6 +1,7 @@
 package com.carland.carland_service.test_sima_idda.service;
 
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.entity.SimaKycRecord;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
@@ -26,9 +27,11 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -209,6 +212,57 @@ class SimaKycServiceTest {
         assertEquals("SIMA_TOTAL_LIMIT", out.getBody().getCode());
         assertTrue(out.getBody().getMessage().contains("5"));
         verify(simaFeign, never()).verifyCitizen(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void passport_callsPassportPathAndSharesAttemptLimit() {
+        stubCitizenCall();
+        when(simaFeign.verifyPassport(any(), any(), any(), any(), any())).thenReturn(envelope(true, 0.996, 0.999));
+        when(simaKycRecordRepository.findByIdempotencyKey(anyString())).thenReturn(Optional.empty());
+        when(simaKycRecordRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(customerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SimaVerifyOutcome out = service.verifyPassport("678", "62HJ5KQ", "C01234567", photo, "az");
+
+        assertEquals(200, out.getHttpStatus());
+        assertTrue(out.getBody().isVerified());
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(simaFeign).verifyPassport(eq("id"), eq("HMACSHA256"), eq("sig"), eq("test"), body.capture());
+        assertTrue(body.getValue().contains("\"documentNumber\":\"C01234567\""));
+        assertFalse(body.getValue().contains("birthDate"));
+        verify(simaFeign, never()).verifyCitizen(any(), any(), any(), any(), any());
+        ArgumentCaptor<SimaKycRecord> saved = ArgumentCaptor.forClass(SimaKycRecord.class);
+        verify(simaKycRecordRepository).save(saved.capture());
+        assertEquals("PASSPORT", saved.getValue().getChannel());
+    }
+
+    @Test
+    void passport_dailyLimitBlocksBeforeSima() {
+        when(customerRepository.findByUserId(678L)).thenReturn(customer);
+        when(simaIddaProperties.getKycTotalAttemptLimit()).thenReturn(5);
+        when(simaIddaProperties.getKycDailyFailLimit()).thenReturn(3);
+        when(simaIddaProperties.getKycTimezone()).thenReturn("Asia/Baku");
+        when(simaKycRecordRepository.countByCustomerAndChannelIn(any(), any())).thenReturn(3L);
+        when(simaKycRecordRepository.countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtGreaterThanEqual(
+                any(), any(), any())).thenReturn(3L);
+
+        SimaVerifyOutcome out = service.verifyPassport("678", "62HJ5KQ", "C01234567", photo, "az");
+
+        assertEquals(429, out.getHttpStatus());
+        assertEquals("SIMA_DAILY_LIMIT", out.getBody().getCode());
+        verify(simaFeign, never()).verifyPassport(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void passport_missingDocumentNumberDoesNotCallSima() {
+        when(customerRepository.findByUserId(678L)).thenReturn(customer);
+        stubLimitsOpen();
+        when(customerRepository.findAllByPinIgnoreCase(anyString())).thenReturn(List.of());
+
+        assertThrows(MissingFieldException.class,
+                () -> service.verifyPassport("678", "62HJ5KQ", " ", photo, "az"));
+
+        verify(simaFeign, never()).verifyPassport(any(), any(), any(), any(), any());
     }
 
     private void stubCitizenCall() {

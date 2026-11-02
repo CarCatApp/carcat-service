@@ -16,12 +16,12 @@ Müşteri SIMA ile doğrulanınca ad / soyad / FIN devlet kaydından gelir ve ki
 
 | Yap | Yapma |
 |---|---|
-| Citizen + foreign multipart | `/api/v1/sima/test/identity/verify` (Postman; kalkacak) |
+| Citizen + passport + foreign multipart | `/api/v1/sima/test/identity/verify` (Postman; kalkacak) |
 | JPEG selfie, max 1 MB | PNG, HEIC, data-URI, 1 MB üstü |
 | `verified` ile buton gizle | Sadece HTTP 200’e bakmak |
 | Skorları 0.90 ile karşılaştırma (backend zaten bakıyor) | Skorları `90` ile karşılaştırmak |
 | FIN alanı adı: `pin` | Login PIN (4 haneli) ile karıştırmak |
-| Passport ekranı | AZE passport API (kapalı) |
+| AZE pasaport: `POST /verify/passport` (FIN + pasaport no + JPEG) | Pasaportta doğum tarihi göndermek |
 | Idempotency key göndermek | — backend kendi üretir |
 
 ---
@@ -74,9 +74,9 @@ Flag HIDDEN/DISABLED: ekranı kapat. Backend yine çağrılsa da ürün kararı 
 
 ---
 
-## 6. İki kanal (ekran seçimi)
+## 6. Üç kanal (ekran seçimi)
 
-Pasaport **yok**.
+Üçü de aynı deneme limitini paylaşır: günlük 3 başarısız, hesapta toplam 5. Ortam değişkeni basılırsa o değerler geçer.
 
 ### A) Yerel vatandaş — vesika
 
@@ -102,7 +102,22 @@ pin + documentNumber + birthDate + photo
 pin + photo
 ```
 
-### B) Yabancı — göçmenlik belgesi
+### B) AZE pasaport
+
+`POST /api/v1/sima/verify/passport`  
+`Content-Type: multipart/form-data`
+
+SIMA yolu: `POST /api/v1/kyc/identity/verify/passport`. Citizen endpoint’i değil.
+
+| Form key | Zorunlu | Değer |
+|---|---|---|
+| `pin` | Evet | FIN |
+| `documentNumber` | Evet | Pasaport numarası |
+| `photo` | Evet | Aynı JPEG kuralları |
+
+`birthDate` bu kanalda **yok**. Boş `documentNumber` → 400, SIMA’ya gidilmez.
+
+### C) Yabancı — göçmenlik belgesi
 
 `POST /api/v1/sima/verify/foreign`  
 `Content-Type: multipart/form-data`
@@ -139,7 +154,7 @@ FormData.fromMap({
 
 ---
 
-## 8. Verify JSON (her iki kanal, aynı şablon)
+## 8. Verify JSON (üç kanal, aynı şablon)
 
 Body **her zaman** bu şekil (alanlar null olabilir). SIMA 4xx olsa bile bu şablon — global `error/message/status` **değil**.
 
@@ -321,9 +336,10 @@ Açılış
         evet → SIMA butonu yok; ad/soyad/FIN kilit; mail açık
         hayır → flag ENABLED ise buton var
 
-Buton → yerel / yabancı seç
+Buton → vesika / AZE pasaport / yabancı seç
   → kamera JPEG ≤ 1MB
   → citizen: FIN + (vesika no XOR doğum tarihi)
+  → passport: FIN + pasaport no
   → foreign: FIN + TRC|PRC|ERP
   → POST verify
   → body.verified == true?
@@ -385,6 +401,8 @@ Flag yok / 403: butonu gösterme (güvenli taraf).
 - [ ] App kill/reopen → GET information → buton hâlâ yok
 - [ ] Skor düşük simülasyonu (staging) → 200 + verified false → kırmızı/uyarı, buton duruyor
 - [ ] Vesika + doğum tarihi birlikte → 400
+- [ ] Passport: FIN + pasaport no + JPEG → SIMA `/verify/passport`, citizen’a gitmez
+- [ ] Passport’ta boş `documentNumber` → 400
 - [ ] Foreign `documentType: PASSPORT` → 400
 - [ ] PNG foto → 400
 - [ ] Başkasının FIN’i → 409, AZ mesaj
@@ -398,7 +416,6 @@ Flag yok / 403: butonu gösterme (güvenli taraf).
 
 Aşağıdakiler **kararlı**. Yeni Jira yoksa sorma:
 
-- Passport kanalı yok  
 - Profilde baba adı / adres / cinsiyet yok  
 - Belge bitiş tarihi uygulamada yok (sadece DB)  
 - Test API müşteriyi güncellemez  

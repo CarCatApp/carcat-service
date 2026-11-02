@@ -73,9 +73,13 @@ class AdminIddaBalanceControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"RequestIdentifier\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"StartDate\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"EndDate\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("type=\"date\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"Offset\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"Limit\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"2026-10-01 00:00:00\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Sayfa başı")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"2026-10-01\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("value=\"2026-10-01 00:00:00\""))))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("name=\"ApiKey\""))));
 
         verifyNoInteractions(digitalFinanceClient);
@@ -142,7 +146,116 @@ class AdminIddaBalanceControllerTest {
 
         org.mockito.ArgumentCaptor<byte[]> body = org.mockito.ArgumentCaptor.forClass(byte[].class);
         verify(digitalFinanceClient).exchange(eq("POST"), eq("/api/v1/Info/Payments"), body.capture(), eq("pay-1"), isNull());
-        assertEquals("{\"EndDate\":\"2026-10-21 23:59:59\"}", new String(body.getValue(), StandardCharsets.UTF_8));
+        assertEquals(
+                "{\"EndDate\":\"2026-10-21 23:59:59\",\"Offset\":0,\"Limit\":50}",
+                new String(body.getValue(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void calendarDaysAreSentAsStartOfDayAndEndOfDay() throws Exception {
+        when(digitalFinanceClient.exchange(eq("POST"), eq("/api/v1/Info/Payments"), any(byte[].class), eq("pay-2"), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", counted(1)));
+
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "payment")
+                        .param("RequestIdentifier", "pay-2")
+                        .param("nav", "search")
+                        .param("StartDate", "2026-10-01")
+                        .param("EndDate", "2026-10-02")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"2026-10-01\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"2026-10-02\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("1–1 / 1")));
+
+        org.mockito.ArgumentCaptor<byte[]> body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(digitalFinanceClient).exchange(eq("POST"), eq("/api/v1/Info/Payments"), body.capture(), eq("pay-2"), isNull());
+        assertEquals(
+                "{\"StartDate\":\"2026-10-01 00:00:00\",\"EndDate\":\"2026-10-02 23:59:59\",\"Offset\":0,\"Limit\":50}",
+                new String(body.getValue(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void nextAndPreviousMoveByPageSize() throws Exception {
+        when(digitalFinanceClient.exchange(eq("POST"), eq("/api/v1/Info/Payments"), any(byte[].class), anyString(), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", counted(120)));
+
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "payment")
+                        .param("nav", "next")
+                        .param("StartDate", "2026-10-01")
+                        .param("EndDate", "2026-10-02")
+                        .param("Offset", "0")
+                        .param("Limit", "50")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("51–100 / 120")));
+
+        org.mockito.ArgumentCaptor<byte[]> nextBody = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(digitalFinanceClient).exchange(eq("POST"), eq("/api/v1/Info/Payments"), nextBody.capture(), anyString(), isNull());
+        assertTrue(new String(nextBody.getValue(), StandardCharsets.UTF_8).contains("\"Offset\":50"));
+
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "payment")
+                        .param("nav", "prev")
+                        .param("StartDate", "2026-10-01")
+                        .param("EndDate", "2026-10-02")
+                        .param("Offset", "100")
+                        .param("Limit", "50")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("51–100 / 120")));
+
+        org.mockito.ArgumentCaptor<byte[]> prevBody = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(digitalFinanceClient, org.mockito.Mockito.times(2))
+                .exchange(eq("POST"), eq("/api/v1/Info/Payments"), prevBody.capture(), anyString(), isNull());
+        assertTrue(new String(prevBody.getAllValues().get(1), StandardCharsets.UTF_8).contains("\"Offset\":50"));
+    }
+
+    @Test
+    void searchStartsAtTheFirstPage() throws Exception {
+        when(digitalFinanceClient.exchange(eq("POST"), eq("/api/v1/Info/Expenses"), any(byte[].class), anyString(), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", expenseJson()));
+
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "expense")
+                        .param("nav", "search")
+                        .param("StartDate", "2026-10-01")
+                        .param("Offset", "50")
+                        .param("Limit", "20")
+                        .accept("text/html"))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<byte[]> body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(digitalFinanceClient).exchange(eq("POST"), eq("/api/v1/Info/Expenses"), body.capture(), anyString(), isNull());
+        assertEquals(
+                "{\"StartDate\":\"2026-10-01 00:00:00\",\"Offset\":0,\"Limit\":20}",
+                new String(body.getValue(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void endDayBeforeStartDoesNotCallUpstream() throws Exception {
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "payment")
+                        .param("StartDate", "2026-10-02")
+                        .param("EndDate", "2026-10-01")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Bitiş, başlangıçtan önce olamaz.")));
+
+        verifyNoInteractions(digitalFinanceClient);
+    }
+
+    @Test
+    void pageSizeOutsideTheChoicesDoesNotCallUpstream() throws Exception {
+        mockMvc.perform(post("/admin/idda-balance")
+                        .param("tab", "payment")
+                        .param("Limit", "15")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Sayfa başı 20, 50 veya 100 olmalı.")));
+
+        verifyNoInteractions(digitalFinanceClient);
     }
 
     @Test
@@ -189,6 +302,7 @@ class AdminIddaBalanceControllerTest {
     void invalidOffsetDoesNotCallUpstream() throws Exception {
         mockMvc.perform(post("/admin/idda-balance")
                         .param("tab", "expense")
+                        .param("nav", "next")
                         .param("Offset", "1.5")
                         .accept("text/html"))
                 .andExpect(status().isOk())
@@ -216,6 +330,11 @@ class AdminIddaBalanceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("HTTP 502")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("not-json")));
+    }
+
+    private static byte[] counted(long count) {
+        return ("{\"Status\":{\"Name\":\"Successful\",\"Code\":0,\"Message\":\"\"},\"Response\":{\"Count\":"
+                + count + ",\"Payments\":[]}}").getBytes(StandardCharsets.UTF_8);
     }
 
     private static byte[] expenseJson() {

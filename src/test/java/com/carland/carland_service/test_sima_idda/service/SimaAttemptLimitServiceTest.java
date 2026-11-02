@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -30,15 +29,15 @@ class SimaAttemptLimitServiceTest {
                 .simaEverLimitResetAt(LocalDateTime.of(2026, 9, 1, 0, 0))
                 .build();
         SimaAttemptLimitService service = new SimaAttemptLimitService(repository, properties);
-        when(repository.countByCustomerAndChannelInAndCreatedAtAfter(eq(customer), eq(List.of("CITIZEN", "FOREIGN")), eq(customer.getSimaEverLimitResetAt())))
+        when(repository.countByCustomerAndChannelInAndCreatedAtAfter(eq(customer), eq(SimaAttemptLimitService.ATTEMPT_CHANNELS), eq(customer.getSimaEverLimitResetAt())))
                 .thenReturn(1L);
-        when(repository.countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtAfter(eq(customer), eq(List.of("CITIZEN", "FOREIGN")), eq(customer.getSimaDailyLimitResetAt())))
+        when(repository.countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtAfter(eq(customer), eq(SimaAttemptLimitService.ATTEMPT_CHANNELS), eq(customer.getSimaDailyLimitResetAt())))
                 .thenReturn(0L);
 
         service.countTotal(customer);
         service.countDailyFails(customer);
 
-        verify(repository).countByCustomerAndChannelInAndCreatedAtAfter(customer, List.of("CITIZEN", "FOREIGN"), customer.getSimaEverLimitResetAt());
-        verify(repository).countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtAfter(customer, List.of("CITIZEN", "FOREIGN"), customer.getSimaDailyLimitResetAt());
+        verify(repository).countByCustomerAndChannelInAndCreatedAtAfter(customer, SimaAttemptLimitService.ATTEMPT_CHANNELS, customer.getSimaEverLimitResetAt());
+        verify(repository).countByCustomerAndChannelInAndVerifiedFalseAndCreatedAtAfter(customer, SimaAttemptLimitService.ATTEMPT_CHANNELS, customer.getSimaDailyLimitResetAt());
     }
 }

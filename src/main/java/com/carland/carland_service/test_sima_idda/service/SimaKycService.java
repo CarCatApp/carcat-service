@@ -19,6 +19,7 @@ import com.carland.carland_service.test_sima_idda.dto.sima.SimaCitizenFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaErrorBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaForeignFeignBody;
 import com.carland.carland_service.test_sima_idda.dto.sima.SimaIdentityResult;
+import com.carland.carland_service.test_sima_idda.dto.sima.SimaPassportFeignBody;
 import com.carland.carland_service.test_sima_idda.feign.SimaFeign;
 import com.carland.carland_service.test_sima_idda.hmac.SimaHmacSigner;
 import com.carland.carland_service.util.GenderNormalizer;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * SIMA KYC: citizen/foreign persist every attempt; profile is updated only when verified.
+ * SIMA KYC: citizen/foreign/passport persist every attempt; profile is updated only when verified.
  */
 @Slf4j
 @Service
@@ -80,6 +81,23 @@ public class SimaKycService {
         }
         SimaCall call = callCitizen(pin, documentNumber, birthDate, photo);
         return finishAttempt(customer, call, "CITIZEN", acceptLanguage, pin, documentNumber, birthDate);
+    }
+
+    @Transactional
+    public SimaVerifyOutcome verifyPassport(
+            String userIdHeader,
+            String pin,
+            String documentNumber,
+            MultipartFile photo,
+            String acceptLanguage
+    ) {
+        Customer customer = requireCustomer(userIdHeader);
+        SimaVerifyOutcome blocked = preflight(customer, pin, acceptLanguage);
+        if (blocked != null) {
+            return blocked;
+        }
+        SimaCall call = callPassport(pin, documentNumber, photo);
+        return finishAttempt(customer, call, "PASSPORT", acceptLanguage, pin, documentNumber, null);
     }
 
     @Transactional
@@ -413,6 +431,36 @@ public class SimaKycService {
                 SimaPiiMask.fin(pin), body.getDocumentType(), idempotencyKey);
         try {
             SimaApiEnvelope envelope = simaFeign.verifyForeign(
+                    simaIddaProperties.getSimaIdentifier(),
+                    simaIddaProperties.getSimaAuthScheme(),
+                    signature,
+                    simaIddaProperties.getSimaDeviceInfo(),
+                    minified
+            );
+            return new SimaCall(envelope, idempotencyKey, 200);
+        } catch (FeignException e) {
+            return parseFeignError(e, idempotencyKey);
+        }
+    }
+
+    private SimaCall callPassport(String pin, String documentNumber, MultipartFile photo) {
+        String document = blankToNull(documentNumber);
+        if (document == null) {
+            throw new MissingFieldException("documentNumber required for passport");
+        }
+        String idempotencyKey = UUID.randomUUID().toString();
+        SimaPassportFeignBody body = SimaPassportFeignBody.builder()
+                .pin(pin)
+                .documentNumber(document)
+                .livePhoto(toJpegBase64(photo))
+                .idempotencyKey(idempotencyKey)
+                .build();
+        String minified = SimaHmacSigner.minify(body);
+        String signature = simaHmacSigner.signBase64(minified);
+        log.info("SIMA passport verify pin={} idempotencyKey={} photoBytes={}",
+                SimaPiiMask.fin(pin), idempotencyKey, photo.getSize());
+        try {
+            SimaApiEnvelope envelope = simaFeign.verifyPassport(
                     simaIddaProperties.getSimaIdentifier(),
                     simaIddaProperties.getSimaAuthScheme(),
                     signature,

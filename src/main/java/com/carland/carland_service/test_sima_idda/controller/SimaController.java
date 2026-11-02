@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * CarCat SIMA KYC APIs. Flutter: citizen (vesika) / foreign (TRC|PRC|ERP).
- * Passport channel is paused (PO).
+ * CarCat SIMA KYC APIs. Flutter: citizen (vesika) / passport (AZE) / foreign (TRC|PRC|ERP).
+ * Citizen, foreign and passport share one attempt limit.
  */
 @RestController
 @RequestMapping("/api/v1/sima")
@@ -49,6 +49,22 @@ public class SimaController {
     ) {
         SimaVerifyOutcome outcome = simaKycService.verifyCitizen(
                 userIdHeader, pin, documentNumber, birthDate, photo, acceptLanguage);
+        return ResponseEntity.status(outcome.getHttpStatus()).body(outcome.getBody());
+    }
+
+    @Operation(summary = "SIMA verify passport (AZE travel passport)",
+            description = "Form: pin, documentNumber, photo (JPEG File). JWT + X-User-Id. "
+                    + "Calls SIMA /api/v1/kyc/identity/verify/passport. Same attempt limit as citizen and foreign.")
+    @PostMapping(value = "/verify/passport", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SimaVerifyResponse> verifyPassport(
+            @RequestParam("pin") String pin,
+            @RequestParam("documentNumber") String documentNumber,
+            @RequestParam("photo") MultipartFile photo,
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        SimaVerifyOutcome outcome = simaKycService.verifyPassport(
+                userIdHeader, pin, documentNumber, photo, acceptLanguage);
         return ResponseEntity.status(outcome.getHttpStatus()).body(outcome.getBody());
     }
 
