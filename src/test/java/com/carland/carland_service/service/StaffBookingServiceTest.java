@@ -167,7 +167,7 @@ class StaffBookingServiceTest {
             Pageable pageable = invocation.getArgument(1);
             Sort.Order day = pageable.getSort().getOrderFor("range.calendar.day");
             assertEquals(Sort.Direction.ASC, day.getDirection());
-            assertEquals(Sort.NullHandling.NULLS_LAST, day.getNullHandling());
+            assertEquals(Sort.NullHandling.NATIVE, day.getNullHandling());
             assertEquals(Sort.Direction.ASC, pageable.getSort().getOrderFor("range.start").getDirection());
             assertEquals(20, pageable.getPageSize());
             return new PageImpl<>(List.of(olderDay, booking, laterSameDay), pageable, 3);

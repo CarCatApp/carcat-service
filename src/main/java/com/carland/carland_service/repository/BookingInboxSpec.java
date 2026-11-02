@@ -66,13 +66,10 @@ public final class BookingInboxSpec {
 
     public static Pageable page(int page, boolean newestDayFirst) {
         int index = Math.max(page, 1) - 1;
-        Sort.Order day = (newestDayFirst
+        Sort.Order day = newestDayFirst
                 ? Sort.Order.desc("range.calendar.day")
-                : Sort.Order.asc("range.calendar.day")).nullsLast();
-        return PageRequest.of(index, PAGE_SIZE, Sort.by(
-                day,
-                Sort.Order.asc("range.start").nullsLast(),
-                Sort.Order.asc("id")));
+                : Sort.Order.asc("range.calendar.day");
+        return PageRequest.of(index, PAGE_SIZE, Sort.by(day, Sort.Order.asc("range.start"), Sort.Order.asc("id")));
     }
 
     public static Specification<Booking> where(
