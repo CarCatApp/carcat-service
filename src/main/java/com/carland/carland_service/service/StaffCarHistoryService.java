@@ -52,6 +52,15 @@ public class StaffCarHistoryService {
     ) {
         BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
         Branch branch = bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
+        return historyOnBranch(branch, carId, vin, acceptLanguage);
+    }
+
+    /**
+     * tr: Şube zaten seçilmiş. Admin tahtası aktif şubeyi buraya verir.
+     * en: The branch is already chosen. The admin board passes an active branch here.
+     */
+    @Transactional(readOnly = true)
+    public StaffCarHistoryResponse historyOnBranch(Branch branch, Long carId, String vin, String acceptLanguage) {
         String normalizedVin = normalizeVin(vin);
         if (carId == null && normalizedVin == null) {
             throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));

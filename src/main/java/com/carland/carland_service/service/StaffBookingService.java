@@ -15,6 +15,7 @@ import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.BookingStaffNote;
+import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
@@ -25,6 +26,7 @@ import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStatus;
+import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.ForbiddenException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -244,12 +246,73 @@ public class StaffBookingService {
         return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
     }
 
+    /**
+     * tr: Admin paneli, aktif şubedeki rezervi şube personeliyle aynı kuralla ilerletir.
+     * en: The admin panel advances a booking on an active branch with the same rule as branch staff.
+     */
+    @Transactional
+    public BookingView adminAccept(Long bookingId, String timezone, String acceptLanguage) {
+        return transition(operable(bookingId, acceptLanguage), BookingStatus.CONFIRMED.apiValue(),
+                null, timezone, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingView adminReject(Long bookingId, BookingRejectRequest request, String timezone,
+                                   String acceptLanguage) {
+        BookingStaffNoteService.Applied applied = bookingStaffNoteService.apply(
+                BookingStaffNote.REJECT, request, acceptLanguage);
+        return transition(operable(bookingId, acceptLanguage), BookingStatus.REJECTED.apiValue(),
+                applied, timezone, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingView adminNoShow(Long bookingId, BookingRejectRequest request, String timezone,
+                                   String acceptLanguage) {
+        BookingStaffNoteService.Applied applied = bookingStaffNoteService.apply(
+                BookingStaffNote.NO_SHOW, request, acceptLanguage);
+        return transition(operable(bookingId, acceptLanguage), BookingStatus.NO_SHOW.apiValue(),
+                applied, timezone, acceptLanguage);
+    }
+
+    @Transactional(readOnly = true)
+    public StaffCompletionDraftView adminDraft(Long bookingId, String acceptLanguage) {
+        return bookingCompletionService.draft(operableConfirmed(bookingId, acceptLanguage), acceptLanguage);
+    }
+
+    @Transactional
+    public BookingView adminComplete(Long bookingId, StaffCompleteRequest request, String timezone,
+                                     String acceptLanguage) {
+        Booking booking = operableConfirmed(bookingId, acceptLanguage);
+        String mode = BranchCompletion.shown(booking.getBranch().getCompletionMode());
+        if (BranchCompletion.DETAILED.equals(mode)) {
+            bookingCompletionService.write(booking,
+                    request == null ? new StaffCompleteRequest() : request, timezone, acceptLanguage);
+        }
+        return transition(booking, BookingStatus.COMPLETED.apiValue(), null, timezone, acceptLanguage);
+    }
+
+    @Transactional
+    public BookingView adminHide(Long bookingId, String timezone, String acceptLanguage) {
+        Booking booking = operable(bookingId, acceptLanguage);
+        booking.setStaffHidden(true);
+        bookingRepository.save(booking);
+        staffBookingLiveService.refreshAfterCommit(
+                booking.getBranch() == null ? null : booking.getBranch().getId());
+        return viewOf(booking, timezone, acceptLanguage);
+    }
+
     private BookingView decide(Long userId, boolean mustChangePassword, Long bookingId, String nextStatus,
                                BookingStaffNoteService.Applied applied, String timezone, String acceptLanguage) {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
         bookingStaffAccess.requireWritableBranch(staff, booking.getBranch().getId(), acceptLanguage);
+        return transition(booking, nextStatus, applied, timezone, acceptLanguage);
+    }
+
+    private BookingView transition(Booking booking, String nextStatus, BookingStaffNoteService.Applied applied,
+                                   String timezone, String acceptLanguage) {
+        Long bookingId = booking.getId();
         String current = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
         if (BookingStatus.REJECTED.apiValue().equals(nextStatus)) {
             if (!BookingStatus.PENDING.apiValue().equals(current)) {
@@ -300,8 +363,42 @@ public class StaffBookingService {
                 notifyCompleted(booking);
             }
         }
+        return viewOf(booking, timezone, acceptLanguage);
+    }
+
+    private Booking operable(Long bookingId, String acceptLanguage) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
+        Branch branch = booking.getBranch();
+        boolean open = branch != null
+                && !Boolean.FALSE.equals(branch.getActive())
+                && branch.getPartner() != null
+                && !Boolean.FALSE.equals(branch.getPartner().getActive());
+        if (!open) {
+            throw new ForbiddenException(MessagesLangValues.COOPERATION_SUSPENDED.getMessageByLang(acceptLanguage));
+        }
+        return booking;
+    }
+
+    private Booking operableConfirmed(Long bookingId, String acceptLanguage) {
+        Booking booking = operable(bookingId, acceptLanguage);
+        String current = booking.getStatus() == null ? "" : booking.getStatus().toLowerCase();
+        if (!BookingStatus.CONFIRMED.apiValue().equals(current)
+                && !BookingStatus.AUTO_ACCEPTED.apiValue().equals(current)) {
+            throw new ConflictException("booking is not confirmed");
+        }
+        return booking;
+    }
+
+    /** tr: Admin tahtası satırı. Saat Asia/Baku, dil az. en: Admin board row. Clock is Asia/Baku, language az. */
+    public BookingView viewForAdmin(Booking booking) {
+        return viewOf(booking, "Asia/Baku", "az");
+    }
+
+    private BookingView viewOf(Booking booking, String timezone, String acceptLanguage) {
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
+        Long bookingId = booking.getId();
         List<String> keys = bookingItemRepository.findByBooking_IdOrderByIdAsc(bookingId).stream()
                 .map(BookingItem::getServiceKey)
                 .toList();
@@ -447,6 +544,9 @@ public class StaffBookingService {
                 .packagePrice(booking.getPackagePrice())
                 .individualServices(individualServices)
                 .inspection(BookingSelectionViews.inspection(inspection))
+                .branchName(booking.getBranch() == null ? null : booking.getBranch().getName())
+                .completionMode(booking.getBranch() == null
+                        ? null : BranchCompletion.shown(booking.getBranch().getCompletionMode()))
                 .serviceLabel(BookingSelectionViews.label(
                         booking.getPackageName(),
                         !individualServices.isEmpty(),

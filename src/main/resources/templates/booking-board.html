@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Rezervasiyalar — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=board1">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/idda">IDDA</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link active" href="/admin/booking-board">Rezervasiyalar</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/fuel-intervals">Aralıqlar</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Rezervasiyalar</h1>
+      <p class="muted">Aktiv şöbələrin hamısı. Şöbə seçimi yoxdur.</p>
+    </div>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <div class="board-chips" id="chips"></div>
+  <form class="board-search" id="search">
+    <input name="vin" placeholder="VIN" autocomplete="off">
+    <input name="plate" placeholder="Nömrə" autocomplete="off">
+    <input name="firstName" placeholder="Ad" autocomplete="off">
+    <input name="lastName" placeholder="Soyad" autocomplete="off">
+    <input name="phone" placeholder="Telefon" autocomplete="off">
+    <input name="dateFrom" type="date" aria-label="Tarixdən">
+    <input name="dateTo" type="date" aria-label="Tarixə">
+    <button class="btn btn-primary" type="submit">Axtar</button>
+  </form>
+  <div id="list"></div>
+  <div class="board-pager" id="pager"></div>
+</main>
+<div class="board-dialog" id="dialog" hidden></div>
+<script src="/admin/booking-board.js?v=board1"></script>
+</body>
+</html>

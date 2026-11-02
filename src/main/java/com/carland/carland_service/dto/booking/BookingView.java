@@ -2,6 +2,7 @@ package com.carland.carland_service.dto.booking;
 
 import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,6 +43,9 @@ public class BookingView {
     BookingCanceledReasonView canceledReason;
     String startsAt;
     String branchName;
+    /** webhook | detailed. Set for the admin board. Omitted on older callers that leave it null. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String completionMode;
     String branchAddress;
     String partnerName;
     String logoUrl;
