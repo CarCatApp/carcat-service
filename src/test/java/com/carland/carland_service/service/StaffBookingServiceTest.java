@@ -30,13 +30,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -121,7 +119,7 @@ class StaffBookingServiceTest {
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of(
                 BookingItem.builder().booking(booking).serviceKey("pkg:hyper-extra").build()));
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
 
         assertEquals(1, out.getItems().size());
         assertEquals("CC-959345", out.getItems().get(0).getRef());
@@ -163,63 +161,58 @@ class StaffBookingServiceTest {
                 .build();
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenAnswer(invocation -> {
-            Pageable pageable = invocation.getArgument(1);
-            Sort.Order day = pageable.getSort().getOrderFor("range.calendar.day");
-            assertEquals(Sort.Direction.ASC, day.getDirection());
-            assertEquals(Sort.NullHandling.NATIVE, day.getNullHandling());
-            assertEquals(Sort.Direction.ASC, pageable.getSort().getOrderFor("range.start").getDirection());
-            assertEquals(20, pageable.getPageSize());
-            return new PageImpl<>(List.of(olderDay, booking, laterSameDay), pageable, 3);
-        });
+        when(bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(eq(7L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(laterSameDay, booking, olderDay)));
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
 
-        BookingInboxResponse out = service.inbox(9L, false, "board", 7L, 1, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "board", 7L, 1, 20, "Asia/Baku", "az");
 
         assertEquals(List.of(3L, 1L, 2L), out.getItems().stream().map(BookingView::getBookingId).toList());
-        assertEquals(20, out.getPageSize());
-        assertEquals(3L, out.getTotal());
+        assertEquals("2026-10-20", out.getItems().get(0).getDay());
+        assertEquals("10:00", out.getItems().get(0).getStart());
+        assertEquals("09:00", out.getItems().get(1).getStart());
+        assertEquals("14:00", out.getItems().get(2).getStart());
     }
 
     @Test
-    void completedPageIsNewestDayFirst() {
-        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
-        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenAnswer(invocation -> {
-            Pageable pageable = invocation.getArgument(1);
-            assertEquals(Sort.Direction.DESC,
-                    pageable.getSort().getOrderFor("range.calendar.day").getDirection());
-            assertEquals(20, pageable.getPageSize());
-            return new PageImpl<>(List.of(booking), pageable, 41);
-        });
-        when(bookingRepository.count(spec())).thenReturn(4L);
-        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
-
-        BookingInboxResponse out = service.inbox(9L, false, "completed", 7L, 1, "Asia/Baku", "az");
-
-        assertEquals(41L, out.getTotal());
-        assertEquals(41L, out.getCompleted());
-        assertEquals(3, out.getTotalPages());
-        assertEquals(4L, out.getPending());
-        assertEquals(20, out.getPageSize());
-    }
-
-    @Test
-    void headAdminPagesEveryActiveBranch() {
+    void headAdminPagesEveryActiveBranchByDay() {
         staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
-        when(bookingRepository.findAll(spec(), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 20), 41));
-        when(bookingRepository.count(spec())).thenReturn(5L);
+        when(bookingRepository.countHead(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            Collection<?> statuses = invocation.getArgument(0);
+            if (statuses.size() == 1 && statuses.contains("pending")) {
+                return 2L;
+            }
+            if (statuses.contains("auto_accepted")) {
+                return 4L;
+            }
+            if (statuses.size() == 1 && statuses.contains("completed")) {
+                return 7L;
+            }
+            if (statuses.contains("no_show")) {
+                return 9L;
+            }
+            return 0L;
+        });
+        when(bookingRepository.findHeadByDayAsc(any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> {
+                    Pageable pageable = invocation.getArgument(8);
+                    assertEquals(20, pageable.getPageSize());
+                    assertEquals(0, pageable.getPageNumber());
+                    return new PageImpl<>(List.of(booking), pageable, 2);
+                });
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", null, 1, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", null, 1, 20, "Asia/Baku", "az");
 
-        assertEquals(41L, out.getPending());
-        assertEquals(5L, out.getConfirmed());
-        assertEquals(5L, out.getRejected());
-        assertEquals(3, out.getTotalPages());
+        assertEquals(2L, out.getPending());
+        assertEquals(4L, out.getConfirmed());
+        assertEquals(7L, out.getCompleted());
+        assertEquals(9L, out.getRejected());
+        assertEquals(1, out.getTotalPages());
+        assertEquals(20, out.getPageSize());
         verify(bookingStaffAccess, never()).requireWritableBranch(any(), any(), any());
+        verify(bookingRepository, never()).findHeadByDayDesc(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -245,7 +238,7 @@ class StaffBookingServiceTest {
         when(brandRepository.findAllByBrandNameIgnoreCase("Mercedes")).thenReturn(List.of(
                 Brand.builder().brandId(42L).brandName("Mercedes").status("ACTIVE").isnew(".").build()));
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
 
         assertEquals(42L, out.getItems().get(0).getCar().getBrandId());
         assertEquals("SUV", out.getItems().get(0).getCar().getBodyType());
@@ -278,7 +271,7 @@ class StaffBookingServiceTest {
                 .ru("Зелёный")
                 .build());
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
 
         assertEquals("Yaşıl", out.getItems().get(0).getCar().getColor());
     }
@@ -434,11 +427,7 @@ class StaffBookingServiceTest {
     }
 
     private void stubInbox(List<Booking> rows) {
-        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenReturn(new PageImpl<>(rows));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Specification<Booking> spec() {
-        return any(Specification.class);
+        when(bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(eq(7L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(rows));
     }
 }

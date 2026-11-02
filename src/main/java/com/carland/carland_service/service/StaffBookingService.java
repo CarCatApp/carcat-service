@@ -34,8 +34,8 @@ import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
-import com.carland.carland_service.repository.BookingInboxSpec;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.CarSpec;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
@@ -43,7 +43,7 @@ import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,8 +69,28 @@ import java.util.stream.Collectors;
 public class StaffBookingService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
+    static final String BOARD = "board";
+    private static final int HEAD_PAGE = 20;
+    private static final LocalDate DAY_MIN = LocalDate.of(1970, 1, 1);
+    private static final LocalDate DAY_MAX = LocalDate.of(9999, 12, 31);
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter CREATED = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final List<String> PENDING_STATUSES = List.of(BookingStatus.PENDING.apiValue());
+    private static final List<String> CONFIRMED_STATUSES = List.of(
+            BookingStatus.CONFIRMED.apiValue(), BookingStatus.AUTO_ACCEPTED.apiValue());
+    private static final List<String> COMPLETED_STATUSES = List.of(BookingStatus.COMPLETED.apiValue());
+    private static final List<String> REJECTED_STATUSES = List.of(
+            BookingStatus.REJECTED.apiValue(), BookingStatus.CANCELLED.apiValue(), "canceled",
+            BookingStatus.NO_SHOW.apiValue());
+    private static final List<String> BOARD_STATUSES = List.of(
+            BookingStatus.PENDING.apiValue(),
+            BookingStatus.CONFIRMED.apiValue(),
+            BookingStatus.AUTO_ACCEPTED.apiValue(),
+            BookingStatus.REJECTED.apiValue(),
+            BookingStatus.CANCELLED.apiValue(),
+            "canceled",
+            BookingStatus.COMPLETED.apiValue(),
+            BookingStatus.NO_SHOW.apiValue());
 
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingRepository bookingRepository;
@@ -96,47 +116,110 @@ public class StaffBookingService {
 
     @Transactional(readOnly = true)
     public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
-                                      Integer page, String timezone, String acceptLanguage) {
-        return inbox(userId, mustChangePassword, status, branchId, page, timezone, acceptLanguage,
+                                      Integer page, Integer pageSize, String timezone, String acceptLanguage) {
+        return inbox(userId, mustChangePassword, status, branchId, page, pageSize, timezone, acceptLanguage,
                 null, null, null, null, null, null, null);
     }
 
+    /**
+     * tr: Şube ve partner admin eski tahta: tek istek, en fazla 200 satır, sayaçlar bu kümeden.
+     *     Head admin ayrı: aktif şubeler, sayfa 20, randevu gününe göre, sayaç gerçek toplam.
+     * en: Branch and partner admin keep the old board: one request, at most 200 rows.
+     *     Head admin is separate: active branches, pages of 20, appointment day, real totals.
+     */
     @Transactional(readOnly = true)
     public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
-                                      Integer page, String timezone, String acceptLanguage,
+                                      Integer page, Integer pageSize, String timezone, String acceptLanguage,
                                       String vin, String plate, String firstName, String lastName, String phone,
                                       String dateFrom, String dateTo) {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
-        String wanted = BookingInboxSpec.tab(status);
+        if (branchId == null && BookingStaffRole.HEAD_ADMIN.name().equals(staff.getRole())) {
+            return headInbox(status, page, timezone, acceptLanguage, vin, plate, firstName, lastName, phone,
+                    dateFrom, dateTo);
+        }
+        String wanted = status == null || status.isBlank() ? BookingStatus.PENDING.apiValue() : status.trim().toLowerCase(Locale.ROOT);
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeSize = pageSize == null || pageSize < 1 ? 200 : Math.min(pageSize, 200);
+        PageRequest pageable = PageRequest.of(safePage - 1, safeSize);
+        boolean board = BOARD.equals(wanted) || "all".equals(wanted);
+        Page<Booking> result;
         Long scopeBranch = null;
         Long scopePartner = null;
-        boolean activePlaces = false;
         if (branchId != null) {
             bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
             scopeBranch = branchId;
-        } else if (BookingStaffRole.HEAD_ADMIN.name().equals(staff.getRole())) {
-            activePlaces = true;
+            result = board
+                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, statusesOf(wanted), pageable);
         } else if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");
             }
             scopeBranch = staff.getBranch().getId();
+            result = board
+                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(scopeBranch, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(scopeBranch, statusesOf(wanted), pageable);
         } else {
             scopePartner = staff.getPartner().getId();
+            result = board
+                    ? bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(scopePartner, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(scopePartner, statusesOf(wanted), pageable);
         }
-        LocalDate from = day(dateFrom);
-        LocalDate to = day(dateTo);
-        Specification<Booking> base = BookingInboxSpec.where(
-                scopeBranch, scopePartner, activePlaces, null,
-                vin, plate, firstName, lastName, phone, from, to);
-        Specification<Booking> tab = base.and(BookingInboxSpec.status(wanted));
-        boolean newest = BookingInboxSpec.newestDayFirst(wanted);
+        boolean newestDay = !board && newestDayFirst(wanted);
+        return respond(result.getContent(), safePage, safeSize, timezone, acceptLanguage, newestDay,
+                countBranch(scopeBranch, scopePartner, PENDING_STATUSES),
+                countBranch(scopeBranch, scopePartner, CONFIRMED_STATUSES),
+                countBranch(scopeBranch, scopePartner, COMPLETED_STATUSES),
+                countBranch(scopeBranch, scopePartner, REJECTED_STATUSES),
+                1);
+    }
+
+    private BookingInboxResponse headInbox(String status, Integer page, String timezone, String acceptLanguage,
+                                           String vin, String plate, String firstName, String lastName, String phone,
+                                           String dateFrom, String dateTo) {
+        String wanted = status == null || status.isBlank() ? "pending" : status.trim().toLowerCase(Locale.ROOT);
+        List<String> statuses = statusesOf(wanted);
+        boolean newest = newestDayFirst(wanted);
+        LocalDate from = dayOr(dateFrom, DAY_MIN);
+        LocalDate to = dayOr(dateTo, DAY_MAX);
+        String vinNeedle = textNeedle(vin);
+        String plateNeedle = plateNeedle(plate);
+        String firstNeedle = textNeedle(firstName);
+        String lastNeedle = textNeedle(lastName);
+        String phoneNeedle = phoneNeedle(phone);
+        long pending = bookingRepository.countHead(PENDING_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long confirmed = bookingRepository.countHead(CONFIRMED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long completed = bookingRepository.countHead(COMPLETED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long rejected = bookingRepository.countHead(REJECTED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long total = switch (wanted) {
+            case "pending" -> pending;
+            case "confirmed" -> confirmed;
+            case "completed" -> completed;
+            case "rejected" -> rejected;
+            default -> bookingRepository.countHead(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        };
+        int totalPages = total == 0 ? 1 : (int) ((total + HEAD_PAGE - 1) / HEAD_PAGE);
         int requested = page == null || page < 1 ? 1 : page;
-        Page<Booking> result = bookingRepository.findAll(tab, BookingInboxSpec.page(requested, newest));
-        if (result.getTotalElements() > 0 && requested > result.getTotalPages()) {
-            result = bookingRepository.findAll(tab, BookingInboxSpec.page(result.getTotalPages(), newest));
+        int safePage = Math.min(requested, totalPages);
+        PageRequest pageable = PageRequest.of(safePage - 1, HEAD_PAGE);
+        Page<Booking> result = newest
+                ? bookingRepository.findHeadByDayDesc(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle, pageable)
+                : bookingRepository.findHeadByDayAsc(statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle, pageable);
+        return respond(result.getContent(), safePage, HEAD_PAGE, timezone, acceptLanguage, newest,
+                pending, confirmed, completed, rejected, totalPages);
+    }
+
+    private long countBranch(Long branchId, Long partnerId, List<String> statuses) {
+        if (branchId != null) {
+            return bookingRepository.countBranch(branchId, statuses);
         }
-        List<Booking> rows = result.getContent();
+        return bookingRepository.countPartner(partnerId, statuses);
+    }
+
+    private BookingInboxResponse respond(List<Booking> rows, int page, int pageSize, String timezone,
+                                         String acceptLanguage, boolean newestDay,
+                                         long pending, long confirmed, long completed, long rejected,
+                                         int totalPages) {
         Map<Long, List<String>> keys = keysByBooking(rows);
         Map<Long, List<BookingIndividualLine>> lines = linesByBooking(rows);
         Map<Long, BookingInspection> inspections = inspectionsByBooking(rows);
@@ -148,37 +231,64 @@ public class StaffBookingService {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), tz, lang,
                     lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds));
         }
-        int shownPage = result.getTotalElements() == 0 ? 1 : result.getNumber() + 1;
-        int totalPages = result.getTotalElements() == 0 ? 1 : result.getTotalPages();
+        items.sort((left, right) -> byAppointment(left, right, newestDay));
+        long total = pending + confirmed + completed + rejected;
         return BookingInboxResponse.builder()
-                .page(shownPage)
-                .pageSize(BookingInboxSpec.PAGE_SIZE)
-                .total(result.getTotalElements())
+                .page(page)
+                .pageSize(pageSize)
+                .total(total)
                 .totalPages(totalPages)
-                .pending(countTab(base, "pending", wanted, result))
-                .confirmed(countTab(base, "confirmed", wanted, result))
-                .completed(countTab(base, "completed", wanted, result))
-                .rejected(countTab(base, "rejected", wanted, result))
+                .pending(pending)
+                .confirmed(confirmed)
+                .completed(completed)
+                .rejected(rejected)
                 .items(items)
                 .build();
     }
 
-    private long countTab(Specification<Booking> base, String tab, String wanted, Page<Booking> page) {
-        if (tab.equals(wanted)) {
-            return page.getTotalElements();
-        }
-        return bookingRepository.count(base.and(BookingInboxSpec.status(tab)));
+    private static List<String> statusesOf(String wanted) {
+        return switch (wanted) {
+            case "confirmed" -> CONFIRMED_STATUSES;
+            case "completed" -> COMPLETED_STATUSES;
+            case "rejected" -> REJECTED_STATUSES;
+            case "all", "board" -> BOARD_STATUSES;
+            case "pending" -> PENDING_STATUSES;
+            default -> List.of(wanted);
+        };
     }
 
-    private static LocalDate day(String raw) {
+    private static boolean newestDayFirst(String wanted) {
+        return "completed".equals(wanted) || "rejected".equals(wanted);
+    }
+
+    private static LocalDate dayOr(String raw, LocalDate fallback) {
         if (raw == null || raw.isBlank()) {
-            return null;
+            return fallback;
         }
         try {
             return LocalDate.parse(raw.trim());
         } catch (DateTimeParseException ex) {
-            return null;
+            return fallback;
         }
+    }
+
+    private static String textNeedle(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return raw.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String plateNeedle(String raw) {
+        String key = CarSpec.plateNeedle(raw);
+        return key == null ? "" : key;
+    }
+
+    private static String phoneNeedle(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return raw.replace("-", "").replace(" ", "").trim().toLowerCase(Locale.ROOT);
     }
 
     @Transactional
@@ -666,6 +776,53 @@ public class StaffBookingService {
         String last = surname == null ? "" : surname.trim();
         String joined = (first + " " + last).trim();
         return joined.isEmpty() ? null : joined;
+    }
+
+    /**
+     * tr: Gün, sonra range başlangıcı. newestDay tamamlanan ve reddedilen sekmesi içindir.
+     * en: Day, then the range start. newestDay is the completed and rejected tabs.
+     */
+    private static int byAppointment(BookingView left, BookingView right, boolean newestDay) {
+        int day = compareDay(left.getDay(), right.getDay());
+        if (newestDay && left.getDay() != null && right.getDay() != null) {
+            day = -day;
+        }
+        if (day != 0) {
+            return day;
+        }
+        int start = compareText(left.getStart(), right.getStart());
+        if (start != 0) {
+            return start;
+        }
+        long leftId = left.getBookingId() == null ? Long.MAX_VALUE : left.getBookingId();
+        long rightId = right.getBookingId() == null ? Long.MAX_VALUE : right.getBookingId();
+        return Long.compare(leftId, rightId);
+    }
+
+    private static int compareDay(String left, String right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return left.compareTo(right);
+    }
+
+    private static int compareText(String left, String right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return left.compareTo(right);
     }
 
     private static String createdStamp(OffsetDateTime time) {

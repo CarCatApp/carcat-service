@@ -85,6 +85,7 @@ public class BookingStaffApiController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize,
             @RequestParam(required = false) String vin,
             @RequestParam(required = false) String plate,
             @RequestParam(required = false) String firstName,
@@ -96,7 +97,7 @@ public class BookingStaffApiController {
         return staffBookingService.inbox(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
-                status, branchId, page, timezone, acceptLanguage,
+                status, branchId, page, pageSize, timezone, acceptLanguage,
                 vin, plate, firstName, lastName, phone, dateFrom, dateTo);
     }
 

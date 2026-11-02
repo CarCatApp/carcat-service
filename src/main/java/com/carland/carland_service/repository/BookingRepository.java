@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -167,6 +168,97 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
     )
     Page<Booking> findVisibleOnActiveBranchesAndStatusIn(
             @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    /**
+     * tr: Head admin sayfası. Sıra randevu günü, sonra range başlangıcı. Criteria sort yok.
+     * en: Head-admin page. Order is the appointment day, then the range start. No Criteria sort.
+     */
+    String HEAD_WHERE = """
+            where b.status in :statuses
+              and (b.staffHidden is null or b.staffHidden = false)
+              and (b.branch.active is null or b.branch.active = true)
+              and (b.branch.partner.active is null or b.branch.partner.active = true)
+              and b.range.calendar.day >= :dayFrom
+              and b.range.calendar.day <= :dayTo
+              and (:vin = '' or lower(coalesce(b.vin, '')) like concat('%', :vin, '%'))
+              and (:plate = '' or exists (
+                    select c.carId from Car c
+                    where c.carId = b.carId
+                      and upper(function('replace', function('replace', function('replace', function('replace', coalesce(c.plateNumber, ''), '-', ''), ' ', ''), '.', ''), '\u00A0', ''))
+                          like concat('%', :plate, '%')))
+              and (:firstName = '' or exists (
+                    select cu.userId from Customer cu
+                    where cu.userId = b.customerUserId
+                      and lower(coalesce(cu.name, '')) like concat('%', :firstName, '%')))
+              and (:lastName = '' or exists (
+                    select cu2.userId from Customer cu2
+                    where cu2.userId = b.customerUserId
+                      and lower(coalesce(cu2.surname, '')) like concat('%', :lastName, '%')))
+              and (:phone = '' or exists (
+                    select cu3.userId from Customer cu3
+                    where cu3.userId = b.customerUserId
+                      and lower(function('replace', function('replace', coalesce(cu3.phoneNumber, ''), '-', ''), ' ', ''))
+                          like concat('%', :phone, '%')))
+            """;
+
+    @Query(
+            value = "select b from Booking b " + HEAD_WHERE
+                    + " order by b.range.calendar.day asc, b.range.start asc, b.id asc",
+            countQuery = "select count(b) from Booking b " + HEAD_WHERE
+    )
+    Page<Booking> findHeadByDayAsc(
+            @Param("statuses") Collection<String> statuses,
+            @Param("dayFrom") LocalDate dayFrom,
+            @Param("dayTo") LocalDate dayTo,
+            @Param("vin") String vin,
+            @Param("plate") String plate,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("phone") String phone,
+            Pageable pageable);
+
+    @Query(
+            value = "select b from Booking b " + HEAD_WHERE
+                    + " order by b.range.calendar.day desc, b.range.start asc, b.id asc",
+            countQuery = "select count(b) from Booking b " + HEAD_WHERE
+    )
+    Page<Booking> findHeadByDayDesc(
+            @Param("statuses") Collection<String> statuses,
+            @Param("dayFrom") LocalDate dayFrom,
+            @Param("dayTo") LocalDate dayTo,
+            @Param("vin") String vin,
+            @Param("plate") String plate,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("phone") String phone,
+            Pageable pageable);
+
+    @Query("select count(b) from Booking b " + HEAD_WHERE)
+    long countHead(
+            @Param("statuses") Collection<String> statuses,
+            @Param("dayFrom") LocalDate dayFrom,
+            @Param("dayTo") LocalDate dayTo,
+            @Param("vin") String vin,
+            @Param("plate") String plate,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("phone") String phone);
+
+    @Query("""
+            select count(b) from Booking b
+            where b.branch.id = :branchId
+              and b.status in :statuses
+              and (b.staffHidden is null or b.staffHidden = false)
+            """)
+    long countBranch(@Param("branchId") Long branchId, @Param("statuses") Collection<String> statuses);
+
+    @Query("""
+            select count(b) from Booking b
+            where b.branch.partner.id = :partnerId
+              and b.status in :statuses
+              and (b.staffHidden is null or b.staffHidden = false)
+            """)
+    long countPartner(@Param("partnerId") Long partnerId, @Param("statuses") Collection<String> statuses);
 
     boolean existsByCustomerUserId(Long customerUserId);
 
