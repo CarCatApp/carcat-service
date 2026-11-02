@@ -56,6 +56,11 @@ public class CustomFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (isClientEventOpen(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (path.startsWith("/partner")) {
             filterChain.doFilter(request, response);
             return;
@@ -117,5 +122,19 @@ public class CustomFilter extends OncePerRequestFilter {
     private static boolean isBannerList(String path) {
         return "/api/v1/banners".equals(path)
                 || (path != null && path.endsWith("/api/v1/banners"));
+    }
+
+    /**
+     * tr: Mobil ingest auth-suzdur. Anonimləşdirmə JWT yox, X-Internal-Token ilə yoxlanır.
+     * en: Mobile ingest has no auth. Anonymize is checked with X-Internal-Token, not a JWT.
+     */
+    private static boolean isClientEventOpen(String path) {
+        if (path == null) {
+            return false;
+        }
+        return "/api/v1/client-events".equals(path)
+                || path.endsWith("/api/v1/client-events")
+                || path.startsWith("/api/v1/internal/client-events/")
+                || path.contains("/api/v1/internal/client-events/");
     }
 }

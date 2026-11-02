@@ -68,6 +68,13 @@ carland:
       - play.google.com
       - apps.apple.com
       - itunes.apple.com
+  client-events:
+    ip-per-minute: ${CLIENT_EVENTS_IP_PER_MINUTE:60}
+    install-events-per-minute: ${CLIENT_EVENTS_INSTALL_PER_MINUTE:300}
+    max-body-bytes: ${CLIENT_EVENTS_MAX_BODY_BYTES:524288}
+    storm-per-minute: ${CLIENT_EVENTS_STORM_PER_MINUTE:20}
+    retention-days: ${CLIENT_EVENTS_RETENTION_DAYS:30}
+    fingerprint-version: 1
   swagger:
     auth-login-url: ${SWAGGER_AUTH_LOGIN_URL:https://digital-innovation.agency/auth/server/api/v1/users/login}
     auth-refresh-url: ${SWAGGER_AUTH_REFRESH_URL:https://digital-innovation.agency/auth/server/api/v1/users/refresh}

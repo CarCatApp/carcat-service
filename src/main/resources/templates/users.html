@@ -16,6 +16,7 @@
     col.c-created { width: 160px; }
     col.c-cars    { width: 90px; }
     col.c-attempts { width: 110px; }
+    col.c-analytics { width: 120px; }
     .data-table { min-width: 1100px; }
     .row-open { background: #fafafa; }
     .sima-panel { border-top: 1px solid var(--border); background: #fafafa; padding: 18px 20px 22px; }
@@ -40,6 +41,7 @@
     <nav class="nav-links">
       <a class="nav-link" href="/admin/cars">Cars</a>
       <a class="nav-link active" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/client-events">Xətalar</a>
       <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
       <a class="nav-link" href="/admin/idda">IDDA</a>
       <a class="nav-link" href="/admin/idda-balance">iddaBalanceInfo</a>
@@ -132,6 +134,7 @@
           <col class="c-created">
           <col class="c-cars">
           <col class="c-attempts">
+          <col class="c-analytics">
         </colgroup>
         <thead>
         <tr>
@@ -144,6 +147,7 @@
           <th>Created At</th>
           <th>Cars</th>
           <th>Attempts</th>
+          <th>Analitika</th>
         </tr>
         </thead>
         <tbody>
@@ -174,9 +178,12 @@
             <a class="btn-cars" th:if="${attemptsUserId != null and attemptsUserId == u.id}"
                th:href="@{/admin/users(page=${currentPage}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima})}">bağla</a>
           </td>
+          <td>
+            <a class="btn-cars" th:href="@{/admin/users/{id}/client-events(id=${u.id})}">Analitika</a>
+          </td>
         </tr>
         <tr class="empty-row" th:if="${users.isEmpty()}">
-          <td colspan="9">Kayıt bulunamadı</td>
+          <td colspan="10">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -301,7 +308,7 @@
   CarlandAdmin.initColumnToggle(
     document.getElementById("usersTable"),
     "carland-admin-cols-users-sima",
-    ["ID", "Name", "Surname", "Phone Number", "Status", "SIMA", "Created At", "Cars", "Attempts"],
+    ["ID", "Name", "Surname", "Phone Number", "Status", "SIMA", "Created At", "Cars", "Attempts", "Analitika"],
     []
   );
 </script>

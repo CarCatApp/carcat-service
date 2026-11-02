@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>Hadisə — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=clientevents1">
+</head>
+<body>
+<a class="skip-link" href="#main">Məzmuna keç</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link active" href="/admin/client-events">Xətalar</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/idda">IDDA</a>
+      <a class="nav-link" href="/admin/idda-balance">iddaBalanceInfo</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/fuel-intervals">Aralıqlar</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <p class="muted"><a th:href="${backUrl}">&#8592; Geri</a></p>
+    <h1>Hadisə</h1>
+  </div>
+
+  <div class="card" style="padding: 20px 24px 28px;" th:if="${view == null}">
+    <p>Qeyd tapılmadı</p>
+  </div>
+
+  <div class="card" style="padding: 20px 24px 28px;" th:if="${view != null}">
+    <dl class="detail-grid">
+      <dt>Vaxt</dt><dd th:text="${view.time()}">vaxt</dd>
+      <dt>Növ</dt><dd th:text="${view.typeLabel()}">növ</dd>
+      <dt>İstifadəçi</dt><dd th:text="${view.userLabel()}">Qonaq</dd>
+      <dt>Status</dt><dd th:text="${view.statusLabel()}">401</dd>
+      <dt>Ünvan</dt><dd th:text="${view.endpoint()}">path</dd>
+      <dt>Gözlənilən</dt><dd th:text="${view.expected()} ? 'Bəli' : 'Xeyr'">Xeyr</dd>
+      <dt>Tətbiq</dt><dd th:text="${view.app() + ' · ' + view.packageName()}">app</dd>
+      <dt>Əməliyyat sistemi</dt><dd th:text="${view.os()}">ios</dd>
+      <dt>Şəbəkə</dt><dd th:text="${view.network()}">Wi-Fi</dd>
+      <dt>Mühit</dt><dd th:text="${view.environment()}">release</dd>
+      <dt>Yaddaş</dt><dd th:text="${view.memory()}">MB</dd>
+      <dt>Quraşdırma</dt><dd th:text="${view.installId()}">id</dd>
+      <dt>Sessiya</dt><dd th:text="${view.sessionId()}">id</dd>
+      <dt>Ekran</dt><dd th:text="${view.route()}">route</dd>
+      <dt>Kitabxana</dt><dd th:text="${view.library()}">bloc</dd>
+    </dl>
+
+    <h2>Mesaj</h2>
+    <pre class="stack-box" th:text="${view.message()}">mesaj</pre>
+
+    <h2>Stek</h2>
+    <pre class="stack-box" th:text="${view.stack() == ''} ? 'Stek yoxdur' : view.stack()">stek</pre>
+
+    <h2>İzlər</h2>
+    <p class="muted" th:if="${view.crumbs().isEmpty()}">İz yoxdur</p>
+    <table class="data-table" th:if="${!view.crumbs().isEmpty()}">
+      <thead>
+      <tr><th>Vaxt</th><th>Kateqoriya</th><th>Mesaj</th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="c : ${view.crumbs()}">
+        <td th:text="${c.time()}">vaxt</td>
+        <td th:text="${c.category()}">nav</td>
+        <td class="clip" th:text="${c.message()}">mesaj</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>
