@@ -14,5 +14,11 @@ import java.util.List;
 public class BookingInboxResponse {
     int page;
     int pageSize;
+    long total;
+    int totalPages;
+    long pending;
+    long confirmed;
+    long completed;
+    long rejected;
     List<BookingView> items;
 }

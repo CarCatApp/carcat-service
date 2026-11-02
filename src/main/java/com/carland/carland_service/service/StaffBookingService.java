@@ -34,6 +34,7 @@ import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
+import com.carland.carland_service.repository.BookingInboxSpec;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
@@ -42,13 +43,15 @@ import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,17 +69,8 @@ import java.util.stream.Collectors;
 public class StaffBookingService {
 
     static final String DEFAULT_TZ = "Asia/Baku";
-    static final String BOARD = "board";
     private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter CREATED = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-    private static final List<String> BOARD_STATUSES = List.of(
-            BookingStatus.PENDING.apiValue(),
-            BookingStatus.CONFIRMED.apiValue(),
-            BookingStatus.AUTO_ACCEPTED.apiValue(),
-            BookingStatus.REJECTED.apiValue(),
-            BookingStatus.CANCELLED.apiValue(),
-            BookingStatus.COMPLETED.apiValue(),
-            BookingStatus.NO_SHOW.apiValue());
 
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingRepository bookingRepository;
@@ -102,36 +96,45 @@ public class StaffBookingService {
 
     @Transactional(readOnly = true)
     public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
-                                      Integer page, Integer pageSize, String timezone, String acceptLanguage) {
+                                      Integer page, String timezone, String acceptLanguage) {
+        return inbox(userId, mustChangePassword, status, branchId, page, timezone, acceptLanguage,
+                null, null, null, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingInboxResponse inbox(Long userId, boolean mustChangePassword, String status, Long branchId,
+                                      Integer page, String timezone, String acceptLanguage,
+                                      String vin, String plate, String firstName, String lastName, String phone,
+                                      String dateFrom, String dateTo) {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
-        String wanted = status == null || status.isBlank() ? BookingStatus.PENDING.apiValue() : status.trim().toLowerCase();
-        int safePage = page == null || page < 1 ? 1 : page;
-        int safeSize = pageSize == null || pageSize < 1 ? 20 : Math.min(pageSize, 200);
-        PageRequest pageable = PageRequest.of(safePage - 1, safeSize);
-        boolean board = BOARD.equals(wanted);
-        Page<Booking> result;
+        String wanted = BookingInboxSpec.tab(status);
+        Long scopeBranch = null;
+        Long scopePartner = null;
+        boolean activePlaces = false;
         if (branchId != null) {
             bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
-            result = board
-                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(branchId, wanted, pageable);
+            scopeBranch = branchId;
         } else if (BookingStaffRole.HEAD_ADMIN.name().equals(staff.getRole())) {
-            result = board
-                    ? bookingRepository.findVisibleOnActiveBranchesAndStatusIn(BOARD_STATUSES, pageable)
-                    : bookingRepository.findVisibleOnActiveBranchesAndStatus(wanted, pageable);
+            activePlaces = true;
         } else if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");
             }
-            Long ownBranch = staff.getBranch().getId();
-            result = board
-                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(ownBranch, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(ownBranch, wanted, pageable);
+            scopeBranch = staff.getBranch().getId();
         } else {
-            Long partnerId = staff.getPartner().getId();
-            result = board
-                    ? bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(partnerId, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_Partner_IdAndStatusOrderByCreatedAtDesc(partnerId, wanted, pageable);
+            scopePartner = staff.getPartner().getId();
+        }
+        LocalDate from = day(dateFrom);
+        LocalDate to = day(dateTo);
+        Specification<Booking> base = BookingInboxSpec.where(
+                scopeBranch, scopePartner, activePlaces, null,
+                vin, plate, firstName, lastName, phone, from, to);
+        Specification<Booking> tab = base.and(BookingInboxSpec.status(wanted));
+        boolean newest = BookingInboxSpec.newestDayFirst(wanted);
+        int requested = page == null || page < 1 ? 1 : page;
+        Page<Booking> result = bookingRepository.findAll(tab, BookingInboxSpec.page(requested, newest));
+        if (result.getTotalElements() > 0 && requested > result.getTotalPages()) {
+            result = bookingRepository.findAll(tab, BookingInboxSpec.page(result.getTotalPages(), newest));
         }
         List<Booking> rows = result.getContent();
         Map<Long, List<String>> keys = keysByBooking(rows);
@@ -145,12 +148,37 @@ public class StaffBookingService {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), tz, lang,
                     lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds));
         }
-        items.sort(StaffBookingService::byAppointment);
+        int shownPage = result.getTotalElements() == 0 ? 1 : result.getNumber() + 1;
+        int totalPages = result.getTotalElements() == 0 ? 1 : result.getTotalPages();
         return BookingInboxResponse.builder()
-                .page(safePage)
-                .pageSize(safeSize)
+                .page(shownPage)
+                .pageSize(BookingInboxSpec.PAGE_SIZE)
+                .total(result.getTotalElements())
+                .totalPages(totalPages)
+                .pending(countTab(base, "pending", wanted, result))
+                .confirmed(countTab(base, "confirmed", wanted, result))
+                .completed(countTab(base, "completed", wanted, result))
+                .rejected(countTab(base, "rejected", wanted, result))
                 .items(items)
                 .build();
+    }
+
+    private long countTab(Specification<Booking> base, String tab, String wanted, Page<Booking> page) {
+        if (tab.equals(wanted)) {
+            return page.getTotalElements();
+        }
+        return bookingRepository.count(base.and(BookingInboxSpec.status(tab)));
+    }
+
+    private static LocalDate day(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
     }
 
     @Transactional
@@ -638,37 +666,6 @@ public class StaffBookingService {
         String last = surname == null ? "" : surname.trim();
         String joined = (first + " " + last).trim();
         return joined.isEmpty() ? null : joined;
-    }
-
-    /**
-     * tr: Siyahı yaranma vaxtına görə deyil. Əvvəl gün (köhnə gün əvvəl), gün içində range başlanğıcı (erkən saat əvvəl).
-     * en: List order is not createdAt. Day first (older day first), then the range start (earlier hour first).
-     */
-    private static int byAppointment(BookingView left, BookingView right) {
-        int day = compareText(left.getDay(), right.getDay());
-        if (day != 0) {
-            return day;
-        }
-        int start = compareText(left.getStart(), right.getStart());
-        if (start != 0) {
-            return start;
-        }
-        long leftId = left.getBookingId() == null ? Long.MAX_VALUE : left.getBookingId();
-        long rightId = right.getBookingId() == null ? Long.MAX_VALUE : right.getBookingId();
-        return Long.compare(leftId, rightId);
-    }
-
-    private static int compareText(String left, String right) {
-        if (left == null && right == null) {
-            return 0;
-        }
-        if (left == null) {
-            return 1;
-        }
-        if (right == null) {
-            return -1;
-        }
-        return left.compareTo(right);
     }
 
     private static String createdStamp(OffsetDateTime time) {

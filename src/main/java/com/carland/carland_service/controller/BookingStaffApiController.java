@@ -85,12 +85,19 @@ public class BookingStaffApiController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer pageSize
+            @RequestParam(required = false) String vin,
+            @RequestParam(required = false) String plate,
+            @RequestParam(required = false) String firstName,
+            @RequestParam(required = false) String lastName,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo
     ) {
         return staffBookingService.inbox(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
-                status, branchId, page, pageSize, timezone, acceptLanguage);
+                status, branchId, page, timezone, acceptLanguage,
+                vin, plate, firstName, lastName, phone, dateFrom, dateTo);
     }
 
     @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/accept")

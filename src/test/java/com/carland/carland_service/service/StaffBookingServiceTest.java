@@ -31,6 +31,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -114,12 +117,11 @@ class StaffBookingServiceTest {
     void inboxReturnsPending() {
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(eq(7L), eq("pending"), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        stubInbox(List.of(booking));
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of(
                 BookingItem.builder().booking(booking).serviceKey("pkg:hyper-extra").build()));
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
 
         assertEquals(1, out.getItems().size());
         assertEquals("CC-959345", out.getItems().get(0).getRef());
@@ -129,7 +131,7 @@ class StaffBookingServiceTest {
     }
 
     @Test
-    void inboxListsOlderDayAndEarlierStartFirst() {
+    void inboxAsksForAppointmentDayOrder() {
         Calendar older = Calendar.builder().day(LocalDate.of(2026, 10, 20)).branch(branch).build();
         Range afternoon = Range.builder()
                 .rangeId(200L)
@@ -161,17 +163,63 @@ class StaffBookingServiceTest {
                 .build();
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(eq(7L), any(), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(laterSameDay, booking, olderDay)));
+        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenAnswer(invocation -> {
+            Pageable pageable = invocation.getArgument(1);
+            Sort.Order day = pageable.getSort().getOrderFor("range.calendar.day");
+            assertEquals(Sort.Direction.ASC, day.getDirection());
+            assertEquals(Sort.NullHandling.NULLS_LAST, day.getNullHandling());
+            assertEquals(Sort.Direction.ASC, pageable.getSort().getOrderFor("range.start").getDirection());
+            assertEquals(20, pageable.getPageSize());
+            return new PageImpl<>(List.of(olderDay, booking, laterSameDay), pageable, 3);
+        });
         when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
 
-        BookingInboxResponse out = service.inbox(9L, false, "board", 7L, 1, 20, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "board", 7L, 1, "Asia/Baku", "az");
 
         assertEquals(List.of(3L, 1L, 2L), out.getItems().stream().map(BookingView::getBookingId).toList());
-        assertEquals("2026-10-20", out.getItems().get(0).getDay());
-        assertEquals("10:00", out.getItems().get(0).getStart());
-        assertEquals("09:00", out.getItems().get(1).getStart());
-        assertEquals("14:00", out.getItems().get(2).getStart());
+        assertEquals(20, out.getPageSize());
+        assertEquals(3L, out.getTotal());
+    }
+
+    @Test
+    void completedPageIsNewestDayFirst() {
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenAnswer(invocation -> {
+            Pageable pageable = invocation.getArgument(1);
+            assertEquals(Sort.Direction.DESC,
+                    pageable.getSort().getOrderFor("range.calendar.day").getDirection());
+            assertEquals(20, pageable.getPageSize());
+            return new PageImpl<>(List.of(booking), pageable, 41);
+        });
+        when(bookingRepository.count(spec())).thenReturn(4L);
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+
+        BookingInboxResponse out = service.inbox(9L, false, "completed", 7L, 1, "Asia/Baku", "az");
+
+        assertEquals(41L, out.getTotal());
+        assertEquals(41L, out.getCompleted());
+        assertEquals(3, out.getTotalPages());
+        assertEquals(4L, out.getPending());
+        assertEquals(20, out.getPageSize());
+    }
+
+    @Test
+    void headAdminPagesEveryActiveBranch() {
+        staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findAll(spec(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 20), 41));
+        when(bookingRepository.count(spec())).thenReturn(5L);
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+
+        BookingInboxResponse out = service.inbox(9L, false, "pending", null, 1, "Asia/Baku", "az");
+
+        assertEquals(41L, out.getPending());
+        assertEquals(5L, out.getConfirmed());
+        assertEquals(5L, out.getRejected());
+        assertEquals(3, out.getTotalPages());
+        verify(bookingStaffAccess, never()).requireWritableBranch(any(), any(), any());
     }
 
     @Test
@@ -191,14 +239,13 @@ class StaffBookingServiceTest {
                 .build();
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(eq(7L), eq("pending"), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        stubInbox(List.of(booking));
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
         when(carRepository.findByCarId(15L)).thenReturn(car);
         when(brandRepository.findAllByBrandNameIgnoreCase("Mercedes")).thenReturn(List.of(
                 Brand.builder().brandId(42L).brandName("Mercedes").status("ACTIVE").isnew(".").build()));
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
 
         assertEquals(42L, out.getItems().get(0).getCar().getBrandId());
         assertEquals("SUV", out.getItems().get(0).getCar().getBodyType());
@@ -220,8 +267,7 @@ class StaffBookingServiceTest {
                 .build();
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
-        when(bookingRepository.findByBranch_IdAndStatusOrderByCreatedAtDesc(eq(7L), eq("pending"), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(List.of(booking)));
+        stubInbox(List.of(booking));
         when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
         when(carRepository.findByCarId(15L)).thenReturn(car);
         when(brandRepository.findAllByBrandNameIgnoreCase("Mercedes")).thenReturn(List.of());
@@ -232,7 +278,7 @@ class StaffBookingServiceTest {
                 .ru("Зелёный")
                 .build());
 
-        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, "Asia/Baku", "az");
 
         assertEquals("Yaşıl", out.getItems().get(0).getCar().getColor());
     }
@@ -385,5 +431,14 @@ class StaffBookingServiceTest {
         verify(staffBookingLiveService, never()).publishAfterCommit(any());
         verifyNoInteractions(bookingPushService);
         verifyNoInteractions(bookingCapacityService);
+    }
+
+    private void stubInbox(List<Booking> rows) {
+        when(bookingRepository.findAll(spec(), any(Pageable.class))).thenReturn(new PageImpl<>(rows));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Specification<Booking> spec() {
+        return any(Specification.class);
     }
 }
