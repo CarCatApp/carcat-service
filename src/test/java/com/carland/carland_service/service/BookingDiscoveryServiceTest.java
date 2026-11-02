@@ -172,4 +172,34 @@ class BookingDiscoveryServiceTest {
 
         assertTrue(out.getBranches().isEmpty());
     }
+
+    @Test
+    void hyperOnlyKeepsPartnerOne() {
+        Partner other = Partner.builder().id(2L).name("AvtoVaz").active(true).build();
+        Branch vaz = Branch.builder().id(9L).name("Vaz").active(true).partner(other).build();
+        when(branchRepository.findActiveWithActivePartner()).thenReturn(List.of(baku, vaz));
+
+        BookingBranchListResponse out = service.listActive(null, true);
+
+        assertEquals(1, out.getBranches().size());
+        assertEquals(7L, out.getBranches().get(0).getBranchId());
+        assertEquals(1L, out.getBranches().get(0).getPartnerId());
+    }
+
+    @Test
+    void hyperOnlyStillAppliesFindServiceFirst() {
+        Partner other = Partner.builder().id(2L).name("AvtoVaz").active(true).build();
+        Branch vaz = Branch.builder().id(9L).name("Vaz").active(true).partner(other).build();
+        when(branchRepository.findActiveWithActivePartner()).thenReturn(List.of(baku, vaz));
+        when(individualServiceSourceRepository.findIndividualServiceIdsByServiceId(144L)).thenReturn(List.of(501L));
+        when(branchIndividualServiceRepository.findActivePricedBranchIds(501L)).thenReturn(List.of(7L, 9L));
+        when(rangeRepository.findBranchIdsWithBookableIndividualSlot(
+                eq(501L), eq("individual"), eq("AVAILABLE"), any(), eq("HIDDEN"),
+                eq(BookingStatus.occupyingCapacity()))).thenReturn(List.of(7L, 9L));
+
+        BookingBranchListResponse out = service.listActive(144L, true);
+
+        assertEquals(1, out.getBranches().size());
+        assertEquals(7L, out.getBranches().get(0).getBranchId());
+    }
 }

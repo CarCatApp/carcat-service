@@ -132,6 +132,17 @@ public class Visit {
      * tr: Ziyarete bir servis satırı ekler ve çift yönlü ilişkiyi (line → visit) kurar.
      * en: Adds a service line to this visit and wires the bidirectional relation (line → visit).
      */
+    /**
+     * tr: Yeni satırda createdAt boşsa yazılır. Karkat'a giriş sırası bu saate bakılır.
+     * en: A new row with an empty createdAt gets one. Karkat arrival order uses this clock.
+     */
+    @PrePersist
+    void stampCreatedAt() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
     public void addService(VisitServiceLine service) {
         services.add(service);
         service.setVisit(this);

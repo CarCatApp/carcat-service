@@ -23,6 +23,7 @@ import com.carland.carland_service.service.BookingPackagePriceInfoService;
 import com.carland.carland_service.service.BookingBranchProfileService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
+import com.carland.carland_service.service.HyperBranchLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingDiscoveryController {
 
     private final BookingDiscoveryService bookingDiscoveryService;
+    private final HyperBranchLockService hyperBranchLockService;
     private final BookingCatalogService bookingCatalogService;
     private final BookingAvailabilityService bookingAvailabilityService;
     private final BookingCalendarService bookingCalendarService;
@@ -66,12 +68,22 @@ public class BookingDiscoveryController {
         return bookingDiscoveryService.discover(partnerId, q, lat, lng, radius, page, pageSize);
     }
 
+    /**
+     * tr: carId yoksa eski liste. carId varsa seçili araç kilitliyse partner 1 dışındaki şubeler dönmez.
+     * en: Without carId the list stays as before. With carId, a locked car omits branches that are not partner 1.
+     */
     @GetMapping("/api/v1/booking/branches")
     public BookingBranchListResponse branches(
             @RequestHeader("Authorization") String token,
-            @RequestParam(required = false) Long findService
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestParam(required = false) Long findService,
+            @RequestParam(required = false) Long carId
     ) {
-        return bookingDiscoveryService.listActive(findService);
+        boolean hyperOnly = false;
+        if (carId != null) {
+            hyperOnly = hyperBranchLockService.locked(carId, parseUserId(userIdHeader));
+        }
+        return bookingDiscoveryService.listActive(findService, hyperOnly);
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}")

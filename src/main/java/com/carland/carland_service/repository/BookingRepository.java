@@ -35,6 +35,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
 
     boolean existsByCustomerUserIdAndBranch_Id(Long customerUserId, Long branchId);
 
+    /** tr: Müşterinin ilk randevu anı. / en: The customer's earliest booking instant. */
+    @Query("SELECT MIN(b.createdAt) FROM Booking b WHERE b.customerUserId = :userId")
+    java.time.OffsetDateTime findEarliestCreatedAtByCustomer(@Param("userId") Long userId);
+
     boolean existsByCustomerUserIdAndBranch_Partner_Id(Long customerUserId, Long partnerId);
 
     @EntityGraph(attributePaths = {"branch", "branch.partner", "range", "range.calendar"})

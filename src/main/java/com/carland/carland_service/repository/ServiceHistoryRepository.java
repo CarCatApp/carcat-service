@@ -46,4 +46,26 @@ public interface ServiceHistoryRepository extends JpaRepository<ServiceHistory, 
             BigDecimal serviceAmount,
             String source
     );
+
+    /**
+     * tr: Bu araçtaki Hyper geçmiş satırı. Partner 1 veya hyperservice kaynağı.
+     * en: Hyper history rows of this car. Partner 1 or a hyperservice source.
+     */
+    @Query("""
+            SELECT COUNT(sh) FROM ServiceHistory sh
+            WHERE sh.car.carId = :carId
+              AND (sh.serviceCenterId = :hyperId
+                   OR lower(coalesce(sh.source, '')) IN ('hyper', 'hyperservice'))
+            """)
+    long countHyperRows(@Param("carId") Long carId, @Param("hyperId") Long hyperId);
+
+    @Query("""
+            SELECT MAX(sh.doneDate) FROM ServiceHistory sh
+            WHERE sh.car.carId = :carId
+              AND (sh.serviceCenterId = :hyperId
+                   OR lower(coalesce(sh.source, '')) IN ('hyper', 'hyperservice'))
+            """)
+    LocalDate findLatestHyperDoneDate(@Param("carId") Long carId, @Param("hyperId") Long hyperId);
+
+    boolean existsByCar_Customer_UserId(Long userId);
 }

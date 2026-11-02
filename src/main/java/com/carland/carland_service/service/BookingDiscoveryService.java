@@ -7,6 +7,7 @@ import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.BookingStatus;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.enums.CalendarStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
@@ -111,6 +112,15 @@ public class BookingDiscoveryService {
      */
     @Transactional(readOnly = true)
     public BookingBranchListResponse listActive(Long findService) {
+        return listActive(findService, false);
+    }
+
+    /**
+     * tr: hyperOnly ise partner 1 dışındaki şubeler düşer. findService filtresi ondan önce uygulanır.
+     * en: hyperOnly drops branches that are not partner 1. The findService filter runs first.
+     */
+    @Transactional(readOnly = true)
+    public BookingBranchListResponse listActive(Long findService, boolean hyperOnly) {
         List<Branch> loaded = branchRepository.findActiveWithActivePartner();
         if (findService != null) {
             Set<Long> ready = readyBranchIds(findService);
@@ -118,9 +128,17 @@ public class BookingDiscoveryService {
         }
         List<BookingDiscoveryBranchView> branches = new ArrayList<>();
         for (Branch branch : loaded) {
+            if (hyperOnly && !hyperPartner(branch)) {
+                continue;
+            }
             branches.add(toBranch(branch));
         }
         return BookingBranchListResponse.builder().branches(branches).build();
+    }
+
+    private static boolean hyperPartner(Branch branch) {
+        Partner partner = branch.getPartner();
+        return partner != null && PartnerId.HYPER.getId().equals(partner.getId());
     }
 
     /** services.id is the source key, so the list is empty or one individual-service id. */

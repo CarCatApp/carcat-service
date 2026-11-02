@@ -53,4 +53,31 @@ public interface VisitRepository extends JpaRepository<Visit, Long> {
     @EntityGraph(attributePaths = {"services"})
     @Query("SELECT v FROM Visit v WHERE v.car.carId = :carId AND v.hyperRecordId = :hyperRecordId")
     Optional<Visit> findWithDetailsByCarIdAndHyperRecordId(@Param("carId") Long carId, @Param("hyperRecordId") Long hyperRecordId);
+
+    /**
+     * tr: Bu araçtaki Hyper ziyareti. Partner 1, Hyper record id veya hyper kaynak.
+     * en: Hyper visits of this car. Partner 1, a Hyper record id, or a hyper source.
+     */
+    @Query("""
+            SELECT COUNT(v) FROM Visit v
+            WHERE v.car.carId = :carId
+              AND (v.serviceCenterId = :hyperId
+                   OR v.hyperRecordId IS NOT NULL
+                   OR lower(coalesce(v.source, '')) IN ('hyper', 'hyperservice'))
+            """)
+    long countHyperVisits(@Param("carId") Long carId, @Param("hyperId") Long hyperId);
+
+    @Query("""
+            SELECT MAX(v.lastServiceDate) FROM Visit v
+            WHERE v.car.carId = :carId
+              AND (v.serviceCenterId = :hyperId
+                   OR v.hyperRecordId IS NOT NULL
+                   OR lower(coalesce(v.source, '')) IN ('hyper', 'hyperservice'))
+            """)
+    java.time.LocalDate findLatestHyperVisitDate(@Param("carId") Long carId, @Param("hyperId") Long hyperId);
+
+    boolean existsByCar_Customer_UserIdAndCreatedAtIsNull(Long userId);
+
+    @Query("SELECT MIN(v.createdAt) FROM Visit v WHERE v.car.customer.userId = :userId")
+    java.time.LocalDateTime findEarliestCreatedAtByCustomer(@Param("userId") Long userId);
 }

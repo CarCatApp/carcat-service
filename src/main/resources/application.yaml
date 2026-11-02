@@ -125,6 +125,8 @@ booking:
   reminder:
     # Scan period and the selection window, in minutes. 1–60. A change needs a service restart.
     slack-minutes: ${BOOKING_REMINDER_SLACK_MINUTES:10}
+  # Days since the last Hyper visit before other partners show. Baku date. Restart picks up a change.
+  hyperservice-lock-days: ${BOOKING_HYPERSERVICE_LOCK_DAYS:365}
 
 access:
   token:
