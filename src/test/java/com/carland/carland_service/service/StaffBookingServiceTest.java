@@ -34,7 +34,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -178,22 +177,14 @@ class StaffBookingServiceTest {
     void headAdminPagesEveryActiveBranchByDay() {
         staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
         when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
-        when(bookingRepository.countHeadOpen(any())).thenAnswer(invocation -> {
-            Collection<?> statuses = invocation.getArgument(0);
-            if (statuses.size() == 1 && statuses.contains("pending")) {
-                return 2L;
-            }
-            if (statuses.contains("auto_accepted")) {
-                return 4L;
-            }
-            if (statuses.size() == 1 && statuses.contains("completed")) {
-                return 7L;
-            }
-            if (statuses.contains("no_show")) {
-                return 9L;
-            }
-            return 0L;
-        });
+        when(bookingRepository.countHeadByStatus()).thenReturn(List.of(
+                new Object[] {"pending", 2L},
+                new Object[] {"confirmed", 3L},
+                new Object[] {"auto_accepted", 1L},
+                new Object[] {"completed", 7L},
+                new Object[] {"rejected", 8L},
+                new Object[] {"no_show", 1L}
+        ));
         when(bookingRepository.findHeadByDayAsc(any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .thenAnswer(invocation -> {
                     Pageable pageable = invocation.getArgument(8);

@@ -234,17 +234,20 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
             Pageable pageable);
 
     /**
-     * tr: Head sayaç. Like ve tekrar eden parametre yok; o sayım 0 dönüyordu, liste ise satır getiriyordu.
-     * en: Head counter. No like and no repeated parameters; that count returned 0 while the list returned rows.
+     * tr: Head sayaç. JPQL count 0 dönüyordu, select satır getiriyordu. Düz SQL, status başına adet.
+     * en: Head counters. JPQL count returned 0 while select returned rows. Plain SQL, one count per status.
      */
-    @Query("""
-            select count(b) from Booking b
-            where b.status in :statuses
-              and (b.staffHidden is null or b.staffHidden = false)
-              and (b.branch.active is null or b.branch.active = true)
-              and (b.branch.partner.active is null or b.branch.partner.active = true)
-            """)
-    long countHeadOpen(@Param("statuses") Collection<String> statuses);
+    @Query(value = """
+            select b.status, count(*)
+            from bookings b
+            join branches br on br.id = b.branch_id
+            join partners p on p.id = br.partner_id
+            where (b.staff_hidden is null or b.staff_hidden = false)
+              and (br.active is null or br.active = true)
+              and (p.active is null or p.active = true)
+            group by b.status
+            """, nativeQuery = true)
+    List<Object[]> countHeadByStatus();
 
     @Query("select count(b) from Booking b " + HEAD_WHERE)
     long countHead(

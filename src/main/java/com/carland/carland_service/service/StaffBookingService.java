@@ -187,19 +187,17 @@ public class StaffBookingService {
         String firstNeedle = textNeedle(firstName);
         String lastNeedle = textNeedle(lastName);
         String phoneNeedle = phoneNeedle(phone);
-        boolean open = vinNeedle.isEmpty() && plateNeedle.isEmpty() && firstNeedle.isEmpty()
-                && lastNeedle.isEmpty() && phoneNeedle.isEmpty()
-                && DAY_MIN.equals(from) && DAY_MAX.equals(to);
-        long pending = headCount(open, PENDING_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long confirmed = headCount(open, CONFIRMED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long completed = headCount(open, COMPLETED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
-        long rejected = headCount(open, REJECTED_STATUSES, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+        long[] totals = headStatusTotals();
+        long pending = totals[0];
+        long confirmed = totals[1];
+        long completed = totals[2];
+        long rejected = totals[3];
         long total = switch (wanted) {
             case "pending" -> pending;
             case "confirmed" -> confirmed;
             case "completed" -> completed;
             case "rejected" -> rejected;
-            default -> headCount(open, statuses, from, to, vinNeedle, plateNeedle, firstNeedle, lastNeedle, phoneNeedle);
+            default -> pending + confirmed + completed + rejected;
         };
         int totalPages = total == 0 ? 1 : (int) ((total + HEAD_PAGE - 1) / HEAD_PAGE);
         int requested = page == null || page < 1 ? 1 : page;
@@ -212,12 +210,31 @@ public class StaffBookingService {
                 pending, confirmed, completed, rejected, totalPages);
     }
 
-    private long headCount(boolean open, List<String> statuses, LocalDate from, LocalDate to,
-                           String vin, String plate, String firstName, String lastName, String phone) {
-        if (open) {
-            return bookingRepository.countHeadOpen(statuses);
+    /** tr: 0 pending, 1 confirmed (auto_accepted dahil), 2 completed, 3 rejected. */
+    private long[] headStatusTotals() {
+        long pending = 0;
+        long confirmed = 0;
+        long completed = 0;
+        long rejected = 0;
+        List<Object[]> rows = bookingRepository.countHeadByStatus();
+        if (rows != null) {
+            for (Object[] row : rows) {
+                if (row == null || row.length < 2 || !(row[1] instanceof Number number)) {
+                    continue;
+                }
+                String status = row[0] == null ? "" : row[0].toString().trim().toLowerCase(Locale.ROOT);
+                long n = number.longValue();
+                switch (status) {
+                    case "pending" -> pending += n;
+                    case "confirmed", "auto_accepted", "accepted" -> confirmed += n;
+                    case "completed" -> completed += n;
+                    case "rejected", "cancelled", "canceled", "no_show" -> rejected += n;
+                    default -> {
+                    }
+                }
+            }
         }
-        return bookingRepository.countHead(statuses, from, to, vin, plate, firstName, lastName, phone);
+        return new long[] { pending, confirmed, completed, rejected };
     }
 
     private long countBranch(Long branchId, Long partnerId, List<String> statuses) {
