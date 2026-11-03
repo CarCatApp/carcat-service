@@ -80,7 +80,7 @@
       <div class="stat-box"><span>Çökmə</span><b th:text="${view.fatal()}">0</b></div>
       <div class="stat-box"><span>API xətası</span><b th:text="${view.api()}">0</b></div>
       <div class="stat-box"><span>Non-fatal</span><b th:text="${view.nonFatal()}">0</b></div>
-      <div class="stat-box"><span>Son görülmə</span><b th:text="${view.lastSeen() == ''} ? '—' : view.lastSeen()">—</b></div>
+      <div class="stat-box"><span>Son görülmə</span><b th:text="${view.lastSeen().isEmpty() ? '—' : view.lastSeen()}">—</b></div>
     </div>
 
     <h2>Son 7 gün</h2>

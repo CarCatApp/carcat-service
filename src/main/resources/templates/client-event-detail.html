@@ -75,7 +75,7 @@
     <pre class="stack-box" th:text="${view.message()}">mesaj</pre>
 
     <h2>Stek</h2>
-    <pre class="stack-box" th:text="${view.stack() == ''} ? 'Stek yoxdur' : view.stack()">stek</pre>
+    <pre class="stack-box" th:text="${view.stack().isEmpty() ? 'Stek yoxdur' : view.stack()}">stek</pre>
 
     <h2>İzlər</h2>
     <p class="muted" th:if="${view.crumbs().isEmpty()}">İz yoxdur</p>

@@ -297,7 +297,7 @@
           <div class="sima-box"><span class="muted">Çökmə</span><b th:text="${crash.fatal()}">0</b></div>
           <div class="sima-box"><span class="muted">API xətası</span><b th:text="${crash.api()}">0</b></div>
           <div class="sima-box"><span class="muted">Non-fatal</span><b th:text="${crash.nonFatal()}">0</b></div>
-          <div class="sima-box"><span class="muted">Son görülmə</span><b th:text="${crash.lastSeen() == ''} ? '—' : crash.lastSeen()">—</b></div>
+          <div class="sima-box"><span class="muted">Son görülmə</span><b th:text="${crash.lastSeen().isEmpty() ? '—' : crash.lastSeen()}">—</b></div>
         </div>
         <p class="muted">Son 7 gün</p>
         <table class="sima-recs">
@@ -364,7 +364,7 @@
         <p><strong th:text="${crashEvent.time()}">vaxt</strong> · <span th:text="${crashEvent.typeLabel()}">növ</span></p>
         <pre class="crash-stack" th:text="${crashEvent.message()}">mesaj</pre>
         <p class="muted">Stek</p>
-        <pre class="crash-stack" th:text="${crashEvent.stack() == ''} ? 'Stek yoxdur' : crashEvent.stack()">stek</pre>
+        <pre class="crash-stack" th:text="${crashEvent.stack().isEmpty() ? 'Stek yoxdur' : crashEvent.stack()}">stek</pre>
         <p class="muted">İzlər</p>
         <p class="muted" th:if="${crashEvent.crumbs().isEmpty()}">İz yoxdur</p>
         <table class="sima-recs" th:if="${!crashEvent.crumbs().isEmpty()}">
