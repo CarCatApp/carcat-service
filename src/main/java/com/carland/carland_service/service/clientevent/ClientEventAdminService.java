@@ -118,6 +118,13 @@ public class ClientEventAdminService {
         return events.findById(id).map(this::detailOf).orElse(null);
     }
 
+    public List<FullEvent> eventsForUserIssue(long userId, long issueId) {
+        return events.findAll(
+                ClientEventSpecs.events(userId, issueId, null, null, null),
+                Sort.by(Sort.Direction.DESC, "occurredAt", "id")
+        ).stream().map(this::fullEvent).toList();
+    }
+
     private List<DayRow> days(long userId, int length) {
         LocalDate today = LocalDate.now(BAKU);
         LocalDate start = today.minusDays(length - 1L);
@@ -273,6 +280,68 @@ public class ClientEventAdminService {
         );
     }
 
+    private FullEvent fullEvent(ClientErrorEvent event) {
+        boolean api = "apiError".equals(event.getEventType());
+        String stack = event.getStackTrace() == null ? "" : event.getStackTrace().trim();
+        if (api) {
+            stack = "";
+        }
+        List<CrumbView> crumbs = new ArrayList<>();
+        if (event.getBreadcrumbs() != null) {
+            List<Map<String, Object>> raw = new ArrayList<>(event.getBreadcrumbs());
+            raw.sort(Comparator.comparing(item -> item.get("timestamp") == null ? "" : String.valueOf(item.get("timestamp"))));
+            for (Map<String, Object> item : raw) {
+                String stamp = text(item.get("timestamp"));
+                String category = text(item.get("category"));
+                String message = text(item.get("message"));
+                if (stamp.isEmpty() && category.isEmpty() && message.isEmpty()) {
+                    continue;
+                }
+                crumbs.add(new CrumbView(crumbWhen(stamp), category, message));
+            }
+        }
+        return new FullEvent(
+                text(event.getEventId()),
+                text(event.getEventType()),
+                ClientEventLabels.iso(event.getOccurredAt()),
+                ClientEventLabels.baku(event.getOccurredAt()),
+                text(event.getEnvironment()),
+                text(event.getSessionId()),
+                text(event.getInstallId()),
+                event.getUserId() == null ? "" : Long.toString(event.getUserId()),
+                text(event.getAppVersion()),
+                text(event.getBuildNumber()),
+                text(event.getPackageName()),
+                text(event.getOsName()),
+                text(event.getOsVersion()),
+                text(event.getNetwork()),
+                event.getMemoryRssBytes() == null ? "" : Long.toString(event.getMemoryRssBytes()),
+                text(event.getMessage()),
+                event.getStatusCode() == null ? "" : Integer.toString(event.getStatusCode()),
+                text(event.getEndpoint()),
+                text(event.getContextRoute()),
+                text(event.getContextLibrary()),
+                stack,
+                crumbs
+        );
+    }
+
+    private static String crumbWhen(String raw) {
+        String baku = ClientEventLabels.crumbTime(raw);
+        if (baku.isEmpty()) {
+            return raw == null ? "" : raw;
+        }
+        return baku;
+    }
+
+    private static String text(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value).trim();
+        return "null".equals(text) ? "" : text;
+    }
+
     private static PageWindow window(Page<?> page) {
         int totalPages = Math.max(page.getTotalPages(), 1);
         int current = page.getTotalElements() == 0 ? 1 : page.getNumber() + 1;
@@ -416,6 +485,35 @@ public class ClientEventAdminService {
     }
 
     public record Crumb(String rawTime, String time, String category, String message) {
+    }
+
+    public record CrumbView(String time, String category, String message) {
+    }
+
+    public record FullEvent(
+            String eventId,
+            String type,
+            String isoTime,
+            String bakuTime,
+            String environment,
+            String sessionId,
+            String installId,
+            String userId,
+            String appVersion,
+            String buildNumber,
+            String packageName,
+            String osName,
+            String osVersion,
+            String network,
+            String memoryRssBytes,
+            String message,
+            String statusCode,
+            String endpoint,
+            String route,
+            String library,
+            String stackTrace,
+            List<CrumbView> breadcrumbs
+    ) {
     }
 
     public record PageWindow(int currentPage, int totalPages, int windowStart, int windowEnd, long totalItems) {

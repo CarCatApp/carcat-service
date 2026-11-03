@@ -14,6 +14,7 @@ import java.util.Locale;
 public final class ClientEventLabels {
 
     public static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm", Locale.ROOT);
+    public static final DateTimeFormatter TIME_SECONDS = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm:ss", Locale.ROOT);
     public static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT);
 
     private ClientEventLabels() {
@@ -24,6 +25,20 @@ public final class ClientEventLabels {
             return "";
         }
         return TIME.format(utc.plusHours(4));
+    }
+
+    public static String baku(LocalDateTime utc) {
+        if (utc == null) {
+            return "";
+        }
+        return TIME_SECONDS.format(utc.plusHours(4));
+    }
+
+    public static String iso(LocalDateTime utc) {
+        if (utc == null) {
+            return "";
+        }
+        return utc.atOffset(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
     public static String dayKey(LocalDateTime utc) {

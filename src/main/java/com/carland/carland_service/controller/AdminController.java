@@ -555,6 +555,7 @@ public class AdminController {
             @RequestParam(defaultValue = "overview") String atab,
             @RequestParam(defaultValue = "1") int apage,
             @RequestParam(required = false) Long aevent,
+            @RequestParam(required = false) Long agroup,
             HttpServletRequest request,
             Model model
     ) {
@@ -628,10 +629,15 @@ public class AdminController {
         model.addAttribute("analyticsError", false);
         model.addAttribute("crash", null);
         model.addAttribute("crashEvent", null);
+        model.addAttribute("analyticsGroupId", agroup);
+        model.addAttribute("crashEvents", java.util.List.of());
         if (analytics != null) {
             try {
                 var crash = clientEventAdminService.user(analytics, atab, null, null, apage);
                 model.addAttribute("crash", crash);
+                if (agroup != null) {
+                    model.addAttribute("crashEvents", clientEventAdminService.eventsForUserIssue(analytics, agroup));
+                }
                 if (aevent != null) {
                     var detail = clientEventAdminService.detail(aevent);
                     if (detail != null && analytics.equals(detail.userId())) {

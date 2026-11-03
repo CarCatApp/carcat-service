@@ -32,6 +32,11 @@
     .sima-box-danger { border-color: #f0c8c8; }
     .crash-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
     .crash-stack { white-space: pre-wrap; word-break: break-word; background: #fff; color: #111; border: 1px solid var(--border); border-radius: 12px; padding: 12px; max-height: 280px; overflow: auto; font-size: 12px; }
+    .crash-card { background: #fff; color: #111; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-top: 12px; }
+    .crash-card h3 { font-size: 15px; margin: 0 0 10px; color: #111; }
+    .crash-grid { display: grid; grid-template-columns: 160px 1fr; gap: 6px 12px; margin: 0; }
+    .crash-grid dt { color: #5f5f68; font-weight: 600; }
+    .crash-grid dd { margin: 0; color: #111; word-break: break-word; }
     tr.row-expected td { color: #5f5f68; background: #f3f3f5; }
   </style>
 </head>
@@ -213,9 +218,81 @@
               <table class="sima-recs" th:if="${!crash.top().isEmpty()}">
                 <thead><tr><th>Başlıq</th><th>Növ</th><th>Say</th></tr></thead>
                 <tbody>
-                <tr th:each="t : ${crash.top()}"><td th:text="${t.title()}">başlıq</td><td th:text="${t.typeLabel()}">növ</td><td th:text="${t.count()}">0</td></tr>
+                <tr th:each="t : ${crash.top()}">
+                  <td>
+                    <a th:if="${analyticsGroupId == null or analyticsGroupId != t.id()}"
+                       th:href="@{/admin/users(page=${currentPage}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima}, attempts=${attemptsUserId}, analytics=${u.id}, agroup=${t.id()})}"
+                       th:text="${t.title()}">başlıq</a>
+                    <a th:if="${analyticsGroupId != null and analyticsGroupId == t.id()}"
+                       th:href="@{/admin/users(page=${currentPage}, from=${from}, to=${to}, phone=${filterPhone}, sima=${filterSima}, attempts=${attemptsUserId}, analytics=${u.id})}"
+                       th:text="${t.title()}">başlıq</a>
+                  </td>
+                  <td th:text="${t.typeLabel()}">növ</td>
+                  <td th:text="${t.count()}">0</td>
+                </tr>
                 </tbody>
               </table>
+
+              <div th:if="${analyticsGroupId != null}">
+                <p class="muted" style="margin-top:14px;">Hadisələr</p>
+                <p th:if="${crashEvents.isEmpty()}" style="font-weight:700;">Qeyd tapılmadı</p>
+                <article class="crash-card" th:each="e : ${crashEvents}">
+                  <h3 th:text="${e.bakuTime()}">03.11.2026, 15:22:11</h3>
+                  <dl class="crash-grid">
+                    <dt th:if="${!e.eventId().isEmpty()}">eventId</dt>
+                    <dd th:if="${!e.eventId().isEmpty()}" th:text="${e.eventId()}">id</dd>
+                    <dt th:if="${!e.type().isEmpty()}">type</dt>
+                    <dd th:if="${!e.type().isEmpty()}" th:text="${e.type()}">fatal</dd>
+                    <dt th:if="${!e.isoTime().isEmpty()}">timestamp</dt>
+                    <dd th:if="${!e.isoTime().isEmpty()}" th:text="${e.isoTime() + ' · Bakı ' + e.bakuTime()}">vaxt</dd>
+                    <dt th:if="${!e.environment().isEmpty()}">environment</dt>
+                    <dd th:if="${!e.environment().isEmpty()}" th:text="${e.environment()}">release</dd>
+                    <dt th:if="${!e.sessionId().isEmpty()}">sessionId</dt>
+                    <dd th:if="${!e.sessionId().isEmpty()}" th:text="${e.sessionId()}">id</dd>
+                    <dt th:if="${!e.installId().isEmpty()}">installId</dt>
+                    <dd th:if="${!e.installId().isEmpty()}" th:text="${e.installId()}">id</dd>
+                    <dt th:if="${!e.userId().isEmpty()}">userId</dt>
+                    <dd th:if="${!e.userId().isEmpty()}" th:text="${e.userId()}">53</dd>
+                    <dt th:if="${!e.appVersion().isEmpty()}">app.version</dt>
+                    <dd th:if="${!e.appVersion().isEmpty()}" th:text="${e.appVersion()}">1.4.0</dd>
+                    <dt th:if="${!e.buildNumber().isEmpty()}">app.buildNumber</dt>
+                    <dd th:if="${!e.buildNumber().isEmpty()}" th:text="${e.buildNumber()}">42</dd>
+                    <dt th:if="${!e.packageName().isEmpty()}">app.packageName</dt>
+                    <dd th:if="${!e.packageName().isEmpty()}" th:text="${e.packageName()}">paket</dd>
+                    <dt th:if="${!e.osName().isEmpty()}">os.name</dt>
+                    <dd th:if="${!e.osName().isEmpty()}" th:text="${e.osName()}">ios</dd>
+                    <dt th:if="${!e.osVersion().isEmpty()}">os.version</dt>
+                    <dd th:if="${!e.osVersion().isEmpty()}" th:text="${e.osVersion()}">18</dd>
+                    <dt th:if="${!e.network().isEmpty()}">network</dt>
+                    <dd th:if="${!e.network().isEmpty()}" th:text="${e.network()}">wifi</dd>
+                    <dt th:if="${!e.memoryRssBytes().isEmpty()}">memoryRssBytes</dt>
+                    <dd th:if="${!e.memoryRssBytes().isEmpty()}" th:text="${e.memoryRssBytes()}">0</dd>
+                    <dt th:if="${!e.statusCode().isEmpty()}">context.statusCode</dt>
+                    <dd th:if="${!e.statusCode().isEmpty()}" th:text="${e.statusCode()}">404</dd>
+                    <dt th:if="${!e.endpoint().isEmpty()}">context.endpoint</dt>
+                    <dd th:if="${!e.endpoint().isEmpty()}" th:text="${e.endpoint()}">path</dd>
+                    <dt th:if="${!e.route().isEmpty()}">context.route</dt>
+                    <dd th:if="${!e.route().isEmpty()}" th:text="${e.route()}">page</dd>
+                    <dt th:if="${!e.library().isEmpty()}">context.library</dt>
+                    <dd th:if="${!e.library().isEmpty()}" th:text="${e.library()}">bloc</dd>
+                  </dl>
+                  <p class="muted" style="margin:12px 0 4px;" th:if="${!e.message().isEmpty()}">message</p>
+                  <pre class="crash-stack" th:if="${!e.message().isEmpty()}" th:text="${e.message()}">mesaj</pre>
+                  <p class="muted" style="margin:12px 0 4px;" th:if="${!e.stackTrace().isEmpty()}">stackTrace</p>
+                  <pre class="crash-stack" th:if="${!e.stackTrace().isEmpty()}" th:text="${e.stackTrace()}">stek</pre>
+                  <p class="muted" style="margin:12px 0 4px;" th:if="${!e.breadcrumbs().isEmpty()}">breadcrumbs</p>
+                  <table class="sima-recs" th:if="${!e.breadcrumbs().isEmpty()}">
+                    <thead><tr><th>timestamp</th><th>category</th><th>message</th></tr></thead>
+                    <tbody>
+                    <tr th:each="c : ${e.breadcrumbs()}">
+                      <td th:text="${c.time()}">vaxt</td>
+                      <td th:text="${c.category()}">navigation</td>
+                      <td th:text="${c.message()}">səhifə</td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </article>
+              </div>
             </div>
           </td>
         </tr>
