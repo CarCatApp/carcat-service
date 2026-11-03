@@ -31,6 +31,7 @@ import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
+import com.carland.carland_service.service.clientevent.ClientEventAdminService;
 import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
 import com.carland.carland_service.service.AdminCarPurgeService;
 import com.carland.carland_service.service.PhotoService;
@@ -113,6 +114,8 @@ public class AdminController {
     private final VisitHistoryService visitHistoryService;
 
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
+
+    private final ClientEventAdminService clientEventAdminService;
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
 
@@ -548,6 +551,10 @@ public class AdminController {
             @RequestParam(required = false) String phone,
             @RequestParam(defaultValue = "all") String sima,
             @RequestParam(required = false) Long attempts,
+            @RequestParam(required = false) Long analytics,
+            @RequestParam(defaultValue = "overview") String atab,
+            @RequestParam(defaultValue = "1") int apage,
+            @RequestParam(required = false) Long aevent,
             HttpServletRequest request,
             Model model
     ) {
@@ -616,6 +623,26 @@ public class AdminController {
         model.addAttribute("attemptsUserId", attempts);
         model.addAttribute("loadError", loadError);
         model.addAttribute("simaPanel", attempts == null ? null : buildSimaPanel(attempts, allUsers, customersById, customersByPhone));
+        model.addAttribute("analyticsUserId", analytics);
+        model.addAttribute("analyticsTab", atab);
+        model.addAttribute("analyticsError", false);
+        model.addAttribute("crash", null);
+        model.addAttribute("crashEvent", null);
+        if (analytics != null) {
+            try {
+                var crash = clientEventAdminService.user(analytics, atab, null, null, apage);
+                model.addAttribute("crash", crash);
+                if (aevent != null) {
+                    var detail = clientEventAdminService.detail(aevent);
+                    if (detail != null && analytics.equals(detail.userId())) {
+                        model.addAttribute("crashEvent", detail);
+                    }
+                }
+            } catch (RuntimeException ex) {
+                log.warn("client-events panel failed userId={} type={}", analytics, ex.getClass().getSimpleName());
+                model.addAttribute("analyticsError", true);
+            }
+        }
 
         return "users";
     }
