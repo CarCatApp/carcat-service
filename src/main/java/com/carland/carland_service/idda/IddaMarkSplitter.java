@@ -2,6 +2,7 @@ package com.carland.carland_service.idda;
 
 import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.Model;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Locale;
@@ -15,6 +16,7 @@ import java.util.Set;
  *     A trailing Type.Description is removed, then the longest catalog brand is matched.
  *     When no brand matches, the remaining text is stored as the brand.
  */
+@Slf4j
 public final class IddaMarkSplitter {
 
     private static final Set<String> FUEL_WORDS = Set.of(
@@ -62,7 +64,9 @@ public final class IddaMarkSplitter {
             return null;
         }
         String rest = stripFuelParen(core.substring("GWM".length()).trim());
-        return new IddaMarkSplit("GWM", rest.isBlank() ? null : rest);
+        String model = rest.isBlank() ? null : rest;
+        log.info("IDDA mark GWM TANK exception brand=GWM model={} mark={}", model, core);
+        return new IddaMarkSplit("GWM", model);
     }
 
     static String fold(String raw) {
