@@ -198,7 +198,7 @@ public class CommissionReportService {
             case "commission" -> "commissionAmount";
             default -> "completedAt";
         };
-        return Sort.by(new Sort.Order(direction, field, Sort.NullHandling.NULLS_LAST), Sort.Order.desc("id"));
+        return Sort.by(direction, field).and(Sort.by(Sort.Direction.DESC, "id"));
     }
 
     private Totals totals(Specification<CommissionEntry> spec) {
