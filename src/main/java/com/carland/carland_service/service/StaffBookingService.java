@@ -40,6 +40,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.service.commission.CommissionLedgerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -109,6 +110,7 @@ public class StaffBookingService {
     private final BookingPushService bookingPushService;
     private final BookingCompletionService bookingCompletionService;
     private final StaffBookingLiveService staffBookingLiveService;
+    private final CommissionLedgerService commissionLedgerService;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -561,6 +563,7 @@ public class StaffBookingService {
                 notifyNoShow(booking);
             } else if (BookingStatus.COMPLETED.apiValue().equals(nextStatus)) {
                 notifyCompleted(booking);
+                commissionLedgerService.onCompleted(booking);
             }
         }
         return viewOf(booking, timezone, acceptLanguage);

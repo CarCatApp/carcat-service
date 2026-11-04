@@ -13,6 +13,7 @@ import com.carland.carland_service.entity.BranchPackage;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.service.commission.CommissionCustomerStatusService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.exceptions.ConflictException;
@@ -72,6 +73,7 @@ class BookingCreateServiceTest {
     @Mock StaffBookingLiveService live;
     @Mock BookingPercentageSnapshot percentageSnapshot;
     @Mock BookingPushService bookingPushService;
+    @Mock CommissionCustomerStatusService commissionCustomerStatusService;
 
     BookingCreateService service;
     Range range;
@@ -85,7 +87,7 @@ class BookingCreateServiceTest {
                 rangeRepository, bookingRepository, bookingItemRepository,
                 packageRepository, serviceRepository, carePackageRepository, offeredServiceRepository,
                 bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper(),
-                selectionWriter, capacity, live, percentageSnapshot, bookingPushService);
+                selectionWriter, capacity, live, percentageSnapshot, bookingPushService, commissionCustomerStatusService);
         customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
         car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();

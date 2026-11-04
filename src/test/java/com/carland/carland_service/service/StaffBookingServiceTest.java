@@ -11,6 +11,7 @@ import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.service.commission.CommissionLedgerService;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.exceptions.ConflictException;
@@ -67,6 +68,7 @@ class StaffBookingServiceTest {
     @Mock BookingPushService bookingPushService;
     @Mock BookingCompletionService bookingCompletionService;
     @Mock StaffBookingLiveService staffBookingLiveService;
+    @Mock CommissionLedgerService commissionLedgerService;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -79,7 +81,7 @@ class StaffBookingServiceTest {
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
                 customerRepository, carRepository, colorRepository, bookingStaffNoteService, brandRepository, bookingPushService,
-                bookingCompletionService, staffBookingLiveService);
+                bookingCompletionService, staffBookingLiveService, commissionLedgerService);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()

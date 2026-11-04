@@ -38,6 +38,7 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.service.commission.CommissionCustomerStatusService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +85,7 @@ public class BookingCreateService {
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPercentageSnapshot percentageSnapshot;
     private final BookingPushService bookingPushService;
+    private final CommissionCustomerStatusService commissionCustomerStatusService;
 
     @Transactional(readOnly = true)
     public BookingQuoteResponse quote(BookingWriteRequest request) {
@@ -147,6 +149,7 @@ public class BookingCreateService {
             booking.setPriceMax(max + priced.priceMax());
         }
         booking = bookingRepository.save(booking);
+        commissionCustomerStatusService.schedule(booking.getId());
         if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
             bookingCapacityService.closePendingWhenFull(prepared.range);
         }

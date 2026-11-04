@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Komissiyalar — Carland Admin</title>
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <link rel="stylesheet" href="/admin/admin.css?v=commission1">
+</head>
+<body class="booking-page commission-page">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav class="nav-links">
+      <a class="nav-link" href="/admin/cars">Cars</a>
+      <a class="nav-link" href="/admin/users">Users</a>
+      <a class="nav-link" href="/admin/client-events">Xətalar</a>
+      <a class="nav-link" href="/admin/feedbacks">Feedbacks</a>
+      <a class="nav-link" href="/admin/idda">IDDA</a>
+      <a class="nav-link" href="/admin/idda-balance">iddaBalanceInfo</a>
+      <a class="nav-link" href="/admin/feature-flags">Feature Flags</a>
+      <a class="nav-link" href="/admin/app-announcements">Duyurular</a>
+      <a class="nav-link" href="/admin/push-notifications">Push</a>
+      <a class="nav-link" href="/admin/booking-partners">Booking</a>
+      <a class="nav-link" href="/admin/booking-notes">Notes</a>
+      <a class="nav-link active" href="/admin/commissions">Komissiyalar</a>
+      <a class="nav-link" href="/admin/brand-logos">Car brand logos</a>
+      <a class="nav-link" href="/admin/percentage-photos">Icons</a>
+      <a class="nav-link" href="/admin/service-categories">Categories</a>
+      <a class="nav-link" href="/admin/service-behaviors">Behaviors</a>
+      <a class="nav-link" href="/admin/offered-services">Paket içi xidmətlər</a>
+      <a class="nav-link" href="/admin/individual-services">Individual</a>
+      <a class="nav-link" href="/admin/fuel-intervals">Aralıqlar</a>
+      <a class="nav-link" href="/admin/brand-models">Brand &amp; models</a>
+      <a class="nav-link" href="/admin/banners">banner</a>
+      <a class="nav-link" href="/admin/color-sort">color sort</a>
+    </nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-excel"
+       th:href="@{/admin/commissions/export(from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}">
+      Excel-ə ixrac et
+    </a>
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>Komissiyalar</h1>
+      <p class="muted">Tamamlanmış randevular. Tarix tamamlanma anına görə, Bakı vaxtı, hər iki gün daxildir.</p>
+    </div>
+  </div>
+
+  <nav class="commission-presets" aria-label="Dövr">
+    <a th:href="@{/admin/commissions(preset='month', partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}"
+       th:classappend="${screen.query.preset == 'month'} ? 'active'">Bu ay</a>
+    <a th:href="@{/admin/commissions(preset='prev', partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}"
+       th:classappend="${screen.query.preset == 'prev'} ? 'active'">Keçən ay</a>
+    <a th:href="@{/admin/commissions(preset='d7', partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}"
+       th:classappend="${screen.query.preset == 'd7'} ? 'active'">Son 7 gün</a>
+    <a th:href="@{/admin/commissions(preset='d30', partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}"
+       th:classappend="${screen.query.preset == 'd30'} ? 'active'">Son 30 gün</a>
+  </nav>
+
+  <form class="filter-bar" method="get" action="/admin/commissions">
+    <div class="filter-field">
+      <label for="from">Başlanğıc</label>
+      <input type="date" id="from" name="from" th:value="${screen.query.from}">
+    </div>
+    <div class="filter-field">
+      <label for="to">Son</label>
+      <input type="date" id="to" name="to" th:value="${screen.query.to}">
+    </div>
+    <div class="filter-field">
+      <label for="partnerId">Servis</label>
+      <select id="partnerId" name="partnerId">
+        <option value="">Hamısı</option>
+        <option th:each="p : ${screen.partners}" th:value="${p.id}" th:text="${p.label}" th:selected="${p.selected}"></option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="branchId">Filial</label>
+      <select id="branchId" name="branchId">
+        <option value="">Hamısı</option>
+        <option th:each="b : ${screen.branches}" th:value="${b.id}" th:text="${b.label}" th:selected="${b.selected}"></option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="" th:selected="${screen.query.status == null}">Hamısı</option>
+        <option value="new" th:selected="${screen.query.status == 'new'}">Yeni</option>
+        <option value="old" th:selected="${screen.query.status == 'old'}">Köhnə</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label for="q">BAN və ya nişan</label>
+      <input type="text" id="q" name="q" th:value="${screen.query.search}" autocomplete="off" spellcheck="false">
+    </div>
+    <button class="btn btn-filter" type="submit">Göstər</button>
+  </form>
+
+  <section class="commission-summary">
+    <article>
+      <span class="label">Yeni</span>
+      <strong th:text="${screen.fresh.count}">0</strong>
+      <span th:text="${screen.fresh.serviceText}">0,00 AZN</span>
+      <span th:text="${screen.fresh.commissionText}">0,00 AZN</span>
+    </article>
+    <article>
+      <span class="label">Köhnə</span>
+      <strong th:text="${screen.again.count}">0</strong>
+      <span th:text="${screen.again.serviceText}">0,00 AZN</span>
+      <span th:text="${screen.again.commissionText}">0,00 AZN</span>
+    </article>
+    <article>
+      <span class="label">Ümumi</span>
+      <strong th:text="${screen.all.count}">0</strong>
+      <span th:text="${screen.all.serviceText}">0,00 AZN</span>
+      <span th:text="${screen.all.commissionText}">0,00 AZN</span>
+    </article>
+  </section>
+  <p class="muted" th:if="${screen.pendingCount > 0}" th:text="${screen.pendingCount} + ' sətir məbləğ gözləyir və cəmə girmir.'"></p>
+  <p class="muted" th:if="${screen.empty}">Bu dövr üçün tranzaksiya tapılmadı</p>
+
+  <div class="card" th:if="${screen.showGroups}">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>Servis</th>
+          <th>Sayı</th>
+          <th>Xidmət dəyəri</th>
+          <th>Yeni komissiya</th>
+          <th>Köhnə komissiya</th>
+          <th>Cəmi komissiya</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="g : ${screen.groups}">
+          <td th:text="${g.name}">Hyper</td>
+          <td th:text="${g.count}">0</td>
+          <td th:text="${g.serviceText}">0,00 AZN</td>
+          <td th:text="${g.newCommissionText}">0,00 AZN</td>
+          <td th:text="${g.oldCommissionText}">0,00 AZN</td>
+          <td th:text="${g.commissionText}">0,00 AZN</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th><a th:href="@{/admin/commissions(from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort='completed', dir=${(screen.query.sort == 'completed' and !screen.query.ascending) ? 'asc' : 'desc'})}">Tamamlanma</a></th>
+          <th><a th:href="@{/admin/commissions(from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort='partner', dir=${(screen.query.sort == 'partner' and !screen.query.ascending) ? 'asc' : 'desc'})}">Servis</a></th>
+          <th>Filial</th>
+          <th>BAN</th>
+          <th>Nişan</th>
+          <th>Status</th>
+          <th><a th:href="@{/admin/commissions(from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort='amount', dir=${(screen.query.sort == 'amount' and !screen.query.ascending) ? 'asc' : 'desc'})}">Xidmət dəyəri</a></th>
+          <th>Faiz</th>
+          <th><a th:href="@{/admin/commissions(from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort='commission', dir=${(screen.query.sort == 'commission' and !screen.query.ascending) ? 'asc' : 'desc'})}">Komissiya</a></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${screen.rows}" class="commission-row"
+            th:attr="data-href=@{/admin/commissions/{id}(id=${row.id})}"
+            onclick="if (event.target.tagName !== 'A') location = this.dataset.href">
+          <td th:text="${row.completedAt}">01.10.2026 09:00</td>
+          <td th:text="${row.partnerName}">Hyper</td>
+          <td th:text="${row.branchName}">Filial</td>
+          <td th:text="${row.vin}">VIN</td>
+          <td th:text="${row.plate}">10-AA-100</td>
+          <td>
+            <span class="badge" th:classappend="${row.status == 'old'} ? 'badge-neutral' : 'badge-info'" th:text="${row.statusLabel}">Yeni müştəri</span>
+          </td>
+          <td>
+            <span th:if="${row.pending}" class="badge badge-warning" th:text="${row.serviceAmount}">Məbləğ gözlənilir</span>
+            <span th:unless="${row.pending}" th:text="${row.serviceAmount}">0,00 AZN</span>
+          </td>
+          <td th:text="${row.rate}">6%</td>
+          <td th:text="${row.commission}">0,00 AZN</td>
+        </tr>
+        <tr class="empty-row" th:if="${screen.empty}">
+          <td colspan="9">Bu dövr üçün tranzaksiya tapılmadı</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-bar" th:if="${screen.totalPages > 1}">
+      <span class="page-info">Səhifə <strong th:text="${screen.currentPage}">1</strong> / <span th:text="${screen.totalPages}">1</span></span>
+      <nav class="pages">
+        <a class="page-arrow" th:classappend="${screen.currentPage == 1} ? 'disabled'"
+           th:href="@{/admin/commissions(page=${screen.currentPage - 1}, from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort=${screen.query.sort}, dir=${screen.query.ascending ? 'asc' : 'desc'})}">←</a>
+        <a th:each="p : ${#numbers.sequence(screen.windowStart, screen.windowEnd)}" class="page-link"
+           th:classappend="${p == screen.currentPage} ? 'active'"
+           th:href="@{/admin/commissions(page=${p}, from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort=${screen.query.sort}, dir=${screen.query.ascending ? 'asc' : 'desc'})}"
+           th:text="${p}">1</a>
+        <a class="page-arrow" th:classappend="${screen.currentPage >= screen.totalPages} ? 'disabled'"
+           th:href="@{/admin/commissions(page=${screen.currentPage + 1}, from=${screen.query.from}, to=${screen.query.to}, preset=${screen.query.preset}, partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search}, sort=${screen.query.sort}, dir=${screen.query.ascending ? 'asc' : 'desc'})}">→</a>
+      </nav>
+    </div>
+  </div>
+
+  <form class="booking-form" method="post" action="/admin/commissions/rates">
+    <input type="hidden" name="preset" th:value="${screen.query.preset}">
+    <input type="hidden" name="from" th:value="${screen.query.from}">
+    <input type="hidden" name="to" th:value="${screen.query.to}">
+    <input type="hidden" name="filterPartnerId" th:value="${screen.query.partnerId}">
+    <input type="hidden" name="branchId" th:value="${screen.query.branchId}">
+    <input type="hidden" name="status" th:value="${screen.query.status}">
+    <input type="hidden" name="q" th:value="${screen.query.search}">
+    <div class="booking-form-title">Faiz</div>
+    <p class="muted">Partner üçün sətir yoxdursa yeni müştəri 6%, köhnə müştəri 2%. Yeni sətir köhnə randevuları yenidən hesablamır. Qüvvəyə minmə tarixi tamamlanma gününə baxır.</p>
+    <div class="ok-box" th:if="${rateMessage}" th:text="${rateMessage}"></div>
+    <div class="error-box" th:if="${rateError}" th:text="${rateError}"></div>
+    <div class="booking-form-grid">
+      <div class="filter-field">
+        <label for="ratePartner">Servis</label>
+        <select id="ratePartner" name="partnerId" required>
+          <option value="">Seçin</option>
+          <option th:each="p : ${screen.partners}" th:value="${p.id}" th:text="${p.label}"></option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="customerStatus">Status</label>
+        <select id="customerStatus" name="customerStatus" required>
+          <option value="new">Yeni müştəri</option>
+          <option value="old">Köhnə müştəri</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="percent">Faiz</label>
+        <input type="text" id="percent" name="percent" inputmode="decimal" required placeholder="6">
+      </div>
+      <div class="filter-field">
+        <label for="effectiveFrom">Qüvvəyə minmə</label>
+        <input type="date" id="effectiveFrom" name="effectiveFrom" required>
+      </div>
+      <div class="filter-field">
+        <label for="note">Qeyd</label>
+        <input type="text" id="note" name="note" maxlength="200">
+      </div>
+      <button class="btn btn-filter" type="submit">Saxla</button>
+    </div>
+  </form>
+
+  <div class="card" th:if="${!screen.rates.isEmpty()}">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>Servis</th>
+          <th>Status</th>
+          <th>Faiz</th>
+          <th>Qüvvəyə minmə</th>
+          <th>Yazılma</th>
+          <th>Qeyd</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="rate : ${screen.rates}">
+          <td th:text="${rate.partnerName}">Hyper</td>
+          <td th:text="${rate.statusLabel}">Yeni müştəri</td>
+          <td th:text="${rate.percent}">6%</td>
+          <td th:text="${rate.effectiveFrom}">01.11.2026</td>
+          <td th:text="${rate.createdAt}">04.11.2026 09:00</td>
+          <td th:text="${rate.note}"></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</body>
+</html>

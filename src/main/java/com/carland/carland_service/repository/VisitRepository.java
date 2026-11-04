@@ -78,6 +78,32 @@ public interface VisitRepository extends JpaRepository<Visit, Long> {
 
     boolean existsByCar_Customer_UserIdAndCreatedAtIsNull(Long userId);
 
+    /**
+     * tr: Randevuya bağlı panel ziyareti. Tutar buradaysa komisyon onu kullanır.
+     * en: Panel visit tied to the booking. Commission uses it when the amount is here.
+     */
+    @EntityGraph(attributePaths = {"services"})
+    @Query("select v from Visit v where v.bookingId = :bookingId order by v.id")
+    List<Visit> findCommissionByBookingId(@Param("bookingId") Long bookingId);
+
+    /**
+     * tr: Aynı VIN, aynı servis günü, aynı partner. Panel satırı (booking_id dolu) karışmaz.
+     * en: Same VIN, same service day, same partner. A panel row (booking_id set) is left out.
+     */
+    @EntityGraph(attributePaths = {"services"})
+    @Query("""
+            select v from Visit v join v.car c
+            where upper(trim(c.vin)) = :vin
+              and v.lastServiceDate = :day
+              and v.serviceCenterId = :partnerId
+              and v.hyperRecordId is not null
+              and v.bookingId is null
+            order by v.id
+            """)
+    List<Visit> findCommissionHyperVisits(@Param("vin") String vin,
+                                          @Param("day") java.time.LocalDate day,
+                                          @Param("partnerId") Long partnerId);
+
     @Query("SELECT MIN(v.createdAt) FROM Visit v WHERE v.car.customer.userId = :userId")
     java.time.LocalDateTime findEarliestCreatedAtByCustomer(@Param("userId") Long userId);
 }

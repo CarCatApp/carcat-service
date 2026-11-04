@@ -22,6 +22,7 @@ import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitIngestService;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.commission.CommissionLedgerService;
 import com.carland.carland_service.service.webhook.HyperWebhookIngestMapper;
 import com.carland.carland_service.service.webhook.HyperServiceVisitValidator;
 import com.carland.carland_service.service.webhook.HyperWebhookCarMetadataApplier;
@@ -59,6 +60,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private final PartnerVisitIngestGuard partnerVisitIngestGuard;
     private final VisitWebhookSupport visitWebhookSupport;
     private final RedisCacheService redisCacheService;
+    private final CommissionLedgerService commissionLedgerService;
 
     /**
      * tr: Webhook isteğini işler: payload'da tek ziyaret olmasını doğrular (validator exception fırlatır),
@@ -121,6 +123,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         refreshServicedPartnerIds(car);
         refreshPercentagesFromTouchedVisits(car, touchedVisits);
         redisCacheService.evictCarAndHistoryAfterCommit(car);
+        commissionLedgerService.refreshVin(vin);
 
         result.setMessage("Visit and service lines created");
         return result;

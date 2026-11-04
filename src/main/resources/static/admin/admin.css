@@ -1600,3 +1600,77 @@ body.booking-page td:has(.clock24) { height: auto; }
 .detail-grid dt { color: #5f5f68; font-weight: 600; }
 .detail-grid dd { color: #111; margin: 0; word-break: break-word; }
 
+.commission-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.commission-presets a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.commission-presets a.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.commission-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.commission-summary article {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text);
+}
+.commission-summary .label {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.commission-summary strong { font-size: 20px; }
+.commission-page .filter-field select,
+.commission-page .filter-field input,
+.commission-page .booking-form .filter-field input,
+.commission-page .booking-form .filter-field select {
+  color: var(--text);
+  background: #fff;
+}
+.commission-row { cursor: pointer; }
+.commission-detail {
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+.commission-detail pre {
+  margin-top: 12px;
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--primary-soft);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.commission-page .data-table a { color: var(--text); }
+@media (max-width: 800px) {
+  .commission-summary { grid-template-columns: 1fr; }
+}
+
+

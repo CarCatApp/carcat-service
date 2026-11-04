@@ -109,6 +109,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     private final HyperTokenService hyperTokenService;
     private final RestTemplate restTemplate;
     private final RedisCacheService redisCacheService;
+    private final com.carland.carland_service.service.commission.CommissionLedgerService commissionLedgerService;
 
     @Value("${hyper.auth.base-url}")
     private String hyperBaseUrl;
@@ -205,6 +206,11 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
             }
 
             persistHyperVisits(car, hyperResponse.getServiceHistory());
+            try {
+                commissionLedgerService.refreshVin(car.getVin());
+            } catch (RuntimeException ex) {
+                log.warn("commission refresh failed | vin={} err={}", car.getVin(), ex.toString());
+            }
             List<Visit> allVisits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
             hyperPercentageSyncService.resyncFromVisits(car, allVisits);
             refreshServicedPartnerIds(car);

@@ -14,6 +14,7 @@ import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.commission.CommissionLedgerService;
 import com.carland.carland_service.service.VisitHistoryService;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ class VisitHistoryServiceImplBranchTest {
     @Mock HyperTokenService hyperTokenService;
     @Mock org.springframework.web.client.RestTemplate restTemplate;
     @Mock RedisCacheService redisCacheService;
+    @Mock CommissionLedgerService commissionLedgerService;
 
     @InjectMocks VisitHistoryServiceImpl service;
 
