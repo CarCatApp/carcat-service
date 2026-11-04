@@ -58,6 +58,14 @@ class IddaMarkSplitterTest {
     }
 
     @Test
+    void gwmTankIsBrandGwmAndTheRestIsModel() {
+        IddaMarkSplit split = IddaMarkSplitter.split(
+                "GWM TANK 300 (BENZIN) MİNİK", "MİNİK", brands, models);
+        assertEquals("GWM", split.brand());
+        assertEquals("TANK 300", split.model());
+    }
+
+    @Test
     void unknownBrandIsNotCutOnTheFirstSpace() {
         IddaMarkSplit split = IddaMarkSplitter.split(
                 "great wall gr333minik", "minik", brands, models);

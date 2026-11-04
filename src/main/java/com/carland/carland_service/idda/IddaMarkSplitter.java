@@ -30,6 +30,10 @@ public final class IddaMarkSplitter {
         if (core.isEmpty()) {
             return new IddaMarkSplit(null, null);
         }
+        IddaMarkSplit gwmTank = gwmTank(core);
+        if (gwmTank != null) {
+            return gwmTank;
+        }
         Brand brand = longestBrandPrefix(core, brands);
         if (brand == null) {
             String whole = stripFuelParen(core);
@@ -40,6 +44,25 @@ public final class IddaMarkSplitter {
         rest = stripFuelParen(rest);
         String modelName = canonicalModel(rest, brand.getBrandId(), models);
         return new IddaMarkSplit(brand.getBrandName(), modelName);
+    }
+
+    /**
+     * tr: IDDA "GWM TANK …"yi tek marka yazıyor. Marka GWM, kalan metin model.
+     *     Katalog eşlemesinden önce bakar. Şimdilik elle istisna.
+     * en: IDDA writes "GWM TANK …" as one brand. Brand is GWM, the rest is the model.
+     *     Checked before the catalog match. A manual exception for now.
+     */
+    private static IddaMarkSplit gwmTank(String core) {
+        String folded = fold(core);
+        String prefix = "GWM TANK";
+        if (!folded.startsWith(prefix)) {
+            return null;
+        }
+        if (folded.length() > prefix.length() && Character.isLetterOrDigit(folded.charAt(prefix.length()))) {
+            return null;
+        }
+        String rest = stripFuelParen(core.substring("GWM".length()).trim());
+        return new IddaMarkSplit("GWM", rest.isBlank() ? null : rest);
     }
 
     static String fold(String raw) {
