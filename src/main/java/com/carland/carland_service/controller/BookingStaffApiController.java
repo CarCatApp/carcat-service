@@ -205,6 +205,23 @@ public class BookingStaffApiController {
                 bookingId, timezone, acceptLanguage);
     }
 
+    /**
+     * tr: Gizlədilmiş sətri siyahıya qaytarır. Status dəyişmir.
+     * en: Restores a hidden booking to the list. Status stays the same.
+     */
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/unhide")
+    public BookingView unhide(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestHeader(value = "X-Client-Timezone", required = false) String timezone
+    ) {
+        return staffBookingService.unhide(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, timezone, acceptLanguage);
+    }
+
     @GetMapping("/api/v1/internal/booking/staff/login-gate")
     public ResponseEntity<?> loginGate(@RequestParam Long userId, HttpServletRequest request) {
         WebhookAuthValidationResult result = internalTokenValidator.validate(request);

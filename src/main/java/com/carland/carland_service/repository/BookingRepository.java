@@ -173,9 +173,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
      * tr: Head admin sayfası. Sıra randevu günü, sonra range başlangıcı. Criteria sort yok.
      * en: Head-admin page. Order is the appointment day, then the range start. No Criteria sort.
      */
-    String HEAD_WHERE = """
-            where b.status in :statuses
-              and (b.staffHidden is null or b.staffHidden = false)
+    String HEAD_SCOPE = """
               and (b.branch.active is null or b.branch.active = true)
               and (b.branch.partner.active is null or b.branch.partner.active = true)
               and b.range.calendar.day >= :dayFrom
@@ -201,6 +199,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
                           like concat('%', :phone, '%')))
             """;
 
+    String HEAD_WHERE = """
+            where b.status in :statuses
+              and (b.staffHidden is null or b.staffHidden = false)
+            """ + HEAD_SCOPE;
+
+    /** tr: Head adminin silinmiş (staff_hidden) sətirləri. en: Head-admin rows hidden from the partner list. */
+    String HEAD_HIDDEN_WHERE = """
+            where b.status in :statuses
+              and b.staffHidden = true
+            """ + HEAD_SCOPE;
+
     @Query(
             value = "select b from Booking b " + HEAD_WHERE
                     + " order by b.range.calendar.day asc, b.range.start asc, b.id asc",
@@ -223,6 +232,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
             countQuery = "select count(b) from Booking b " + HEAD_WHERE
     )
     Page<Booking> findHeadByDayDesc(
+            @Param("statuses") Collection<String> statuses,
+            @Param("dayFrom") LocalDate dayFrom,
+            @Param("dayTo") LocalDate dayTo,
+            @Param("vin") String vin,
+            @Param("plate") String plate,
+            @Param("firstName") String firstName,
+            @Param("lastName") String lastName,
+            @Param("phone") String phone,
+            Pageable pageable);
+
+    @Query(
+            value = "select b from Booking b " + HEAD_HIDDEN_WHERE
+                    + " order by b.range.calendar.day desc, b.range.start asc, b.id asc",
+            countQuery = "select count(b) from Booking b " + HEAD_HIDDEN_WHERE
+    )
+    Page<Booking> findHeadHiddenByDayDesc(
             @Param("statuses") Collection<String> statuses,
             @Param("dayFrom") LocalDate dayFrom,
             @Param("dayTo") LocalDate dayTo,
@@ -259,6 +284,46 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
               and (b.staffHidden is null or b.staffHidden = false)
             """)
     long countPartner(@Param("partnerId") Long partnerId, @Param("statuses") Collection<String> statuses);
+
+    /**
+     * tr: Şube siyahısından gizlədilmiş sətirlər. Status eyni qalır.
+     * en: Rows hidden from the branch list. Status stays the same.
+     */
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.id = :branchId
+                      and b.status in :statuses
+                      and b.staffHidden = true
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.id = :branchId
+                      and b.status in :statuses
+                      and b.staffHidden = true
+                    """
+    )
+    Page<Booking> findHiddenByBranch_IdAndStatusIn(
+            @Param("branchId") Long branchId, @Param("statuses") Collection<String> statuses, Pageable pageable);
+
+    @Query(
+            value = """
+                    select b from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status in :statuses
+                      and b.staffHidden = true
+                    order by b.createdAt desc
+                    """,
+            countQuery = """
+                    select count(b) from Booking b
+                    where b.branch.partner.id = :partnerId
+                      and b.status in :statuses
+                      and b.staffHidden = true
+                    """
+    )
+    Page<Booking> findHiddenByBranch_Partner_IdAndStatusIn(
+            @Param("partnerId") Long partnerId, @Param("statuses") Collection<String> statuses, Pageable pageable);
 
     boolean existsByCustomerUserId(Long customerUserId);
 

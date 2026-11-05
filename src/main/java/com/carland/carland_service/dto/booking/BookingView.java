@@ -64,6 +64,13 @@ public class BookingView {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     String createdAt;
 
+    /**
+     * tr: Aracın VIN-indəki cari müştəri durumu. new və ya old. Sətir yoxdursa boş.
+     * en: Current customer status on the car VIN. new or old. Empty when that row is missing.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String customerStatus;
+
     /** tr: Görüntü formatı. / en: Display format. */
     public String getPlateNumber() {
         return PlateNumbers.format(plateNumber);

@@ -6,6 +6,7 @@ import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Color;
+import com.carland.carland_service.entity.CommissionCustomerStatus;
 import com.carland.carland_service.entity.BookingItem;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
@@ -23,6 +24,7 @@ import com.carland.carland_service.dto.booking.BookingRejectRequest;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
+import com.carland.carland_service.repository.CommissionCustomerStatusRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,6 +72,7 @@ class StaffBookingServiceTest {
     @Mock BookingCompletionService bookingCompletionService;
     @Mock StaffBookingLiveService staffBookingLiveService;
     @Mock CommissionLedgerService commissionLedgerService;
+    @Mock CommissionCustomerStatusRepository commissionCustomerStatusRepository;
 
     StaffBookingService service;
     BookingStaff staff;
@@ -81,7 +85,8 @@ class StaffBookingServiceTest {
                 bookingStaffAccess, bookingRepository, bookingItemRepository,
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
                 customerRepository, carRepository, colorRepository, bookingStaffNoteService, brandRepository, bookingPushService,
-                bookingCompletionService, staffBookingLiveService, commissionLedgerService);
+                bookingCompletionService, staffBookingLiveService, commissionLedgerService,
+                commissionCustomerStatusRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -127,6 +132,27 @@ class StaffBookingServiceTest {
         assertEquals("pkg:hyper-extra", out.getItems().get(0).getServiceKeys().get(0));
         assertEquals("2026-11-02T02:16:30Z", out.getItems().get(0).getCreatedAt());
         assertNull(out.getItems().get(0).getCar());
+        assertNull(out.getItems().get(0).getCustomerStatus());
+    }
+
+    @Test
+    void inboxReadsCurrentCustomerStatusByVin() {
+        booking.setVin(" lgxch4c07s2115197 ");
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        stubInbox(List.of(booking));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+        when(commissionCustomerStatusRepository.findByVinIn(List.of("LGXCH4C07S2115197"))).thenReturn(
+                List.of(CommissionCustomerStatus.builder().vin("LGXCH4C07S2115197").status("old").build()),
+                List.of(CommissionCustomerStatus.builder().vin("LGXCH4C07S2115197").status("new").build()),
+                List.of(CommissionCustomerStatus.builder().vin("LGXCH4C07S2115197").status("maybe").build()));
+
+        assertEquals("old", service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
+                .getItems().get(0).getCustomerStatus());
+        assertEquals("new", service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
+                .getItems().get(0).getCustomerStatus());
+        assertNull(service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
+                .getItems().get(0).getCustomerStatus());
     }
 
     @Test
@@ -416,6 +442,59 @@ class StaffBookingServiceTest {
         verify(staffBookingLiveService, never()).publishAfterCommit(any());
         verifyNoInteractions(bookingPushService);
         verifyNoInteractions(bookingCapacityService);
+    }
+
+    @Test
+    void unhideClearsTheFlagAndKeepsStatus() {
+        booking.setStatus("completed");
+        booking.setStaffHidden(true);
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(1L)).thenReturn(List.of());
+
+        BookingView out = service.unhide(9L, false, 1L, "Asia/Baku", "az");
+
+        assertEquals("completed", booking.getStatus());
+        assertEquals("completed", out.getStatus());
+        assertFalse(booking.getStaffHidden());
+        verify(bookingRepository).save(booking);
+        verify(staffBookingLiveService).refreshAfterCommit(7L);
+        verifyNoInteractions(bookingPushService);
+        verifyNoInteractions(bookingCapacityService);
+    }
+
+    @Test
+    void inboxHiddenReturnsStaffHiddenRows() {
+        booking.setStatus("confirmed");
+        booking.setStaffHidden(true);
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        when(bookingRepository.findHiddenByBranch_IdAndStatusIn(eq(7L), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+
+        BookingInboxResponse out = service.inbox(9L, false, "hidden", 7L, 1, 200, "Asia/Baku", "az");
+
+        assertEquals(1, out.getItems().size());
+        assertEquals("confirmed", out.getItems().get(0).getStatus());
+        verify(bookingRepository, never()).findByBranch_IdAndStatusInOrderByCreatedAtDesc(any(), any(), any());
+    }
+
+    @Test
+    void headInboxHiddenSkipsTheVisibleBoard() {
+        staff.setRole(BookingStaffRole.HEAD_ADMIN.name());
+        booking.setStaffHidden(true);
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingRepository.findHeadHiddenByDayDesc(any(), any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(booking)));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+
+        BookingInboxResponse out = service.inbox(9L, false, "hidden", null, 1, 20, "Asia/Baku", "az");
+
+        assertEquals(1, out.getItems().size());
+        assertEquals(1L, out.getItems().get(0).getBookingId());
+        verify(bookingRepository, never()).findHeadByDayAsc(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     private void stubInbox(List<Booking> rows) {

@@ -21,6 +21,7 @@ import com.carland.carland_service.entity.Calendar;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.entity.Color;
+import com.carland.carland_service.entity.CommissionCustomerStatus;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingMode;
@@ -38,9 +39,12 @@ import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CarSpec;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
+import com.carland.carland_service.repository.CommissionCustomerStatusRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import com.carland.carland_service.service.commission.CommissionLedgerService;
+import com.carland.carland_service.service.commission.CommissionStatus;
+import com.carland.carland_service.service.commission.CommissionVin;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -111,6 +115,7 @@ public class StaffBookingService {
     private final BookingCompletionService bookingCompletionService;
     private final StaffBookingLiveService staffBookingLiveService;
     private final CommissionLedgerService commissionLedgerService;
+    private final CommissionCustomerStatusRepository commissionCustomerStatusRepository;
 
     @Transactional(readOnly = true)
     public StaffNotesResponse notes(Long userId, boolean mustChangePassword, String kind, String acceptLanguage) {
@@ -145,31 +150,35 @@ public class StaffBookingService {
         int safePage = page == null || page < 1 ? 1 : page;
         int safeSize = pageSize == null || pageSize < 1 ? 200 : Math.min(pageSize, 200);
         PageRequest pageable = PageRequest.of(safePage - 1, safeSize);
-        boolean board = BOARD.equals(wanted) || "all".equals(wanted);
+        boolean hiddenList = "hidden".equals(wanted);
+        boolean board = !hiddenList && (BOARD.equals(wanted) || "all".equals(wanted));
         Page<Booking> result;
         Long scopeBranch = null;
         Long scopePartner = null;
         if (branchId != null) {
             bookingStaffAccess.requireWritableBranch(staff, branchId, acceptLanguage);
             scopeBranch = branchId;
-            result = board
-                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(branchId, statusesOf(wanted), pageable);
+            result = hiddenList
+                    ? bookingRepository.findHiddenByBranch_IdAndStatusIn(branchId, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(
+                            branchId, board ? BOARD_STATUSES : statusesOf(wanted), pageable);
         } else if (BookingStaffRole.BRANCH_ADMIN.name().equals(staff.getRole())) {
             if (staff.getBranch() == null) {
                 throw new ForbiddenException("branch required");
             }
             scopeBranch = staff.getBranch().getId();
-            result = board
-                    ? bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(scopeBranch, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(scopeBranch, statusesOf(wanted), pageable);
+            result = hiddenList
+                    ? bookingRepository.findHiddenByBranch_IdAndStatusIn(scopeBranch, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_IdAndStatusInOrderByCreatedAtDesc(
+                            scopeBranch, board ? BOARD_STATUSES : statusesOf(wanted), pageable);
         } else {
             scopePartner = staff.getPartner().getId();
-            result = board
-                    ? bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(scopePartner, BOARD_STATUSES, pageable)
-                    : bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(scopePartner, statusesOf(wanted), pageable);
+            result = hiddenList
+                    ? bookingRepository.findHiddenByBranch_Partner_IdAndStatusIn(scopePartner, BOARD_STATUSES, pageable)
+                    : bookingRepository.findByBranch_Partner_IdAndStatusInOrderByCreatedAtDesc(
+                            scopePartner, board ? BOARD_STATUSES : statusesOf(wanted), pageable);
         }
-        boolean newestDay = !board && newestDayFirst(wanted);
+        boolean newestDay = hiddenList || (!board && newestDayFirst(wanted));
         return respond(result.getContent(), safePage, safeSize, timezone, acceptLanguage, newestDay,
                 countBranch(scopeBranch, scopePartner, PENDING_STATUSES),
                 countBranch(scopeBranch, scopePartner, CONFIRMED_STATUSES),
@@ -182,6 +191,20 @@ public class StaffBookingService {
                                            String vin, String plate, String firstName, String lastName, String phone,
                                            String dateFrom, String dateTo) {
         String wanted = status == null || status.isBlank() ? "pending" : status.trim().toLowerCase(Locale.ROOT);
+        if ("hidden".equals(wanted)) {
+            List<Booking> hidden = bookingRepository.findHeadHiddenByDayDesc(
+                    BOARD_STATUSES,
+                    dayOr(dateFrom, DAY_MIN),
+                    dayOr(dateTo, DAY_MAX),
+                    textNeedle(vin),
+                    plateNeedle(plate),
+                    textNeedle(firstName),
+                    textNeedle(lastName),
+                    phoneNeedle(phone),
+                    PageRequest.of(0, HEAD_LOAD)).getContent();
+            return respond(hidden, 1, Math.max(hidden.size(), 1), timezone, acceptLanguage, true,
+                    0, 0, 0, 0, 1);
+        }
         List<String> statuses = statusesOf(wanted);
         boolean newest = newestDayFirst(wanted);
         LocalDate from = dayOr(dateFrom, DAY_MIN);
@@ -282,13 +305,15 @@ public class StaffBookingService {
         Map<Long, List<String>> keys = keysByBooking(rows);
         Map<Long, List<BookingIndividualLine>> lines = linesByBooking(rows);
         Map<Long, BookingInspection> inspections = inspectionsByBooking(rows);
+        Map<String, String> customerStatuses = customerStatusByVin(rows);
         String tz = timezone == null || timezone.isBlank() ? DEFAULT_TZ : timezone.trim();
         String lang = BookingMineService.langOf(acceptLanguage);
         Map<String, Long> brandIds = new HashMap<>();
         List<BookingView> items = new ArrayList<>();
         for (Booking booking : rows) {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), tz, lang,
-                    lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds));
+                    lines.getOrDefault(booking.getId(), List.of()), inspections.get(booking.getId()), brandIds,
+                    customerStatuses));
         }
         items.sort((left, right) -> byAppointment(left, right, newestDay));
         long total = pending + confirmed + completed + rejected;
@@ -429,11 +454,26 @@ public class StaffBookingService {
     @Transactional
     public BookingView hide(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
                             String acceptLanguage) {
+        return setStaffHidden(userId, mustChangePassword, bookingId, true, timezone, acceptLanguage);
+    }
+
+    /**
+     * tr: Gizlədilmiş sətri partner siyahısına qaytarır. Status dəyişmir. Push yoxdur.
+     * en: Puts a hidden row back on the partner list. Status stays the same. No push.
+     */
+    @Transactional
+    public BookingView unhide(Long userId, boolean mustChangePassword, Long bookingId, String timezone,
+                              String acceptLanguage) {
+        return setStaffHidden(userId, mustChangePassword, bookingId, false, timezone, acceptLanguage);
+    }
+
+    private BookingView setStaffHidden(Long userId, boolean mustChangePassword, Long bookingId, boolean hidden,
+                                       String timezone, String acceptLanguage) {
         BookingStaff staff = requireStaff(userId, mustChangePassword, acceptLanguage);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("booking not found"));
         bookingStaffAccess.requireWritableBranch(staff, booking.getBranch().getId(), acceptLanguage);
-        booking.setStaffHidden(true);
+        booking.setStaffHidden(hidden);
         bookingRepository.save(booking);
         staffBookingLiveService.refreshAfterCommit(
                 booking.getBranch() == null ? null : booking.getBranch().getId());
@@ -445,7 +485,8 @@ public class StaffBookingService {
         List<BookingIndividualLine> lines = individualLineRepository.findByBooking_IdOrderByIdAsc(bookingId);
         java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(bookingId);
         BookingInspection inspection = found == null ? null : found.orElse(null);
-        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
+        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>(),
+                customerStatusByVin(List.of(booking)));
     }
 
     /**
@@ -608,7 +649,8 @@ public class StaffBookingService {
         List<BookingIndividualLine> lines = individualLineRepository.findByBooking_IdOrderByIdAsc(bookingId);
         java.util.Optional<BookingInspection> found = inspectionRepository.findByBooking_Id(bookingId);
         BookingInspection inspection = found == null ? null : found.orElse(null);
-        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>());
+        return toView(booking, keys, tz, lang, lines == null ? List.of() : lines, inspection, new HashMap<>(),
+                customerStatusByVin(List.of(booking)));
     }
 
     /**
@@ -705,7 +747,7 @@ public class StaffBookingService {
 
     private BookingView toView(Booking booking, List<String> keys, String timezone, String lang,
                                List<BookingIndividualLine> lines, BookingInspection inspection,
-                               Map<String, Long> brandIds) {
+                               Map<String, Long> brandIds, Map<String, String> customerStatuses) {
         Range range = booking.getRange();
         Calendar calendar = range == null ? null : range.getCalendar();
         String mode = range == null || range.getBookingMode() == null || range.getBookingMode().isBlank()
@@ -761,7 +803,57 @@ public class StaffBookingService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .createdAt(createdStamp(booking.getCreatedAt()))
+                .customerStatus(customerStatus(booking, car, customerStatuses))
                 .build();
+    }
+
+    /**
+     * tr: Siyahı hər dəfə VIN cədvəlinin cari dəyərini oxuyur. Sətir yoxdursa və ya kod tanınmırsa boş.
+     * en: Each list read uses the current VIN-table value. Empty when the row is missing or the code is unknown.
+     */
+    private Map<String, String> customerStatusByVin(List<Booking> rows) {
+        List<String> vins = new ArrayList<>();
+        for (Booking booking : rows) {
+            String vin = CommissionVin.normalize(booking.getVin());
+            if (vin != null && !vins.contains(vin)) {
+                vins.add(vin);
+            }
+        }
+        Map<String, String> out = new HashMap<>();
+        if (vins.isEmpty()) {
+            return out;
+        }
+        for (String vin : vins) {
+            out.put(vin, "");
+        }
+        List<CommissionCustomerStatus> found = commissionCustomerStatusRepository.findByVinIn(vins);
+        if (found == null) {
+            return out;
+        }
+        for (CommissionCustomerStatus row : found) {
+            String vin = CommissionVin.normalize(row.getVin());
+            if (vin != null && CommissionStatus.known(row.getStatus())) {
+                out.put(vin, row.getStatus());
+            }
+        }
+        return out;
+    }
+
+    private String customerStatus(Booking booking, Car car, Map<String, String> loaded) {
+        String vin = CommissionVin.normalize(booking.getVin());
+        if (vin == null && car != null) {
+            vin = CommissionVin.normalize(car.getVin());
+        }
+        if (vin == null) {
+            return null;
+        }
+        if (loaded != null && loaded.containsKey(vin)) {
+            return CommissionStatus.known(loaded.get(vin)) ? loaded.get(vin) : null;
+        }
+        return commissionCustomerStatusRepository.findByVin(vin)
+                .map(CommissionCustomerStatus::getStatus)
+                .filter(CommissionStatus::known)
+                .orElse(null);
     }
 
     private CarResponseForSlotPanel carPanel(Car car, Map<String, Long> brandIds, String lang) {
