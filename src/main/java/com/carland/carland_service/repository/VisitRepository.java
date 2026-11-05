@@ -23,6 +23,12 @@ public interface VisitRepository extends JpaRepository<Visit, Long> {
     /** tr: Araca ait ziyaret olup olmadığını kontrol eder. / en: Checks whether any visit exists for the car. */
     boolean existsByCar(Car car);
 
+    /**
+     * tr: Rozet ekranı. Servis satırı çekmez. Sıra, rozet listesindeki en yeni ziyaretle aynıdır.
+     * en: Badge screen. Does not fetch service lines. Order matches the newest visit used by the badge list.
+     */
+    List<Visit> findByCar_CarIdOrderByLastServiceDateDescIdDesc(Long carId);
+
     /** tr: Aracın ziyaretlerini servis satırlarıyla birlikte tarihe göre azalan sırada listeler. / en: Lists a car's visits with service lines, ordered by last service date descending. */
     /** Eager-fetch services; parts loaded via {@link org.hibernate.annotations.BatchSize} (Hibernate cannot join-fetch two List bags). */
     @EntityGraph(attributePaths = {"services"})

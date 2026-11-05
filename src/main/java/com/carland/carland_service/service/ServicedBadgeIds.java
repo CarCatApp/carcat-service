@@ -57,7 +57,7 @@ public final class ServicedBadgeIds {
             return List.of();
         }
         for (Visit visit : visits) {
-            Long branchId = branchId(visit);
+            Long branchId = resolvedBranchId(visit);
             if (branchId != null) {
                 ordered.add(String.valueOf(branchId));
             }
@@ -65,7 +65,11 @@ public final class ServicedBadgeIds {
         return new ArrayList<>(ordered);
     }
 
-    private static Long branchId(Visit visit) {
+    /**
+     * tr: Rozet şubesi. {@code branch_id} doluysa o; Hyper ve boşsa geçici şube 10; başka partnerde boşsa yok.
+     * en: Badge branch. The stored {@code branch_id} when set; temporary branch 10 for Hyper with an empty one; none for another partner with an empty one.
+     */
+    public static Long resolvedBranchId(Visit visit) {
         if (visit == null) {
             return null;
         }

@@ -15,6 +15,7 @@ import com.carland.carland_service.idda.IddaPlateCheckService;
 import com.carland.carland_service.service.impl.HyperTokenService;
 import com.carland.carland_service.service.CarService;
 import com.carland.carland_service.service.CarVinHistoryService;
+import com.carland.carland_service.service.ServicedBranchesService;
 import com.carland.carland_service.dto.response.VisitHistoryResponse;
 import com.carland.carland_service.service.VisitHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +42,7 @@ public class CarController {
 
     private final CarService carService;
     private final CarVinHistoryService carVinHistoryService;
+    private final ServicedBranchesService servicedBranchesService;
     private final VisitHistoryService visitHistoryService;
     private final MaintenanceTemplateRepository maintenanceTemplateRepository;
     private final CarRepository carRepository;
@@ -390,6 +392,22 @@ public class CarController {
                                                                 @RequestHeader("Accept-Language") String acceptLanguage) {
         log.info("[hist-debug] GET /{}/service-history (v1) | userId={} lang={}", vin, userIdHeader, acceptLanguage);
         return carVinHistoryService.getServiceHistoryByVin(vin, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
+    /**
+     * tr: Rozete tıklanınca açılan şube listesi. Sıra {@code cars.serviced_branch_ids}.
+     *     Redis yok: okuma, carlist'e yazılmaz.
+     * en: Branch list opened from the badges. Order is {@code cars.serviced_branch_ids}.
+     *     No Redis: a read, nothing is written to carlist.
+     */
+    @Operation(summary = "Branches this car was serviced at, in badge order")
+    @GetMapping("/{carId}/serviced-branches")
+    public ServicedBranchesResponse servicedBranches(@PathVariable Long carId,
+                                                     @RequestHeader("Authorization") String token,
+                                                     @RequestHeader("X-User-Id") String userIdHeader,
+                                                     @RequestHeader("Accept-Language") String acceptLanguage) {
+        log.info("GET /car/{}/serviced-branches | userId={}", carId, userIdHeader);
+        return servicedBranchesService.list(carId, userIdHeader, acceptLanguage);
     }
 
     /**
