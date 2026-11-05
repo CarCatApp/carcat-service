@@ -3,6 +3,8 @@ package com.carland.carland_service.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.carland.carland_service.digitalhistory.DigitalHistoryPaths;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -56,6 +58,7 @@ public class JWTConfiguration {
                         .requestMatchers("/api/v1/banners").permitAll()
                         .requestMatchers("/api/v1/client-events").permitAll()
                         .requestMatchers("/api/v1/internal/client-events/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, DigitalHistoryPaths.PDF).permitAll()
                         .anyRequest().authenticated())
 
                 .addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import com.carland.carland_service.digitalhistory.DigitalHistoryPaths;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -82,7 +83,8 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.startsWith("/api/v1/user/customer-cars")
                         || path.equals("/api/v1/group/by/get/brand/list/with/models")
                         || isAppAnnouncementActive(path)
-                        || isBannerList(path);
+                        || isBannerList(path)
+                        || DigitalHistoryPaths.isPdf(path);
 
         if (isPublic) {
             filterChain.doFilter(request, response);

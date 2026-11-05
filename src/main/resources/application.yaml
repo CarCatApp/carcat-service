@@ -160,6 +160,15 @@ digital-finance:
   api-key: ${DIGITAL_FINANCE_API_KEY:}
 
 # Placeholder values are "test". Put the real key only in /root/carland.env (never git).
+carland:
+  issuer:
+    key: ${CARLAND_ISSUER_KEY:carland}
+
+# Share link lifetime. 300 seconds = 5 minutes. Change the env value; no code change.
+digital-history:
+  share-seconds: ${DIGITAL_HISTORY_SHARE_SECONDS:300}
+  public-base-url: ${DIGITAL_HISTORY_PUBLIC_BASE_URL:https://digital-innovation.agency/carland/server-carland}
+
 openai:
   api-key: ${OPENAI_API_KEY:test}
   image-model: ${OPENAI_IMAGE_MODEL:gpt-image-2.5-flare}
