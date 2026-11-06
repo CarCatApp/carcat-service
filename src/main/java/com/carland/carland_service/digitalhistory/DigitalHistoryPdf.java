@@ -10,6 +10,12 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Component;
 
+import javax.imageio.ImageIO;
+import javax.imageio.spi.IIORegistry;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,6 +40,11 @@ import java.util.Locale;
 public class DigitalHistoryPdf {
 
     static final String REPORT_NO = "CC-2025-0001849";
+
+    static {
+        IIORegistry.getDefaultInstance().registerServiceProvider(
+                new com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi());
+    }
 
     private static final ZoneId BAKU = ZoneId.of("Asia/Baku");
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
@@ -892,15 +903,54 @@ public class DigitalHistoryPdf {
         }
 
         private PDImageXObject photo(byte[] data) {
-            if (data == null || data.length == 0) {
+            byte[] printable = pdfImage(data);
+            if (printable == null) {
                 return null;
             }
             try {
-                return PDImageXObject.createFromByteArray(document, data, "car");
-            } catch (IOException ex) {
+                return PDImageXObject.createFromByteArray(document, printable, "car");
+            } catch (IOException | IllegalArgumentException ex) {
                 return null;
             }
         }
+    }
+
+    /**
+     * tr: PDFBox WebP (RIFF) basmaz. Araç fotoğrafı WebP ise JPEG'e çevrilir. Bozuksa null, rapor yine çıkar.
+     * en: PDFBox does not print WebP (RIFF). A WebP car photo is turned into JPEG. A broken image is null and the report still prints.
+     */
+    static byte[] pdfImage(byte[] data) {
+        if (data == null || data.length == 0) {
+            return null;
+        }
+        if (!webp(data)) {
+            return data;
+        }
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(data));
+            if (image == null) {
+                return null;
+            }
+            BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = rgb.createGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            graphics.drawImage(image, 0, 0, null);
+            graphics.dispose();
+            ByteArrayOutputStream jpeg = new ByteArrayOutputStream();
+            if (!ImageIO.write(rgb, "jpg", jpeg) || jpeg.size() == 0) {
+                return null;
+            }
+            return jpeg.toByteArray();
+        } catch (IOException | RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private static boolean webp(byte[] data) {
+        return data.length >= 12
+                && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F'
+                && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
     }
 
     private static String dateLine(String day) {
