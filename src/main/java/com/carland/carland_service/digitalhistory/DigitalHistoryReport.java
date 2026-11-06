@@ -4,7 +4,9 @@ import java.util.List;
 
 /**
  * tr: PDF'e basılan düz metin. Entity taşınmaz. Boş alan {@code ""}.
+ *     {@code photo} aracın hazır fotoğrafıdır; yoksa null. Loga yazılmaz.
  * en: Plain text printed on the PDF. No entities. A missing value is {@code ""}.
+ *     {@code photo} is the car's ready photo, or null. It is not logged.
  */
 public record DigitalHistoryReport(
         String generatedOn,
@@ -27,7 +29,8 @@ public record DigitalHistoryReport(
         int centerCount,
         List<VisitBlock> visits,
         String grandTotal,
-        List<CenterBlock> centers
+        List<CenterBlock> centers,
+        byte[] photo
 ) {
     public record VisitBlock(
             String mileage,

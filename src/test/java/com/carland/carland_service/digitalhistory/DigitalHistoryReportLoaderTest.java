@@ -9,6 +9,7 @@ import com.carland.carland_service.entity.VisitServiceLine;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.CarPhotoRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.PartnerRepository;
@@ -43,6 +44,7 @@ class DigitalHistoryReportLoaderTest {
     @Mock PartnerRepository partners;
     @Mock ColorRepository colors;
     @Mock IddaPlateCheckRepository idda;
+    @Mock CarPhotoRepository photos;
     @InjectMocks DigitalHistoryReportLoader loader;
 
     @Test
@@ -88,6 +90,7 @@ class DigitalHistoryReportLoaderTest {
                 .contactEmail("info@toyotabaku.az")
                 .build();
         when(branches.findAllById(any())).thenReturn(List.of(branch));
+        when(partners.findAllById(any())).thenReturn(List.of());
 
         Visit panel = Visit.builder()
                 .bookingId(5L)
@@ -128,6 +131,9 @@ class DigitalHistoryReportLoaderTest {
         assertEquals("2 487 sm³", report.engineVolume());
         assertEquals("89 128 km", report.mileage());
         assertEquals(2, report.serviceCount());
+        assertEquals(1, report.centerCount());
+        assertEquals(1, report.centers().size());
+        assertEquals("Toyota Bakı Mərkəzi", report.centers().get(0).name());
         assertEquals("395,00 AZN", report.grandTotal());
 
         DigitalHistoryReport.VisitBlock panelBlock = report.visits().get(0);
@@ -147,9 +153,17 @@ class DigitalHistoryReportLoaderTest {
         String text = pdfText(new DigitalHistoryPdf().render(report));
         assertTrue(text.contains("JTNB23HK5R3164829"));
         assertTrue(text.contains("BC481273"));
-        assertTrue(text.contains("Fərdi xidmətlər"));
+        assertTrue(text.contains("Filtr"));
         assertTrue(text.contains("Diaqnostika"));
         assertTrue(text.contains("Antifriz"));
+        assertTrue(text.contains("CC-2025-0001849"));
+        assertTrue(text.contains("Yenilənib"));
+        assertTrue(text.contains("27.02.2025 tarixində"));
+        assertTrue(text.contains("Yürüş dinamikası"));
+        assertTrue(text.contains("Orta yürüş"));
+        assertTrue(text.contains("Hesabatın orijinallığını yoxlayın"));
+        assertTrue(text.contains("carcat.az/verify/CC-2025-0001849"));
+        assertFalse(text.contains("Fərdi xidmətlər"));
         assertFalse(text.contains("SECRET"));
         assertFalse(text.contains("SHOULD_NOT"));
     }

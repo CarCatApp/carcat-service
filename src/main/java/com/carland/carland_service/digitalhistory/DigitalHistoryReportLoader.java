@@ -2,13 +2,16 @@ package com.carland.carland_service.digitalhistory;
 
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Car;
+import com.carland.carland_service.entity.CarPhoto;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
+import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.CarPhotoRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.PartnerRepository;
@@ -30,8 +33,12 @@ import java.util.Map;
 
 /**
  * tr: PDF verisini okur. Hyper'a gitmez, satır yazmaz, {@code carlist} silmez.
+ *     Sayılan qeyd tamamlanmış booking (panel) və Hyper ziyarətidir. Servis mərkəzi sayı branch-dır.
+ *     Hazır fotoşəkil bayt olaraq alınır; Redis yazılmaz.
  *     Şəhadətnamə və mühərrik nömrəsi, VIN'in son başarılı IDDA kaydından gelir. Sahip adı alınmaz.
  * en: Reads the PDF data. Does not call Hyper, does not write rows, does not drop {@code carlist}.
+ *     A counted record is a completed booking (panel) or a Hyper visit. The center count is branches.
+ *     A ready photo is taken as bytes; Redis is not written.
  *     Certificate and engine number come from the VIN's latest successful IDDA row. The owner name is not read.
  */
 @Service
@@ -46,6 +53,7 @@ public class DigitalHistoryReportLoader {
     private final PartnerRepository partnerRepository;
     private final ColorRepository colorRepository;
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
+    private final CarPhotoRepository carPhotoRepository;
 
     @Transactional(readOnly = true)
     public DigitalHistoryReport load(long carId) {
@@ -53,7 +61,9 @@ public class DigitalHistoryReportLoader {
         if (car == null) {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang("az"));
         }
-        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car);
+        List<Visit> visits = visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car).stream()
+                .filter(DigitalHistoryReportLoader::counted)
+                .toList();
         for (Visit visit : visits) {
             if (visit.getServices() != null) {
                 visit.getServices().size();
@@ -125,7 +135,8 @@ public class DigitalHistoryReportLoader {
                 centers.size(),
                 List.copyOf(blocks),
                 anyAmount ? DigitalHistoryFormat.total(grand, grandCurrency, mixed) : "",
-                centers.values().stream().map(CenterAcc::toBlock).toList()
+                centers.values().stream().map(CenterAcc::toBlock).toList(),
+                photo(car.getCarId())
         );
     }
 
@@ -171,13 +182,44 @@ public class DigitalHistoryReportLoader {
         return partners.get(visit.getServiceCenterId());
     }
 
+    /**
+     * tr: Tamamlanmış booking (panel və ya bookingId) və Hyper ziyarəti. Başqa mənbə sayılmır.
+     * en: A completed booking (panel or a booking id) and a Hyper visit. Any other source is left out.
+     */
+    private static boolean counted(Visit visit) {
+        String source = visit.getSource();
+        if (visit.getBookingId() != null || "panel".equalsIgnoreCase(source)) {
+            return true;
+        }
+        if (source == null || source.isBlank()) {
+            return true;
+        }
+        String normalized = source.toLowerCase(Locale.ROOT);
+        return "hyper".equals(normalized) || "hyperservice".equals(normalized);
+    }
+
+    private byte[] photo(Long carId) {
+        if (carId == null) {
+            return null;
+        }
+        CarPhoto stored = carPhotoRepository.findByCarId(carId);
+        if (stored == null || stored.getImageData() == null || stored.getImageData().length == 0) {
+            return null;
+        }
+        if (!CarPhotoStatus.isReady(stored.getPhotoStatus())) {
+            return null;
+        }
+        return stored.getImageData();
+    }
+
     private static void accumulate(Map<String, CenterAcc> centers, Visit visit, Branch branch, Partner partner) {
-        String key = visit.getBranchId() != null
-                ? "b:" + visit.getBranchId()
-                : "n:" + DigitalHistoryVisits.centerName(visit, branch, partner).toLowerCase(Locale.ROOT);
+        if (branch == null) {
+            return;
+        }
+        String key = "b:" + branch.getId();
         CenterAcc acc = centers.computeIfAbsent(key, ignored -> new CenterAcc(
                 DigitalHistoryVisits.centerName(visit, branch, partner),
-                branch == null ? "" : DigitalHistoryFormat.text(branch.getAddress()),
+                DigitalHistoryFormat.text(branch.getAddress()),
                 DigitalHistoryVisits.phone(branch, partner),
                 DigitalHistoryVisits.email(branch, partner)
         ));
