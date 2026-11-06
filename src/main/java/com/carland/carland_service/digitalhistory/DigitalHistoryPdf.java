@@ -8,6 +8,7 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.Locale;
  * en: Prints the digital history onto the template pages. The report number is still fixed.
  *     "Yenilənib" is Baku time. The QR block, image included, is fixed.
  */
+@Component
 public class DigitalHistoryPdf {
 
     static final String REPORT_NO = "CC-2025-0001849";
