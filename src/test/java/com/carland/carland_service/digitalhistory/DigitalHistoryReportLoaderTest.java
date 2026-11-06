@@ -131,9 +131,11 @@ class DigitalHistoryReportLoaderTest {
         assertEquals("2 487 sm³", report.engineVolume());
         assertEquals("89 128 km", report.mileage());
         assertEquals(2, report.serviceCount());
-        assertEquals(1, report.centerCount());
-        assertEquals(1, report.centers().size());
+        assertEquals(2, report.centerCount());
+        assertEquals(2, report.centers().size());
         assertEquals("Toyota Bakı Mərkəzi", report.centers().get(0).name());
+        assertEquals("Hyper Service", report.centers().get(1).name());
+        assertEquals(1, report.centers().get(1).visits());
         assertEquals("395,00 AZN", report.grandTotal());
 
         DigitalHistoryReport.VisitBlock panelBlock = report.visits().get(0);

@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
@@ -33,11 +34,13 @@ import java.util.Map;
 
 /**
  * tr: PDF verisini okur. Hyper'a gitmez, satır yazmaz, {@code carlist} silmez.
- *     Sayılan qeyd tamamlanmış booking (panel) və Hyper ziyarətidir. Servis mərkəzi sayı branch-dır.
+ *     Sayılan qeyd tamamlanmış booking (panel) və Hyper ziyarətidir.
+ *     Hyper ziyarətində şube yoxdursa bir Hyper şubesi sayılır. Dealer ayrımı sonra.
  *     Hazır fotoşəkil bayt olaraq alınır; Redis yazılmaz.
  *     Şəhadətnamə və mühərrik nömrəsi, VIN'in son başarılı IDDA kaydından gelir. Sahip adı alınmaz.
  * en: Reads the PDF data. Does not call Hyper, does not write rows, does not drop {@code carlist}.
- *     A counted record is a completed booking (panel) or a Hyper visit. The center count is branches.
+ *     A counted record is a completed booking (panel) or a Hyper visit.
+ *     A Hyper visit with no branch counts as one Hyper center. Dealer split comes later.
  *     A ready photo is taken as bytes; Redis is not written.
  *     Certificate and engine number come from the VIN's latest successful IDDA row. The owner name is not read.
  */
@@ -198,6 +201,18 @@ public class DigitalHistoryReportLoader {
         return "hyper".equals(normalized) || "hyperservice".equals(normalized);
     }
 
+    private static boolean hyper(Visit visit) {
+        if (PartnerId.HYPER.getId().equals(visit.getServiceCenterId())) {
+            return true;
+        }
+        String source = visit.getSource();
+        if (source == null || source.isBlank()) {
+            return visit.getBookingId() == null;
+        }
+        String normalized = source.trim().toLowerCase(Locale.ROOT);
+        return "hyper".equals(normalized) || "hyperservice".equals(normalized);
+    }
+
     private byte[] photo(Long carId) {
         if (carId == null) {
             return null;
@@ -212,14 +227,18 @@ public class DigitalHistoryReportLoader {
         return stored.getImageData();
     }
 
+    /**
+     * tr: Şubesi olan ziyaret o şubeye yazılır. Şubesiz Hyper ziyaretlerin hepsi tek Hyper şubesidir.
+     * en: A visit with a branch is filed there. Every branchless Hyper visit shares one Hyper center.
+     */
     private static void accumulate(Map<String, CenterAcc> centers, Visit visit, Branch branch, Partner partner) {
-        if (branch == null) {
+        if (branch == null && !hyper(visit)) {
             return;
         }
-        String key = "b:" + branch.getId();
+        String key = branch == null ? "hyper" : "b:" + branch.getId();
         CenterAcc acc = centers.computeIfAbsent(key, ignored -> new CenterAcc(
                 DigitalHistoryVisits.centerName(visit, branch, partner),
-                DigitalHistoryFormat.text(branch.getAddress()),
+                branch == null ? "" : DigitalHistoryFormat.text(branch.getAddress()),
                 DigitalHistoryVisits.phone(branch, partner),
                 DigitalHistoryVisits.email(branch, partner)
         ));
