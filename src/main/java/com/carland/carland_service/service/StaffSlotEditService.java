@@ -3,7 +3,6 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.StaffSlotCapacityRequest;
 import com.carland.carland_service.dto.request.StaffSlotDayHiddenRequest;
 import com.carland.carland_service.dto.request.StaffSlotHiddenRequest;
-import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Calendar;
@@ -18,7 +17,6 @@ import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CalendarRepository;
 import com.carland.carland_service.repository.RangeRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +35,6 @@ import java.util.Set;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class StaffSlotEditService {
 
     static final int CAPACITY_MAX = 50;
@@ -48,7 +45,6 @@ public class StaffSlotEditService {
     private final BookingRepository bookingRepository;
     private final BookingCapacityService bookingCapacityService;
     private final AppointmentRepository appointmentRepository;
-    private final BookingPushService bookingPushService;
 
     /**
      * tr: Yer sayısını bir değiştirir. Dolu yerin altına inmez.
@@ -152,13 +148,13 @@ public class StaffSlotEditService {
 
     /**
      * tr: Günün yalnız seçili hizmətinin saatlarını silir (packageId, individualServiceId və ya repairInspection,
-     *     dəqiq biri). Digər hizmətlərin saatlarına toxunmur. Aktiv rezervasiyalar "calendar_deleted" ilə rədd
-     *     edilir. Rezervasiyası olmuş saat DELETED olur (sətir durur ki köhnə rezervasiyanın vaxtı itməsin),
+     *     dəqiq biri). Digər hizmətlərin saatlarına toxunmur. Rezervasiyanın statusu, qeydi və push-u dəyişmir.
+     *     Rezervasiyası olmuş saat DELETED olur (sətir durur ki rezervasiyanın vaxtı itməsin),
      *     heç rezervasiyası olmamış saat silinir. Gündə saat qalmasa təqvim də silinir.
      * en: Deletes only the selected service's hours on the day (exactly one of packageId, individualServiceId or
-     *     repairInspection). Other services' hours are untouched. Active bookings are rejected with
-     *     "calendar_deleted". An hour that ever had a booking becomes DELETED (the row stays so the old booking
-     *     keeps its time); an hour that never had one is removed. The calendar goes when no hour is left.
+     *     repairInspection). Other services' hours are untouched. A booking's status, note and push stay as they
+     *     are. An hour that ever had a booking becomes DELETED (the row stays so the booking keeps its time);
+     *     an hour that never had one is removed. The calendar goes when no hour is left.
      */
     @Transactional
     public void deleteCalendar(Long userId, boolean mustChangePassword, Long calendarId, Long packageId,
@@ -198,15 +194,9 @@ public class StaffSlotEditService {
         List<Calendar> calendars = latest == null
                 ? List.of()
                 : calendarRepository.findByBranchIdAndDayBetween(branch.getId(), today, latest);
-        boolean rejected = removeTargets(calendars, today, packageId, individualServiceId, repairInspection,
+        removeTargets(calendars, today, packageId, individualServiceId, repairInspection,
                 sentence(lang, "Bu xidmət üçün slot yoxdur.",
                         "There is no slot for this service.", "Для этой услуги слота нет."));
-        if (rejected) {
-            return sentence(lang,
-                    "Xidmətin slotları silindi, rezervasiyalar rədd edildi",
-                    "The service slots were deleted, and the reservations were rejected",
-                    "Слоты услуги удалены, брони отклонены");
-        }
         return sentence(lang,
                 "Xidmətin slotları silindi",
                 "The service slots were deleted",
@@ -224,11 +214,13 @@ public class StaffSlotEditService {
     }
 
     /**
+     * tr: Seçili saatları silir. Rezervasiya sətirinə yazmır və push atmır.
+     * en: Removes the selected hours. It does not write the booking row and does not send a push.
+     *
      * @param earliest when set, days before it are left alone. Null keeps every loaded day.
-     * @return true when at least one holding booking was rejected
      */
-    private boolean removeTargets(List<Calendar> calendars, LocalDate earliest, Long packageId,
-                                  Long individualServiceId, Boolean repairInspection, String missing) {
+    private void removeTargets(List<Calendar> calendars, LocalDate earliest, Long packageId,
+                               Long individualServiceId, Boolean repairInspection, String missing) {
         Set<Long> rangeIds = new LinkedHashSet<>();
         Map<Long, Calendar> ownerByRange = new LinkedHashMap<>();
         if (calendars != null) {
@@ -259,18 +251,6 @@ public class StaffSlotEditService {
         for (Long rangeId : ids) {
             rangeRepository.lockByRangeId(rangeId).ifPresent(ranges::add);
         }
-        List<Booking> active = bookingRepository.findByRange_RangeIdInAndStatusIn(
-                ids, BookingStatus.holdingCarOnRange());
-        boolean rejected = false;
-        if (active != null) {
-            for (Booking booking : active) {
-                booking.setStatus(BookingStatus.REJECTED.apiValue());
-                booking.setCancelReasonCode(BookingSystemNotes.CALENDAR_DELETED);
-                booking.setCancelNote(BookingSystemNotes.text(BookingSystemNotes.CALENDAR_DELETED, "az"));
-                notifyRejected(booking);
-                rejected = true;
-            }
-        }
         for (Range range : ranges) {
             Calendar owner = ownerByRange.get(range.getRangeId());
             List<Long> one = List.of(range.getRangeId());
@@ -288,19 +268,6 @@ public class StaffSlotEditService {
             if (owner.getTimeRanges() != null && owner.getTimeRanges().isEmpty()) {
                 calendarRepository.delete(owner);
             }
-        }
-        return rejected;
-    }
-
-    /**
-     * tr: Push xətası təqvim silinəndə yazılan rəddi geri almır.
-     * en: A push failure does not undo the rejection written when the calendar is deleted.
-     */
-    private void notifyRejected(Booking booking) {
-        try {
-            bookingPushService.rejected(booking);
-        } catch (Exception ex) {
-            log.warn("booking calendar-deleted push skipped id={}", booking == null ? null : booking.getId());
         }
     }
 

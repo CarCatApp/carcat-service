@@ -3,7 +3,6 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.StaffSlotCapacityRequest;
 import com.carland.carland_service.dto.request.StaffSlotDayHiddenRequest;
 import com.carland.carland_service.dto.request.StaffSlotHiddenRequest;
-import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackage;
@@ -13,7 +12,6 @@ import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Range;
 import com.carland.carland_service.enums.BookingStaffRole;
 import com.carland.carland_service.enums.BookingStaffStatus;
-import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
@@ -40,7 +38,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +50,6 @@ class StaffSlotEditServiceTest {
     @Mock BookingRepository bookingRepository;
     @Mock BookingCapacityService bookingCapacityService;
     @Mock AppointmentRepository appointmentRepository;
-    @Mock BookingPushService bookingPushService;
 
     StaffSlotEditService service;
     Branch branch;
@@ -64,7 +60,7 @@ class StaffSlotEditServiceTest {
     void setUp() {
         service = new StaffSlotEditService(
                 bookingStaffAccess, rangeRepository, calendarRepository, bookingRepository, bookingCapacityService,
-                appointmentRepository, bookingPushService);
+                appointmentRepository);
         Partner partner = Partner.builder().id(1L).name("HS").build();
         branch = Branch.builder().id(5L).name("Babek").partner(partner).build();
         staff = BookingStaff.builder()
@@ -175,22 +171,13 @@ class StaffSlotEditServiceTest {
         Range repair = target(3L, StaffSlotTargets.REPAIR_INSPECTION, null);
         dayOf(oilEmpty, oilBooked, repair);
         lock(oilEmpty, oilBooked);
-        Booking waiting = Booking.builder().id(31L).range(oilBooked).status(BookingStatus.PENDING.apiValue()).build();
-        Booking accepted = Booking.builder().id(32L).range(oilBooked).status(BookingStatus.CONFIRMED.apiValue()).build();
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(1L, 2L), BookingStatus.holdingCarOnRange()))
-                .thenReturn(List.of(waiting, accepted));
         when(bookingRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(false);
         when(appointmentRepository.existsByRange_RangeIdIn(List.of(1L))).thenReturn(false);
         when(bookingRepository.existsByRange_RangeIdIn(List.of(2L))).thenReturn(true);
 
         service.deleteCalendar(9L, false, 1L, 10L, null, null, "az");
 
-        for (Booking booking : List.of(waiting, accepted)) {
-            assertEquals(BookingStatus.REJECTED.apiValue(), booking.getStatus());
-            assertEquals(BookingSystemNotes.CALENDAR_DELETED, booking.getCancelReasonCode());
-            assertEquals("Xidmət təqvimi silindi", booking.getCancelNote());
-        }
-        verify(bookingPushService, times(2)).rejected(any());
+        verify(bookingRepository, never()).findByRange_RangeIdInAndStatusIn(any(), any());
         assertEquals(RangeStatus.DELETED.name(), oilBooked.getStatus());
         assertEquals(List.of(oilBooked, repair), calendar.getTimeRanges());
         assertEquals(RangeStatus.AVAILABLE.name(), repair.getStatus());
@@ -203,15 +190,13 @@ class StaffSlotEditServiceTest {
         Range repair = target(3L, StaffSlotTargets.REPAIR_INSPECTION, null);
         dayOf(repair);
         lock(repair);
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(List.of(3L), BookingStatus.holdingCarOnRange()))
-                .thenReturn(List.of());
         when(bookingRepository.existsByRange_RangeIdIn(List.of(3L))).thenReturn(false);
         when(appointmentRepository.existsByRange_RangeIdIn(List.of(3L))).thenReturn(false);
 
         service.deleteCalendar(9L, false, 1L, null, null, true, "az");
 
         verify(calendarRepository).delete(calendar);
-        verify(bookingPushService, never()).rejected(any());
+        verify(bookingRepository, never()).findByRange_RangeIdInAndStatusIn(any(), any());
     }
 
     @Test
@@ -261,22 +246,12 @@ class StaffSlotEditServiceTest {
         when(calendarRepository.findByBranchIdAndDayBetween(5L, today, last.getDay()))
                 .thenReturn(List.of(past, todayCal, later, last));
         lock(hiddenOil, booked, emptyOil, onlyOil);
-        Booking waiting = Booking.builder().id(31L).range(booked).status(BookingStatus.PENDING.apiValue()).build();
-        Booking accepted = Booking.builder().id(32L).range(booked).status(BookingStatus.AUTO_ACCEPTED.apiValue()).build();
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
-                List.of(12L, 14L, 15L, 17L), BookingStatus.holdingCarOnRange()))
-                .thenReturn(List.of(waiting, accepted));
         lenient().when(bookingRepository.existsByRange_RangeIdIn(List.of(14L))).thenReturn(true);
 
         String message = service.deleteFromToday(9L, false, 5L, 10L, null, null, "az");
 
-        assertEquals("Xidmətin slotları silindi, rezervasiyalar rədd edildi", message);
-        for (Booking booking : List.of(waiting, accepted)) {
-            assertEquals(BookingStatus.REJECTED.apiValue(), booking.getStatus());
-            assertEquals(BookingSystemNotes.CALENDAR_DELETED, booking.getCancelReasonCode());
-            assertEquals("Xidmət təqvimi silindi", booking.getCancelNote());
-        }
-        verify(bookingPushService, times(2)).rejected(any());
+        assertEquals("Xidmətin slotları silindi", message);
+        verify(bookingRepository, never()).findByRange_RangeIdInAndStatusIn(any(), any());
         assertEquals(List.of(pastOil), past.getTimeRanges());
         assertEquals(RangeStatus.AVAILABLE.name(), pastOil.getStatus());
         assertEquals(List.of(repair), todayCal.getTimeRanges());
@@ -308,8 +283,6 @@ class StaffSlotEditServiceTest {
         when(calendarRepository.findByBranchIdAndDayBetween(5L, today, later.getDay()))
                 .thenReturn(List.of(todayCal, later));
         lock(repairToday, repairLater);
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
-                List.of(21L, 23L), BookingStatus.holdingCarOnRange())).thenReturn(List.of());
 
         String message = service.deleteFromToday(9L, false, null, null, null, true, "az");
 
@@ -318,7 +291,7 @@ class StaffSlotEditServiceTest {
         assertEquals(RangeStatus.AVAILABLE.name(), packageToday.getStatus());
         verify(calendarRepository).delete(later);
         verify(calendarRepository, never()).delete(todayCal);
-        verify(bookingPushService, never()).rejected(any());
+        verify(bookingRepository, never()).findByRange_RangeIdInAndStatusIn(any(), any());
         verify(rangeRepository, never()).lockByRangeId(22L);
     }
 
@@ -335,8 +308,6 @@ class StaffSlotEditServiceTest {
         when(calendarRepository.findLatestDayFrom(5L, today)).thenReturn(today);
         when(calendarRepository.findByBranchIdAndDayBetween(5L, today, today)).thenReturn(List.of(todayCal));
         lock(brakeHour);
-        when(bookingRepository.findByRange_RangeIdInAndStatusIn(
-                List.of(31L), BookingStatus.holdingCarOnRange())).thenReturn(List.of());
         when(appointmentRepository.existsByRange_RangeIdIn(List.of(31L))).thenReturn(true);
 
         String message = service.deleteFromToday(9L, false, 5L, null, 20L, null, "en");

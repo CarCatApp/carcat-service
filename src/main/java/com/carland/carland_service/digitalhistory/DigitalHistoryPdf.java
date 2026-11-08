@@ -180,24 +180,27 @@ public class DigitalHistoryPdf {
                 float modelSize = fitSize(model, bold, 30f, titleMax);
                 text(model, bold, modelSize, LEFT, 154.3f, INK_R, INK_G, INK_B);
             }
-            if (photo != null) {
-                cover(photo, 289f, 107.7f, 258.1f, 135.6f);
+            PhotoBox carPhoto = photo == null ? PhotoBox.empty() : photoBox(photo.getWidth(), photo.getHeight());
+            if (photo != null && carPhoto.w() > 0f) {
+                stream.drawImage(photo, carPhoto.x(), PAGE_H - carPhoto.y() - carPhoto.h(), carPhoto.w(), carPhoto.h());
             }
             drawPlate();
 
-            round(LEFT, 263.2f, CONTENT_W, 77.7f, 12f, 1f, 1f, 1f, true);
+            float shift = carPhoto.drop();
+            float card = 263.2f + shift;
+            round(LEFT, card, CONTENT_W, 77.7f, 12f, 1f, 1f, 1f, true);
             float col = CONTENT_W / 3f;
-            vline(LEFT + col, 277f, 327f);
-            vline(LEFT + col * 2f, 277f, 327f);
-            stat(LEFT, copy.mileage(), report.mileage(), copy.mileageOn(report.mileageUpdatedOn()));
-            stat(LEFT + col, copy.serviceRecords(), Integer.toString(report.serviceCount()), report.period());
-            stat(LEFT + col * 2f, copy.centers(), Integer.toString(report.centerCount()), report.centerCities());
+            vline(LEFT + col, card + 13.8f, card + 63.8f);
+            vline(LEFT + col * 2f, card + 13.8f, card + 63.8f);
+            stat(LEFT, card, copy.mileage(), report.mileage(), copy.mileageOn(report.mileageUpdatedOn()));
+            stat(LEFT + col, card, copy.serviceRecords(), Integer.toString(report.serviceCount()), report.period());
+            stat(LEFT + col * 2f, card, copy.centers(), Integer.toString(report.centerCount()), report.centerCities());
 
-            text(copy.technical(), bold, 11f, LEFT, 362.9f, INK_R, INK_G, INK_B);
-            specs();
-            fit(mascot, 371.5f, 398.7f, 181.4f, 221.9f, false);
+            text(copy.technical(), bold, 11f, LEFT, 362.9f + shift, INK_R, INK_G, INK_B);
+            specs(shift);
+            fit(mascot, 371.5f, 398.7f + shift, 181.4f, 221.9f, false);
 
-            chart();
+            chart(640.4f + shift);
         }
 
         private void drawPlate() throws IOException {
@@ -219,20 +222,20 @@ public class DigitalHistoryPdf {
             raw(value, bold, size, textX, baseline, INK_R, INK_G, INK_B);
         }
 
-        private void stat(float x, String label, String value, String sub) throws IOException {
-            text(label, regular, 8.5f, x + 14.8f, 278.2f, MUTED_R, MUTED_G, MUTED_B);
-            text(blank(value) ? "—" : value, bold, 18f, x + 14.8f, 293.3f, INK_R, INK_G, INK_B);
+        private void stat(float x, float card, String label, String value, String sub) throws IOException {
+            text(label, regular, 8.5f, x + 14.8f, card + 15f, MUTED_R, MUTED_G, MUTED_B);
+            text(blank(value) ? "—" : value, bold, 18f, x + 14.8f, card + 30.1f, INK_R, INK_G, INK_B);
             if (!blank(sub)) {
-                text(sub, regular, 8.5f, x + 14.8f, 317.3f, MUTED_R, MUTED_G, MUTED_B);
+                text(sub, regular, 8.5f, x + 14.8f, card + 54.1f, MUTED_R, MUTED_G, MUTED_B);
             }
         }
 
-        private void specs() throws IOException {
+        private void specs(float shift) throws IOException {
             List<DigitalHistoryReport.SpecLine> rows = report.specs() == null ? List.of() : report.specs();
             String note = report.technicalNote();
             float noteH = blank(note) ? 0f : 26f;
-            float specTop = 391.9f;
-            float limit = 640.4f - 16f - noteH;
+            float specTop = 391.9f + shift;
+            float limit = 640.4f + shift - 16f - noteH;
             float step = rows.isEmpty() ? 23.55f : Math.min(23.55f, (limit - specTop) / rows.size());
             for (int i = 0; i < rows.size(); i++) {
                 specAt(specTop + i * step, rows.get(i).label(), rows.get(i).value());
@@ -257,8 +260,7 @@ public class DigitalHistoryPdf {
             text(value, regular, size, 348f - width(value, regular, size), y, INK_R, INK_G, INK_B);
         }
 
-        private void chart() throws IOException {
-            float y = 640.4f;
+        private void chart(float y) throws IOException {
             float h = 143.9f;
             round(LEFT, y, CONTENT_W, h, 12f, 1f, 1f, 1f, true);
             text(copy.chart(), bold, 11f, LEFT + 14.8f, y + 15.6f, INK_R, INK_G, INK_B);
@@ -762,19 +764,6 @@ public class DigitalHistoryPdf {
             stream.drawImage(image, dx, PAGE_H - dy - dh, dw, dh);
         }
 
-        private void cover(PDImageXObject image, float x, float yTop, float w, float h) throws IOException {
-            float scale = Math.max(w / image.getWidth(), h / image.getHeight());
-            float dw = image.getWidth() * scale;
-            float dh = image.getHeight() * scale;
-            float dx = x + (w - dw) / 2f;
-            float dy = yTop + (h - dh) / 2f;
-            stream.saveGraphicsState();
-            stream.addRect(x, PAGE_H - yTop - h, w, h);
-            stream.clip();
-            stream.drawImage(image, dx, PAGE_H - dy - dh, dw, dh);
-            stream.restoreGraphicsState();
-        }
-
         private void traceRound(float x, float y, float w, float h, float r) throws IOException {
             float radius = Math.min(r, Math.min(w, h) / 2f);
             float k = 0.55228475f * radius;
@@ -1076,6 +1065,36 @@ public class DigitalHistoryPdf {
 
     private static boolean blank(String value) {
         return value == null || value.isBlank();
+    }
+
+    /**
+     * tr: Şəkil kəsilmir. En 258-dir, hündürlük şəklin öz nisbətidir.
+     *     Sahə şəkildən 6 punkt böyükdür. Kartlar ən çox 16 punkt aşağı düşür.
+     * en: The photo is not cropped. Width stays 258 and the height follows the photo.
+     *     The slot is 6 points taller than the photo. Cards move down by at most 16 points.
+     */
+    static PhotoBox photoBox(float imgW, float imgH) {
+        float left = 289f;
+        float top = 107.7f;
+        float maxW = 258.1f;
+        float pad = 6f;
+        float cardTop = 263.2f;
+        float maxDrop = 16f;
+        if (imgW <= 0f || imgH <= 0f) {
+            return PhotoBox.empty();
+        }
+        float maxH = cardTop + maxDrop - pad - top;
+        float scale = Math.min(maxW / imgW, maxH / imgH);
+        float dw = imgW * scale;
+        float dh = imgH * scale;
+        float drop = Math.max(0f, top + dh + pad - cardTop);
+        return new PhotoBox(left + maxW - dw, top, dw, dh, drop);
+    }
+
+    record PhotoBox(float x, float y, float w, float h, float drop) {
+        static PhotoBox empty() {
+            return new PhotoBox(289f, 107.7f, 0f, 0f, 0f);
+        }
     }
 
     private record Spot(LocalDate date, int km, int order) {

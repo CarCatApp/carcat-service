@@ -171,9 +171,9 @@ public class BookingStaffSlotController {
 
     /**
      * tr: Günün yalnız seçili hizmətinin saatlarını silir (packageId, individualServiceId və ya repairInspection,
-     *     dəqiq biri). Digər hizmətlərə toxunmur. Aktiv rezervasiyalar "calendar_deleted" ilə rədd edilir.
+     *     dəqiq biri). Digər hizmətlərə toxunmur. Rezervasiyanın statusu, qeydi və push-u dəyişmir.
      * en: Deletes only the selected service's hours on the day (exactly one of packageId, individualServiceId or
-     *     repairInspection). Other services are untouched. Active bookings are rejected with "calendar_deleted".
+     *     repairInspection). Other services are untouched. A booking's status, note and push stay as they are.
      */
     @DeleteMapping("/api/v1/booking/staff/calendars/{calendarId}")
     public void deleteCalendar(
