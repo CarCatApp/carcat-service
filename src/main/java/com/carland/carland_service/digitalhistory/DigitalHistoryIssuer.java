@@ -31,8 +31,8 @@ public class DigitalHistoryIssuer {
     private final DigitalHistoryCodes codes;
     private final ObjectMapper mapper;
 
-    public long issue(long carId, String acceptLanguage) {
-        String lang = DigitalHistoryLang.normalize(acceptLanguage);
+    public long issue(long carId, String notificationLanguage) {
+        String lang = DigitalHistoryLang.normalize(notificationLanguage);
         DigitalHistoryReport report = loader.load(carId, lang);
         ZonedDateTime now = ZonedDateTime.now(BAKU);
         String stamp = STAMP.format(now);

@@ -41,11 +41,11 @@ class DigitalHistoryLinkServiceTest {
 
     @Test
     void linkIsThePdfUrlAndLastsFiveMinutes() {
-        Customer customer = Customer.builder().userId(9L).build();
+        Customer customer = Customer.builder().userId(9L).notificationLanguage("en").build();
         Car car = Car.builder().carId(7L).build();
         when(customers.findByUserIdAndPhoneNumberAndStatus(9L, "0501112233", "ACTIVE")).thenReturn(customer);
         when(cars.findByCarIdAndCustomer(7L, customer)).thenReturn(car);
-        when(issuer.issue(7L, "az")).thenReturn(15L);
+        when(issuer.issue(7L, "en")).thenReturn(15L);
 
         DigitalHistoryLinkResponse response = service.create(7L, "0501112233", "9", "az");
 

@@ -3,8 +3,8 @@ package com.carland.carland_service.digitalhistory;
 import com.carland.carland_service.service.BookingMineService;
 
 /**
- * tr: Paylaşım anındakı Accept-Language. az, en, ru deyilsə az.
- * en: Accept-Language at share time. Anything other than az, en or ru becomes az.
+ * tr: Hesabat dili {@code customers.notificationLanguage}. Boş və ya az/en/ru deyilsə az.
+ * en: Report language is {@code customers.notificationLanguage}. Blank or anything other than az, en, ru becomes az.
  */
 public final class DigitalHistoryLang {
 

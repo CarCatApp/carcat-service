@@ -53,7 +53,7 @@ public class DigitalHistoryLinkService {
         if (car == null || car.getCarId() == null) {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
-        String token = tokens.sign(issuer.issue(car.getCarId(), acceptLanguage));
+        String token = tokens.sign(issuer.issue(car.getCarId(), customer.getNotificationLanguage()));
         return DigitalHistoryLinkResponse.builder()
                 .url(base() + DigitalHistoryPaths.PDF + "?jwt=" + token)
                 .expiresInSeconds(tokens.shareSeconds())
