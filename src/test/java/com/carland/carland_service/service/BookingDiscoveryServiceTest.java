@@ -5,11 +5,14 @@ import com.carland.carland_service.dto.booking.BookingDiscoveryPartnerView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.entity.ServiceCategory;
 import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.BranchServiceCategoryRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.repository.ServiceCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +38,8 @@ class BookingDiscoveryServiceTest {
     @Mock IndividualServiceSourceRepository individualServiceSourceRepository;
     @Mock BranchIndividualServiceRepository branchIndividualServiceRepository;
     @Mock RangeRepository rangeRepository;
+    @Mock ServiceCategoryRepository categoryRepository;
+    @Mock BranchServiceCategoryRepository branchCategoryRepository;
     @InjectMocks BookingDiscoveryService service;
 
     Partner hyper;
@@ -86,7 +92,9 @@ class BookingDiscoveryServiceTest {
         assertEquals(2, out.getBranches().size());
         assertEquals(7L, out.getBranches().get(0).getBranchId());
         assertEquals("Hyper", out.getBranches().get(0).getPartnerName());
+        assertEquals(Boolean.FALSE, out.getBranches().get(0).getInspectionRepair());
         assertEquals(8L, out.getBranches().get(1).getBranchId());
+        assertEquals(Boolean.FALSE, out.getBranches().get(1).getInspectionRepair());
         assertTrue(out.getBranches().stream().noneMatch(b -> b.getBranchId().equals(closedPartnerBranch.getId())));
     }
 
@@ -144,6 +152,34 @@ class BookingDiscoveryServiceTest {
 
         assertEquals(1, out.getBranches().size());
         assertEquals(7L, out.getBranches().get(0).getBranchId());
+    }
+
+    @Test
+    void inspectionRepairFollowsThePartnerToggle() {
+        ServiceCategory repair = ServiceCategory.builder()
+                .id(2L).code("repair_inspection").active(true).toggleable(true).build();
+        when(branchRepository.findActiveWithActivePartner()).thenReturn(List.of(baku, far));
+        when(categoryRepository.findByCode("repair_inspection")).thenReturn(Optional.of(repair));
+        when(branchCategoryRepository.findBranchIdsByCategoryIdAndActiveTrue(2L)).thenReturn(List.of(7L));
+
+        BookingBranchListResponse out = service.listActive(null);
+
+        assertEquals(Boolean.TRUE, out.getBranches().get(0).getInspectionRepair());
+        assertEquals(Boolean.FALSE, out.getBranches().get(1).getInspectionRepair());
+    }
+
+    @Test
+    void inspectionRepairIsOnForEveryBranchWhenTheCategoryCannotBeToggled() {
+        ServiceCategory repair = ServiceCategory.builder()
+                .id(2L).code("repair_inspection").active(true).toggleable(false).build();
+        when(branchRepository.findActiveWithActivePartner()).thenReturn(List.of(baku, far));
+        when(categoryRepository.findByCode("repair_inspection")).thenReturn(Optional.of(repair));
+
+        BookingBranchListResponse out = service.listActive(null);
+
+        assertEquals(Boolean.TRUE, out.getBranches().get(0).getInspectionRepair());
+        assertEquals(Boolean.TRUE, out.getBranches().get(1).getInspectionRepair());
+        verify(branchCategoryRepository, never()).findBranchIdsByCategoryIdAndActiveTrue(any());
     }
 
     @Test

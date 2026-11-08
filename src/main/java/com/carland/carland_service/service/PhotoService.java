@@ -93,7 +93,9 @@ public interface PhotoService {
 
     /**
      * tr: Şube rozetini yükler. Eski satırı siler. Redis'te tutulmaz.
+     *     Diğer yazan: {@code StaffMediaService.uploadBranchBadge} (staff, yazabildiği şube).
      * en: Uploads the branch badge. Deletes the previous row. Not stored in Redis.
+     *     The other writer is {@code StaffMediaService.uploadBranchBadge} (staff, a branch they may write).
      */
     PhotoResponse uploadBranchBadgeLogo(MultipartFile file, Long branchId);
 

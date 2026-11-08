@@ -6,14 +6,17 @@ import com.carland.carland_service.dto.booking.BookingDiscoveryPartnerView;
 import com.carland.carland_service.dto.booking.BookingDiscoveryResponse;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Partner;
+import com.carland.carland_service.entity.ServiceCategory;
 import com.carland.carland_service.enums.BookingStatus;
 import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.enums.CalendarStatus;
 import com.carland.carland_service.enums.RangeStatus;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.BranchServiceCategoryRepository;
 import com.carland.carland_service.repository.IndividualServiceSourceRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.repository.ServiceCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -45,6 +49,8 @@ public class BookingDiscoveryService {
     private final IndividualServiceSourceRepository individualServiceSourceRepository;
     private final BranchIndividualServiceRepository branchIndividualServiceRepository;
     private final RangeRepository rangeRepository;
+    private final ServiceCategoryRepository categoryRepository;
+    private final BranchServiceCategoryRepository branchCategoryRepository;
 
     @Transactional(readOnly = true)
     public BookingDiscoveryResponse discover(Long partnerId, String q, Double lat, Double lng, Integer radiusMeters,
@@ -76,6 +82,7 @@ public class BookingDiscoveryService {
             grouped.computeIfAbsent(partner.getId(), ignored -> new ArrayList<>()).add(branch);
         }
 
+        RepairAvailability repair = repairAvailability();
         List<BookingDiscoveryPartnerView> all = new ArrayList<>();
         for (List<Branch> branches : grouped.values()) {
             if (geo) {
@@ -84,7 +91,7 @@ public class BookingDiscoveryService {
             Partner partner = branches.get(0).getPartner();
             List<BookingDiscoveryBranchView> views = new ArrayList<>();
             for (Branch branch : branches) {
-                views.add(toBranch(branch));
+                views.add(toBranch(branch, repair.on(branch.getId())));
             }
             all.add(BookingDiscoveryPartnerView.builder()
                     .partnerId(partner.getId())
@@ -126,12 +133,13 @@ public class BookingDiscoveryService {
             Set<Long> ready = readyBranchIds(findService);
             loaded = loaded.stream().filter(branch -> ready.contains(branch.getId())).toList();
         }
+        RepairAvailability repair = repairAvailability();
         List<BookingDiscoveryBranchView> branches = new ArrayList<>();
         for (Branch branch : loaded) {
             if (hyperOnly && !hyperPartner(branch)) {
                 continue;
             }
-            branches.add(toBranch(branch));
+            branches.add(toBranch(branch, repair.on(branch.getId())));
         }
         return BookingBranchListResponse.builder().branches(branches).build();
     }
@@ -170,7 +178,24 @@ public class BookingDiscoveryService {
         return ready;
     }
 
-    private static BookingDiscoveryBranchView toBranch(Branch branch) {
+    /**
+     * tr: repair_inspection partner paneldeki aç/kapa. Global kapalı veya satır yoksa false.
+     * en: repair_inspection is the partner-panel toggle. Globally off, or no row, is false.
+     */
+    private RepairAvailability repairAvailability() {
+        Optional<ServiceCategory> found = categoryRepository.findByCode(StaffSlotTargets.REPAIR_INSPECTION);
+        ServiceCategory category = found == null || found.isEmpty() ? null : found.get();
+        if (category == null || !Boolean.TRUE.equals(category.getActive())) {
+            return new RepairAvailability(false, Set.of());
+        }
+        if (!Boolean.TRUE.equals(category.getToggleable())) {
+            return new RepairAvailability(true, Set.of());
+        }
+        List<Long> ids = branchCategoryRepository.findBranchIdsByCategoryIdAndActiveTrue(category.getId());
+        return new RepairAvailability(false, ids == null ? Set.of() : new HashSet<>(ids));
+    }
+
+    private static BookingDiscoveryBranchView toBranch(Branch branch, boolean inspectionRepair) {
         Partner partner = branch.getPartner();
         return BookingDiscoveryBranchView.builder()
                 .partnerId(partner.getId())
@@ -191,7 +216,17 @@ public class BookingDiscoveryService {
                 .photo(branch.getPhoto())
                 .rating(branch.getRating())
                 .ratingCount(BookingRatingService.storedCount(branch.getRatingCount()))
+                .inspectionRepair(inspectionRepair)
                 .build();
+    }
+
+    private record RepairAvailability(boolean openForAll, Set<Long> openBranchIds) {
+        boolean on(Long branchId) {
+            if (openForAll) {
+                return true;
+            }
+            return branchId != null && openBranchIds.contains(branchId);
+        }
     }
 
     private static boolean matches(String value, String needle) {

@@ -305,6 +305,23 @@ public class PhotoController {
     }
 
     /**
+     * tr: Şube nişanını yükler. Yetki şube fotoğrafı ile aynıdır. Admin panel ucu ayrı kalır.
+     * en: Uploads the branch badge. Permission matches the branch photo. The admin panel endpoint stays separate.
+     */
+    @PostMapping(value = "/for/branch/badge/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PhotoResponse uploadBranchBadge(HttpServletRequest request,
+                                           @RequestPart("file") MultipartFile file,
+                                           @RequestParam(value = "branchId", required = false) Long branchId,
+                                           @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return staffMediaService.uploadBranchBadge(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                file,
+                branchId,
+                acceptLanguage);
+    }
+
+    /**
      * tr: Şube fotoğrafını döner. Müşteri (role USER) veya staff okuyabilir. Yükleme staff'ta kalır.
      * en: Returns the branch photo. A customer (role USER) or staff may read it. Upload stays staff-only.
      */

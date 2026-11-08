@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.response.PhotoResponse;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchBadgeLogo;
 import com.carland.carland_service.entity.BranchPhoto;
 import com.carland.carland_service.entity.StaffPhoto;
 import com.carland.carland_service.entity.UserPhoto;
@@ -15,6 +16,7 @@ import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingRepository;
+import com.carland.carland_service.repository.BranchBadgeLogoRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.StaffPhotoRepository;
@@ -46,6 +48,7 @@ public class StaffMediaService {
     private final BookingStaffAccess bookingStaffAccess;
     private final BranchRepository branchRepository;
     private final BranchPhotoRepository branchPhotoRepository;
+    private final BranchBadgeLogoRepository branchBadgeLogoRepository;
     private final StaffPhotoRepository staffPhotoRepository;
     private final UserPhotoRepository userPhotoRepository;
     private final BookingRepository bookingRepository;
@@ -78,6 +81,36 @@ public class StaffMediaService {
         branch.setPhoto("/api/v1/photo/for/branch/get/" + branch.getId());
         branchRepository.save(branch);
         redisCacheService.evictBranchPhotoAfterCommit(branch.getId());
+        return PhotoResponse.builder()
+                .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .build();
+    }
+
+    /**
+     * tr: Şube nişanını yazar. Yetki şube fotoğrafı ile aynıdır: branch admin kendi şubesi, partner admin seçtiği şube.
+     *     Eski satır silinir. Redis yok; diğer yazan {@code PhotoServiceImpl.uploadBranchBadgeLogo} (admin panel).
+     * en: Writes the branch badge. Same permission as the branch photo: a branch admin writes their own branch,
+     *     a partner admin writes the branch they picked. The previous row is deleted. Not stored in Redis.
+     *     The other writer is {@code PhotoServiceImpl.uploadBranchBadgeLogo} (admin panel).
+     */
+    @Transactional
+    public PhotoResponse uploadBranchBadge(Long userId, boolean mustChangePassword, MultipartFile file,
+                                            Long branchId, String acceptLanguage) {
+        BookingStaff staff = bookingStaffAccess.requireStaff(userId, mustChangePassword, acceptLanguage);
+        Branch branch = branchForPhoto(staff, branchId, acceptLanguage);
+        byte[] bytes = imageBytes(file);
+        String fileType = fileType(bytes, acceptLanguage);
+        BranchBadgeLogo existing = branchBadgeLogoRepository.findByBranchId(branch.getId());
+        if (existing != null) {
+            branchBadgeLogoRepository.delete(existing);
+            branchBadgeLogoRepository.flush();
+        }
+        branchBadgeLogoRepository.save(BranchBadgeLogo.builder()
+                .branchId(branch.getId())
+                .fileName("branch " + branch.getId() + " badge logo")
+                .fileType(fileType)
+                .imageData(bytes)
+                .build());
         return PhotoResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
                 .build();

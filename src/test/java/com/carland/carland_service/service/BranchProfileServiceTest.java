@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.request.StaffBranchWorkingHoursRequest;
 import com.carland.carland_service.dto.request.StaffBrandModelSaveRequest;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchBadgeLogo;
 import com.carland.carland_service.entity.BranchPhoto;
 import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.BrandModelService;
@@ -14,6 +15,7 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingStaffRepository;
+import com.carland.carland_service.repository.BranchBadgeLogoRepository;
 import com.carland.carland_service.repository.BranchPhotoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
@@ -50,6 +52,7 @@ class BranchProfileServiceTest {
     @Mock BrandModelServiceRepository brandModelServiceRepository;
     @Mock BrandModelRepository brandModelRepository;
     @Mock BranchPhotoRepository branchPhotoRepository;
+    @Mock BranchBadgeLogoRepository branchBadgeLogoRepository;
     @Mock StaffPhotoRepository staffPhotoRepository;
     @Mock UserPhotoRepository userPhotoRepository;
     @Mock BookingRepository bookingRepository;
@@ -78,6 +81,7 @@ class BranchProfileServiceTest {
                 bookingStaffAccess,
                 branchRepository,
                 branchPhotoRepository,
+                branchBadgeLogoRepository,
                 staffPhotoRepository,
                 userPhotoRepository,
                 bookingRepository,
@@ -132,6 +136,49 @@ class BranchProfileServiceTest {
         assertThrows(MissingFieldException.class,
                 () -> media.uploadBranchPhoto(9L, false, file, null, "az"));
         verify(branchPhotoRepository, never()).save(any());
+    }
+
+    @Test
+    void partnerAdminUploadsBadgeForAChosenBranch() {
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
+        when(bookingStaffAccess.requireWritableBranch(partnerAdmin, 12L, "az")).thenReturn(branch);
+        when(branchBadgeLogoRepository.findByBranchId(12L)).thenReturn(null);
+        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", PNG);
+
+        media.uploadBranchBadge(9L, false, file, 12L, "az");
+
+        ArgumentCaptor<BranchBadgeLogo> captor = ArgumentCaptor.forClass(BranchBadgeLogo.class);
+        verify(branchBadgeLogoRepository).save(captor.capture());
+        assertEquals(12L, captor.getValue().getBranchId());
+        assertEquals("png", captor.getValue().getFileType());
+        verify(branchRepository, never()).save(any());
+        verify(redisCacheService, never()).evictBranchPhotoAfterCommit(any());
+    }
+
+    @Test
+    void branchAdminUploadsBadgeOnTheirOwnBranchAndReplacesTheOldRow() {
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(branchAdmin);
+        BranchBadgeLogo old = BranchBadgeLogo.builder().imageId(4L).branchId(12L).build();
+        when(branchBadgeLogoRepository.findByBranchId(12L)).thenReturn(old);
+        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", PNG);
+
+        media.uploadBranchBadge(8L, false, file, null, "az");
+
+        verify(branchBadgeLogoRepository).delete(old);
+        verify(branchBadgeLogoRepository).flush();
+        ArgumentCaptor<BranchBadgeLogo> captor = ArgumentCaptor.forClass(BranchBadgeLogo.class);
+        verify(branchBadgeLogoRepository).save(captor.capture());
+        assertEquals(12L, captor.getValue().getBranchId());
+    }
+
+    @Test
+    void partnerAdminBadgeRequiresABranch() {
+        when(bookingStaffAccess.requireStaff(9L, false, "az")).thenReturn(partnerAdmin);
+        MockMultipartFile file = new MockMultipartFile("file", "a.png", "image/png", PNG);
+
+        assertThrows(MissingFieldException.class,
+                () -> media.uploadBranchBadge(9L, false, file, null, "az"));
+        verify(branchBadgeLogoRepository, never()).save(any());
     }
 
     @Test

@@ -28,4 +28,9 @@ public class BookingDiscoveryBranchView {
     String photo;
     Double rating;
     Long ratingCount;
+    /**
+     * tr: Partner paneldə təmir və diaqnostika. Açıqsa true, bağlıysa və ya satır yoxsa false.
+     * en: Partner-panel repair and diagnostics. True when on, false when off or when no row exists.
+     */
+    Boolean inspectionRepair;
 }
