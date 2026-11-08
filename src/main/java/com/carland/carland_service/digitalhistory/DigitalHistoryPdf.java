@@ -5,6 +5,9 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
@@ -31,15 +34,13 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * tr: Rəqəmsal tarixçəni şablon səhifəsinə basır. Hesabat nömrəsi hələlik sabitdir.
- *     «Yenilənib» Bakı saatıdır. QR bloku şəkli ilə birlikdə sabitdir.
- * en: Prints the digital history onto the template pages. The report number is still fixed.
- *     "Yenilənib" is Baku time. The QR block, image included, is fixed.
+ * tr: Rəqəmsal tarixçəni şablon səhifəsinə basır. Nömrə və «Buraxılıb» snapshot-dandır.
+ *     QR və klik carcat.az/verify/{nömrə} açır.
+ * en: Prints the digital history onto the template pages. The number and "Issued" come from the snapshot.
+ *     The QR and the click open carcat.az/verify/{number}.
  */
 @Component
 public class DigitalHistoryPdf {
-
-    static final String REPORT_NO = "CC-2025-0001849";
 
     static {
         IIORegistry.getDefaultInstance().registerServiceProvider(
@@ -77,24 +78,13 @@ public class DigitalHistoryPdf {
     private static final float ORANGE_R = 193f / 255f;
     private static final float ORANGE_G = 65f / 255f;
     private static final float ORANGE_B = 12f / 255f;
-    private static final float CHECK_R = 0.18f;
-    private static final float CHECK_G = 0.45f;
-    private static final float CHECK_B = 0.32f;
-
-    private static final String VERIFY_TITLE = "Hesabatın orijinallığını yoxlayın";
-    private static final String VERIFY_LINK =
-            "QR kodu skan edin və ya daxil olun: carcat.az/verify/" + REPORT_NO;
-    private static final String VERIFY_BODY =
-            "Bu hesabat yalnız CarCat platformasına ötürülmüş məlumatlar əsasında tərtib olunub. "
-                    + "Bu avtomobillə bağlı bəzi hadisələr CarCat-a bildirilməmiş ola bilər. "
-                    + "Hesabatdan avtomobilin texniki baxışı ilə yanaşı, qərarvermə üçün köməkçi vasitə kimi istifadə edin. "
-                    + "(c) 2026 CarCat MMC.";
 
     public byte[] render(DigitalHistoryReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDFont regular = loadFont(document, "NotoSans-Regular.ttf");
             PDFont bold = loadFont(document, "NotoSans-Bold.ttf");
-            document.getDocumentInformation().setTitle("CarCat — Rəqəmsal tarixçə hesabatı");
+            document.getDocumentInformation().setTitle(
+                    DigitalHistoryCopy.of(report.lang()).documentTitle());
             document.getDocumentInformation().setAuthor("CarCat");
             Canvas canvas = new Canvas(document, regular, bold, report);
             canvas.draw();
@@ -128,6 +118,8 @@ public class DigitalHistoryPdf {
         private final PDFont regular;
         private final PDFont bold;
         private final DigitalHistoryReport report;
+        private final DigitalHistoryCopy copy;
+        private final String verifyUrl;
         private final PDImageXObject logo;
         private final PDImageXObject logoInk;
         private final PDImageXObject mascot;
@@ -146,13 +138,16 @@ public class DigitalHistoryPdf {
             this.regular = regular;
             this.bold = bold;
             this.report = report;
+            this.copy = DigitalHistoryCopy.of(report.lang());
+            String code = blank(report.reportNo()) ? "" : report.reportNo().trim();
+            this.verifyUrl = DigitalHistoryPaths.verifyUrl(code);
             this.logo = image("carcat-logo.png");
             this.logoInk = image("carcat-logo-ink.png");
             this.mascot = image("carcat-mascot.png");
             this.plate = image("plate-badge.png");
-            this.qr = image("verify-qr.png");
+            this.qr = PDImageXObject.createFromByteArray(document, DigitalHistoryQr.png(verifyUrl), "qr");
             this.photo = photo(report.photo());
-            this.stampedAt = STAMP.format(ZonedDateTime.now(BAKU));
+            this.stampedAt = blank(report.issuedAt()) ? STAMP.format(ZonedDateTime.now(BAKU)) : report.issuedAt();
         }
 
         private void draw() throws IOException {
@@ -169,9 +164,10 @@ public class DigitalHistoryPdf {
             open(false);
             fill(0, PAGE_H - 82.2f, PAGE_W, 82.2f, HEADER_R, HEADER_G, HEADER_B);
             fit(logo, LEFT, 28.3f, 92f, 25.5f, false);
-            String title = "Rəqəmsal tarixçə hesabatı";
-            text(title, bold, 9.5f, RIGHT - width(title, bold, 9.5f), 27.4f, 1f, 1f, 1f);
-            String stamp = "№ " + REPORT_NO + "    Yenilənib " + stampedAt;
+            String title = copy.title();
+            float titleSize = fitSize(title, bold, 9.5f, CONTENT_W - 120f);
+            text(title, bold, titleSize, RIGHT - width(title, bold, titleSize), 27.4f, 1f, 1f, 1f);
+            String stamp = "№ " + (blank(report.reportNo()) ? "" : report.reportNo()) + "    " + copy.issued() + " " + stampedAt;
             float stampSize = fitSize(stamp, regular, 9f, CONTENT_W - 120f);
             text(stamp, regular, stampSize, RIGHT - width(stamp, regular, stampSize), 45.2f, 1f, 1f, 1f);
 
@@ -185,7 +181,7 @@ public class DigitalHistoryPdf {
                 text(model, bold, modelSize, LEFT, 154.3f, INK_R, INK_G, INK_B);
             }
             if (photo != null) {
-                fit(photo, 289f, 107.7f, 258.1f, 135.6f, true);
+                cover(photo, 289f, 107.7f, 258.1f, 135.6f);
             }
             drawPlate();
 
@@ -193,21 +189,12 @@ public class DigitalHistoryPdf {
             float col = CONTENT_W / 3f;
             vline(LEFT + col, 277f, 327f);
             vline(LEFT + col * 2f, 277f, 327f);
-            stat(LEFT, "Cari yürüş", report.mileage(), dateLine(report.lastServiceDate()));
-            stat(LEFT + col, "Servis qeydi", Integer.toString(report.serviceCount()), report.lastServiceDate());
-            stat(LEFT + col * 2f, "Servis mərkəzi", Integer.toString(report.centerCount()), "");
+            stat(LEFT, copy.mileage(), report.mileage(), copy.mileageOn(report.mileageUpdatedOn()));
+            stat(LEFT + col, copy.serviceRecords(), Integer.toString(report.serviceCount()), report.period());
+            stat(LEFT + col * 2f, copy.centers(), Integer.toString(report.centerCount()), report.centerCities());
 
-            text("Texniki məlumatlar", bold, 11f, LEFT, 362.9f, INK_R, INK_G, INK_B);
-            spec(0, "Qeydiyyat şəhadətnaməsinin nömrəsi", report.certificateNumber());
-            spec(1, "Şəhadətnamənin verilmə tarixi", report.certificateDate());
-            spec(2, "Qeydiyyat nişanı", report.plate());
-            spec(3, "Marka və model", report.brandModel());
-            spec(4, "Ban nömrəsi (VIN)", report.vin());
-            spec(5, "Buraxılış ili", report.year());
-            spec(6, "Rəngi", report.color());
-            spec(7, "Mühərrik həcmi", report.engineVolume());
-            spec(8, "Mühərrik nömrəsi", report.engineNumber());
-            spec(9, "Növü", report.bodyType());
+            text(copy.technical(), bold, 11f, LEFT, 362.9f, INK_R, INK_G, INK_B);
+            specs();
             fit(mascot, 371.5f, 398.7f, 181.4f, 221.9f, false);
 
             chart();
@@ -223,9 +210,11 @@ public class DigitalHistoryPdf {
             if (value.isEmpty()) {
                 return;
             }
-            float area = w * 0.64f;
+            float areaLeft = x + w * 0.185f;
+            float areaRight = x + w * 0.96f;
+            float area = areaRight - areaLeft;
             float size = fitSize(value, bold, 14f, area);
-            float textX = x + w * 0.30f;
+            float textX = areaLeft + (area - width(value, bold, size)) / 2f;
             float baseline = PAGE_H - y - (h + size * 0.35f) / 2f;
             raw(value, bold, size, textX, baseline, INK_R, INK_G, INK_B);
         }
@@ -238,10 +227,29 @@ public class DigitalHistoryPdf {
             }
         }
 
-        private void spec(int index, String label, String value) throws IOException {
-            float y = 391.9f + index * 23.55f;
+        private void specs() throws IOException {
+            List<DigitalHistoryReport.SpecLine> rows = report.specs() == null ? List.of() : report.specs();
+            String note = report.technicalNote();
+            float noteH = blank(note) ? 0f : 26f;
+            float specTop = 391.9f;
+            float limit = 640.4f - 16f - noteH;
+            float step = rows.isEmpty() ? 23.55f : Math.min(23.55f, (limit - specTop) / rows.size());
+            for (int i = 0; i < rows.size(); i++) {
+                specAt(specTop + i * step, rows.get(i).label(), rows.get(i).value());
+            }
+            if (blank(note)) {
+                return;
+            }
+            float y = specTop + rows.size() * step + 2f;
+            for (String row : wrap(note, regular, 8f, 330f)) {
+                text(row, regular, 8f, LEFT, y, MUTED_R, MUTED_G, MUTED_B);
+                y += 11f;
+            }
+        }
+
+        private void specAt(float y, String label, String value) throws IOException {
             text(label, regular, 9.5f, LEFT, y, MUTED_R, MUTED_G, MUTED_B);
-            hairline(LEFT, y + 16.5f, 352f);
+            hairline(LEFT, y + 14f, 352f);
             if (blank(value)) {
                 return;
             }
@@ -253,7 +261,7 @@ public class DigitalHistoryPdf {
             float y = 640.4f;
             float h = 143.9f;
             round(LEFT, y, CONTENT_W, h, 12f, 1f, 1f, 1f, true);
-            text("Yürüş dinamikası", bold, 11f, LEFT + 14.8f, y + 15.6f, INK_R, INK_G, INK_B);
+            text(copy.chart(), bold, 11f, LEFT + 14.8f, y + 15.6f, INK_R, INK_G, INK_B);
             List<Spot> spots = spots();
             String average = average(spots);
             if (!average.isEmpty()) {
@@ -264,7 +272,6 @@ public class DigitalHistoryPdf {
             if (spots.size() >= 2) {
                 plot(spots, y);
             }
-            legend(y + h - 20f);
         }
 
         private void plot(List<Spot> spots, float cardTop) throws IOException {
@@ -293,11 +300,7 @@ public class DigitalHistoryPdf {
             float slot = spots.size() < 2 ? 80f : (plotRight - plotLeft) / last;
             int step = slot >= 46f ? 1 : (int) Math.ceil(46f / slot);
             for (int i = 0; i < spots.size(); i++) {
-                if (spots.get(i).repair()) {
-                    disk(xs[i], ys[i], 3.4f, ORANGE_R, ORANGE_G, ORANGE_B, true);
-                } else {
-                    disk(xs[i], ys[i], 3.4f, INK_R, INK_G, INK_B, false);
-                }
+                disk(xs[i], ys[i], 3.4f, INK_R, INK_G, INK_B, true);
                 if (i % step != 0 && i != last) {
                     continue;
                 }
@@ -310,25 +313,18 @@ public class DigitalHistoryPdf {
             }
         }
 
-        private void legend(float y) throws IOException {
-            disk(LEFT + 22f, PAGE_H - y - 4f, 3.2f, INK_R, INK_G, INK_B, false);
-            text("Planlı / qulluq ziyarəti", regular, 7.5f, LEFT + 30f, y, MUTED_R, MUTED_G, MUTED_B);
-            disk(LEFT + 148f, PAGE_H - y - 4f, 3.2f, ORANGE_R, ORANGE_G, ORANGE_B, true);
-            text("Təmir ziyarəti", regular, 7.5f, LEFT + 156f, y, MUTED_R, MUTED_G, MUTED_B);
-        }
-
         private void history() throws IOException {
             open(true);
-            text("Servis tarixçəsi", bold, 18f, LEFT, top, INK_R, INK_G, INK_B);
+            text(copy.history(), bold, 18f, LEFT, top, INK_R, INK_G, INK_B);
             top += 28f;
-            String note = "Qeydlər ən yenidən ən köhnəyə doğru sıralanıb – son ziyarət yuxarıdadır.";
+            String note = copy.historyNote();
             for (String row : wrap(note, regular, 9.5f, CONTENT_W)) {
                 text(row, regular, 9.5f, LEFT, top, MUTED_R, MUTED_G, MUTED_B);
                 top += 13f;
             }
             top += 8f;
             if (report.visits().isEmpty()) {
-                text("Qeyd yoxdur", regular, 10f, LEFT, top, INK_R, INK_G, INK_B);
+                text(copy.empty(), regular, 10f, LEFT, top, INK_R, INK_G, INK_B);
                 top += 18f;
                 return;
             }
@@ -404,7 +400,7 @@ public class DigitalHistoryPdf {
                 String amount = blank(visit.total()) ? "—" : visit.total();
                 float amountSize = fitSize(amount, bold, 11f, 180f);
                 float barTop = cardTop + height - 30f;
-                text("Ümumi məbləğ", regular, 8.5f, LEFT + 104.8f + 14f, barTop + 9f, MUTED_R, MUTED_G, MUTED_B);
+                text(copy.lineTotal(), regular, 8.5f, LEFT + 104.8f + 14f, barTop + 9f, MUTED_R, MUTED_G, MUTED_B);
                 text(amount, bold, amountSize,
                         LEFT + 104.8f + 394f - 14f - width(amount, bold, amountSize),
                         barTop + 8f, INK_R, INK_G, INK_B);
@@ -451,7 +447,7 @@ public class DigitalHistoryPdf {
             traceRound(LEFT, y, CONTENT_W, h, 14f);
             stream.setNonStrokingColor(INK_R, INK_G, INK_B);
             stream.fill();
-            text("Ümumi servis xərci", regular, 11f, LEFT + 20f, top + 24f, 1f, 1f, 1f);
+            text(copy.grandTotal(), regular, 11f, LEFT + 20f, top + 24f, 1f, 1f, 1f);
             String amount = blank(report.grandTotal()) ? "—" : report.grandTotal();
             float size = fitSize(amount, bold, 22f, 250f);
             text(amount, bold, size, RIGHT - 20f - width(amount, bold, size), top + 18f, 1f, 1f, 1f);
@@ -463,10 +459,12 @@ public class DigitalHistoryPdf {
                 open(true);
             }
             top += 18f;
-            text("Xidmət göstərən servis mərkəzləri", bold, 11f, LEFT, top, INK_R, INK_G, INK_B);
+            String centersTitle = copy.centersTitle();
+            float centersSize = fitSize(centersTitle, bold, 11f, CONTENT_W);
+            text(centersTitle, bold, centersSize, LEFT, top, INK_R, INK_G, INK_B);
             top += 16f;
             if (report.centers().isEmpty()) {
-                text("Qeyd yoxdur", regular, 10f, LEFT, top, INK_R, INK_G, INK_B);
+                text(copy.empty(), regular, 10f, LEFT, top, INK_R, INK_G, INK_B);
                 top += 16f;
                 return;
             }
@@ -492,7 +490,7 @@ public class DigitalHistoryPdf {
                 throws IOException {
             round(x, cardTop, w, h, 12f, 1f, 1f, 1f, true);
             float y = cardTop + 14f;
-            text(blank(center.name()) ? "Servis mərkəzi" : center.name(), bold, 11f, x + 14.8f, y, INK_R, INK_G, INK_B);
+            text(blank(center.name()) ? copy.centerFallback() : center.name(), bold, 11f, x + 14.8f, y, INK_R, INK_G, INK_B);
             y += 20f;
             for (String line : centerLines(center)) {
                 for (String wrapped : wrap(line, regular, 8.5f, w - 30f)) {
@@ -504,12 +502,12 @@ public class DigitalHistoryPdf {
             hairline(x + 14.8f, statsTop, x + w - 14.8f);
             String visits = Integer.toString(center.visits());
             text(visits, bold, 9.5f, x + 14.8f, statsTop + 8f, INK_R, INK_G, INK_B);
-            text("ziyarət", regular, 7.5f, x + 14.8f, statsTop + 22f, MUTED_R, MUTED_G, MUTED_B);
+            text(copy.visitWord(), regular, 7.5f, x + 14.8f, statsTop + 22f, MUTED_R, MUTED_G, MUTED_B);
             String money = centerMoney(center.total());
             float moneySize = fitSize(money, bold, 9.5f, w * 0.55f);
             text(money, bold, moneySize, x + w - 14.8f - width(money, bold, moneySize), statsTop + 8f,
                     INK_R, INK_G, INK_B);
-            String caption = "ümumi xərc";
+            String caption = copy.spent();
             text(caption, regular, 7.5f, x + w - 14.8f - width(caption, regular, 7.5f), statsTop + 22f,
                     MUTED_R, MUTED_G, MUTED_B);
         }
@@ -538,7 +536,8 @@ public class DigitalHistoryPdf {
         }
 
         private void verify() throws IOException {
-            List<String> body = wrap(VERIFY_BODY, regular, 7.5f, CONTENT_W - 86f);
+            String lead = copy.verifyLead(blank(report.reportNo()) ? "" : report.reportNo().trim());
+            List<String> body = wrap(copy.verifyBody(), regular, 7.5f, CONTENT_W - 86f);
             float h = Math.max(84f, 36f + body.size() * 11.2f);
             if (top + 16f + h > FLOW_LIMIT) {
                 open(true);
@@ -546,16 +545,35 @@ public class DigitalHistoryPdf {
             top += 6f;
             round(LEFT, top, CONTENT_W, h, 10f, 1f, 1f, 1f, true);
             float qrSize = 56f;
-            stream.drawImage(qr, LEFT + 14f, PAGE_H - top - 14f - qrSize, qrSize, qrSize);
+            float qrX = LEFT + 14f;
+            float qrTop = top + 14f;
+            stream.drawImage(qr, qrX, PAGE_H - qrTop - qrSize, qrSize, qrSize);
+            link(qrX, qrTop, qrSize, qrSize);
             float textX = LEFT + 84f;
-            text(VERIFY_TITLE, bold, 11f, textX, top + 12f, INK_R, INK_G, INK_B);
-            text(VERIFY_LINK, regular, 8.5f, textX, top + 28f, MUTED_R, MUTED_G, MUTED_B);
+            text(copy.verifyTitle(), bold, 11f, textX, top + 12f, INK_R, INK_G, INK_B);
+            text(lead, regular, 8.5f, textX, top + 28f, MUTED_R, MUTED_G, MUTED_B);
+            link(textX, top + 28f, width(lead, regular, 8.5f), 12f);
             float y = top + 44f;
             for (String line : body) {
                 text(line, regular, 7.5f, textX, y, MUTED_R, MUTED_G, MUTED_B);
                 y += 11.2f;
             }
             top += h;
+        }
+
+        private void link(float x, float yTop, float w, float h) throws IOException {
+            if (w <= 0f || h <= 0f || blank(verifyUrl)) {
+                return;
+            }
+            PDAnnotationLink annotation = new PDAnnotationLink();
+            annotation.setRectangle(new PDRectangle(x, PAGE_H - yTop - h, w, h));
+            PDBorderStyleDictionary border = new PDBorderStyleDictionary();
+            border.setWidth(0);
+            annotation.setBorderStyle(border);
+            PDActionURI action = new PDActionURI();
+            action.setURI(verifyUrl);
+            annotation.setAction(action);
+            pages.get(pages.size() - 1).getAnnotations().add(annotation);
         }
 
         private void open(boolean continuation) throws IOException {
@@ -584,7 +602,7 @@ public class DigitalHistoryPdf {
 
         private void footers() throws IOException {
             int total = pages.size();
-            String left = "CarCat · Rəqəmsal tarixçə hesabatı · " + REPORT_NO;
+            String left = copy.footer(blank(report.reportNo()) ? "" : report.reportNo());
             for (int i = 0; i < total; i++) {
                 try (PDPageContentStream footer = new PDPageContentStream(
                         document, pages.get(i), AppendMode.APPEND, true, true)) {
@@ -594,7 +612,7 @@ public class DigitalHistoryPdf {
                     footer.newLineAtOffset(LEFT, 28f);
                     footer.showText(left);
                     footer.endText();
-                    String right = "Səhifə " + (i + 1) + " / " + total;
+                    String right = copy.page(i + 1, total);
                     float w = width(right, regular, 7.5f);
                     footer.beginText();
                     footer.setFont(regular, 7.5f);
@@ -668,7 +686,7 @@ public class DigitalHistoryPdf {
                 traceCircle(x + 6.3f, pdfY + 6.5f, 1.7f);
                 stream.stroke();
             } else {
-                stream.setStrokingColor(CHECK_R, CHECK_G, CHECK_B);
+                stream.setStrokingColor(INK_R, INK_G, INK_B);
                 stream.moveTo(x + 0.8f, pdfY + 3.6f);
                 stream.lineTo(x + 3.1f, pdfY + 1.1f);
                 stream.lineTo(x + 8f, pdfY + 7.2f);
@@ -742,6 +760,19 @@ public class DigitalHistoryPdf {
             float dx = alignRight ? x + w - dw : x + (w - dw) / 2f;
             float dy = yTop + (h - dh) / 2f;
             stream.drawImage(image, dx, PAGE_H - dy - dh, dw, dh);
+        }
+
+        private void cover(PDImageXObject image, float x, float yTop, float w, float h) throws IOException {
+            float scale = Math.max(w / image.getWidth(), h / image.getHeight());
+            float dw = image.getWidth() * scale;
+            float dh = image.getHeight() * scale;
+            float dx = x + (w - dw) / 2f;
+            float dy = yTop + (h - dh) / 2f;
+            stream.saveGraphicsState();
+            stream.addRect(x, PAGE_H - yTop - h, w, h);
+            stream.clip();
+            stream.drawImage(image, dx, PAGE_H - dy - dh, dw, dh);
+            stream.restoreGraphicsState();
         }
 
         private void traceRound(float x, float y, float w, float h, float r) throws IOException {
@@ -860,7 +891,7 @@ public class DigitalHistoryPdf {
                 if (date == null || km < 0) {
                     continue;
                 }
-                spots.add(new Spot(date, km, repair(visit), i));
+                spots.add(new Spot(date, km, i));
             }
             spots.sort(Comparator.comparing(Spot::date).thenComparing(Comparator.comparingInt(Spot::order).reversed()));
             return spots;
@@ -878,7 +909,7 @@ public class DigitalHistoryPdf {
             }
             double months = days / 30.4375d;
             long perMonth = Math.round((last.km() - first.km()) / months);
-            return "Orta yürüş: ~ " + number(perMonth) + " km / ay";
+            return copy.average(number(perMonth));
         }
 
         private String identity() {
@@ -953,17 +984,8 @@ public class DigitalHistoryPdf {
                 && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
     }
 
-    private static String dateLine(String day) {
-        return blank(day) ? "" : day + " tarixində";
-    }
-
     private static boolean repair(DigitalHistoryReport.VisitBlock visit) {
-        String label = visit.label();
-        if (label != null && label.toLowerCase(Locale.ROOT).contains("təmir")) {
-            return true;
-        }
-        return visit.inspectionNote() != null && !visit.inspectionNote().isBlank()
-                || (visit.inspectionLines() != null && !visit.inspectionLines().isEmpty());
+        return visit.repair();
     }
 
     private static List<Row> rows(DigitalHistoryReport.VisitBlock visit) {
@@ -1056,7 +1078,7 @@ public class DigitalHistoryPdf {
         return value == null || value.isBlank();
     }
 
-    private record Spot(LocalDate date, int km, boolean repair, int order) {
+    private record Spot(LocalDate date, int km, int order) {
     }
 
     private record Row(String name, String detail, boolean wrench) {

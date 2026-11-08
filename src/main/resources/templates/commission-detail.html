@@ -75,7 +75,7 @@
     <p th:text="${detail.why}">Hyper</p>
     <p class="muted">Statusun yazıldığı an: <span th:text="${detail.decidedAt}">01.10.2026 09:00</span></p>
     <p class="muted">Hyper: <span th:text="${detail.outcome}">Hyper-da qeyd yoxdur</span></p>
-    <p class="muted">Ən erkən servis günü: <span th:text="${detail.earliest}">—</span></p>
+    <p class="muted">Son xidmət tarixi: <span th:text="${detail.earliest}">—</span></p>
     <pre th:if="${detail.snapshot != null}" th:text="${detail.snapshot}"></pre>
     <p th:if="${detail.sharedDay}">Bu gün eyni BAN və eyni servis üçün bir neçə tamamlanmış randevu var. Hyper tutarı bölünmədi, sətir cəmə girmir.</p>
   </div>

@@ -28,6 +28,7 @@ public class HyperWebhookCarMetadataApplier {
             changed = true;
         }
         if (hyper.getCurrentMileage() != null) {
+            // Müştəri tarixi lastMileageUpdateAt burada dəyişmir.
             car.setMileage(hyper.getCurrentMileage().longValue());
             changed = true;
         }

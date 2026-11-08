@@ -2,6 +2,7 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
+import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
@@ -44,5 +45,12 @@ public interface UserService {
      */
     PinOccupiedResponse isPinOccupied(String pin, String role, String phoneNumber, String userIdHeader,
                                       String acceptLanguage);
+
+    /**
+     * tr: Aktiv müştərinin bildiriş dilini az, en və ya ru olaraq yazır. Booking push növbəti göndərişdə bunu oxuyur.
+     * en: Stores the active customer's notification language as az, en, or ru. The next booking push reads it.
+     */
+    NotificationLanguageResponse setNotificationLanguage(String lang, String role, String phoneNumber,
+                                                         String userIdHeader, String acceptLanguage);
 
 }

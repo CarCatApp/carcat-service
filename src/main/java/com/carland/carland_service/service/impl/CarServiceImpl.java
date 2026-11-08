@@ -16,6 +16,7 @@ import com.carland.carland_service.service.BookingStaffAccess;
 import com.carland.carland_service.service.AfterAddCarSyncService;
 import com.carland.carland_service.service.CarAiPhotoGenerateLock;
 import com.carland.carland_service.service.CarIddaColor;
+import com.carland.carland_service.service.CarMileage;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.PercentageLifeService;
 import com.carland.carland_service.service.CarService;
@@ -337,7 +338,7 @@ public class CarServiceImpl implements CarService {
 
 
         if (carRequest.getMileage() != null) {
-            car.setMileage(carRequest.getMileage());
+            CarMileage.writtenByCustomer(car, carRequest.getMileage());
         }
 
         if (carRequest.getPlateNumber() != null) {
@@ -1355,6 +1356,7 @@ public class CarServiceImpl implements CarService {
                     .transmissionType(carRequest.getTransmissionType())
                     .bodyType(carRequest.getBodyType())
                     .mileage(carRequest.getMileage())
+                    .lastMileageUpdateAt(carRequest.getMileage() == null ? null : LocalDateTime.now(CarMileage.BAKU))
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .customer(customer)
@@ -1501,7 +1503,11 @@ public class CarServiceImpl implements CarService {
             car.setModelYear(carRequest.getModelYear());
         }
         CarIddaColor.apply(car, carRequest.getColorId(), carRequest.getIddaColor());
-        car.setMileage(carRequest.getMileage());
+        if (carRequest.getMileage() != null) {
+            CarMileage.writtenByCustomer(car, carRequest.getMileage());
+        } else {
+            car.setMileage(null);
+        }
         car.setEngineType(engineType.getEngineType());
         car.setEngineTypeId(engineType.getEngineTypeId());
         if (carRequest.getEngineVolume() != null) {
@@ -1727,7 +1733,11 @@ public class CarServiceImpl implements CarService {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        car.setMileage(carRequest.getMileage());
+        if (customer != null) {
+            CarMileage.writtenByCustomer(car, carRequest.getMileage());
+        } else {
+            car.setMileage(carRequest.getMileage());
+        }
         car.setUpdatedAt(LocalDateTime.now(ZoneId.of(timezone)));
 
         carRepository.save(car);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
   <title>Hadisə — Carland Admin</title>
-  <link rel="stylesheet" href="/admin/admin.css?v=clientevents1">
+  <link rel="stylesheet" href="/admin/admin.css?v=clientevents2">
 </head>
 <body>
 <a class="skip-link" href="#main">Məzmuna keç</a>
@@ -88,11 +88,15 @@
       <tr th:each="c : ${view.crumbs()}">
         <td th:text="${c.time()}">vaxt</td>
         <td th:text="${c.category()}">nav</td>
-        <td class="clip" th:text="${c.message()}">mesaj</td>
+        <td class="clip crumb-msg" th:text="${c.message()}">mesaj</td>
       </tr>
       </tbody>
     </table>
   </div>
 </main>
+<script src="/admin/admin.js?v=clientevents2"></script>
+<script>
+  CarlandAdmin.initClippedCells(".crumb-msg");
+</script>
 </body>
 </html>

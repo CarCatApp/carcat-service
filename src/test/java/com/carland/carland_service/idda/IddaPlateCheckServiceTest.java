@@ -5,10 +5,8 @@ import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.dto.response.CarResponse;
 import com.carland.carland_service.entity.Customer;
-import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
-import com.carland.carland_service.repository.ModelRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,8 +41,6 @@ class IddaPlateCheckServiceTest {
     @Mock IddaPlateCheckRepository iddaPlateCheckRepository;
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
-    @Mock BrandRepository brandRepository;
-    @Mock ModelRepository modelRepository;
 
     IddaPlateCheckService service;
 
@@ -55,8 +51,6 @@ class IddaPlateCheckServiceTest {
                 iddaPlateCheckRepository,
                 customerRepository,
                 carRepository,
-                brandRepository,
-                modelRepository,
                 new ObjectMapper());
     }
 
@@ -142,9 +136,6 @@ class IddaPlateCheckServiceTest {
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
                 .thenReturn(four)
                 .thenReturn(five);
-        when(brandRepository.existsByIsnew(".")).thenReturn(false);
-        when(brandRepository.findAll()).thenReturn(List.of());
-        when(modelRepository.findAll()).thenReturn(List.of());
         when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -162,6 +153,10 @@ class IddaPlateCheckServiceTest {
         assertEquals(MessagesLangValues.PLATE_QUERY_LIMIT.getMessageByLang("az"), capped.getMessage());
         verify(digitalFinanceClient, times(1)).exchange(eq("GET"), anyString(), any(), anyString(), any());
         verify(carRepository, times(1)).findAllByVinIgnoreCase(anyString());
+        ArgumentCaptor<IddaPlateCheck> saved = ArgumentCaptor.forClass(IddaPlateCheck.class);
+        verify(iddaPlateCheckRepository).save(saved.capture());
+        assertEquals("HONDA", saved.getValue().getBrand());
+        assertEquals("INSIGHT", saved.getValue().getModel());
     }
 
     @Test
@@ -193,9 +188,6 @@ class IddaPlateCheckServiceTest {
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
                 .thenReturn(ten);
-        when(brandRepository.existsByIsnew(".")).thenReturn(false);
-        when(brandRepository.findAll()).thenReturn(List.of());
-        when(modelRepository.findAll()).thenReturn(List.of());
         when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -215,9 +207,6 @@ class IddaPlateCheckServiceTest {
     void guideUser92OnOwnPlatesSkipsTheFullCapAndDoesNotCount() throws Exception {
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(92L, "050", "ACTIVE"))
                 .thenReturn(Customer.builder().userId(92L).name("N").surname("M").phoneNumber("050").build());
-        when(brandRepository.existsByIsnew(".")).thenReturn(false);
-        when(brandRepository.findAll()).thenReturn(List.of());
-        when(modelRepository.findAll()).thenReturn(List.of());
         when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

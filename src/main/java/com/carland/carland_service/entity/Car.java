@@ -63,6 +63,16 @@ public class Car {
     private String transmissionType;
     private String bodyType;
     private Long mileage;
+
+    /**
+     * tr: Müştərinin özü km yazdığı Bakı vaxtı. Staff, Hyper və booking bu sahəni dəyişmir.
+     *     carlist JSON-una girmir.
+     * en: Baku time when the customer themselves wrote the mileage. Staff, Hyper and booking do not change it.
+     *     It is not part of the carlist JSON.
+     */
+    @Column(name = "last_mileage_update_at")
+    private LocalDateTime lastMileageUpdateAt;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private BigDecimal allTimeCost;

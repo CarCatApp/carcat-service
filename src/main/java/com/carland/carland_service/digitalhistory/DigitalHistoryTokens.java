@@ -49,12 +49,12 @@ public class DigitalHistoryTokens {
         return shareSeconds;
     }
 
-    public String sign(long carId) {
+    public String sign(long issueId) {
         Instant now = clock.instant();
         return Jwts.builder()
                 .subject("digital-history")
                 .claim("purpose", PURPOSE)
-                .claim("carId", carId)
+                .claim("issueId", issueId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(shareSeconds)))
                 .issuer(issuer)
@@ -62,7 +62,7 @@ public class DigitalHistoryTokens {
                 .compact();
     }
 
-    public long parseCarId(String token) {
+    public long parseIssueId(String token) {
         if (token == null || token.isBlank() || token.length() > 4000) {
             throw DigitalHistoryTokenException.invalid();
         }
@@ -74,7 +74,7 @@ public class DigitalHistoryTokens {
                     .build()
                     .parseSignedClaims(token.trim())
                     .getPayload();
-            Object raw = claims.get("carId");
+            Object raw = claims.get("issueId");
             String purpose = claims.get("purpose", String.class);
             if (!PURPOSE.equals(purpose) || !(raw instanceof Number number) || number.longValue() <= 0) {
                 throw DigitalHistoryTokenException.invalid();

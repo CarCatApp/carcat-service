@@ -27,6 +27,7 @@ class DigitalHistoryLinkServiceTest {
 
     @Mock CustomerRepository customers;
     @Mock CarRepository cars;
+    @Mock DigitalHistoryIssuer issuer;
 
     private DigitalHistoryTokens tokens;
     private DigitalHistoryLinkService service;
@@ -35,7 +36,7 @@ class DigitalHistoryLinkServiceTest {
     void setUp() {
         tokens = new DigitalHistoryTokens(SECRET, "carland", 300, Clock.systemUTC());
         service = new DigitalHistoryLinkService(
-                customers, cars, tokens, "https://digital-innovation.agency/carland/server-carland/");
+                customers, cars, tokens, issuer, "https://digital-innovation.agency/carland/server-carland/");
     }
 
     @Test
@@ -44,6 +45,7 @@ class DigitalHistoryLinkServiceTest {
         Car car = Car.builder().carId(7L).build();
         when(customers.findByUserIdAndPhoneNumberAndStatus(9L, "0501112233", "ACTIVE")).thenReturn(customer);
         when(cars.findByCarIdAndCustomer(7L, customer)).thenReturn(car);
+        when(issuer.issue(7L, "az")).thenReturn(15L);
 
         DigitalHistoryLinkResponse response = service.create(7L, "0501112233", "9", "az");
 
@@ -51,7 +53,7 @@ class DigitalHistoryLinkServiceTest {
         assertTrue(response.getUrl().startsWith(
                 "https://digital-innovation.agency/carland/server-carland/api/v1/car/digital-history?jwt="));
         String jwt = response.getUrl().substring(response.getUrl().indexOf("jwt=") + 4);
-        assertEquals(7L, tokens.parseCarId(jwt));
+        assertEquals(15L, tokens.parseIssueId(jwt));
     }
 
     @Test

@@ -15,22 +15,28 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * tr: Ziyareti PDF satırına çevirir. Paket, fərdi və təmir, tamamlanma anında satıra yazılmış {@code kind} değeridir.
- *     Hyper satırında {@code kind} boştur; servis adı ve parça düz liste olur, Dövri/Təmir etiketi konmaz.
- * en: Turns a visit into PDF lines. Package, individual and repair come from the {@code kind} stored at completion.
- *     A Hyper line has an empty {@code kind}; the service name and parts stay a flat list, with no routine/repair label.
+ * tr: Ziyarəti PDF sətirinə çevirir. Hyper sətri Toyota kimi solda xidmət, sağda hissədir.
+ *     Eyni ad iki sətir olmur. Panel sətri {@code kind} ilə qalır.
+ * en: Turns a visit into PDF lines. A Hyper row is service on the left and the part on the right, as on Toyota.
+ *     The same name is not printed twice. A panel row still follows {@code kind}.
  */
 final class DigitalHistoryVisits {
 
     private DigitalHistoryVisits() {
     }
 
-    static DigitalHistoryReport.VisitBlock toBlock(Visit visit, Branch branch, Partner partner) {
+    interface Names {
+        String service(VisitServiceLine line);
+
+        String product(VisitServiceLine line);
+    }
+
+    static DigitalHistoryReport.VisitBlock toBlock(Visit visit, Branch branch, Partner partner, Names names) {
         List<VisitServiceLine> lines = sortedLines(visit);
-        boolean routine = hasText(visit.getPackageName())
-                || lines.stream().anyMatch(line -> kind(line, "package", "package_info", "individual", "one_time"));
         boolean repair = hasText(visit.getInspectionNote())
                 || lines.stream().anyMatch(line -> kind(line, "inspection"));
+        boolean routine = hasText(visit.getPackageName())
+                || lines.stream().anyMatch(line -> kind(line, "package", "package_info", "individual", "one_time"));
         boolean panel = visit.getBookingId() != null
                 || "panel".equalsIgnoreCase(text(visit.getSource()))
                 || lines.stream().anyMatch(line -> hasText(line.getKind()));
@@ -41,36 +47,36 @@ final class DigitalHistoryVisits {
         List<String> plainLines = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
-        for (VisitServiceLine line : lines) {
-            String printed = lineText(line);
-            remember(seen, line.getProductName());
-            if (printed == null) {
-                continue;
+        if (!panel) {
+            hyperLines(visit, lines, names, plainLines);
+        } else {
+            for (VisitServiceLine line : lines) {
+                String printed = lineText(line, names);
+                remember(seen, names.product(line));
+                if (printed == null) {
+                    continue;
+                }
+                if (kind(line, "package", "package_info")) {
+                    packageLines.add(printed);
+                } else if (kind(line, "individual", "one_time")) {
+                    individualLines.add(printed);
+                } else if (kind(line, "inspection")) {
+                    inspectionLines.add(printed);
+                } else {
+                    plainLines.add(printed);
+                }
             }
-            if (!panel) {
+            for (VisitPart part : sortedParts(visit)) {
+                String printed = partRow(part);
+                if (printed == null) {
+                    continue;
+                }
+                String key = text(part.getName()).toLowerCase(Locale.ROOT);
+                if (!key.isEmpty() && seen.contains(key)) {
+                    continue;
+                }
                 plainLines.add(printed);
-                continue;
             }
-            if (kind(line, "package", "package_info")) {
-                packageLines.add(printed);
-            } else if (kind(line, "individual", "one_time")) {
-                individualLines.add(printed);
-            } else if (kind(line, "inspection")) {
-                inspectionLines.add(printed);
-            } else {
-                plainLines.add(printed);
-            }
-        }
-        for (VisitPart part : sortedParts(visit)) {
-            String printed = partText(part);
-            if (printed == null) {
-                continue;
-            }
-            String key = text(part.getName()).toLowerCase(Locale.ROOT);
-            if (!key.isEmpty() && seen.contains(key)) {
-                continue;
-            }
-            plainLines.add(printed);
         }
 
         String label = routine || repair ? BookingKindLabel.of(routine, repair) : null;
@@ -86,8 +92,58 @@ final class DigitalHistoryVisits {
                 clean(visit.getInspectionNote()),
                 List.copyOf(inspectionLines),
                 List.copyOf(plainLines),
-                DigitalHistoryFormat.money(visit.getFinalCostAmount(), visit.getFinalCostCurrency())
+                DigitalHistoryFormat.money(visit.getFinalCostAmount(), visit.getFinalCostCurrency()),
+                repair
         );
+    }
+
+    /**
+     * tr: Xidmət solda, eyni adlı hissənin miqdarı sağda. Qalan hissə öz sətrindədir.
+     * en: Service on the left, quantity of a same-named part on the right. A remaining part is its own row.
+     */
+    private static void hyperLines(Visit visit, List<VisitServiceLine> lines, Names names, List<String> plainLines) {
+        List<VisitPart> parts = sortedParts(visit);
+        boolean[] used = new boolean[parts.size()];
+        Set<String> seen = new HashSet<>();
+        for (VisitServiceLine line : lines) {
+            String name = text(names.service(line));
+            if (name.isEmpty()) {
+                continue;
+            }
+            String detail = takeParts(parts, used, name);
+            plainLines.add(detail.isEmpty() ? name : name + " · " + detail);
+            remember(seen, name);
+        }
+        for (int i = 0; i < parts.size(); i++) {
+            if (used[i]) {
+                continue;
+            }
+            String name = text(parts.get(i).getName());
+            if (name.isEmpty() || seen.contains(name.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            String detail = partDetail(parts.get(i));
+            plainLines.add(detail.isEmpty() ? name : name + " · " + detail);
+        }
+    }
+
+    private static String takeParts(List<VisitPart> parts, boolean[] used, String serviceName) {
+        StringBuilder detail = new StringBuilder();
+        for (int i = 0; i < parts.size(); i++) {
+            if (used[i] || !serviceName.equalsIgnoreCase(text(parts.get(i).getName()))) {
+                continue;
+            }
+            used[i] = true;
+            String qty = partDetail(parts.get(i));
+            if (qty.isEmpty()) {
+                continue;
+            }
+            if (!detail.isEmpty()) {
+                detail.append(", ");
+            }
+            detail.append(qty);
+        }
+        return detail.toString();
     }
 
     static String centerName(Visit visit, Branch branch, Partner partner) {
@@ -151,10 +207,10 @@ final class DigitalHistoryVisits {
         return false;
     }
 
-    private static String lineText(VisitServiceLine line) {
+    private static String lineText(VisitServiceLine line, Names names) {
         List<String> bits = new ArrayList<>();
-        add(bits, line.getServiceName());
-        add(bits, line.getProductName());
+        add(bits, names.service(line));
+        add(bits, names.product(line));
         String qty = DigitalHistoryFormat.qty(line.getProductQty());
         if (!qty.isEmpty()) {
             bits.add(qty);
@@ -166,18 +222,24 @@ final class DigitalHistoryVisits {
         return String.join(" · ", bits);
     }
 
-    private static String partText(VisitPart part) {
+    private static String partRow(VisitPart part) {
         if (!hasText(part.getName())) {
             return null;
         }
-        List<String> bits = new ArrayList<>();
-        bits.add(part.getName().trim());
+        String detail = partDetail(part);
+        return detail.isEmpty() ? part.getName().trim() : part.getName().trim() + " · " + detail;
+    }
+
+    private static String partDetail(VisitPart part) {
         String qty = DigitalHistoryFormat.qty(part.getQty());
-        if (!qty.isEmpty()) {
-            bits.add(qty);
+        String unit = text(part.getUnit());
+        if (qty.isEmpty()) {
+            return unit;
         }
-        add(bits, part.getUnit());
-        return String.join(" · ", bits);
+        if (unit.isEmpty()) {
+            return qty;
+        }
+        return qty + " " + unit;
     }
 
     private static void add(List<String> bits, String value) {

@@ -1,10 +1,15 @@
 package com.carland.carland_service.digitalhistory;
 
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchServicedGood;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.CarPhoto;
+import com.carland.carland_service.entity.IndividualService;
+import com.carland.carland_service.entity.OfferedService;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
+import com.carland.carland_service.entity.VisitServiceLine;
+import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.CarPhotoStatus;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.PartnerId;
@@ -12,11 +17,15 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.BranchServicedGoodRepository;
 import com.carland.carland_service.repository.CarPhotoRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
+import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
+import com.carland.carland_service.service.ServiceCategoryJson;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,9 +37,11 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * tr: PDF verisini okur. Hyper'a gitmez, satır yazmaz, {@code carlist} silmez.
@@ -57,9 +68,18 @@ public class DigitalHistoryReportLoader {
     private final ColorRepository colorRepository;
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
     private final CarPhotoRepository carPhotoRepository;
+    private final OfferedServiceRepository offeredServiceRepository;
+    private final IndividualServiceRepository individualServiceRepository;
+    private final BranchServicedGoodRepository branchServicedGoodRepository;
+    private final ServiceCategoryJson titles;
 
     @Transactional(readOnly = true)
     public DigitalHistoryReport load(long carId) {
+        return load(carId, "az");
+    }
+
+    @Transactional(readOnly = true)
+    public DigitalHistoryReport load(long carId, String acceptLanguage) {
         Car car = carRepository.findByCarId(carId);
         if (car == null) {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang("az"));
@@ -76,8 +96,10 @@ public class DigitalHistoryReportLoader {
             }
         }
 
+        String lang = DigitalHistoryLang.normalize(acceptLanguage);
         Map<Long, Branch> branches = branches(visits);
         Map<Long, Partner> partners = partners(visits);
+        DigitalHistoryVisits.Names names = names(visits, lang);
         List<DigitalHistoryReport.VisitBlock> blocks = new ArrayList<>();
         Map<String, CenterAcc> centers = new LinkedHashMap<>();
         BigDecimal grand = BigDecimal.ZERO;
@@ -90,7 +112,7 @@ public class DigitalHistoryReportLoader {
         for (Visit visit : visits) {
             Branch branch = visit.getBranchId() == null ? null : branches.get(visit.getBranchId());
             Partner partner = partner(visit, branch, partners);
-            blocks.add(DigitalHistoryVisits.toBlock(visit, branch, partner));
+            blocks.add(DigitalHistoryVisits.toBlock(visit, branch, partner, names));
             accumulate(centers, visit, branch, partner);
             if (visit.getFinalCostAmount() != null) {
                 anyAmount = true;
@@ -117,20 +139,35 @@ public class DigitalHistoryReportLoader {
 
         IddaFields idda = idda(car.getVin());
         String period = period(oldest, newest);
+        DigitalHistoryCopy copy = DigitalHistoryCopy.of(lang);
+        String body = BodyTypeTranslation.translate(car.getBodyType(), lang);
+        DigitalHistorySpecs.Input spec = new DigitalHistorySpecs.Input(
+                DigitalHistorySpecs.platePath(car),
+                idda.certificateNumber(),
+                idda.certificateDate(),
+                DigitalHistoryFormat.text(PlateNumbers.format(car.getPlateNumber())),
+                DigitalHistoryFormat.joinSpace(car.getBrand(), car.getModel()),
+                DigitalHistoryFormat.text(car.getVin()),
+                car.getModelYear() == null ? "" : car.getModelYear().toString(),
+                color(car, lang),
+                DigitalHistoryFormat.volume(car.getEngineVolume()),
+                idda.engineNumber(),
+                DigitalHistoryFormat.text(body)
+        );
         return new DigitalHistoryReport(
                 DigitalHistoryFormat.day(LocalDate.now(BAKU)),
                 DigitalHistoryFormat.text(car.getBrand()),
                 DigitalHistoryFormat.text(car.getModel()),
-                DigitalHistoryFormat.joinSpace(car.getBrand(), car.getModel()),
-                DigitalHistoryFormat.text(PlateNumbers.format(car.getPlateNumber())),
-                DigitalHistoryFormat.text(car.getVin()),
-                car.getModelYear() == null ? "" : car.getModelYear().toString(),
-                color(car),
-                DigitalHistoryFormat.volume(car.getEngineVolume()),
-                idda.engineNumber(),
-                DigitalHistoryFormat.text(car.getBodyType()),
-                idda.certificateNumber(),
-                idda.certificateDate(),
+                spec.brandModel(),
+                spec.plateNumber(),
+                spec.vin(),
+                spec.year(),
+                spec.color(),
+                spec.volume(),
+                spec.engineNumber(),
+                spec.bodyType(),
+                spec.certificateNumber(),
+                spec.certificateDate(),
                 DigitalHistoryFormat.km(car.getMileage()),
                 DigitalHistoryFormat.day(newest),
                 visits.size(),
@@ -139,8 +176,32 @@ public class DigitalHistoryReportLoader {
                 List.copyOf(blocks),
                 anyAmount ? DigitalHistoryFormat.total(grand, grandCurrency, mixed) : "",
                 centers.values().stream().map(CenterAcc::toBlock).toList(),
+                "",
+                "",
+                lang,
+                mileageUpdatedOn(car),
+                cities(centers),
+                DigitalHistorySpecs.note(spec, copy),
+                DigitalHistorySpecs.rows(spec, copy),
                 photo(car.getCarId())
         );
+    }
+
+    private static String mileageUpdatedOn(Car car) {
+        if (car.getLastMileageUpdateAt() == null) {
+            return "";
+        }
+        return DigitalHistoryFormat.day(car.getLastMileageUpdateAt().toLocalDate());
+    }
+
+    private static String cities(Map<String, CenterAcc> centers) {
+        Set<String> cities = new LinkedHashSet<>();
+        for (CenterAcc center : centers.values()) {
+            if (center.city != null && !center.city.isBlank()) {
+                cities.add(center.city);
+            }
+        }
+        return String.join(" · ", cities);
     }
 
     private Map<Long, Branch> branches(List<Visit> visits) {
@@ -213,6 +274,11 @@ public class DigitalHistoryReportLoader {
         return "hyper".equals(normalized) || "hyperservice".equals(normalized);
     }
 
+    @Transactional(readOnly = true)
+    public byte[] readyPhoto(Long carId) {
+        return photo(carId);
+    }
+
     private byte[] photo(Long carId) {
         if (carId == null) {
             return null;
@@ -238,9 +304,12 @@ public class DigitalHistoryReportLoader {
         String key = branch == null ? "hyper" : "b:" + branch.getId();
         CenterAcc acc = centers.computeIfAbsent(key, ignored -> new CenterAcc(
                 DigitalHistoryVisits.centerName(visit, branch, partner),
-                branch == null ? "" : DigitalHistoryFormat.text(branch.getAddress()),
+                branch != null ? DigitalHistoryFormat.text(branch.getAddress())
+                        : partner == null ? "" : DigitalHistoryFormat.text(partner.getAddress()),
                 DigitalHistoryVisits.phone(branch, partner),
-                DigitalHistoryVisits.email(branch, partner)
+                DigitalHistoryVisits.email(branch, partner),
+                branch != null ? DigitalHistoryFormat.text(branch.getCity())
+                        : partner == null ? "" : DigitalHistoryFormat.text(partner.getCity())
         ));
         acc.visits++;
         if (visit.getFinalCostAmount() != null) {
@@ -269,10 +338,10 @@ public class DigitalHistoryReportLoader {
         return start + " – " + end;
     }
 
-    private String color(Car car) {
+    private String color(Car car, String lang) {
         if (car.getColorId() != null) {
             String named = colorRepository.findById(car.getColorId())
-                    .map(color -> color.nameForLang("az"))
+                    .map(color -> color.nameForLang(lang))
                     .map(DigitalHistoryFormat::text)
                     .orElse("");
             if (!named.isEmpty()) {
@@ -280,6 +349,112 @@ public class DigitalHistoryReportLoader {
             }
         }
         return DigitalHistoryFormat.text(car.getIddaColor());
+    }
+
+    private DigitalHistoryVisits.Names names(List<Visit> visits, String lang) {
+        Set<Long> offeredIds = new java.util.HashSet<>();
+        Set<Long> individualIds = new java.util.HashSet<>();
+        Set<Long> goodIds = new java.util.HashSet<>();
+        for (Visit visit : visits) {
+            if (visit.getServices() == null) {
+                continue;
+            }
+            for (VisitServiceLine line : visit.getServices()) {
+                if (line.getOfferedServiceId() != null) {
+                    offeredIds.add(line.getOfferedServiceId());
+                }
+                if (line.getIndividualServiceId() != null) {
+                    individualIds.add(line.getIndividualServiceId());
+                }
+                if (line.getProductGoodId() != null) {
+                    goodIds.add(line.getProductGoodId());
+                }
+            }
+        }
+        Map<Long, OfferedService> offered = offeredIds.isEmpty()
+                ? Map.of()
+                : map(offeredServiceRepository.findAllById(offeredIds), OfferedService::getId);
+        Map<Long, IndividualService> individual = individualIds.isEmpty()
+                ? Map.of()
+                : map(individualServiceRepository.findAllById(individualIds), IndividualService::getId);
+        Map<Long, BranchServicedGood> goods = goodIds.isEmpty()
+                ? Map.of()
+                : map(branchServicedGoodRepository.findAllById(goodIds), BranchServicedGood::getId);
+        return new DigitalHistoryVisits.Names() {
+            @Override
+            public String service(VisitServiceLine line) {
+                if (line.getOfferedServiceId() != null) {
+                    OfferedService row = offered.get(line.getOfferedServiceId());
+                    String title = row == null ? "" : catalog(row.getTitleJson(), lang);
+                    if (!title.isEmpty()) {
+                        return title;
+                    }
+                }
+                if (line.getIndividualServiceId() != null) {
+                    IndividualService row = individual.get(line.getIndividualServiceId());
+                    String title = row == null ? "" : catalog(row.getTitleJson(), lang);
+                    if (!title.isEmpty()) {
+                        return title;
+                    }
+                }
+                return line.getServiceName();
+            }
+
+            @Override
+            public String product(VisitServiceLine line) {
+                if (line.getProductGoodId() != null) {
+                    BranchServicedGood good = goods.get(line.getProductGoodId());
+                    if (good != null) {
+                        String heading = good.getBrandModelService() == null
+                                ? ""
+                                : catalog(good.getBrandModelService().getTitleJson(), lang);
+                        String brand = DigitalHistoryFormat.text(good.getName());
+                        if (!heading.isEmpty() && !brand.isEmpty()) {
+                            return heading + " · " + brand;
+                        }
+                        if (!heading.isEmpty()) {
+                            return heading;
+                        }
+                        if (!brand.isEmpty()) {
+                            return brand;
+                        }
+                    }
+                }
+                return line.getProductName();
+            }
+        };
+    }
+
+    private String catalog(String titleJson, String lang) {
+        return DigitalHistoryFormat.text(catalogText(titles.read(titleJson), lang));
+    }
+
+    private static String catalogText(Map<String, String> titles, String lang) {
+        if (titles == null || titles.isEmpty()) {
+            return "";
+        }
+        String picked = titles.get(lang);
+        if (picked != null && !picked.isBlank()) {
+            return picked;
+        }
+        for (String key : List.of("az", "en", "ru")) {
+            String value = titles.get(key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private static <T> Map<Long, T> map(Iterable<T> rows, java.util.function.Function<T, Long> id) {
+        Map<Long, T> byId = new HashMap<>();
+        for (T row : rows) {
+            Long key = id.apply(row);
+            if (key != null) {
+                byId.put(key, row);
+            }
+        }
+        return byId;
     }
 
     /**
@@ -314,17 +489,19 @@ public class DigitalHistoryReportLoader {
         private final String address;
         private final String phone;
         private final String email;
+        private final String city;
         private int visits;
         private BigDecimal total = BigDecimal.ZERO;
         private boolean anyAmount;
         private String currency;
         private boolean mixed;
 
-        private CenterAcc(String name, String address, String phone, String email) {
+        private CenterAcc(String name, String address, String phone, String email, String city) {
             this.name = name;
             this.address = address;
             this.phone = phone;
             this.email = email;
+            this.city = city;
         }
 
         private DigitalHistoryReport.CenterBlock toBlock() {

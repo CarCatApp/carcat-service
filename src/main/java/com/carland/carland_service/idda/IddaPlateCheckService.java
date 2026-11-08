@@ -2,20 +2,16 @@ package com.carland.carland_service.idda;
 
 import com.carland.carland_service.digitalfinance.DigitalFinanceClient;
 import com.carland.carland_service.dto.response.CarResponse;
-import com.carland.carland_service.entity.Brand;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
-import com.carland.carland_service.entity.Model;
 import com.carland.carland_service.enums.BodyTypeTranslation;
 import com.carland.carland_service.enums.EngineTypeTranslation;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
-import com.carland.carland_service.repository.BrandRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
-import com.carland.carland_service.repository.ModelRepository;
 import com.carland.carland_service.util.PlateNumbers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,7 +51,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class IddaPlateCheckService {
 
-    private static final String NEW_SET_MARKER = ".";
     /**
      * tr: Geçici test hakkı. Canlıda aynı müşteri + plaka ayda 1, plaka geneli ayda 2 idi.
      * en: Temporary test cap. Production was 1 per customer+plate and 2 per plate each month.
@@ -81,8 +76,6 @@ public class IddaPlateCheckService {
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
-    private final BrandRepository brandRepository;
-    private final ModelRepository modelRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -156,7 +149,7 @@ public class IddaPlateCheckService {
                 || (statusName != null && statusName.equalsIgnoreCase("ServiceRestrictedByPerson"));
         boolean success = code == 0 && vin != null && !blocked;
         IddaMarkSplit split = success
-                ? IddaMarkSplitter.split(rawMark, typeDescription, loadBrands(), loadModels())
+                ? IddaMarkSplitter.split(rawMark, typeDescription)
                 : new IddaMarkSplit(null, null);
         String storedVin = vin == null ? null : vin.trim().toUpperCase(Locale.ROOT);
         return IddaPlateCheck.builder()
@@ -289,18 +282,6 @@ public class IddaPlateCheckService {
             }
         }
         return cars.get(0);
-    }
-
-    private List<Brand> loadBrands() {
-        return brandRepository.existsByIsnew(NEW_SET_MARKER)
-                ? brandRepository.findAllByIsnew(NEW_SET_MARKER)
-                : brandRepository.findAll();
-    }
-
-    private List<Model> loadModels() {
-        return brandRepository.existsByIsnew(NEW_SET_MARKER)
-                ? modelRepository.findAllByIsnew(NEW_SET_MARKER)
-                : modelRepository.findAll();
     }
 
     private Customer requireCustomer(String phoneNumber, String userIdHeader, String acceptLanguage) {

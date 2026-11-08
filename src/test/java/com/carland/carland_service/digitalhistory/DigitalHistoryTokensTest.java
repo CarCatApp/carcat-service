@@ -26,10 +26,10 @@ class DigitalHistoryTokensTest {
         DigitalHistoryTokens tokens = new DigitalHistoryTokens(SECRET, "carland", 300, Clock.systemUTC());
         String token = tokens.sign(42L);
 
-        assertEquals(42L, tokens.parseCarId(token));
+        assertEquals(42L, tokens.parseIssueId(token));
         String json = payload(token);
         assertTrue(json.contains("\"purpose\":\"DIGITAL_HISTORY\""));
-        assertTrue(json.contains("\"carId\":42"));
+        assertTrue(json.contains("\"issueId\":42"));
         assertFalse(json.contains("userId"));
         assertFalse(json.contains("role"));
     }
@@ -41,7 +41,7 @@ class DigitalHistoryTokensTest {
         String token = tokens.sign(7L);
         clock.instant = clock.instant.plusSeconds(301);
 
-        DigitalHistoryTokenException ex = assertThrows(DigitalHistoryTokenException.class, () -> tokens.parseCarId(token));
+        DigitalHistoryTokenException ex = assertThrows(DigitalHistoryTokenException.class, () -> tokens.parseIssueId(token));
         assertTrue(ex.isExpired());
     }
 
@@ -60,7 +60,7 @@ class DigitalHistoryTokensTest {
         DigitalHistoryTokens tokens = new DigitalHistoryTokens(SECRET, "carland", 300, Clock.systemUTC());
 
         DigitalHistoryTokenException ex = assertThrows(
-                DigitalHistoryTokenException.class, () -> tokens.parseCarId(access));
+                DigitalHistoryTokenException.class, () -> tokens.parseIssueId(access));
         assertFalse(ex.isExpired());
     }
 
@@ -69,7 +69,13 @@ class DigitalHistoryTokensTest {
         assertTrue(DigitalHistoryPaths.isPdf("/api/v1/car/digital-history"));
         assertTrue(DigitalHistoryPaths.isPdf("/carland/server-carland/api/v1/car/digital-history"));
         assertFalse(DigitalHistoryPaths.isPdf("/api/v1/car/15/digital-history/link"));
+        assertFalse(DigitalHistoryPaths.isPdf("/api/v1/car/digital-history/verify/CC-2026-K7Q2M9X4TA"));
         assertFalse(DigitalHistoryPaths.isPdf(null));
+        assertTrue(DigitalHistoryPaths.isVerify("/verify/CC-2026-K7Q2M9X4TA"));
+        assertTrue(DigitalHistoryPaths.isVerify("/verify/CC-2026-K7Q2M9X4TA/pdf"));
+        assertTrue(DigitalHistoryPaths.isVerify("/api/v1/car/digital-history/verify/CC-2026-K7Q2M9X4TA"));
+        assertFalse(DigitalHistoryPaths.isVerify("/api/v1/car/digital-history"));
+        assertFalse(DigitalHistoryPaths.isVerify("/api/v1/car/15/digital-history/link"));
     }
 
     private static String payload(String token) {

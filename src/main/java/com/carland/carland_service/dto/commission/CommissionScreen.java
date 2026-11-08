@@ -25,6 +25,7 @@ public class CommissionScreen {
     private final List<Option> partners;
     private final List<Option> branches;
     private final List<RateRow> rates;
+    private final List<String> reviews;
     private final int currentPage;
     private final int totalPages;
     private final int windowStart;

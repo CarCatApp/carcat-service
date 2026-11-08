@@ -19,8 +19,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * tr: VIN başına bir kez yazılan müşteri durumu. Sonra değişmez.
- * en: Customer status written once per VIN. It does not change later.
+ * tr: VIN başına müştəri statusu. Yeni yapışır. Köhnə növbəti növbədə yeniyə keçə bilər.
+ * en: Customer status per VIN. New sticks. Old may become new on a later booking.
  */
 @Entity
 @Data
@@ -50,10 +50,11 @@ public class CommissionCustomerStatus {
     @Column(name = "first_booking_id")
     Long firstBookingId;
 
-    /** found | not_found | timeout */
+    /** ACTIVE | INACTIVE_12M | NO_DATE | NOT_FOUND | NO_RESPONSE | FUTURE_DATE, plus older codes */
     @Column(name = "hyper_outcome", nullable = false, length = 16)
     String hyperOutcome;
 
+    /** tr: Son qərarda istifadə olunan son xidmət tarixi. en: Last service date used by the latest decision. */
     @Column(name = "earliest_service_date")
     LocalDate earliestServiceDate;
 

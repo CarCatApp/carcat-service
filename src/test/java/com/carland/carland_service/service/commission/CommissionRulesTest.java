@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,26 +19,59 @@ class CommissionRulesTest {
     private static final LocalDate DAY = LocalDate.of(2026, 10, 15);
 
     @Test
-    void earlierHyperDayIsOld() {
-        CommissionDecision decision = CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 10, 14)), "1 2026-10-14"));
-        assertEquals(CommissionStatus.OLD, decision.status());
-        assertEquals(CommissionStatusRules.FOUND, decision.outcome());
-        assertEquals(LocalDate.of(2026, 10, 14), decision.earliestServiceDate());
+    void ceoScenariosUseTheLastServiceDateAndTwelveCalendarMonths() {
+        OffsetDateTime booking = noon(LocalDate.of(2026, 11, 8));
+
+        CommissionDecision missing = CommissionStatusRules.decide(booking, HyperVinSnapshot.notFound("vehicle_not_found"));
+        assertEquals(CommissionStatus.NEW, missing.status());
+        assertEquals(CommissionStatusRules.NOT_FOUND, missing.outcome());
+
+        CommissionDecision recent = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 8, 8)), "3m"));
+        assertEquals(CommissionStatus.OLD, recent.status());
+        assertEquals(CommissionStatusRules.ACTIVE, recent.outcome());
+
+        CommissionDecision exact = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2025, 11, 8)), "12m"));
+        assertEquals(CommissionStatus.NEW, exact.status());
+        assertEquals(CommissionStatusRules.INACTIVE_12M, exact.outcome());
+
+        OffsetDateTime midnight = LocalDate.of(2026, 11, 8).atStartOfDay(CommissionClock.BAKU).toOffsetDateTime();
+        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(midnight,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2025, 11, 8)), "exact")).status());
+
+        CommissionDecision almost = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2025, 11, 9)), "11m29d"));
+        assertEquals(CommissionStatus.OLD, almost.status());
+        assertEquals(CommissionStatusRules.ACTIVE, almost.outcome());
+
+        CommissionDecision silent = CommissionStatusRules.decide(booking, HyperVinSnapshot.failed("timeout"));
+        assertEquals(CommissionStatus.NEW, silent.status());
+        assertEquals(CommissionStatusRules.NO_RESPONSE, silent.outcome());
+
+        CommissionDecision blank = CommissionStatusRules.decide(booking, HyperVinSnapshot.found(List.of(), "no-date"));
+        assertEquals(CommissionStatus.NEW, blank.status());
+        assertEquals(CommissionStatusRules.NO_DATE, blank.outcome());
+
+        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2025, 10, 8)), "13m")).status());
+
+        CommissionDecision latest = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2025, 10, 8), LocalDate.of(2026, 8, 8)), "mix"));
+        assertEquals(CommissionStatus.OLD, latest.status());
+        assertEquals(LocalDate.of(2026, 8, 8), latest.serviceDate());
+
+        CommissionDecision future = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 11, 9)), "future"));
+        assertEquals(CommissionStatus.OLD, future.status());
+        assertEquals(CommissionStatusRules.FUTURE_DATE, future.outcome());
+
+        assertEquals(CommissionStatus.OLD, CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 11, 8)), "same")).status());
     }
 
-    @Test
-    void sameDayAndLaterAndMissingAreNew() {
-        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.found(List.of(DAY), "same")).status());
-        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.found(List.of(DAY.plusDays(1)), "later")).status());
-        assertEquals(CommissionStatusRules.NOT_FOUND, CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.notFound("empty")).outcome());
-        assertEquals(CommissionStatusRules.TIMEOUT, CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.failed("timeout")).outcome());
-        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(DAY,
-                HyperVinSnapshot.found(List.of(), "no-date")).status());
+    private static OffsetDateTime noon(LocalDate day) {
+        return day.atTime(12, 0).atZone(CommissionClock.BAKU).toOffsetDateTime();
     }
 
     @Test

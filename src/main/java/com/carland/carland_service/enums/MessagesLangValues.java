@@ -621,6 +621,12 @@ public enum MessagesLangValues {
             "AA qeydiyyat nişanı icazəsi yoxdur",
             "AA registration plates are not allowed",
             "Регистрационные номера AA не допускаются"
+    ),
+
+    INVALID_LANGUAGE(
+            "Dil yalnız az, en və ya ru ola bilər",
+            "Language must be az, en, or ru",
+            "Язык может быть только az, en или ru"
     );
 
     private final String azMessage;

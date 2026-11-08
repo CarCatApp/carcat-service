@@ -38,6 +38,14 @@ public class Partner {
     @Column(name = "contact_email", length = 128)
     String contactEmail;
 
+    /** tr: Ünvan. Hyper kartı bunu göstərir. Boş ola bilər. / en: Address. The Hyper card prints this. Optional. */
+    @Column(length = 512)
+    String address;
+
+    /** tr: Xülasədəki şəhər. / en: City shown under the center count. */
+    @Column(length = 64)
+    String city;
+
     @Builder.Default
     @Column(nullable = false)
     Boolean active = true;

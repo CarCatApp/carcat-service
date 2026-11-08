@@ -1575,6 +1575,24 @@ body.booking-page td:has(.clock24) { height: auto; }
 .stat-box b { display: block; margin-top: 4px; color: #111; font-size: 22px; }
 .event-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
 .data-table tbody td.clip { max-width: 380px; }
+.data-table tbody td.crumb-msg.is-overflow { cursor: pointer; }
+.data-table tbody td.crumb-msg.is-overflow:not(.is-open):hover { text-decoration: underline; text-underline-offset: 2px; }
+.data-table tbody tr:has(td.crumb-msg.is-open) td {
+  height: auto;
+  overflow: visible;
+  vertical-align: top;
+}
+.data-table tbody td.crumb-msg.is-open {
+  max-width: 720px;
+  height: auto;
+  overflow: visible;
+  white-space: pre-wrap;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  cursor: text;
+}
 .stack-box {
   background: #fff;
   color: #111;

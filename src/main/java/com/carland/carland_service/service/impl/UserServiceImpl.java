@@ -2,6 +2,7 @@ package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
+import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
@@ -17,6 +18,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
+import com.carland.carland_service.service.BookingMineService;
 import com.carland.carland_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -240,6 +242,33 @@ public class UserServiceImpl implements UserService {
                 .anyMatch(owner -> owner.getUserId() != null
                         && !owner.getUserId().equals(userId)
                         && Boolean.TRUE.equals(owner.getSimaVerified()));
+    }
+
+    /**
+     * tr: Aktiv müştərinin notificationLanguage sahəsini az, en və ya ru edir. Boş və ya başqa kod rədd edilir.
+     *     Booking push göndəriləndə bu sahəni oxuyur; başqa profil sahəsi dəyişmir.
+     * en: Sets the active customer's notificationLanguage to az, en, or ru. A blank or other code is rejected.
+     *     Booking push reads this field when it sends; no other profile field changes.
+     */
+    @Override
+    public NotificationLanguageResponse setNotificationLanguage(String lang, String role, String phoneNumber,
+                                                                String userIdHeader, String acceptLanguage) {
+        String stored = normalizeLanguage(lang, acceptLanguage);
+        Customer customer = requireActiveCustomer(role, phoneNumber, userIdHeader, acceptLanguage);
+        customer.setNotificationLanguage(stored);
+        customerRepository.save(customer);
+        return NotificationLanguageResponse.builder().language(stored).build();
+    }
+
+    private static String normalizeLanguage(String lang, String acceptLanguage) {
+        if (lang == null || lang.isBlank()) {
+            throw MissingFieldException.required("lang");
+        }
+        String code = BookingMineService.langOf(lang);
+        if (!"az".equals(code) && !"en".equals(code) && !"ru".equals(code)) {
+            throw new NotMatchException(MessagesLangValues.INVALID_LANGUAGE.getMessageByLang(acceptLanguage));
+        }
+        return code;
     }
 
     private static String trimToNull(String value) {

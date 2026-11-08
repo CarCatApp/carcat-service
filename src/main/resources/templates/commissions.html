@@ -55,6 +55,13 @@
     </div>
   </div>
 
+  <div class="card" th:if="${screen.reviews != null and !screen.reviews.isEmpty()}">
+    <p><strong>Əl ilə yoxlama.</strong> Hyper gələcək xidmət tarixi qaytardı. Status köhnə müştəri kimi qalır və növbəti növbədə yenidən soruşulur.</p>
+    <ul>
+      <li th:each="line : ${screen.reviews}" th:text="${line}">VIN</li>
+    </ul>
+  </div>
+
   <nav class="commission-presets" aria-label="Dövr">
     <a th:href="@{/admin/commissions(preset='month', partnerId=${screen.query.partnerId}, branchId=${screen.query.branchId}, status=${screen.query.status}, q=${screen.query.search})}"
        th:classappend="${screen.query.preset == 'month'} ? 'active'">Bu ay</a>

@@ -23,6 +23,7 @@ import com.carland.carland_service.repository.EngineTypeRepository;
 import com.carland.carland_service.repository.MaintenanceTemplateRepository;
 import com.carland.carland_service.repository.PercentageRepository;
 import com.carland.carland_service.service.CarIddaColor;
+import com.carland.carland_service.service.CarMileage;
 import com.carland.carland_service.service.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -114,7 +115,11 @@ public class IddaCarWriteService {
         car.setModel(snapshot.getModel());
         car.setModelYear(snapshot.getModelYear());
         car.setEngineVolume(snapshot.getEngineCapacity());
-        car.setMileage(carRequest.getMileage());
+        if (carRequest.getMileage() != null) {
+            CarMileage.writtenByCustomer(car, carRequest.getMileage());
+        } else {
+            car.setMileage(null);
+        }
         if (carRequest.getBodyType() != null && !carRequest.getBodyType().isBlank()) {
             car.setBodyType(carRequest.getBodyType().trim());
         }
@@ -158,6 +163,7 @@ public class IddaCarWriteService {
                 .engineVolume(snapshot.getEngineCapacity())
                 .bodyType(blankToNull(carRequest.getBodyType()))
                 .mileage(carRequest.getMileage())
+                .lastMileageUpdateAt(carRequest.getMileage() == null ? null : LocalDateTime.now(CarMileage.BAKU))
                 .createdAt(now)
                 .updatedAt(now)
                 .customer(customer)

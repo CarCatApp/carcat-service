@@ -81,7 +81,10 @@ public class CommissionLedgerService {
         if (vin != null && vin.length() > 32) {
             vin = vin.substring(0, 32);
         }
-        CommissionCustomerStatus status = vin == null ? null : statusService.ensure(booking);
+        CommissionCustomerStatus status = statusService.find(vin);
+        if (status == null && vin != null) {
+            status = statusService.ensure(booking);
+        }
         String customerStatus = status == null ? CommissionStatus.NEW : status.getStatus();
         OffsetDateTime completedAt = OffsetDateTime.now(CommissionClock.BAKU);
         Branch branch = booking.getBranch();

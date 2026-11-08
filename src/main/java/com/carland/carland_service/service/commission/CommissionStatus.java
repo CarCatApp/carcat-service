@@ -3,8 +3,8 @@ package com.carland.carland_service.service.commission;
 import java.math.BigDecimal;
 
 /**
- * tr: Müşteri durumu kodu. Yeni = ilk randevu anında Hyper'da eski kayıt yok. Eski = vardı.
- * en: Customer-status code. New = no earlier Hyper record at the first booking. Old = there was one.
+ * tr: Müştəri statusu. Yeni = son 12 ayda Hyper xidməti yoxdur. Köhnə = var.
+ * en: Customer status. New = no Hyper service in the last 12 months. Old = there was one.
  */
 public final class CommissionStatus {
 

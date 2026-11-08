@@ -23,16 +23,19 @@ public class DigitalHistoryLinkService {
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
     private final DigitalHistoryTokens tokens;
+    private final DigitalHistoryIssuer issuer;
     private final String publicBaseUrl;
 
     public DigitalHistoryLinkService(
             CustomerRepository customerRepository,
             CarRepository carRepository,
             DigitalHistoryTokens tokens,
+            DigitalHistoryIssuer issuer,
             @Value("${digital-history.public-base-url}") String publicBaseUrl) {
         this.customerRepository = customerRepository;
         this.carRepository = carRepository;
         this.tokens = tokens;
+        this.issuer = issuer;
         this.publicBaseUrl = publicBaseUrl;
     }
 
@@ -50,7 +53,7 @@ public class DigitalHistoryLinkService {
         if (car == null || car.getCarId() == null) {
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
-        String token = tokens.sign(car.getCarId());
+        String token = tokens.sign(issuer.issue(car.getCarId(), acceptLanguage));
         return DigitalHistoryLinkResponse.builder()
                 .url(base() + DigitalHistoryPaths.PDF + "?jwt=" + token)
                 .expiresInSeconds(tokens.shareSeconds())

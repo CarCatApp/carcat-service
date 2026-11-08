@@ -711,7 +711,7 @@ public class BookingMineService {
         return null;
     }
 
-    static String langOf(String header) {
+    public static String langOf(String header) {
         if (header == null || header.isBlank()) {
             return "az";
         }

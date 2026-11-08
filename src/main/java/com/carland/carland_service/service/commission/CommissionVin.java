@@ -1,8 +1,10 @@
 package com.carland.carland_service.service.commission;
 
+import java.util.Locale;
+
 /**
- * tr: BAN komisyon anahtarı. bookings.vin, büyük harf, boşluksuz.
- * en: BAN commission key. bookings.vin, upper case, trimmed.
+ * tr: BAN komisyon anahtarı. Boşluklar silinir, böyük harf. Hyper sorğusu 17 simvol ister.
+ * en: BAN commission key. Spaces are removed, then upper case. The Hyper query requires 17 characters.
  */
 public final class CommissionVin {
 
@@ -13,7 +15,11 @@ public final class CommissionVin {
         if (vin == null) {
             return null;
         }
-        String value = vin.trim().toUpperCase();
+        String value = vin.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
         return value.isEmpty() ? null : value;
+    }
+
+    public static boolean seventeen(String normalized) {
+        return normalized != null && normalized.length() == 17;
     }
 }

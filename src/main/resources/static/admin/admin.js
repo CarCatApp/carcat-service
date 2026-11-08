@@ -384,6 +384,87 @@
     host.insertBefore(bar, wrap);
   }
 
+  function initClippedCells(selector) {
+    var sel = selector || ".crumb-msg";
+    var nodes = Array.prototype.slice.call(document.querySelectorAll(sel));
+    if (!nodes.length) return;
+
+    function clipped(el) {
+      return el.scrollWidth > el.clientWidth + 1;
+    }
+
+    function mark(el) {
+      if (el.classList.contains("is-open")) return;
+      var over = clipped(el);
+      el.classList.toggle("is-overflow", over);
+      if (over) {
+        el.tabIndex = 0;
+        el.setAttribute("role", "button");
+        el.setAttribute("aria-expanded", "false");
+      } else {
+        el.removeAttribute("tabindex");
+        el.removeAttribute("role");
+        el.removeAttribute("aria-expanded");
+      }
+    }
+
+    function markAll() {
+      nodes.forEach(mark);
+    }
+
+    function collapse(el) {
+      el.classList.remove("is-open");
+      mark(el);
+    }
+
+    function collapseAll(except) {
+      nodes.forEach(function (el) {
+        if (el !== except && el.classList.contains("is-open")) collapse(el);
+      });
+    }
+
+    function open(el) {
+      collapseAll(el);
+      el.classList.add("is-open");
+      el.tabIndex = 0;
+      el.setAttribute("role", "button");
+      el.setAttribute("aria-expanded", "true");
+    }
+
+    document.addEventListener("click", function (e) {
+      var cell = e.target.closest(sel);
+      if (cell && nodes.indexOf(cell) !== -1) {
+        if (cell.classList.contains("is-open")) return;
+        if (cell.classList.contains("is-overflow") || clipped(cell)) {
+          open(cell);
+          return;
+        }
+      }
+      collapseAll(null);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        collapseAll(null);
+        return;
+      }
+      var cell = e.target.closest ? e.target.closest(sel) : null;
+      if (!cell || nodes.indexOf(cell) === -1) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (cell.classList.contains("is-open")) return;
+      if (!cell.classList.contains("is-overflow") && !clipped(cell)) return;
+      e.preventDefault();
+      open(cell);
+    });
+
+    window.addEventListener("resize", markAll);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(markAll);
+    requestAnimationFrame(function () {
+      markAll();
+      requestAnimationFrame(markAll);
+    });
+  }
+
   function initExpandCells(selector) {
     var sel = selector || ".cell-clip";
     function collapse(el) {
@@ -425,6 +506,7 @@
     confirmModal: confirmModal,
     initColumnToggle: initColumnToggle,
     initExpandCells: initExpandCells,
+    initClippedCells: initClippedCells,
     initTimeWheels: initTimeWheels,
     upgradeClocks: upgradeClocks,
     readDateTime: readDateTime,

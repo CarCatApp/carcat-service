@@ -181,6 +181,19 @@ public class UserController {
         return userService.isPinOccupied(pin, role, phoneNumber, userIdHeader, acceptLanguage);
     }
 
+    /**
+     * tr: Tətbiq dili dəyişəndə müştərinin bildiriş dilini yazır. Sonrakı booking push bu dili oxuyur.
+     * en: Stores the customer's notification language when the app language changes. Later booking pushes read it.
+     */
+    @PostMapping("/setLanguage")
+    public NotificationLanguageResponse setLanguage(@RequestParam("lang") String lang,
+                                                    @RequestHeader("role") String role,
+                                                    @RequestHeader("phoneNumber") String phoneNumber,
+                                                    @RequestHeader("X-User-Id") String userIdHeader,
+                                                    @RequestHeader("Accept-Language") String acceptLanguage) {
+        return userService.setNotificationLanguage(lang, role, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
 
     /**
      * tr: Tüm müşterileri araçlarıyla birlikte (aracı olmayan müşteriler tek satır olarak) XLSX dosyasına yazar ve indirilebilir olarak döner.

@@ -9,11 +9,17 @@ import com.carland.carland_service.entity.VisitServiceLine;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.BranchServicedGoodRepository;
 import com.carland.carland_service.repository.CarPhotoRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
+import com.carland.carland_service.repository.IndividualServiceRepository;
+import com.carland.carland_service.repository.OfferedServiceRepository;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
+import com.carland.carland_service.service.ServiceCategoryJson;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -25,7 +31,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,6 +53,10 @@ class DigitalHistoryReportLoaderTest {
     @Mock ColorRepository colors;
     @Mock IddaPlateCheckRepository idda;
     @Mock CarPhotoRepository photos;
+    @Mock OfferedServiceRepository offered;
+    @Mock IndividualServiceRepository individual;
+    @Mock BranchServicedGoodRepository goods;
+    @Mock ServiceCategoryJson titles;
     @InjectMocks DigitalHistoryReportLoader loader;
 
     @Test
@@ -60,6 +72,8 @@ class DigitalHistoryReportLoaderTest {
                 .engineVolume(2487)
                 .colorId(3L)
                 .bodyType("Minik")
+                .path(Car.PATH_PLATE)
+                .lastMileageUpdateAt(LocalDateTime.of(2026, 11, 2, 11, 32))
                 .build();
         when(cars.findByCarId(7L)).thenReturn(car);
         when(colors.findById(3L)).thenReturn(Optional.of(Color.builder().az("Ağ").color("White").build()));
@@ -148,26 +162,75 @@ class DigitalHistoryReportLoaderTest {
 
         DigitalHistoryReport.VisitBlock hyperBlock = report.visits().get(1);
         assertNull(hyperBlock.label());
-        assertTrue(hyperBlock.plainLines().contains("Antifriz"));
-        assertTrue(hyperBlock.plainLines().contains("Antifriz · 5 · L"));
+        assertEquals(List.of("Antifriz · 5 L"), hyperBlock.plainLines());
         assertTrue(hyperBlock.packageLines().isEmpty());
+        assertEquals("02.11.2026", report.mileageUpdatedOn());
+        assertEquals("19.01.2024 – 27.02.2025", report.period());
+        assertTrue(report.technicalNote().startsWith("Növü"));
+        assertTrue(report.specs().stream().anyMatch(line -> "BC481273".equals(line.value())));
 
-        String text = pdfText(new DigitalHistoryPdf().render(report));
+        DigitalHistoryReport issued = report.withIssue("CC-2026-K7Q2M9X4TA", "07.11.2026 11:32");
+        String text = pdfText(new DigitalHistoryPdf().render(issued));
         assertTrue(text.contains("JTNB23HK5R3164829"));
         assertTrue(text.contains("BC481273"));
         assertTrue(text.contains("Filtr"));
         assertTrue(text.contains("Diaqnostika"));
         assertTrue(text.contains("Antifriz"));
-        assertTrue(text.contains("CC-2025-0001849"));
-        assertTrue(text.contains("Yenilənib"));
-        assertTrue(text.contains("27.02.2025 tarixində"));
+        assertTrue(text.contains("CC-2026-K7Q2M9X4TA"));
+        assertTrue(text.contains("Buraxılıb"));
+        assertTrue(text.contains("07.11.2026 11:32"));
+        assertTrue(text.contains("02.11.2026 tarixində"));
+        assertTrue(text.contains("19.01.2024 – 27.02.2025"));
         assertTrue(text.contains("Yürüş dinamikası"));
         assertTrue(text.contains("Orta yürüş"));
         assertTrue(text.contains("Hesabatın orijinallığını yoxlayın"));
-        assertTrue(text.contains("carcat.az/verify/CC-2025-0001849"));
+        assertTrue(text.contains("carcat.az/verify/CC-2026-K7Q2M9X4TA"));
+        assertTrue(text.contains("manual daxil edilib"));
+        assertFalse(text.contains("Yenilənib"));
+        assertFalse(text.contains("Planlı"));
+        assertFalse(text.contains("Təmir ziyarəti"));
         assertFalse(text.contains("Fərdi xidmətlər"));
         assertFalse(text.contains("SECRET"));
         assertFalse(text.contains("SHOULD_NOT"));
+
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> body = mapper.convertValue(DigitalHistorySnapshot.from(issued), new TypeReference<>() {
+        });
+        DigitalHistoryReport restored = mapper.convertValue(body, DigitalHistorySnapshot.class).toReport(null);
+        assertEquals(issued.reportNo(), restored.reportNo());
+        assertEquals(issued.issuedAt(), restored.issuedAt());
+        assertEquals("Antifriz · 5 L", restored.visits().get(1).plainLines().get(0));
+        assertTrue(restored.visits().get(0).repair());
+        assertEquals(issued.technicalNote(), restored.technicalNote());
+    }
+
+    @Test
+    void vinPathHidesIddaRowsAndListsManualFields() {
+        Car car = Car.builder()
+                .carId(8L)
+                .vin("HONDACIVICVIN0001")
+                .brand("Honda")
+                .model("Civic")
+                .modelYear(2020)
+                .plateNumber("10AA010")
+                .mileage(94190L)
+                .engineVolume(1800)
+                .bodyType("Sedan")
+                .path(Car.PATH_VIN)
+                .lastMileageUpdateAt(LocalDateTime.of(2026, 11, 3, 9, 0))
+                .build();
+        when(cars.findByCarId(8L)).thenReturn(car);
+        when(visits.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of());
+        when(idda.findByVinNewestFirst("HONDACIVICVIN0001")).thenReturn(List.of());
+
+        DigitalHistoryReport report = loader.load(8L, "en");
+
+        assertEquals("03.11.2026", report.mileageUpdatedOn());
+        assertTrue(report.specs().stream().noneMatch(line -> line.label().toLowerCase().contains("certificate")));
+        assertTrue(report.specs().stream().noneMatch(line -> line.label().toLowerCase().contains("engine number")));
+        assertTrue(report.technicalNote().contains("Registration plate"));
+        assertTrue(report.technicalNote().contains("were entered manually"));
+        assertFalse(report.technicalNote().contains("VIN"));
     }
 
     private static String pdfText(byte[] pdf) throws Exception {

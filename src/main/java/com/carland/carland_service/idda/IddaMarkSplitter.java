@@ -1,72 +1,92 @@
 package com.carland.carland_service.idda;
 
-import com.carland.carland_service.entity.Brand;
-import com.carland.carland_service.entity.Model;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 /**
- * tr: IDDA Mark alanı tek stringdir (marka + model + tip). İlk boşluktan bölünmez.
- *     Sondaki Type.Description düşer, en uzun katalog markası eşlenir.
- *     Katalogda marka yoksa kalan metin olduğu gibi markaya yazılır.
- * en: IDDA Mark is one string (brand + model + type). It is not split on the first space.
- *     A trailing Type.Description is removed, then the longest catalog brand is matched.
- *     When no brand matches, the remaining text is stored as the brand.
+ * tr: IDDA Mark alanı tek stringdir. Sondaki Type.Description ve parantez içindeki yakıt düşer.
+ *     Listedeki iki kelimelik ad markadır, kalan metin modeldir. Liste yazımı kaydedilir.
+ *     Mercedes-Benz ve Rolls-Royce tireli ya da ayrı yazılsa da aynı markadır.
+ *     Diğerlerinde ilk kelime marka, kalan metin modeldir. O yazım IDDA metninden kalır.
+ * en: IDDA Mark is one string. A trailing Type.Description and a parenthetical fuel word are removed.
+ *     A listed two-word name is the brand and the rest is the model. The list spelling is stored.
+ *     Mercedes-Benz and Rolls-Royce match with a hyphen or a space.
+ *     Otherwise the first word is the brand and the rest is the model, kept as IDDA wrote them.
  */
-@Slf4j
 public final class IddaMarkSplitter {
 
     private static final Set<String> FUEL_WORDS = Set.of(
             "HIBRID", "DIZEL", "BENZIN", "QAZ", "ELEKTRIK", "PLUGIN"
     );
 
+    private static final List<String> TWO_WORD_BRANDS = List.of(
+            "Aston Martin",
+            "Land Rover",
+            "Rolls-Royce",
+            "Alfa Romeo",
+            "Mercedes-Benz",
+            "Mini Cooper",
+            "Great Wall",
+            "Tata Motors",
+            "Morgan Motor",
+            "Lucid Motors",
+            "Fisker Automotive",
+            "Genesis Motor",
+            "De Tomaso",
+            "Polestar Automotive"
+    );
+
     private IddaMarkSplitter() {
     }
 
-    public static IddaMarkSplit split(String mark, String typeDescription, List<Brand> brands, List<Model> models) {
+    public static IddaMarkSplit split(String mark, String typeDescription) {
         String core = stripTrailingType(mark == null ? "" : mark.trim(), typeDescription);
-        core = core.trim();
+        core = stripFuelParen(core).replaceAll("\\s+", " ").trim();
         if (core.isEmpty()) {
             return new IddaMarkSplit(null, null);
         }
-        IddaMarkSplit gwmTank = gwmTank(core);
-        if (gwmTank != null) {
-            return gwmTank;
+        TwoWord twoWord = matchTwoWordBrand(core);
+        if (twoWord != null) {
+            return new IddaMarkSplit(twoWord.canonical(), blankToNull(core.substring(twoWord.cut()).trim()));
         }
-        Brand brand = longestBrandPrefix(core, brands);
-        if (brand == null) {
-            String whole = stripFuelParen(core);
-            return new IddaMarkSplit(whole.isBlank() ? null : whole, null);
+        int space = core.indexOf(' ');
+        if (space < 0) {
+            return new IddaMarkSplit(core, null);
         }
-        String foldedBrand = fold(brand.getBrandName());
-        String rest = core.substring(Math.min(foldedBrand.length(), core.length())).trim();
-        rest = stripFuelParen(rest);
-        String modelName = canonicalModel(rest, brand.getBrandId(), models);
-        return new IddaMarkSplit(brand.getBrandName(), modelName);
+        return new IddaMarkSplit(blankToNull(core.substring(0, space)), blankToNull(core.substring(space + 1).trim()));
     }
 
-    /**
-     * tr: IDDA "GWM TANK …"yi tek marka yazıyor. Marka GWM, kalan metin model.
-     *     Katalog eşlemesinden önce bakar. Şimdilik elle istisna.
-     * en: IDDA writes "GWM TANK …" as one brand. Brand is GWM, the rest is the model.
-     *     Checked before the catalog match. A manual exception for now.
-     */
-    private static IddaMarkSplit gwmTank(String core) {
-        String folded = fold(core);
-        String prefix = "GWM TANK";
-        if (!folded.startsWith(prefix)) {
-            return null;
+    private static TwoWord matchTwoWordBrand(String core) {
+        String foldedCore = fold(core);
+        TwoWord best = null;
+        for (String canonical : TWO_WORD_BRANDS) {
+            for (String pattern : patterns(canonical)) {
+                String foldedPattern = fold(pattern);
+                if (!startsWithWord(foldedCore, foldedPattern)) {
+                    continue;
+                }
+                if (best == null || foldedPattern.length() > best.cut()) {
+                    best = new TwoWord(canonical, foldedPattern.length());
+                }
+            }
         }
-        if (folded.length() > prefix.length() && Character.isLetterOrDigit(folded.charAt(prefix.length()))) {
-            return null;
+        return best;
+    }
+
+    private static List<String> patterns(String canonical) {
+        if (canonical.indexOf('-') < 0) {
+            return List.of(canonical);
         }
-        String rest = stripFuelParen(core.substring("GWM".length()).trim());
-        String model = rest.isBlank() ? null : rest;
-        log.info("IDDA mark GWM TANK exception brand=GWM model={} mark={}", model, core);
-        return new IddaMarkSplit("GWM", model);
+        return List.of(canonical, canonical.replace('-', ' '));
+    }
+
+    private static boolean startsWithWord(String foldedCore, String foldedPattern) {
+        if (foldedPattern.isEmpty() || foldedCore.length() < foldedPattern.length() || !foldedCore.startsWith(foldedPattern)) {
+            return false;
+        }
+        return foldedCore.length() == foldedPattern.length()
+                || !Character.isLetterOrDigit(foldedCore.charAt(foldedPattern.length()));
     }
 
     static String fold(String raw) {
@@ -104,36 +124,6 @@ public final class IddaMarkSplitter {
         return mark.substring(0, cut).trim();
     }
 
-    private static Brand longestBrandPrefix(String core, List<Brand> brands) {
-        if (brands == null || brands.isEmpty()) {
-            return null;
-        }
-        String foldedCore = fold(core);
-        Brand best = null;
-        int bestLen = -1;
-        for (Brand brand : brands) {
-            if (brand == null || brand.getBrandName() == null || brand.getBrandName().isBlank()) {
-                continue;
-            }
-            String foldedBrand = fold(brand.getBrandName().trim());
-            if (foldedBrand.isEmpty() || foldedBrand.length() > foldedCore.length()) {
-                continue;
-            }
-            if (!foldedCore.startsWith(foldedBrand)) {
-                continue;
-            }
-            if (foldedCore.length() > foldedBrand.length()
-                    && Character.isLetterOrDigit(foldedCore.charAt(foldedBrand.length()))) {
-                continue;
-            }
-            if (foldedBrand.length() > bestLen) {
-                best = brand;
-                bestLen = foldedBrand.length();
-            }
-        }
-        return best;
-    }
-
     private static String stripFuelParen(String value) {
         String trimmed = value == null ? "" : value.trim();
         int open = trimmed.lastIndexOf('(');
@@ -148,35 +138,13 @@ public final class IddaMarkSplitter {
         return trimmed.substring(0, open).trim();
     }
 
-    /**
-     * tr: Kalan metin katalog modeliyle birebir örtüşürse katalog adı yazılır.
-     *     "520 D" gibi artan harf varsa tahmin yok, metin olduğu gibi kalır.
-     * en: A catalog model name is used only when the remainder matches it fully.
-     *     A leftover such as "520 D" is kept as written.
-     */
-    private static String canonicalModel(String rest, Long brandId, List<Model> models) {
-        if (rest == null || rest.isBlank()) {
+    private static String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
             return null;
         }
-        if (models == null || brandId == null) {
-            return rest;
-        }
-        String foldedRest = fold(rest);
-        Model exact = null;
-        int exactLen = -1;
-        for (Model model : models) {
-            if (model == null || model.getModelName() == null || !brandId.equals(model.getBrandId())) {
-                continue;
-            }
-            String foldedModel = fold(model.getModelName().trim());
-            if (foldedModel.isEmpty() || !foldedRest.equals(foldedModel)) {
-                continue;
-            }
-            if (foldedModel.length() > exactLen) {
-                exact = model;
-                exactLen = foldedModel.length();
-            }
-        }
-        return exact == null ? rest : exact.getModelName();
+        return value;
+    }
+
+    private record TwoWord(String canonical, int cut) {
     }
 }

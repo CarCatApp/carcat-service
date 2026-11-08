@@ -37,6 +37,10 @@ public class Branch {
 
     String address;
 
+    /** tr: Xülasədəki şəhər. Ünvan küçə kimi qalır. / en: City under the center count. Address stays the street. */
+    @Column(length = 64)
+    String city;
+
     Double lat;
 
     Double lng;

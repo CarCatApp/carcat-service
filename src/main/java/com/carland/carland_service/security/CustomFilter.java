@@ -84,7 +84,8 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.equals("/api/v1/group/by/get/brand/list/with/models")
                         || isAppAnnouncementActive(path)
                         || isBannerList(path)
-                        || DigitalHistoryPaths.isPdf(path);
+                        || DigitalHistoryPaths.isPdf(path)
+                        || DigitalHistoryPaths.isVerify(path);
 
         if (isPublic) {
             filterChain.doFilter(request, response);

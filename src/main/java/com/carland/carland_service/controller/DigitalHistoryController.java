@@ -1,8 +1,8 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.digitalhistory.DigitalHistoryIssuer;
 import com.carland.carland_service.digitalhistory.DigitalHistoryLinkService;
 import com.carland.carland_service.digitalhistory.DigitalHistoryPdf;
-import com.carland.carland_service.digitalhistory.DigitalHistoryReportLoader;
 import com.carland.carland_service.digitalhistory.DigitalHistoryTokenException;
 import com.carland.carland_service.digitalhistory.DigitalHistoryTokens;
 import com.carland.carland_service.dto.response.DigitalHistoryLinkResponse;
@@ -36,7 +36,7 @@ public class DigitalHistoryController {
 
     private final DigitalHistoryLinkService linkService;
     private final DigitalHistoryTokens tokens;
-    private final DigitalHistoryReportLoader reportLoader;
+    private final DigitalHistoryIssuer issuer;
     private final DigitalHistoryPdf pdf;
 
     @Operation(summary = "Digital history share URL for a logo QR")
@@ -54,9 +54,9 @@ public class DigitalHistoryController {
     @Operation(summary = "Digital history PDF opened from the share link")
     @GetMapping("/digital-history")
     public ResponseEntity<?> pdf(@RequestParam(name = "jwt", required = false) String jwt) {
-        final long carId;
+        final long issueId;
         try {
-            carId = tokens.parseCarId(jwt);
+            issueId = tokens.parseIssueId(jwt);
         } catch (DigitalHistoryTokenException ex) {
             log.warn("digital history pdf rejected | expired={}", ex.isExpired());
             String message = ex.isExpired() ? "Keçidin müddəti bitib" : "Keçid etibarsızdır";
@@ -64,8 +64,19 @@ public class DigitalHistoryController {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("error", message));
         }
-        log.info("GET /car/digital-history | carId={}", carId);
-        byte[] body = pdf.render(reportLoader.load(carId));
+        return issuer.find(issueId)
+                .<ResponseEntity<?>>map(this::pdfResponse)
+                .orElseGet(() -> {
+                    log.warn("digital history pdf missing | issueId={}", issueId);
+                    return ResponseEntity.status(401)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(Map.of("error", "Keçid etibarsızdır"));
+                });
+    }
+
+    private ResponseEntity<byte[]> pdfResponse(com.carland.carland_service.digitalhistory.DigitalHistoryReport report) {
+        log.info("GET /car/digital-history | report={}", report.reportNo());
+        byte[] body = pdf.render(report);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"digital-history.pdf\"")

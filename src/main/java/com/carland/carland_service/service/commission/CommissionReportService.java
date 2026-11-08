@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.commission.CommissionScreen;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.CommissionEntry;
 import com.carland.carland_service.entity.CommissionRate;
+import com.carland.carland_service.entity.CommissionStatusAudit;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.entity.VisitPart;
@@ -13,6 +14,7 @@ import com.carland.carland_service.entity.VisitServiceLine;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CommissionEntryRepository;
 import com.carland.carland_service.repository.CommissionRateRepository;
+import com.carland.carland_service.repository.CommissionStatusAuditRepository;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import jakarta.persistence.EntityManager;
@@ -53,6 +55,7 @@ public class CommissionReportService {
 
     private final CommissionEntryRepository entries;
     private final CommissionRateRepository rates;
+    private final CommissionStatusAuditRepository audits;
     private final PartnerRepository partners;
     private final BranchRepository branches;
     private final VisitRepository visits;
@@ -87,6 +90,7 @@ public class CommissionReportService {
                         .map(branch -> new CommissionScreen.Option(branch.getId(), label(branch, partnerNames), branch.getId().equals(query.getBranchId())))
                         .toList())
                 .rates(rateRows(partnerNames))
+                .reviews(reviews())
                 .currentPage(result.getNumber() + 1)
                 .totalPages(Math.max(result.getTotalPages(), 1))
                 .windowStart(windowStart(result.getNumber() + 1, Math.max(result.getTotalPages(), 1)))
@@ -481,15 +485,32 @@ public class CommissionReportService {
         return value == null ? 0L : ((Number) value).longValue();
     }
 
+    private List<String> reviews() {
+        return audits.findTop20ByReviewRequiredTrueOrderByIdDesc().stream().map(this::reviewLine).toList();
+    }
+
+    private String reviewLine(CommissionStatusAudit row) {
+        String vin = row.getVin() == null ? "—" : row.getVin();
+        String when = CommissionClock.dateTime(row.getBookingTime());
+        String date = row.getLastServiceDate() == null ? "—" : CommissionClock.date(row.getLastServiceDate());
+        return vin + " · növbə " + row.getBookingId() + " · " + when + " · " + date;
+    }
+
     private static String why(CommissionEntry entry) {
-        if (CommissionStatusRules.FOUND.equals(entry.getHyperOutcome())
-                && CommissionStatus.OLD.equals(entry.getCustomerStatus())) {
+        String outcome = entry.getHyperOutcome();
+        if (CommissionStatusRules.ACTIVE.equals(outcome)) {
+            return "Son xidmət tarixi növbənin yarandığı andan əvvəlki 12 ayın içindədir.";
+        }
+        if (CommissionStatusRules.FUTURE_DATE.equals(outcome)) {
+            return "Hyper gələcək xidmət tarixi qaytardı. Əl ilə yoxlanmalıdır.";
+        }
+        if (CommissionStatusRules.FOUND.equals(outcome) && CommissionStatus.OLD.equals(entry.getCustomerStatus())) {
             return "Ən erkən servis günü randevunun açıldığı gündən əvvəldir.";
         }
-        if (CommissionStatusRules.FOUND.equals(entry.getHyperOutcome())) {
+        if (CommissionStatusRules.FOUND.equals(outcome)) {
             return "Ən erkən servis günü randevu günü və ya sonradır.";
         }
-        return CommissionStatusRules.outcomeLabel(entry.getHyperOutcome());
+        return CommissionStatusRules.outcomeLabel(outcome);
     }
 
     private static BigDecimal parsePercent(String text) {

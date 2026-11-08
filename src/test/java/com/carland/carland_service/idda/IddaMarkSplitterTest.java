@@ -1,75 +1,93 @@
 package com.carland.carland_service.idda;
 
-import com.carland.carland_service.entity.Brand;
-import com.carland.carland_service.entity.Model;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class IddaMarkSplitterTest {
 
-    private final List<Brand> brands = List.of(
-            brand(1L, "Honda"),
-            brand(2L, "BMW"),
-            brand(3L, "BMW Alpina"),
-            brand(4L, "Alfa Romeo"),
-            brand(5L, "Land Rover")
-    );
-
-    private final List<Model> models = List.of(
-            model(1L, 1L, "Insight"),
-            model(2L, 2L, "520"),
-            model(3L, 2L, "520d")
-    );
-
     @Test
-    void hondaInsightDropsTypeAndFuelParen() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "HONDA İNSİGHT(HİBRİD) MİNİK", "MİNİK", brands, models);
-        assertEquals("Honda", split.brand());
-        assertEquals("Insight", split.model());
+    void firstWordIsBrandAndTheRestIsModel() {
+        IddaMarkSplit split = IddaMarkSplitter.split("LİXİANG L7 PRO PLUG-İN HİBRİD", null);
+        assertEquals("LİXİANG", split.brand());
+        assertEquals("L7 PRO PLUG-İN HİBRİD", split.model());
     }
 
     @Test
-    void bmwKeepsTrailingLetterInsteadOfGuessingDiesel() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "BMW 520 D MİNİK", "MİNİK", brands, models);
+    void hondaDropsTypeAndFuelParen() {
+        IddaMarkSplit split = IddaMarkSplitter.split("HONDA İNSİGHT(HİBRİD) MİNİK", "MİNİK");
+        assertEquals("HONDA", split.brand());
+        assertEquals("İNSİGHT", split.model());
+    }
+
+    @Test
+    void bmwAlpinaIsNotATwoWordBrand() {
+        IddaMarkSplit split = IddaMarkSplitter.split("BMW ALPINA B7 MİNİK", "MİNİK");
+        assertEquals("BMW", split.brand());
+        assertEquals("ALPINA B7", split.model());
+    }
+
+    @Test
+    void bmwKeepsTrailingLetter() {
+        IddaMarkSplit split = IddaMarkSplitter.split("BMW 520 D MİNİK", "MİNİK");
         assertEquals("BMW", split.brand());
         assertEquals("520 D", split.model());
     }
 
     @Test
-    void longestBrandWins() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "BMW ALPINA B7 MİNİK", "MİNİK", brands, models);
-        assertEquals("BMW Alpina", split.brand());
-        assertEquals("B7", split.model());
-    }
-
-    @Test
-    void twoWordBrandStaysTogether() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "LAND ROVER RANGE ROVER MİNİK", "MİNİK", brands, models);
-        assertEquals("Land Rover", split.brand());
-        assertEquals("RANGE ROVER", split.model());
-    }
-
-    @Test
-    void gwmTankIsBrandGwmAndTheRestIsModel() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "GWM TANK 300 (BENZIN) MİNİK", "MİNİK", brands, models);
+    void gwmTankUsesTheFirstWord() {
+        IddaMarkSplit split = IddaMarkSplitter.split("GWM TANK 300 (BENZIN) MİNİK", "MİNİK");
         assertEquals("GWM", split.brand());
         assertEquals("TANK 300", split.model());
     }
 
     @Test
-    void unknownBrandIsNotCutOnTheFirstSpace() {
-        IddaMarkSplit split = IddaMarkSplitter.split(
-                "great wall gr333minik", "minik", brands, models);
-        assertEquals("great wall gr333", split.brand());
+    void listedTwoWordNamesAreTheBrand() {
+        String[][] rows = {
+                {"ASTON MARTIN DBX MİNİK", "MİNİK", "Aston Martin", "DBX"},
+                {"LAND ROVER RANGE ROVER MİNİK", "MİNİK", "Land Rover", "RANGE ROVER"},
+                {"ROLLS-ROYCE GHOST MİNİK", "MİNİK", "Rolls-Royce", "GHOST"},
+                {"ROLLS ROYCE GHOST", null, "Rolls-Royce", "GHOST"},
+                {"ALFA ROMEO GIULIA", null, "Alfa Romeo", "GIULIA"},
+                {"MERCEDES-BENZ C 180", null, "Mercedes-Benz", "C 180"},
+                {"MERCEDES BENZ C 180", null, "Mercedes-Benz", "C 180"},
+                {"MINI COOPER S", null, "Mini Cooper", "S"},
+                {"GREAT WALL GR333", null, "Great Wall", "GR333"},
+                {"TATA MOTORS NEXON", null, "Tata Motors", "NEXON"},
+                {"MORGAN MOTOR PLUS 4", null, "Morgan Motor", "PLUS 4"},
+                {"LUCID MOTORS AIR", null, "Lucid Motors", "AIR"},
+                {"FISKER AUTOMOTIVE OCEAN", null, "Fisker Automotive", "OCEAN"},
+                {"GENESIS MOTOR G70", null, "Genesis Motor", "G70"},
+                {"DE TOMASO PANTERA", null, "De Tomaso", "PANTERA"},
+                {"POLESTAR AUTOMOTIVE 2", null, "Polestar Automotive", "2"},
+                {"land rover range rover", null, "Land Rover", "range rover"}
+        };
+        for (String[] row : rows) {
+            IddaMarkSplit split = IddaMarkSplitter.split(row[0], row[1]);
+            assertEquals(row[2], split.brand(), row[0]);
+            assertEquals(row[3], split.model(), row[0]);
+        }
+    }
+
+    @Test
+    void miniWithoutCooperStaysOneWord() {
+        IddaMarkSplit split = IddaMarkSplitter.split("MINI CLUBMAN", null);
+        assertEquals("MINI", split.brand());
+        assertEquals("CLUBMAN", split.model());
+    }
+
+    @Test
+    void twoWordBrandRequiresAWordBoundary() {
+        IddaMarkSplit split = IddaMarkSplitter.split("LAND ROVERSPORT MİNİK", "MİNİK");
+        assertEquals("LAND", split.brand());
+        assertEquals("ROVERSPORT", split.model());
+    }
+
+    @Test
+    void brandAloneLeavesModelEmpty() {
+        IddaMarkSplit split = IddaMarkSplitter.split("LAND ROVER MİNİK", "MİNİK");
+        assertEquals("Land Rover", split.brand());
         assertNull(split.model());
     }
 
@@ -78,13 +96,5 @@ class IddaMarkSplitterTest {
         assertEquals("77BU669", IddaPlateKey.of("77-bu-669"));
         assertEquals("77BU669", IddaPlateKey.of("77 BU 669"));
         assertEquals("77BU669", IddaPlateKey.of("77BU669"));
-    }
-
-    private static Brand brand(Long id, String name) {
-        return Brand.builder().brandId(id).brandName(name).build();
-    }
-
-    private static Model model(Long id, Long brandId, String name) {
-        return Model.builder().modelId(id).brandId(brandId).modelName(name).build();
     }
 }

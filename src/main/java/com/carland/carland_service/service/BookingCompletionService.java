@@ -250,6 +250,7 @@ public class BookingCompletionService {
         visitRepository.saveAndFlush(visit);
 
         if (car.getMileage() == null || car.getMileage() < request.getMileage()) {
+            // Müştəri tarixi lastMileageUpdateAt burada dəyişmir.
             car.setMileage(request.getMileage().longValue());
         }
         visitWebhookSupport.recalculateAllTimeCost(car);

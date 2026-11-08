@@ -808,8 +808,8 @@ public class StaffBookingService {
     }
 
     /**
-     * tr: Siyahı hər dəfə VIN cədvəlinin cari dəyərini oxuyur. Sətir yoxdursa və ya kod tanınmırsa boş.
-     * en: Each list read uses the current VIN-table value. Empty when the row is missing or the code is unknown.
+     * tr: Siyahı VIN cədvəlinin cari dəyərini oxuyur. Sətir yoxdursa və ya kod tanınmırsa yeni.
+     * en: The list reads the current VIN-table value. Missing or unknown codes are new.
      */
     private Map<String, String> customerStatusByVin(List<Booking> rows) {
         List<String> vins = new ArrayList<>();
@@ -845,15 +845,15 @@ public class StaffBookingService {
             vin = CommissionVin.normalize(car.getVin());
         }
         if (vin == null) {
-            return null;
+            return CommissionStatus.NEW;
         }
         if (loaded != null && loaded.containsKey(vin)) {
-            return CommissionStatus.known(loaded.get(vin)) ? loaded.get(vin) : null;
+            return CommissionStatus.known(loaded.get(vin)) ? loaded.get(vin) : CommissionStatus.NEW;
         }
         return commissionCustomerStatusRepository.findByVin(vin)
                 .map(CommissionCustomerStatus::getStatus)
                 .filter(CommissionStatus::known)
-                .orElse(null);
+                .orElse(CommissionStatus.NEW);
     }
 
     private CarResponseForSlotPanel carPanel(Car car, Map<String, Long> brandIds, String lang) {

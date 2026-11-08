@@ -3,6 +3,9 @@ package com.carland.carland_service.service.commission;
 import com.carland.carland_service.dto.response.hyper.HyperServiceHistoryItemResponse;
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
 import com.carland.carland_service.service.impl.HyperTokenService;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -20,12 +23,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * tr: VIN'i Hyper'da yalnız okur. Ziyaret yazmaz, cache'e dokunmaz. 5 saniyede cevap yoksa başarısız.
+ * tr: VIN-i Hyper-da yalnız oxuyur. Ziyarət yazmır, cache-ə toxunmur. 5 saniyədə cavab yoxdursa uğursuz.
  * en: Reads a VIN from Hyper only. Does not write visits or touch cache. No answer in 5 seconds is a failure.
  */
 @Slf4j
 @Service
 public class HyperVinLookup {
+
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private final HyperTokenService hyperTokenService;
     private final RestTemplate http;
@@ -51,25 +58,33 @@ public class HyperVinLookup {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + vin;
         try {
-            ResponseEntity<HyperVehicleByVinResponse> response = http.exchange(
-                    url, HttpMethod.GET, new HttpEntity<>(headers), HyperVehicleByVinResponse.class);
-            return fromBody(response.getBody());
+            ResponseEntity<String> response = http.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            String body = response.getBody();
+            if (body == null || body.isBlank()) {
+                return HyperVinSnapshot.notFound("empty", clip(body));
+            }
+            try {
+                return fromBody(JSON.readValue(body, HyperVehicleByVinResponse.class), body);
+            } catch (Exception ex) {
+                return HyperVinSnapshot.failed("unreadable", clip(body));
+            }
         } catch (HttpClientErrorException.NotFound notFound) {
             String body = notFound.getResponseBodyAsString();
             if (body != null && body.contains("vehicle_not_found")) {
-                return HyperVinSnapshot.notFound("vehicle_not_found");
+                return HyperVinSnapshot.notFound("vehicle_not_found", clip(body));
             }
             log.warn("commission hyper vin lookup not found | vin={} status=404", vin);
-            return HyperVinSnapshot.failed("not_found");
+            return HyperVinSnapshot.failed("not_found", clip(body));
         } catch (RuntimeException ex) {
             log.warn("commission hyper vin lookup failed | vin={} err={}", vin, ex.getClass().getSimpleName());
             return HyperVinSnapshot.failed(ex.getClass().getSimpleName());
         }
     }
 
-    private static HyperVinSnapshot fromBody(HyperVehicleByVinResponse body) {
+    private static HyperVinSnapshot fromBody(HyperVehicleByVinResponse body, String raw) {
         if (body == null || body.getServiceHistory() == null || body.getServiceHistory().isEmpty()) {
-            return HyperVinSnapshot.notFound("empty");
+            return HyperVinSnapshot.notFound("empty", clip(raw));
         }
         List<LocalDate> dates = new ArrayList<>();
         StringBuilder text = new StringBuilder();
@@ -91,6 +106,13 @@ public class HyperVinLookup {
         if (text.length() > 2000) {
             text.setLength(2000);
         }
-        return HyperVinSnapshot.found(dates, text.toString());
+        return HyperVinSnapshot.found(dates, text.toString(), clip(raw));
+    }
+
+    private static String clip(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= 4000 ? value : value.substring(0, 4000);
     }
 }
