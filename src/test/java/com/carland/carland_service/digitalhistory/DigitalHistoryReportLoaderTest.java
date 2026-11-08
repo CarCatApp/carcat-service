@@ -184,7 +184,9 @@ class DigitalHistoryReportLoaderTest {
         assertTrue(text.contains("Yürüş dinamikası"));
         assertTrue(text.contains("Orta yürüş"));
         assertTrue(text.contains("Hesabatın orijinallığını yoxlayın"));
-        assertTrue(text.contains("carcat.az/verify/CC-2026-K7Q2M9X4TA"));
+        assertTrue(text.contains(
+                "https://digital-innovation.agency/carland/server-carland/verify/CC-2026-K7Q2M9X4TA"));
+        assertFalse(text.contains("carcat.az/verify"));
         assertTrue(text.contains("manual daxil edilib"));
         assertFalse(text.contains("Yenilənib"));
         assertFalse(text.contains("Planlı"));

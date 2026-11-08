@@ -281,12 +281,11 @@ final class DigitalHistoryCopy {
         };
     }
 
-    String verifyLead(String code) {
-        String url = "carcat.az/verify/" + code;
+    String verifyLead() {
         return switch (lang) {
-            case "en" -> "Scan the QR code or open: " + url;
-            case "ru" -> "Отсканируйте QR-код или откройте: " + url;
-            default -> "QR kodu skan edin və ya daxil olun: " + url;
+            case "en" -> "Scan the QR code or open:";
+            case "ru" -> "Отсканируйте QR-код или откройте:";
+            default -> "QR kodu skan edin və ya daxil olun:";
         };
     }
 

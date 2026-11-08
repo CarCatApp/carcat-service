@@ -11,6 +11,8 @@ import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -35,9 +37,9 @@ import java.util.Locale;
 
 /**
  * tr: Rəqəmsal tarixçəni şablon səhifəsinə basır. Nömrə və «Buraxılıb» snapshot-dandır.
- *     QR və klik carcat.az/verify/{nömrə} açır.
+ *     QR və klik {@code digital-history.public-base-url}/verify/{nömrə} açır.
  * en: Prints the digital history onto the template pages. The number and "Issued" come from the snapshot.
- *     The QR and the click open carcat.az/verify/{number}.
+ *     The QR and the click open {@code digital-history.public-base-url}/verify/{number}.
  */
 @Component
 public class DigitalHistoryPdf {
@@ -78,6 +80,19 @@ public class DigitalHistoryPdf {
     private static final float ORANGE_R = 193f / 255f;
     private static final float ORANGE_G = 65f / 255f;
     private static final float ORANGE_B = 12f / 255f;
+    static final String DEFAULT_PUBLIC_BASE = "https://digital-innovation.agency/carland/server-carland";
+
+    private final String publicBaseUrl;
+
+    public DigitalHistoryPdf() {
+        this(DEFAULT_PUBLIC_BASE);
+    }
+
+    @Autowired
+    public DigitalHistoryPdf(
+            @Value("${digital-history.public-base-url:" + DEFAULT_PUBLIC_BASE + "}") String publicBaseUrl) {
+        this.publicBaseUrl = publicBaseUrl;
+    }
 
     public byte[] render(DigitalHistoryReport report) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -140,7 +155,7 @@ public class DigitalHistoryPdf {
             this.report = report;
             this.copy = DigitalHistoryCopy.of(report.lang());
             String code = blank(report.reportNo()) ? "" : report.reportNo().trim();
-            this.verifyUrl = DigitalHistoryPaths.verifyUrl(code);
+            this.verifyUrl = DigitalHistoryPaths.verifyUrl(publicBaseUrl, code);
             this.logo = image("carcat-logo.png");
             this.logoInk = image("carcat-logo-ink.png");
             this.mascot = image("carcat-mascot.png");
@@ -538,9 +553,11 @@ public class DigitalHistoryPdf {
         }
 
         private void verify() throws IOException {
-            String lead = copy.verifyLead(blank(report.reportNo()) ? "" : report.reportNo().trim());
-            List<String> body = wrap(copy.verifyBody(), regular, 7.5f, CONTENT_W - 86f);
-            float h = Math.max(84f, 36f + body.size() * 11.2f);
+            String lead = copy.verifyLead();
+            float textW = CONTENT_W - 86f;
+            float urlSize = fitSize(verifyUrl, regular, 8f, textW);
+            List<String> body = wrap(copy.verifyBody(), regular, 7.5f, textW);
+            float h = Math.max(96f, 56f + body.size() * 11.2f);
             if (top + 16f + h > FLOW_LIMIT) {
                 open(true);
             }
@@ -554,8 +571,9 @@ public class DigitalHistoryPdf {
             float textX = LEFT + 84f;
             text(copy.verifyTitle(), bold, 11f, textX, top + 12f, INK_R, INK_G, INK_B);
             text(lead, regular, 8.5f, textX, top + 28f, MUTED_R, MUTED_G, MUTED_B);
-            link(textX, top + 28f, width(lead, regular, 8.5f), 12f);
-            float y = top + 44f;
+            text(verifyUrl, regular, urlSize, textX, top + 40f, MUTED_R, MUTED_G, MUTED_B);
+            link(textX, top + 40f, width(verifyUrl, regular, urlSize), 12f);
+            float y = top + 56f;
             for (String line : body) {
                 text(line, regular, 7.5f, textX, y, MUTED_R, MUTED_G, MUTED_B);
                 y += 11.2f;

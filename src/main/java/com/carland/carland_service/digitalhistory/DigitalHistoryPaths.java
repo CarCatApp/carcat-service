@@ -12,8 +12,27 @@ public final class DigitalHistoryPaths {
 
     public static final String PDF = "/api/v1/car/digital-history";
 
-    /** tr: QR və klik bu ünvana gedir. Kong bu yolu JWT-siz buraxmalıdır. / en: The QR and the click open this URL. Kong must allow the path without JWT. */
-    public static final String VERIFY_ORIGIN = "https://carcat.az/verify/";
+    /**
+     * tr: QR və klik {@code {public-base-url}/verify/{nömrə}} açır.
+     *     Kong {@code /carland/server-carland/verify} yolunu JWT-siz buraxır.
+     * en: The QR and the click open {@code {public-base-url}/verify/{number}}.
+     *     Kong lets {@code /carland/server-carland/verify} through without JWT.
+     */
+    public static String verifyUrl(String publicBaseUrl, String code) {
+        String number = code == null ? "" : code.trim();
+        return base(publicBaseUrl) + "/verify/" + number;
+    }
+
+    public static String base(String publicBaseUrl) {
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
+            throw new IllegalStateException("digital-history.public-base-url is empty");
+        }
+        String base = publicBaseUrl.trim();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base;
+    }
 
     private DigitalHistoryPaths() {
     }
@@ -45,10 +64,6 @@ public final class DigitalHistoryPaths {
                 || bare.contains("/verify/")
                 || bare.contains("/digital-history/verify/")
                 || bare.endsWith("/digital-history/verify");
-    }
-
-    public static String verifyUrl(String code) {
-        return VERIFY_ORIGIN + code;
     }
 
     private static String bare(String path) {

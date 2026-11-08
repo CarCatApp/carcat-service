@@ -1,6 +1,6 @@
 package com.carland.carland_service.digitalhistory;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -9,15 +9,24 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * tr: carcat.az/verify/{nömrə}. Login yoxdur. Kong bu yolu JWT-siz buraxır.
- * en: carcat.az/verify/{number}. No login. Kong lets this path through without JWT.
+ * tr: {@code {public-base-url}/verify/{nömrə}}. Login yoxdur. Kong bu yolu JWT-siz buraxır.
+ * en: {@code {public-base-url}/verify/{number}}. No login. Kong lets this path through without JWT.
  */
 @RestController
-@RequiredArgsConstructor
 public class DigitalHistoryVerifyController {
 
     private final DigitalHistoryIssuer issuer;
     private final DigitalHistoryPdf pdf;
+    private final String publicBaseUrl;
+
+    public DigitalHistoryVerifyController(
+            DigitalHistoryIssuer issuer,
+            DigitalHistoryPdf pdf,
+            @Value("${digital-history.public-base-url}") String publicBaseUrl) {
+        this.issuer = issuer;
+        this.pdf = pdf;
+        this.publicBaseUrl = publicBaseUrl;
+    }
 
     @GetMapping({"/verify/{code}", "/api/v1/car/digital-history/verify/{code}"})
     public ResponseEntity<String> page(@PathVariable String code) {
@@ -25,7 +34,7 @@ public class DigitalHistoryVerifyController {
                 .map(report -> ResponseEntity.ok()
                         .contentType(MediaType.TEXT_HTML)
                         .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                        .body(DigitalHistoryVerifyHtml.page(report, DigitalHistoryPaths.verifyUrl(code) + "/pdf")))
+                        .body(DigitalHistoryVerifyHtml.page(report, DigitalHistoryPaths.verifyUrl(publicBaseUrl, code) + "/pdf")))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .contentType(MediaType.TEXT_HTML)
                         .body(DigitalHistoryVerifyHtml.missing()));
