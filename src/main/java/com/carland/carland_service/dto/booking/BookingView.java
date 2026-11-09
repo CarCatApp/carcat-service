@@ -64,6 +64,18 @@ public class BookingView {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     String createdAt;
 
+    /** tr: Sorğunun qəbul anı. / en: When the request was accepted. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String acceptedTime;
+
+    /** tr: Xidmətin tamamlanma anı. / en: When the service was completed. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String completedTime;
+
+    /** tr: Sorğunun rədd anı. / en: When the request was rejected. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String rejectedTime;
+
     /**
      * tr: Aracın VIN-indəki cari müştəri durumu. new və ya old. Sətir yoxdursa boş.
      * en: Current customer status on the car VIN. new or old. Empty when that row is missing.

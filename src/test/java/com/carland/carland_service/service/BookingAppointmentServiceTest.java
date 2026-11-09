@@ -20,9 +20,11 @@ import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.service.commission.CommissionCustomerStatusService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,6 +37,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -57,6 +61,7 @@ class BookingAppointmentServiceTest {
     @Mock StaffBookingLiveService live;
     @Mock BookingPushService bookingPushService;
     @Mock BookingPercentageSnapshot percentageSnapshot;
+    @Mock CommissionCustomerStatusService commissionCustomerStatusService;
 
     BookingAppointmentService service;
     Branch branch;
@@ -67,7 +72,7 @@ class BookingAppointmentServiceTest {
         service = new BookingAppointmentService(
                 rangeRepository, bookingRepository, carePackageRepository, customerRepository,
                 carRepository, calendarService, selectionWriter, capacity, live, bookingPushService,
-                percentageSnapshot);
+                percentageSnapshot, commissionCustomerStatusService);
         Partner partner = Partner.builder().id(1L).name("HS").active(true).build();
         branch = Branch.builder().id(7L).name("Babek").active(true).partner(partner).build();
         pkg = BranchCarePackage.builder().id(10L).name("Yağ").active(true).branch(branch).price(40).build();
@@ -109,7 +114,11 @@ class BookingAppointmentServiceTest {
         assertEquals(4000, response.getPackagePrice());
         assertEquals(4000, response.getPriceMin());
         assertEquals("qepik", response.getUnit());
+        ArgumentCaptor<Booking> saved = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(saved.capture());
+        assertNotNull(saved.getValue().getAcceptedTime());
         verify(bookingPushService).accepted(any());
+        verify(commissionCustomerStatusService).schedule(100L);
     }
 
     @Test
@@ -132,6 +141,9 @@ class BookingAppointmentServiceTest {
 
         assertEquals("pending", response.getStatus());
         assertEquals("approval", response.getBookingMode());
+        ArgumentCaptor<Booking> saved = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(saved.capture());
+        assertNull(saved.getValue().getAcceptedTime());
         verify(bookingPushService, never()).accepted(any());
     }
 

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -50,6 +51,7 @@ public class BookingCapacityService {
         }
         for (Booking row : waiting) {
             row.setStatus(BookingStatus.REJECTED.apiValue());
+            row.stampRejected(OffsetDateTime.now());
             row.setCancelReasonCode(PLACES_FULL);
             row.setCancelNote(note("az"));
             notifyRejected(row);

@@ -149,10 +149,11 @@ public class BookingCreateService {
             booking.setPriceMax(max + priced.priceMax());
         }
         booking = bookingRepository.save(booking);
-        commissionCustomerStatusService.schedule(booking.getId());
         if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            booking.stampAccepted(booking.getCreatedAt());
             bookingCapacityService.closePendingWhenFull(prepared.range);
         }
+        commissionCustomerStatusService.schedule(booking.getId());
         Customer customer = customerRepository.findByUserId(customerUserId);
         BookingInspection inspection = null;
         if (priced != null) {

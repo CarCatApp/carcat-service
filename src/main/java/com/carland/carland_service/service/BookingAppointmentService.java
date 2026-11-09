@@ -30,6 +30,7 @@ import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.RangeRepository;
+import com.carland.carland_service.service.commission.CommissionCustomerStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,7 @@ public class BookingAppointmentService {
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPushService bookingPushService;
     private final BookingPercentageSnapshot percentageSnapshot;
+    private final CommissionCustomerStatusService commissionCustomerStatusService;
 
     /**
      * tr: Range kilitlenir, yeri varsa book ve alt satırları yazılır.
@@ -150,11 +152,13 @@ public class BookingAppointmentService {
                 .packageName(packageName(selection.packageId()))
                 .packagePrice(selection.packageId() == null ? null : packageQepik)
                 .build());
+        commissionCustomerStatusService.schedule(booking.getId());
         percentageSnapshot.snapshotPackage(booking, car);
         if (priced != null) {
             selectionWriter.save(booking, customer, car, priced);
         }
         if (BookingStatus.AUTO_ACCEPTED.apiValue().equals(status)) {
+            booking.stampAccepted(booking.getCreatedAt());
             bookingCapacityService.closePendingWhenFull(range);
         }
         List<BookingAppointmentServiceView> services = serviceViews(priced, lang);

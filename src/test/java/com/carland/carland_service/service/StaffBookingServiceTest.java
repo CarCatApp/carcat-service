@@ -42,6 +42,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -307,6 +308,10 @@ class StaffBookingServiceTest {
 
         assertEquals("confirmed", out.getStatus());
         assertEquals("confirmed", booking.getStatus());
+        assertNotNull(booking.getAcceptedTime());
+        assertNotNull(out.getAcceptedTime());
+        assertNull(booking.getCompletedTime());
+        assertNull(booking.getRejectedTime());
         verify(bookingStaffAccess).requireWritableBranch(staff, 7L, "az");
         verify(bookingCapacityService).closePendingWhenFull(booking.getRange());
         verify(bookingPushService).accepted(booking);
@@ -350,6 +355,7 @@ class StaffBookingServiceTest {
 
         assertThrows(ConflictException.class, () -> service.accept(9L, false, 1L, "Asia/Baku", "az"));
         assertEquals("pending", booking.getStatus());
+        assertNull(booking.getAcceptedTime());
         verify(bookingPushService, never()).accepted(any());
     }
 
@@ -367,6 +373,9 @@ class StaffBookingServiceTest {
         assertEquals("rejected", out.getStatus());
         assertEquals("rejected", booking.getCancelReasonCode());
         assertEquals("ehtiyat yoxdur", booking.getCancelNote());
+        assertNotNull(booking.getRejectedTime());
+        assertNotNull(out.getRejectedTime());
+        assertNull(booking.getAcceptedTime());
         verify(bookingPushService).rejected(booking);
         verify(bookingPushService, never()).accepted(any());
     }
@@ -399,6 +408,9 @@ class StaffBookingServiceTest {
         BookingView out = service.complete(9L, false, 1L, null, "Asia/Baku", "az");
 
         assertEquals("completed", out.getStatus());
+        assertNotNull(booking.getCompletedTime());
+        assertNotNull(out.getCompletedTime());
+        assertNull(booking.getRejectedTime());
         verify(bookingPushService).completed(booking);
         verify(bookingPushService, never()).accepted(any());
         verify(bookingPushService, never()).rejected(any());
@@ -419,6 +431,8 @@ class StaffBookingServiceTest {
         assertEquals("no_show", booking.getStatus());
         assertEquals("no_show_1", booking.getCancelReasonCode());
         assertEquals("gəlmədi", booking.getCancelNote());
+        assertNull(booking.getRejectedTime());
+        assertNull(booking.getCompletedTime());
         verify(bookingPushService, never()).accepted(any());
         verify(bookingPushService, never()).rejected(any());
         verify(bookingPushService).noShow(booking);

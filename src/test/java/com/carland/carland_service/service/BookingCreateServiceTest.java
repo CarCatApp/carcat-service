@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -146,6 +147,7 @@ class BookingCreateServiceTest {
         verify(bookingRepository).save(captor.capture());
         assertEquals(77L, captor.getValue().getCustomerUserId());
         assertEquals(55L, captor.getValue().getCarId());
+        assertNull(captor.getValue().getAcceptedTime());
         verify(bookingPushService, never()).accepted(any());
     }
 
@@ -210,6 +212,7 @@ class BookingCreateServiceTest {
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).save(captor.capture());
         assertEquals("auto_accepted", captor.getValue().getStatus());
+        assertNotNull(captor.getValue().getAcceptedTime());
         verify(bookingPushService).accepted(captor.getValue());
     }
 

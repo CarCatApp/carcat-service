@@ -40,7 +40,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -1738,7 +1737,9 @@ public class CarServiceImpl implements CarService {
         } else {
             car.setMileage(carRequest.getMileage());
         }
-        car.setUpdatedAt(LocalDateTime.now(ZoneId.of(timezone)));
+        // tr: UTC. Panel Bakü için +4 ekler. İstemci saati burada ikinci +4 üretiyordu.
+        // en: UTC. The admin list adds +4 for Baku. The client zone here produced a second +4.
+        car.setUpdatedAt(LocalDateTime.now());
 
         carRepository.save(car);
         String ownerId = customer != null ? String.valueOf(customer.getUserId()) : redisCacheService.ownerUserId(car);

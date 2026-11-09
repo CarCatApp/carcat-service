@@ -103,6 +103,48 @@ public class Booking {
     @Column(name = "updated_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime updatedAt;
 
+    /**
+     * tr: Partner sorğunu qəbul edəndə. Ani növbədə bu, yaranma anıdır. Köhnə sətir boş qala bilər.
+     * en: When the partner accepts the request. On an instant queue this is the creation instant. Old rows may stay empty.
+     */
+    @Column(name = "accepted_time", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    OffsetDateTime acceptedTime;
+
+    /**
+     * tr: Xidmət tamamlananda. Köhnə sətir boş qala bilər.
+     * en: When the service is completed. Old rows may stay empty.
+     */
+    @Column(name = "completed_time", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    OffsetDateTime completedTime;
+
+    /**
+     * tr: Partner rədd edəndə, ya da yer dolunca gözləyən rədd olunanda. Ləğv və gəlmədi bunu yazmır.
+     * en: When the partner rejects, or a waiting request is rejected because the places are full. Cancel and no-show leave this empty.
+     */
+    @Column(name = "rejected_time", columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    OffsetDateTime rejectedTime;
+
+    /** tr: Boşdursa yazır. Sonrakı keçid köhnə saatı saxlayır. en: Writes while empty. A later transition keeps the earlier stamp. */
+    public void stampAccepted(OffsetDateTime when) {
+        if (acceptedTime == null) {
+            acceptedTime = when == null ? OffsetDateTime.now() : when;
+        }
+    }
+
+    /** tr: Boşdursa yazır. en: Writes while empty. */
+    public void stampCompleted(OffsetDateTime when) {
+        if (completedTime == null) {
+            completedTime = when == null ? OffsetDateTime.now() : when;
+        }
+    }
+
+    /** tr: Boşdursa yazır. en: Writes while empty. */
+    public void stampRejected(OffsetDateTime when) {
+        if (rejectedTime == null) {
+            rejectedTime = when == null ? OffsetDateTime.now() : when;
+        }
+    }
+
     @PrePersist
     void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();

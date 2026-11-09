@@ -584,11 +584,17 @@ public class StaffBookingService {
             }
             bookingCapacityService.requirePlace(locked, acceptLanguage);
             booking.setStatus(nextStatus);
+            booking.stampAccepted(OffsetDateTime.now());
             bookingRepository.saveAndFlush(booking);
             bookingCapacityService.closePendingWhenFull(locked);
             notifyCustomer(booking, true);
         } else {
             booking.setStatus(nextStatus);
+            if (BookingStatus.REJECTED.apiValue().equals(nextStatus)) {
+                booking.stampRejected(OffsetDateTime.now());
+            } else if (BookingStatus.COMPLETED.apiValue().equals(nextStatus)) {
+                booking.stampCompleted(OffsetDateTime.now());
+            }
             if (applied != null) {
                 String code = applied.code();
                 if ((code == null || code.isBlank())
@@ -803,6 +809,9 @@ public class StaffBookingService {
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)
                 .createdAt(createdStamp(booking.getCreatedAt()))
+                .acceptedTime(createdStamp(booking.getAcceptedTime()))
+                .completedTime(createdStamp(booking.getCompletedTime()))
+                .rejectedTime(createdStamp(booking.getRejectedTime()))
                 .customerStatus(customerStatus(booking, car, customerStatuses))
                 .build();
     }
