@@ -71,6 +71,7 @@ public class BookingAppointmentService {
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPushService bookingPushService;
     private final BookingPercentageSnapshot percentageSnapshot;
+    private final BookingVehicleSnapshot vehicleSnapshot;
     private final CommissionCustomerStatusService commissionCustomerStatusService;
 
     /**
@@ -137,7 +138,7 @@ public class BookingAppointmentService {
                 : BookingStatus.AUTO_ACCEPTED.apiValue();
         BookingSelectionWriter.Priced priced = extras(branch, body);
         int packageQepik = packageQepik(selection.packageId());
-        Booking booking = bookingRepository.save(Booking.builder()
+        Booking booking = Booking.builder()
                 .ref(nextRef())
                 .customerUserId(customerUserId)
                 .branch(branch)
@@ -151,7 +152,9 @@ public class BookingAppointmentService {
                 .carePackageId(selection.packageId())
                 .packageName(packageName(selection.packageId()))
                 .packagePrice(selection.packageId() == null ? null : packageQepik)
-                .build());
+                .build();
+        vehicleSnapshot.capture(booking, car, lang);
+        booking = bookingRepository.save(booking);
         commissionCustomerStatusService.schedule(booking.getId());
         percentageSnapshot.snapshotPackage(booking, car);
         if (priced != null) {

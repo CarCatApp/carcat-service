@@ -36,6 +36,8 @@ public class VisitServiceLineResponse {
     private String productName;
     private BigDecimal productQty;
     private MoneyResponse productAmount;
+    /** Product-only discount %. Service discount is {@link #discountPercent}. */
+    private BigDecimal productDiscountPercent;
     private BigDecimal discountPercent;
     private MoneyResponse finalAmount;
     private String notes;

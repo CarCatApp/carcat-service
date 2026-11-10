@@ -2,6 +2,7 @@ package com.carland.carland_service.service.commission;
 
 import com.carland.carland_service.dto.response.hyper.HyperServiceHistoryItemResponse;
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
+import com.carland.carland_service.hyper.HyperVin;
 import com.carland.carland_service.service.impl.HyperTokenService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,10 +54,14 @@ public class HyperVinLookup {
         if (token == null || token.isBlank()) {
             return HyperVinSnapshot.failed("no_token");
         }
+        String hyperVin = HyperVin.forHyperApi(vin);
+        if (hyperVin == null) {
+            return HyperVinSnapshot.failed("no_vin");
+        }
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + vin;
+        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + hyperVin;
         try {
             ResponseEntity<String> response = http.exchange(
                     url, HttpMethod.GET, new HttpEntity<>(headers), String.class);

@@ -2,6 +2,8 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.request.AdminPushAudienceRequest;
 import com.carland.carland_service.dto.request.AdminPushSendRequest;
+import com.carland.carland_service.exceptions.InvalidStatusException;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.AdminPushCampaignService;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -46,7 +48,7 @@ public class AdminPushRestController {
         }
         try {
             return ResponseEntity.ok(adminPushCampaignService.preview(body == null ? new AdminPushAudienceRequest() : body));
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | InvalidStatusException | MissingFieldException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
     }
@@ -63,7 +65,7 @@ public class AdminPushRestController {
         try {
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(adminPushCampaignService.queue(body, adminAccessService.actor(request)));
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | InvalidStatusException | MissingFieldException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
     }

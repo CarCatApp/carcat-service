@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.enums.PartnerId;
+import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
@@ -40,6 +41,7 @@ class VisitHistoryServiceImplBranchTest {
 
     @Mock BranchRepository branchRepository;
     @Mock CarRepository carRepository;
+    @Mock CarByVin carByVin;
     @Mock CustomerRepository customerRepository;
     @Mock VisitRepository visitRepository;
     @Mock HyperPercentageSyncService hyperPercentageSyncService;
@@ -66,7 +68,7 @@ class VisitHistoryServiceImplBranchTest {
                 .serviceCenterName("HyperService").build();
 
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(9L, "0501112233", "ACTIVE")).thenReturn(customer);
-        when(carRepository.findByVinAndCustomer("VIN1", customer)).thenReturn(car);
+        when(carByVin.findForCustomer("VIN1", customer)).thenReturn(car);
         when(visitRepository.existsByCar(car)).thenReturn(true);
         when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(panel, hyper));
         when(hyperTokenService.getToken()).thenThrow(new RuntimeException("hyper down"));

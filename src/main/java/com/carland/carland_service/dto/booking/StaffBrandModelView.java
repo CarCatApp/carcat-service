@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,4 +16,5 @@ public class StaffBrandModelView {
     String series;
     String viscosity;
     String unit;
+    BigDecimal price;
 }

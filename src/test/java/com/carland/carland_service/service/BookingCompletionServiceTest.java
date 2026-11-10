@@ -5,7 +5,7 @@ import com.carland.carland_service.dto.request.StaffCompleteRequest.StaffComplet
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.BranchCarePackageItem;
-import com.carland.carland_service.entity.BranchServicedGood;
+import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.IndividualService;
 import com.carland.carland_service.entity.OfferedService;
@@ -19,10 +19,13 @@ import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.BranchCarePackageItemRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
-import com.carland.carland_service.repository.BranchServicedGoodRepository;
+import com.carland.carland_service.repository.BrandModelRepository;
+import com.carland.carland_service.repository.BrandModelServiceRepository;
+import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.IndividualServiceRepository;
 import com.carland.carland_service.repository.OfferedServiceRepository;
+import com.carland.carland_service.repository.ServiceEntityRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.webhook.VisitWebhookSupport;
 import java.math.BigDecimal;
@@ -54,11 +57,14 @@ class BookingCompletionServiceTest {
     @Mock BranchIndividualServiceRepository branchIndividualServiceRepository;
     @Mock IndividualServiceRepository individualServiceRepository;
     @Mock OfferedServiceRepository offeredServiceRepository;
-    @Mock BranchServicedGoodRepository servicedGoodRepository;
+    @Mock BrandModelRepository brandModelRepository;
+    @Mock BrandModelServiceRepository brandModelServiceRepository;
     @Mock CarRepository carRepository;
+    @Mock CarByVin carByVin;
     @Mock VisitRepository visitRepository;
+    @Mock ServiceEntityRepository serviceEntityRepository;
     @Mock ServiceCategoryJson json;
-    @Mock BookingBranchBrandsService bookingBranchBrandsService;
+    @Mock BookingPercentageSnapshot bookingPercentageSnapshot;
     @Mock VisitWebhookSupport visitWebhookSupport;
     @Mock DetailedPercentageService detailedPercentageService;
     @Mock RedisCacheService redisCacheService;
@@ -72,9 +78,9 @@ class BookingCompletionServiceTest {
     void setUp() {
         service = new BookingCompletionService(carePackageItemRepository, individualLineRepository,
                 selectedServiceRepository, inspectionRepository, branchIndividualServiceRepository,
-                individualServiceRepository, offeredServiceRepository, servicedGoodRepository, carRepository,
-                visitRepository, json, bookingBranchBrandsService, visitWebhookSupport, detailedPercentageService,
-                redisCacheService);
+                individualServiceRepository, offeredServiceRepository, brandModelRepository,
+                brandModelServiceRepository, carRepository, carByVin, visitRepository, serviceEntityRepository, json,
+                bookingPercentageSnapshot, visitWebhookSupport, detailedPercentageService, redisCacheService);
         Partner partner = Partner.builder().id(1L).name("HyperService").active(true).build();
         Branch branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(partner).build();
         booking = Booking.builder().id(50L).ref("CC-042197").branch(branch).carId(5L)
@@ -89,9 +95,9 @@ class BookingCompletionServiceTest {
                 BranchCarePackageItem.builder().id(31L).offeredService(oil).build(),
                 BranchCarePackageItem.builder().id(32L).offeredService(scan).build()));
         lenient().when(inspectionRepository.findByBooking_Id(50L)).thenReturn(Optional.empty());
-        lenient().when(servicedGoodRepository.findByBranch_IdOrderByIdAsc(7L)).thenReturn(List.of(
-                BranchServicedGood.builder().id(11L).name("Castrol EDGE").price(new BigDecimal("25")).build(),
-                BranchServicedGood.builder().id(12L).name("Brembo").price(new BigDecimal("15")).build()));
+        lenient().when(brandModelRepository.findByBranch_IdOrderByIdAsc(7L)).thenReturn(List.of(
+                BrandModel.builder().id(11L).name("Castrol EDGE").price(new BigDecimal("25")).build(),
+                BrandModel.builder().id(12L).name("Brembo").price(new BigDecimal("15")).build()));
         lenient().when(visitRepository.saveAndFlush(any(Visit.class))).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of());
     }
@@ -106,16 +112,19 @@ class BookingCompletionServiceTest {
                 .date(LocalDate.of(2026, 10, 27))
                 .mileage(42580)
                 .discountPercent(new BigDecimal("10"))
+                .notes("ümumi qeyd")
                 .lines(List.of(
                         // Paket: qiymət daxildir, göndərilən qiymət nəzərə alınmır.
-                        StaffCompleteLine.builder().kind("package").offeredServiceId(1L).goodId(11L)
+                        StaffCompleteLine.builder().kind("package").offeredServiceId(1L).brandModelId(11L)
                                 .productQty(new BigDecimal("4")).price(new BigDecimal("999"))
                                 .nextMileage(52580).build(),
-                        // 50 + 15×2 = 80, 10% → 72
-                        StaffCompleteLine.builder().kind("individual").individualServiceId(20L).goodId(12L)
-                                .productQty(new BigDecimal("2")).price(new BigDecimal("50"))
+                        // product 15×2=30 −10% → 27; service 50 −10% → 45; line final 72
+                        StaffCompleteLine.builder().kind("individual").individualServiceId(20L).brandModelId(12L)
+                                .productQty(new BigDecimal("2"))
+                                .productDiscountPercent(new BigDecimal("10"))
+                                .price(new BigDecimal("50"))
                                 .discountPercent(new BigDecimal("10")).build(),
-                        // 100 → manual 90, discount back-computed as 10%
+                        // service 100 → manual 90, discount back-computed as 10%
                         StaffCompleteLine.builder().kind("one_time").title("Dəmir qapının dəyişdirilməsi")
                                 .price(new BigDecimal("100")).finalAmount(new BigDecimal("90"))
                                 .nextDate(LocalDate.of(2027, 1, 1)).build()))
@@ -127,6 +136,7 @@ class BookingCompletionServiceTest {
         assertEquals(new BigDecimal("309.00"), visit.getCostAmount());
         assertEquals(new BigDecimal("261.90"), visit.getFinalCostAmount());
         assertEquals(new BigDecimal("129.00"), visit.getPackagePrice());
+        assertEquals("ümumi qeyd", visit.getNotes());
         assertEquals("panel", visit.getSource());
         assertNull(visit.getHyperRecordId());
         assertEquals(7L, visit.getBranchId());
@@ -143,6 +153,7 @@ class BookingCompletionServiceTest {
 
         VisitServiceLine individual = visit.getServices().get(1);
         assertEquals(new BigDecimal("30.00"), individual.getProductAmount());
+        assertEquals(new BigDecimal("10.00"), individual.getProductDiscountPercent());
         assertEquals(new BigDecimal("72.00"), individual.getFinalAmount());
 
         VisitServiceLine oneTime = visit.getServices().get(2);
@@ -153,6 +164,7 @@ class BookingCompletionServiceTest {
         assertEquals("package_info", visit.getServices().get(3).getKind());
         assertEquals(2, visit.getParts().size());
         assertNull(visit.getParts().get(0).getPrice(), "package product is included in the package price");
+        assertEquals(new BigDecimal("27.00"), visit.getParts().get(1).getPrice());
         assertEquals(42580L, car.getMileage());
         verify(detailedPercentageService).applyFromVisit(car, booking, visit);
     }

@@ -178,6 +178,42 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
+    void unknownHostDoesNotSaveAndIsRestrictedInThreeLanguages() throws Exception {
+        customer();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any()))
+                .thenReturn(List.of());
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenThrow(new java.net.UnknownHostException("idda.example"));
+
+        for (String lang : List.of("az", "en", "ru")) {
+            CarResponse response = service.check("77BU669", "050", "7", lang);
+            assertEquals(Boolean.TRUE, response.getIsRestrict());
+            assertNull(response.getVin());
+            assertEquals(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(lang), response.getMessage());
+        }
+        verify(iddaPlateCheckRepository, never()).save(any());
+    }
+
+    @Test
+    void http502DoesNotSaveAndIsRestricted() throws Exception {
+        customer();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any()))
+                .thenReturn(List.of());
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenReturn(new DigitalFinanceClient.Upstream(502, "text/plain", "bad gateway".getBytes(StandardCharsets.UTF_8)));
+
+        CarResponse response = service.check("77BU669", "050", "7", "en");
+
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        assertNull(response.getVin());
+        assertEquals(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang("en"), response.getMessage());
+        verify(iddaPlateCheckRepository, never()).save(any());
+        verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
+    }
+
+    @Test
     void guideUserOnDemoPlateSkipsTheFullCapAndDoesNotCount() throws Exception {
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(55L, "050", "ACTIVE"))
                 .thenReturn(Customer.builder().userId(55L).name("N").surname("M").phoneNumber("050").build());

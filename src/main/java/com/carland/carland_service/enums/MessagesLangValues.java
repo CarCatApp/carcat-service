@@ -606,9 +606,9 @@ public enum MessagesLangValues {
     ),
 
     IDDA_UNAVAILABLE(
-            "Dövlət reyestrinə indi çatılmır. Yenidən cəhd edin",
-            "The state registry is unreachable right now. Try again",
-            "Государственный реестр сейчас недоступен. Повторите попытку"
+            "Hazırda qarşı tərəfin təqdim etdiyi xidmət ilə bağlı problem yaşanmaqdadır. Xahiş edirik ki, BAN nömrəsi seçməklə davam edəsiniz",
+            "There is currently a problem with the counterparty service. Please continue by selecting the BAN number",
+            "В настоящее время возникла проблема с услугой контрагента. Пожалуйста, продолжите, выбрав номер BAN"
     ),
 
     PLATE_QUERY_LIMIT(

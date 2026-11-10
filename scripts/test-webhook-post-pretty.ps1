@@ -1,5 +1,5 @@
 $bodyPath = Join-Path $env:TEMP "webhook-body-pretty.json"
-$secret = "Y2FybGFuZC1zZWNyZXQta2V5LXNoYXJlZC13aXRoLWh5cGVy"
+$secret = $env:PARTNER_WEBHOOK_SECRET  # from partners.webhook_secret / env — never commit the real value
 
 $body = @'
 {

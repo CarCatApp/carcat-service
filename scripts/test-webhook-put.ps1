@@ -1,5 +1,5 @@
 $bodyPath = Join-Path $env:TEMP "webhook-put-body.json"
-$secret = "Y2FybGFuZC1zZWNyZXQta2V5LXNoYXJlZC13aXRoLWh5cGVy"
+$secret = $env:PARTNER_WEBHOOK_SECRET  # from partners.webhook_secret / env — never commit the real value
 
 $body = '{"partnerId":1,"plate":"55-BB-666","vin":"HHGHHHJHGHHHHHGGG","currentMileage":121000,"serviceHistory":[{"recordId":19387,"serviceType":"Mühərrik xidməti","lastServiceDate":"2026-05-25","lastServiceMileage":121000,"services":[{"serviceCode":7,"serviceName":"EXTRA Mühərrik yağının dəyişdirilməsi","universalServiceId":"Engine oil & filter","cost":{"amount":50.0,"currency":"AZN"},"nextServiceDate":"2027-05-25","nextServiceMileage":141000}],"finalCost":{"amount":50.0,"currency":"AZN"},"dealer":"Babək Ekspress"}]}'
 

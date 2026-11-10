@@ -23,6 +23,8 @@ public class StaffCompleteRequest {
     Integer mileage;
     /** Overall discount % applied after line discounts (0–100). */
     BigDecimal discountPercent;
+    /** One operator note for the whole visit. */
+    String notes;
     List<StaffCompleteLine> lines;
 
     @Data
@@ -40,18 +42,22 @@ public class StaffCompleteRequest {
         Integer mileage;
         LocalDate nextDate;
         Integer nextMileage;
-        /** branch_serviced_goods id. */
-        Long goodId;
-        /** Free-text product when no good is picked. */
+        /** brand_models id. */
+        Long brandModelId;
+        /** Free-text / overridden product name. */
         String productName;
         BigDecimal productQty;
-        /** Product total; null → good unit price × qty. Ignored for package lines. */
+        /** Product total before product discount; null → brand unit price × qty. Ignored for package lines. */
         BigDecimal productAmount;
+        /** Product-only discount % (0–100). */
+        BigDecimal productDiscountPercent;
+        /** Manual product final; null → productAmount × (1 − productDiscount%). */
+        BigDecimal productFinalAmount;
         /** Service price; ignored for package lines. */
         BigDecimal price;
+        /** Service-only discount % (0–100). */
         BigDecimal discountPercent;
-        /** Manual final amount; null → (price + product) × (1 − discount%). */
+        /** Manual service final; null → price × (1 − discount%). */
         BigDecimal finalAmount;
-        String notes;
     }
 }

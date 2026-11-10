@@ -55,15 +55,29 @@ public final class DigitalHistoryPaths {
 
     /**
      * tr: Yoxlama səhifəsi və onun PDF-i. Paylaşım linkini yaradan POST bura düşmür.
+     *     {@code /api/v1/sima/verify/*} bura düşməz — {@code contains("/verify/")} SIMA-nı da tuturdu.
      * en: The verify page and its PDF. The POST that mints the share link does not land here.
+     *     {@code /api/v1/sima/verify/*} must not match — bare {@code contains("/verify/")} also hit SIMA.
      */
     public static boolean isVerify(String path) {
         String bare = bare(path);
-        return bare.equals("/verify")
-                || bare.startsWith("/verify/")
-                || bare.contains("/verify/")
-                || bare.contains("/digital-history/verify/")
-                || bare.endsWith("/digital-history/verify");
+        if (bare.equals("/verify") || bare.startsWith("/verify/")) {
+            return true;
+        }
+        int digitalHistory = bare.indexOf("/digital-history/verify");
+        if (digitalHistory >= 0) {
+            String after = bare.substring(digitalHistory + "/digital-history/verify".length());
+            return after.isEmpty() || after.startsWith("/");
+        }
+        // /{context}/verify/{code} when the URI still includes the servlet context (one segment only).
+        int verifyAt = bare.indexOf("/verify/");
+        if (verifyAt > 0) {
+            return bare.substring(0, verifyAt).indexOf('/', 1) < 0;
+        }
+        if (bare.endsWith("/verify")) {
+            return bare.substring(0, bare.length() - "/verify".length()).indexOf('/', 1) < 0;
+        }
+        return false;
     }
 
     private static String bare(String path) {

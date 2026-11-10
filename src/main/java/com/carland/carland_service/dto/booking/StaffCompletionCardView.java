@@ -29,4 +29,11 @@ public class StaffCompletionCardView {
     /** Branch price range (AZN) for individual services. */
     BigDecimal priceMin;
     BigDecimal priceMax;
+    /**
+     * From this car's maintenance template for {@link #maintenanceCode}:
+     * intervalMonth &gt; 0 → date open; intervalKm &gt; 0 → mileage open;
+     * both empty → both open.
+     */
+    boolean nextDateOpen;
+    boolean nextMileageOpen;
 }

@@ -77,6 +77,37 @@ public class Booking {
     @Column(name = "car_id")
     Long carId;
 
+    /**
+     * tr: Partner hover üçün book anındakı avtomobil kopyası. Sonrakı cars dəyişikliyi bunu dəyişmir.
+     *     Köhnə sətir boş qala bilər; oxuyanda canlı cars-a düşülür.
+     * en: Car copy at booking time for the partner hover. Later cars edits do not change this.
+     *     Old rows may stay empty; reads fall back to the live cars row.
+     */
+    @Column(name = "car_brand", length = 80)
+    String carBrand;
+
+    @Column(name = "car_model", length = 80)
+    String carModel;
+
+    /** tr: Book anında Accept-Language ilə yazılmış rəng adı. Dil dəyişəndə də eyni qalır. */
+    @Column(name = "car_color", length = 80)
+    String carColor;
+
+    @Column(name = "car_body_type", length = 80)
+    String carBodyType;
+
+    @Column(name = "car_engine_type", length = 80)
+    String carEngineType;
+
+    @Column(name = "car_model_year")
+    Integer carModelYear;
+
+    @Column(name = "car_engine_volume")
+    Integer carEngineVolume;
+
+    @Column(name = "car_mileage")
+    Long carMileage;
+
     /** Şubenin care paketi. İçerik satırları cevapta yok; ad ve fiyat kopyası. */
     @Column(name = "care_package_id")
     Long carePackageId;

@@ -18,6 +18,8 @@ import com.carland.carland_service.enums.ServiceTypeTranslation;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
+import com.carland.carland_service.hyper.CarByVin;
+import com.carland.carland_service.hyper.HyperVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.ServiceHistoryPartRepository;
@@ -61,6 +63,7 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
     private static final ConcurrentHashMap<Long, Object> CAR_PERSIST_LOCKS = new ConcurrentHashMap<>();
 
     private final CarRepository carRepository;
+    private final CarByVin carByVin;
     private final CustomerRepository customerRepository;
     private final ServiceHistoryRepository serviceHistoryRepository;
     private final ServiceHistoryPartRepository serviceHistoryPartRepository;
@@ -97,7 +100,7 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        Car car = carRepository.findByVinAndCustomer(vin, customer);
+        Car car = carByVin.findForCustomer(vin, customer);
         if (car == null) {
             log.warn("[hist-debug] v1 car not found for customer | vin={} userId={}", vin, userIdHeader);
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
@@ -167,7 +170,8 @@ public class CarVinHistoryServiceImpl implements CarVinHistoryService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + vin;
+        String hyperVin = HyperVin.forHyperApi(vin);
+        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + (hyperVin != null ? hyperVin : vin);
         try {
             ResponseEntity<HyperVehicleByVinResponse> response = restTemplate.exchange(
                     url, HttpMethod.GET, entity, HyperVehicleByVinResponse.class

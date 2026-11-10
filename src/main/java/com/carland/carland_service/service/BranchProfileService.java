@@ -26,6 +26,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -189,6 +191,7 @@ public class BranchProfileService {
                 .series(series)
                 .viscosity(viscosity)
                 .unit(unit)
+                .price(money(body.getPrice(), "price"))
                 .build());
         return view(staff, branch, acceptLanguage);
     }
@@ -219,6 +222,7 @@ public class BranchProfileService {
             model.setViscosity(null);
         }
         model.setUnit(unit(body.getUnit()));
+        model.setPrice(money(body.getPrice(), "price"));
         brandModelRepository.save(model);
         return view(staff, branch, acceptLanguage);
     }
@@ -253,6 +257,7 @@ public class BranchProfileService {
                             .series(model.getSeries())
                             .viscosity(model.getViscosity())
                             .unit(model.getUnit())
+                            .price(model.getPrice())
                             .build());
         }
         String lang = BookingMineService.langOf(acceptLanguage);
@@ -373,5 +378,15 @@ public class BranchProfileService {
             throw new MissingFieldException("unit is invalid");
         }
         return code;
+    }
+
+    private static BigDecimal money(BigDecimal value, String field) {
+        if (value == null) {
+            return null;
+        }
+        if (value.signum() < 0) {
+            throw new MissingFieldException(field + " must be >= 0");
+        }
+        return value.setScale(2, RoundingMode.HALF_UP);
     }
 }

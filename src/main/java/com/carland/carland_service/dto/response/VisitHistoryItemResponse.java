@@ -68,4 +68,6 @@ public class VisitHistoryItemResponse {
     /** cost − amount (all discounts together). */
     private MoneyResponse discount;
     private String inspectionNote;
+    /** Operator note for the whole visit (panel completion). */
+    private String notes;
 }

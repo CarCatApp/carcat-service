@@ -73,9 +73,14 @@ class DigitalHistoryTokensTest {
         assertFalse(DigitalHistoryPaths.isPdf(null));
         assertTrue(DigitalHistoryPaths.isVerify("/verify/CC-2026-K7Q2M9X4TA"));
         assertTrue(DigitalHistoryPaths.isVerify("/verify/CC-2026-K7Q2M9X4TA/pdf"));
+        assertTrue(DigitalHistoryPaths.isVerify("/server-carland/verify/CC-2026-K7Q2M9X4TA"));
         assertTrue(DigitalHistoryPaths.isVerify("/api/v1/car/digital-history/verify/CC-2026-K7Q2M9X4TA"));
         assertFalse(DigitalHistoryPaths.isVerify("/api/v1/car/digital-history"));
         assertFalse(DigitalHistoryPaths.isVerify("/api/v1/car/15/digital-history/link"));
+        assertFalse(DigitalHistoryPaths.isVerify("/api/v1/sima/verify/citizen"));
+        assertFalse(DigitalHistoryPaths.isVerify("/server-carland/api/v1/sima/verify/passport"));
+        assertFalse(DigitalHistoryPaths.isVerify("/api/v1/sima/verify/foreign"));
+        assertFalse(DigitalHistoryPaths.isVerify("/api/v1/sima/test/identity/verify"));
     }
 
     private static String payload(String token) {

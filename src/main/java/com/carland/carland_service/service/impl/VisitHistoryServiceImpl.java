@@ -24,6 +24,8 @@ import com.carland.carland_service.enums.ServiceTypeTranslation;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
+import com.carland.carland_service.hyper.CarByVin;
+import com.carland.carland_service.hyper.HyperVin;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
@@ -102,6 +104,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
 
     private final BranchRepository branchRepository;
     private final CarRepository carRepository;
+    private final CarByVin carByVin;
     private final CustomerRepository customerRepository;
     private final VisitRepository visitRepository;
     private final HyperPercentageSyncService hyperPercentageSyncService;
@@ -139,7 +142,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
             throw new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage));
         }
 
-        Car car = carRepository.findByVinAndCustomer(vin, customer);
+        Car car = carByVin.findForCustomer(vin, customer);
         if (car == null) {
             log.warn("[hist-debug] v2 car not found for customer | vin={} userId={}", vin, userIdHeader);
             throw new ResourceNotFoundException(MessagesLangValues.CAR_NOT_FOUND.getMessageByLang(acceptLanguage));
@@ -411,6 +414,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                 .discountPercent(visit.getDiscountPercent())
                 .discount(discountOf(visit))
                 .inspectionNote(visit.getInspectionNote())
+                .notes(visit.getNotes())
                 .build();
     }
 
@@ -442,6 +446,7 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                             .productName(line.getProductName())
                             .productQty(line.getProductQty())
                             .productAmount(line.getProductAmount() == null ? null : toMoney(line.getProductAmount(), line.getCostCurrency()))
+                            .productDiscountPercent(line.getProductDiscountPercent())
                             .discountPercent(line.getDiscountPercent())
                             .finalAmount(line.getFinalAmount() == null ? null : toMoney(line.getFinalAmount(), line.getCostCurrency()))
                             .notes(line.getNotes())
@@ -528,7 +533,8 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + vin;
+        String hyperVin = HyperVin.forHyperApi(vin);
+        String url = hyperBaseUrl + "/partner/v1/vehicles/by-vin/" + (hyperVin != null ? hyperVin : vin);
         try {
             ResponseEntity<HyperVehicleByVinResponse> response = restTemplate.exchange(
                     url, HttpMethod.GET, entity, HyperVehicleByVinResponse.class

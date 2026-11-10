@@ -91,6 +91,10 @@ public class VisitServiceLine {
     @Column(name = "final_amount", precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
+    /**
+     * Brand model id used on the line ({@code brand_models.id}).
+     * Legacy rows may still hold a serviced-good id.
+     */
     @Column(name = "product_good_id")
     private Long productGoodId;
 
@@ -101,9 +105,13 @@ public class VisitServiceLine {
     @Column(name = "product_qty", precision = 10, scale = 2)
     private BigDecimal productQty;
 
-    /** Product total (unit price × qty), AZN. Null when included in the package. */
+    /** Product total before its own discount (unit price × qty), AZN. Null when included in the package. */
     @Column(name = "product_amount", precision = 12, scale = 2)
     private BigDecimal productAmount;
+
+    /** Product-only discount % (0–100). Service discount stays in {@link #discountPercent}. */
+    @Column(name = "product_discount_percent", precision = 5, scale = 2)
+    private BigDecimal productDiscountPercent;
 
     @Column(name = "notes", length = 1000)
     private String notes;

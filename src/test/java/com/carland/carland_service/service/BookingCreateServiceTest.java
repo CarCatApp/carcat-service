@@ -73,6 +73,7 @@ class BookingCreateServiceTest {
     @Mock BookingCapacityService capacity;
     @Mock StaffBookingLiveService live;
     @Mock BookingPercentageSnapshot percentageSnapshot;
+    @Mock BookingVehicleSnapshot vehicleSnapshot;
     @Mock BookingPushService bookingPushService;
     @Mock CommissionCustomerStatusService commissionCustomerStatusService;
 
@@ -88,7 +89,8 @@ class BookingCreateServiceTest {
                 rangeRepository, bookingRepository, bookingItemRepository,
                 packageRepository, serviceRepository, carePackageRepository, offeredServiceRepository,
                 bookingSelectedServiceRepository, customerRepository, carRepository, new ObjectMapper(),
-                selectionWriter, capacity, live, percentageSnapshot, bookingPushService, commissionCustomerStatusService);
+                selectionWriter, capacity, live, percentageSnapshot, vehicleSnapshot, bookingPushService,
+                commissionCustomerStatusService);
         customer = Customer.builder().userId(77L).phoneNumber("+994501112233").build();
         car = Car.builder().carId(55L).vin("3FA6P0HDXKR168752").customer(customer).build();
         Partner hyper = Partner.builder().id(1L).active(true).name("Hyper").source("hyper").build();
@@ -148,6 +150,7 @@ class BookingCreateServiceTest {
         assertEquals(77L, captor.getValue().getCustomerUserId());
         assertEquals(55L, captor.getValue().getCarId());
         assertNull(captor.getValue().getAcceptedTime());
+        verify(vehicleSnapshot).capture(any(Booking.class), eq(car), any());
         verify(bookingPushService, never()).accepted(any());
     }
 

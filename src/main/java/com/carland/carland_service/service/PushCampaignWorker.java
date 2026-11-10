@@ -13,11 +13,13 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * tr: Kuyruğa alınan admin push kampanyasını arka planda FCM sendEachForMulticast (500) ile işler.
- * en: Processes a queued admin push campaign in the background via FCM sendEachForMulticast (500).
+ * tr: Kuyruğa alınan admin push kampanyasını dil gruplarına ayırıp FCM multicast (500) ile işler.
+ * en: Processes a queued admin push campaign by language group via FCM multicast (500).
  */
 @Service
 @RequiredArgsConstructor
@@ -51,8 +53,10 @@ public class PushCampaignWorker {
         campaign.setStartedAt(LocalDateTime.now());
         pushCampaignRepository.save(campaign);
 
-        List<DeviceToken> audience = adminPushCampaignService.loadAudience(campaign).stream()
-                .filter(dt -> dt.getDeviceToken() != null && !dt.getDeviceToken().isBlank())
+        List<AdminPushCampaignService.AudienceRow> audience = adminPushCampaignService.loadAudience(campaign).stream()
+                .filter(row -> row.deviceToken() != null
+                        && row.deviceToken().getDeviceToken() != null
+                        && !row.deviceToken().getDeviceToken().isBlank())
                 .toList();
         campaign.setAudienceCount(audience.size());
         pushCampaignRepository.save(campaign);
@@ -64,51 +68,65 @@ public class PushCampaignWorker {
             return;
         }
 
-        String title = campaign.getTitle();
-        String body = campaign.getBody();
+        Map<String, List<AdminPushCampaignService.AudienceRow>> byLang = new LinkedHashMap<>();
+        for (AdminPushCampaignService.AudienceRow row : audience) {
+            String lang = row.lang() == null || row.lang().isBlank() ? "az" : row.lang();
+            byLang.computeIfAbsent(lang, ignored -> new ArrayList<>()).add(row);
+        }
+
         int success = 0;
         int failed = 0;
 
-        for (int from = 0; from < audience.size(); from += FCM_MULTICAST_LIMIT) {
-            int to = Math.min(from + FCM_MULTICAST_LIMIT, audience.size());
-            List<DeviceToken> slice = audience.subList(from, to);
-            List<String> tokens = slice.stream().map(DeviceToken::getDeviceToken).toList();
-            List<Boolean> results;
-            try {
-                results = pushNotificationService.sendEachForMulticast(title, body, tokens);
-            } catch (Exception e) {
-                log.error("Multicast batch failed campaignId={} from={} to={}", campaignId, from, to, e);
-                failed += slice.size();
+        for (Map.Entry<String, List<AdminPushCampaignService.AudienceRow>> entry : byLang.entrySet()) {
+            String title = AdminPushCampaignService.titleFor(campaign, entry.getKey());
+            String body = AdminPushCampaignService.bodyFor(campaign, entry.getKey());
+            List<AdminPushCampaignService.AudienceRow> group = entry.getValue();
+
+            for (int from = 0; from < group.size(); from += FCM_MULTICAST_LIMIT) {
+                int to = Math.min(from + FCM_MULTICAST_LIMIT, group.size());
+                List<AdminPushCampaignService.AudienceRow> slice = group.subList(from, to);
+                List<String> tokens = slice.stream()
+                        .map(AdminPushCampaignService.AudienceRow::deviceToken)
+                        .map(DeviceToken::getDeviceToken)
+                        .toList();
+                List<Boolean> results;
+                try {
+                    results = pushNotificationService.sendEachForMulticast(title, body, tokens);
+                } catch (Exception e) {
+                    log.error("Multicast batch failed campaignId={} lang={} from={} to={}",
+                            campaignId, entry.getKey(), from, to, e);
+                    failed += slice.size();
+                    campaign.setFailedCount(failed);
+                    pushCampaignRepository.save(campaign);
+                    continue;
+                }
+                List<Notification> inbox = new ArrayList<>();
+                for (int i = 0; i < slice.size(); i++) {
+                    boolean ok = i < results.size() && Boolean.TRUE.equals(results.get(i));
+                    if (ok) {
+                        success++;
+                        OffsetDateTime createdAt = Notification.nowLocal();
+                        inbox.add(Notification.builder()
+                                .created(createdAt.toLocalDate())
+                                .createdAt(createdAt)
+                                .customerId(slice.get(i).deviceToken().getUserId())
+                                .notificationText(body)
+                                .title(title)
+                                .status("ACTIVE")
+                                .isRead(false)
+                                .type("BULK")
+                                .build());
+                    } else {
+                        failed++;
+                    }
+                }
+                if (!inbox.isEmpty()) {
+                    notificationRepository.saveAll(inbox);
+                }
+                campaign.setSuccessCount(success);
                 campaign.setFailedCount(failed);
                 pushCampaignRepository.save(campaign);
-                continue;
             }
-            List<Notification> inbox = new ArrayList<>();
-            for (int i = 0; i < slice.size(); i++) {
-                boolean ok = i < results.size() && Boolean.TRUE.equals(results.get(i));
-                if (ok) {
-                    success++;
-                    OffsetDateTime createdAt = Notification.nowLocal();
-                    inbox.add(Notification.builder()
-                            .created(createdAt.toLocalDate())
-                            .createdAt(createdAt)
-                            .customerId(slice.get(i).getUserId())
-                            .notificationText(body)
-                            .title(title)
-                            .status("ACTIVE")
-                            .isRead(false)
-                            .type("BULK")
-                            .build());
-                } else {
-                    failed++;
-                }
-            }
-            if (!inbox.isEmpty()) {
-                notificationRepository.saveAll(inbox);
-            }
-            campaign.setSuccessCount(success);
-            campaign.setFailedCount(failed);
-            pushCampaignRepository.save(campaign);
         }
 
         campaign.setStatus(PushCampaign.COMPLETED);

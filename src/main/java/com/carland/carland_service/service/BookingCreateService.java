@@ -84,6 +84,7 @@ public class BookingCreateService {
     private final BookingCapacityService bookingCapacityService;
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPercentageSnapshot percentageSnapshot;
+    private final BookingVehicleSnapshot vehicleSnapshot;
     private final BookingPushService bookingPushService;
     private final CommissionCustomerStatusService commissionCustomerStatusService;
 
@@ -141,6 +142,7 @@ public class BookingCreateService {
                 .vin(vin)
                 .carId(car.getCarId())
                 .build();
+        vehicleSnapshot.capture(booking, car, acceptLanguage);
         applyCarePackage(booking, prepared.branch, request.getCarePackageId());
         if (priced != null) {
             int min = booking.getPriceMin() == null ? 0 : booking.getPriceMin();

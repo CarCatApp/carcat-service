@@ -32,6 +32,6 @@ public class StaffCompletionDraftView {
     List<StaffCompletionCardView> cards;
     /** "Yeni xidmət → Dövri": individual services this branch has enabled. */
     List<StaffCompletionCardView> individualCatalog;
-    /** Products by heading, with unit prices. */
+    /** Brand/models by heading (Settings → Xidmətlərə uyğun marka və model), with unit prices. */
     List<BookingBrandModelGroupView> goods;
 }

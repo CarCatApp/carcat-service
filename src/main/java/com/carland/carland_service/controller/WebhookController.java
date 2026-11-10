@@ -3,7 +3,7 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
 import com.carland.carland_service.dto.webhook.PartnerNewServiceVisitResult;
 import com.carland.carland_service.dto.webhook.PartnerUpdateServiceVisitResult;
-import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.service.PartnerServiceVisitIngestService;
 import com.carland.carland_service.service.PartnerServiceVisitUpdateService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +32,7 @@ public class WebhookController {
     private static final String DELIVERY_SOURCE_HEADER = "X-Webhook-Delivery";
     private static final String DELIVERY_RABBIT_REPLAY = "rabbit-replay";
 
-    private final CarRepository carRepository;
+    private final CarByVin carByVin;
     private final PartnerServiceVisitIngestService partnerServiceVisitIngestService;
     private final PartnerServiceVisitUpdateService partnerServiceVisitUpdateService;
 
@@ -51,7 +51,7 @@ public class WebhookController {
      */
     @GetMapping("/car/find")
     public ResponseEntity<Void> findCarByVin(@RequestParam String vin, @RequestParam Long partnerId) {
-        if (vin == null || vin.isBlank() || partnerId == null || carRepository.findByVin(vin.trim()) == null) {
+        if (vin == null || vin.isBlank() || partnerId == null || carByVin.findOne(vin) == null) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok().build();

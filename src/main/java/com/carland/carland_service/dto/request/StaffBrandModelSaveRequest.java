@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.request;
 
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,4 +15,6 @@ public class StaffBrandModelSaveRequest {
     String series;
     String viscosity;
     String unit;
+    /** Unit price in AZN; null clears / leaves unset. */
+    BigDecimal price;
 }

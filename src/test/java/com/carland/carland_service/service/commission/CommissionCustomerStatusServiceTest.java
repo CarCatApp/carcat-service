@@ -94,17 +94,19 @@ class CommissionCustomerStatusServiceTest {
     }
 
     @Test
-    void shortVinIsNotSentToHyper() {
-        when(statusRepository.findByVin("ABC")).thenReturn(Optional.empty());
+    void shortVinIsPaddedWhenAskingHyper() {
+        when(statusRepository.findByVin("C11437527")).thenReturn(Optional.empty());
+        when(hyperVinLookup.lookup("C11437527")).thenReturn(HyperVinSnapshot.notFound("vehicle_not_found"));
+        when(statusRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertNull(service.ensure(booking("ABC")));
+        CommissionCustomerStatus result = service.ensure(booking("C11-437527"));
 
-        verify(hyperVinLookup, never()).lookup(any());
-        verify(statusRepository, never()).saveAndFlush(any());
+        assertEquals(CommissionStatus.NEW, result.getStatus());
+        verify(hyperVinLookup).lookup("C11437527");
         ArgumentCaptor<CommissionStatusAudit> audit = ArgumentCaptor.forClass(CommissionStatusAudit.class);
         verify(auditRepository).save(audit.capture());
-        assertEquals(CommissionStatusRules.INVALID_VIN, audit.getValue().getReason());
-        assertEquals(CommissionStatus.NEW, audit.getValue().getStatus());
+        assertTrue(audit.getValue().getRequestText().startsWith(
+                "GET /partner/v1/vehicles/by-vin/C1143752700000000\n"));
     }
 
     private static Booking booking(String vin) {

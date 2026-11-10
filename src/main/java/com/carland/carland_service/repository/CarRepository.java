@@ -32,6 +32,27 @@ public interface CarRepository extends JpaRepository<Car, Long>, JpaSpecificatio
     List<Car> findAllByVinIgnoreCase(@Param("vin") String vin);
 
     /**
+     * tr: Tire/boşluk yok sayılarak VIN eşler. {@code C11-437527} ile {@code C11437527} aynıdır.
+     * en: Matches VIN ignoring dashes and spaces. {@code C11-437527} equals {@code C11437527}.
+     */
+    @Query(value = """
+            SELECT * FROM cars
+            WHERE upper(replace(replace(coalesce(vin, ''), '-', ''), ' ', '')) = :vinKey
+            """, nativeQuery = true)
+    List<Car> findAllByVinKey(@Param("vinKey") String vinKey);
+
+    /**
+     * tr: Aynı VIN anahtarı + sahip. Hyper pad / tire farkı {@code vinKey} tarafında çözülür.
+     * en: Same VIN key + owner. Hyper pad / dash differences are resolved in {@code vinKey}.
+     */
+    @Query(value = """
+            SELECT * FROM cars
+            WHERE upper(replace(replace(coalesce(vin, ''), '-', ''), ' ', '')) = :vinKey
+              AND customer_id = :customerId
+            """, nativeQuery = true)
+    List<Car> findAllByVinKeyAndCustomerId(@Param("vinKey") String vinKey, @Param("customerId") Long customerId);
+
+    /**
      * tr: Plaka anahtarı: büyük harf, boşluk, tire ve nokta yok. 77-BU-669 ile 77BU669 aynıdır.
      * en: Plate key: upper case, no space, dash or dot. 77-BU-669 and 77BU669 match.
      */

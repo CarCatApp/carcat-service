@@ -28,11 +28,25 @@ public class PushCampaign {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
+    /** az title (required). */
     @Column(nullable = false, length = 100)
     String title;
 
+    /** az body (required). */
     @Column(nullable = false, length = 300)
     String body;
+
+    @Column(name = "title_en", length = 100)
+    String titleEn;
+
+    @Column(name = "body_en", length = 300)
+    String bodyEn;
+
+    @Column(name = "title_ru", length = 100)
+    String titleRu;
+
+    @Column(name = "body_ru", length = 300)
+    String bodyRu;
 
     @Column(name = "filter_gender", length = 16)
     String filterGender;
@@ -45,6 +59,10 @@ public class PushCampaign {
 
     @Column(name = "filter_engine_type_name", length = 64)
     String filterEngineTypeName;
+
+    /** Newline-separated +994… phones; when set, demographic filters are ignored. */
+    @Column(name = "filter_phones", length = 8000)
+    String filterPhones;
 
     @Column(nullable = false, length = 16)
     String status;

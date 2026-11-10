@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -82,4 +83,28 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
             @Param("engineTypeId") Long engineTypeId,
             @Param("engineTypeName") String engineTypeName
     );
+
+    /**
+     * tr: Verilen telefon varyantlarından biriyle eşleşen müşterilerin cihaz token'ları.
+     * en: Device tokens for customers whose phone matches any of the given variants.
+     */
+    @Query("""
+            SELECT dt FROM DeviceToken dt
+            WHERE EXISTS (
+              SELECT 1 FROM Customer c
+              WHERE c.userId = dt.userId
+                AND c.phoneNumber IN :phones
+            )
+            """)
+    List<DeviceToken> findAudienceByPhones(@Param("phones") Collection<String> phones);
+
+    @Query("""
+            SELECT COUNT(dt) FROM DeviceToken dt
+            WHERE EXISTS (
+              SELECT 1 FROM Customer c
+              WHERE c.userId = dt.userId
+                AND c.phoneNumber IN :phones
+            )
+            """)
+    long countAudienceByPhones(@Param("phones") Collection<String> phones);
 }

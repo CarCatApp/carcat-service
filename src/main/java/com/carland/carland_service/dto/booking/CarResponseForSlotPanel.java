@@ -9,10 +9,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: Slot panelindeki araç kutusu. Değerler cars satırının kendisi.
- *     Rəng, colors cədvəlindən Accept-Language adına görə gəlir.
- * en: Vehicle box on the slot panel. Values are the cars row as stored.
- *     Color is the colors-table name for Accept-Language.
+ * tr: Partner hover araç kutusu. Book anı kopyası varsa onu gösterir; yoksa canlı cars.
+ *     Rəng snap doludursa o mətn; boşdursa colors cədvəlindən Accept-Language adı.
+ * en: Partner hover vehicle box. Prefers the booking-time copy; otherwise live cars.
+ *     Color is the frozen snap text when present; otherwise the colors-table Accept-Language name.
  */
 @Data
 @Builder

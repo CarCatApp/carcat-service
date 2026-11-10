@@ -15,6 +15,7 @@ import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Partner;
 import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
+import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.HyperPercentageSyncService;
@@ -53,6 +54,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private static final PartnerId DEFAULT_PARTNER = PartnerId.HYPER;
 
     private final CarRepository carRepository;
+    private final CarByVin carByVin;
     private final VisitRepository visitRepository;
     private final PartnerLookupService partnerLookupService;
     private final HyperWebhookCarMetadataApplier hyperWebhookCarMetadataApplier;
@@ -78,7 +80,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
         Partner partner = partnerLookupService.requireActivePartner(request.getPartnerId());
 
         String vin = request.getVin().trim();
-        Car car = carRepository.findByVin(vin);
+        Car car = carByVin.findOne(vin);
         if (car == null) {
             throw new ResourceNotFoundException("Car not found for vin: " + vin);
         }
@@ -241,4 +243,5 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private int sizeOf(List<?> items) {
         return items == null ? 0 : items.size();
     }
+
 }

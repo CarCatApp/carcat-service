@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * tr: Admin push kampanyasının kuyruk / ilerleme görünümü.
@@ -15,6 +16,10 @@ public class AdminPushCampaignView {
     Long id;
     String title;
     String body;
+    String titleEn;
+    String bodyEn;
+    String titleRu;
+    String bodyRu;
     String status;
     int audienceCount;
     int successCount;
@@ -23,6 +28,7 @@ public class AdminPushCampaignView {
     String brand;
     Long engineTypeId;
     String engineTypeName;
+    List<String> phoneNumbers;
     String createdBy;
     String errorMessage;
     LocalDateTime createdAt;

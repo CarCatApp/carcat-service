@@ -35,14 +35,16 @@ import java.util.UUID;
  *     İzin yok, dolu limit, hata ve diğer her status isRestrict true döner ve araç taşımaz.
  *     Eski Code 0 limite sayılır, ekrana basılmaz.
  *     Geçici test: aynı müşteri + plaka ayda 5 canlı, plaka geneli ayda 10 canlı.
- *     Code 4 ve timeout hakka yazılmaz. Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
+ *     Code 4 ve teknik HTTP hataları (timeout, host, HTTP≠2xx, bozuk gövde) hakka yazılmaz.
+ *     Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
  *     Check araç satırı açmaz, sahip değiştirmez.
  *     Redis: bu servis carlist yazmaz. Araç yazısı IddaCarWriteService içindedir, orada evict vardır.
  * en: Plate check. The car is returned only from this request's live IDDA success, with isRestrict false.
  *     No permission, a full cap, errors and every other status return isRestrict true and no car.
  *     An old Code 0 still counts toward the cap and is not shown.
  *     Temporary test caps: 5 live calls per customer and plate, 10 live calls per plate.
- *     Code 4 and timeouts do not count. A plate with two adjacent A's (10AA000) never calls IDDA.
+ *     Code 4 and technical HTTP failures (timeout, host, non-2xx, unreadable body) do not count.
+ *     A plate with two adjacent A's (10AA000) never calls IDDA.
  *     The check does not insert a car or change an owner.
  *     Redis: this service does not write carlist. Car writes and evicts live in IddaCarWriteService.
  */
@@ -108,21 +110,27 @@ public class IddaPlateCheckService {
         try {
             upstream = digitalFinanceClient.exchange("GET", path, null, requestId, null);
         } catch (IOException | IllegalStateException ex) {
-            log.warn("IDDA plate check unreachable plateKey={}", plateKey);
-            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            // tr: Timeout, host bulunamadı, bağlantı reddi, interrupt, boş API key.
+            // en: Timeout, unknown host, connection refused, interrupt, empty API key.
+            log.warn("IDDA plate check unreachable plateKey={} cause={}", plateKey, ex.toString());
+            return technicalUnavailable(plateKey, acceptLanguage);
+        }
+        if (upstream.statusCode() < 200 || upstream.statusCode() >= 300) {
+            log.warn("IDDA plate check http plateKey={} http={}", plateKey, upstream.statusCode());
+            return technicalUnavailable(plateKey, acceptLanguage);
         }
         JsonNode root;
         try {
             root = objectMapper.readTree(upstream.body());
         } catch (IOException ex) {
             log.warn("IDDA plate check unreadable plateKey={} http={}", plateKey, upstream.statusCode());
-            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            return technicalUnavailable(plateKey, acceptLanguage);
         }
         JsonNode status = root.path("Status");
         int code = status.path("Code").asInt(-1);
         if (code < 0) {
             log.warn("IDDA plate check missing status plateKey={} http={}", plateKey, upstream.statusCode());
-            return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
+            return technicalUnavailable(plateKey, acceptLanguage);
         }
         IddaPlateCheck row = mapRow(root, plateKey, customer, requestId, code);
         iddaPlateCheckRepository.save(row);
@@ -131,6 +139,16 @@ public class IddaPlateCheckService {
             return toResponse(row, acceptLanguage);
         }
         return restrictedLive(row, acceptLanguage);
+    }
+
+    /**
+     * tr: Yalnız IDDA HTTP teknik hatası. Limit, AA, body ve diğer lokal validation buraya girmez.
+     *     Satır yazılmaz, hak sayılmaz. Mesaj az/en/ru IDDA_UNAVAILABLE.
+     * en: Only an IDDA HTTP technical failure. Cap, AA, body and other local validation stay elsewhere.
+     *     No row is saved and the call does not count. Message is IDDA_UNAVAILABLE in az/en/ru.
+     */
+    private CarResponse technicalUnavailable(String plateKey, String acceptLanguage) {
+        return restricted(plateKey, MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang(acceptLanguage));
     }
 
     private IddaPlateCheck mapRow(JsonNode root, String plateKey, Customer customer, String requestId, int code) {

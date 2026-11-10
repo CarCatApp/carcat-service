@@ -7,6 +7,7 @@ import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.hyper.HyperVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
@@ -109,7 +110,10 @@ public class StaffCarHistoryService {
         if (vin == null) {
             return List.of();
         }
-        List<Car> matches = new ArrayList<>(carRepository.findAllByVinIgnoreCase(vin));
+        String vinKey = HyperVin.vinKey(vin);
+        List<Car> matches = vinKey == null
+                ? new ArrayList<>(carRepository.findAllByVinIgnoreCase(vin))
+                : new ArrayList<>(carRepository.findAllByVinKey(vinKey));
         matches.sort(Comparator.comparing(Car::getCarId, Comparator.nullsLast(Comparator.reverseOrder())));
         return matches;
     }

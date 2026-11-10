@@ -3,6 +3,7 @@ package com.carland.carland_service.service.commission;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.CommissionCustomerStatus;
 import com.carland.carland_service.entity.CommissionStatusAudit;
+import com.carland.carland_service.hyper.HyperVin;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CommissionCustomerStatusRepository;
 import com.carland.carland_service.repository.CommissionStatusAuditRepository;
@@ -134,7 +135,9 @@ public class CommissionCustomerStatusService {
         String request = null;
         String response = null;
         if (snapshot != null && vin != null) {
-            request = "GET /partner/v1/vehicles/by-vin/" + vin + "\nrequest_datetime=" + bookingTime;
+            String hyperVin = HyperVin.forHyperApi(vin);
+            request = "GET /partner/v1/vehicles/by-vin/" + (hyperVin != null ? hyperVin : vin)
+                    + "\nrequest_datetime=" + bookingTime;
             response = snapshot.raw();
         }
         auditRepository.save(CommissionStatusAudit.builder()

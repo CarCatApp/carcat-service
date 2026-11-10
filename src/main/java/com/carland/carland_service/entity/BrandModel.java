@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -66,4 +67,8 @@ public class BrandModel {
     /** eded, litr, kq, metr, dest, servis. Labels stay in the UI. */
     @Column(nullable = false, length = 16)
     String unit;
+
+    /** Unit price in AZN for "Xidməti tamamla". Null until the branch sets it. */
+    @Column(precision = 12, scale = 2)
+    BigDecimal price;
 }

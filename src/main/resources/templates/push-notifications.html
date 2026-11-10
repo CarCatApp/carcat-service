@@ -6,6 +6,86 @@
   <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
   <title>Push notifications — Carland Admin</title>
   <link rel="stylesheet" href="/admin/admin.css?v=brand1">
+  <style>
+    .push-lang-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .push-lang {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      background: var(--surface, transparent);
+    }
+    .push-lang h3 {
+      font-size: 15px;
+      margin: 0 0 12px;
+      font-weight: 800;
+    }
+    .push-lang .req { color: var(--danger-text); font-weight: 700; }
+    .push-phones-field { width: 100%; min-width: 220px; flex: 1 1 100%; }
+    .phone-chip-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 96px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md, 10px);
+      background: var(--input-bg, transparent);
+      cursor: text;
+    }
+    .phone-chip-editor:focus-within { border-color: var(--text); }
+    .phone-chip-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .phone-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 100%;
+      padding: 6px 8px 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--muted, rgba(127,127,127,0.12));
+      color: var(--text);
+      font-weight: 600;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+    .phone-chip button {
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0 4px;
+      border-radius: 999px;
+    }
+    .phone-chip button:hover { color: var(--danger-text); }
+    .phone-chip-draft {
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-variant-numeric: tabular-nums;
+      width: 100%;
+      min-height: 28px;
+      padding: 4px 0;
+    }
+    .phone-chip-draft::placeholder { color: var(--text-muted); }
+    .push-hint { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+    @media (max-width: 980px) {
+      .push-lang-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -45,7 +125,7 @@
   <div class="page-head">
     <div>
       <h1>Push notifications</h1>
-      <p class="muted">Filters combine with AND. Leave every filter on All to reach every user who has a device token. Title max 100, message max 300. Send queues in the background so this page does not freeze.</p>
+      <p class="muted">az title/body required. en/ru optional (fallback az). Delivery uses each user's notificationLanguage. Phone numbers, if any, override gender/brand/fuel. Title max 100, message max 300.</p>
     </div>
   </div>
 
@@ -74,6 +154,23 @@
           <option value="">All</option>
         </select>
       </div>
+      <div class="filter-field push-phones-field">
+        <label for="phoneDraft">Phone numbers</label>
+        <div class="phone-chip-editor" id="phoneChipEditor" tabindex="-1">
+          <div class="phone-chip-list" id="phoneChipList" aria-live="polite"></div>
+          <input
+            id="phoneDraft"
+            class="phone-chip-draft"
+            type="text"
+            inputmode="tel"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="+994XXXXXXXXX"
+            aria-describedby="phoneHint"
+          />
+        </div>
+        <p class="push-hint" id="phoneHint">One +994 number per line. Completed numbers become chips; incomplete draft is cleared on blur. When chips exist, gender/brand/fuel are ignored.</p>
+      </div>
       <button class="btn btn-ghost" type="submit">Preview count</button>
     </form>
     <p class="ok-box" id="previewResult" hidden role="status" aria-live="polite"></p>
@@ -82,16 +179,48 @@
   <section class="create-card">
     <h2>Message</h2>
     <form id="messageForm">
-      <div class="field grow stack-field">
-        <label for="pushTitle">Title</label>
-        <input id="pushTitle" name="title" maxlength="100" required autocomplete="off" />
-        <span class="char-count" id="titleCount">0 / 100</span>
+      <div class="push-lang-grid">
+        <article class="push-lang">
+          <h3>az <span class="req">*</span></h3>
+          <div class="field grow stack-field">
+            <label for="titleAz">Title</label>
+            <input id="titleAz" name="titleAz" maxlength="100" required autocomplete="off" />
+            <span class="char-count" id="titleAzCount">0 / 100</span>
+          </div>
+          <div class="field grow stack-field">
+            <label for="bodyAz">Message</label>
+            <textarea id="bodyAz" name="bodyAz" maxlength="300" required rows="4"></textarea>
+            <span class="char-count" id="bodyAzCount">0 / 300</span>
+          </div>
+        </article>
+        <article class="push-lang">
+          <h3>en</h3>
+          <div class="field grow stack-field">
+            <label for="titleEn">Title</label>
+            <input id="titleEn" name="titleEn" maxlength="100" autocomplete="off" />
+            <span class="char-count" id="titleEnCount">0 / 100</span>
+          </div>
+          <div class="field grow stack-field">
+            <label for="bodyEn">Message</label>
+            <textarea id="bodyEn" name="bodyEn" maxlength="300" rows="4"></textarea>
+            <span class="char-count" id="bodyEnCount">0 / 300</span>
+          </div>
+        </article>
+        <article class="push-lang">
+          <h3>ru</h3>
+          <div class="field grow stack-field">
+            <label for="titleRu">Title</label>
+            <input id="titleRu" name="titleRu" maxlength="100" autocomplete="off" />
+            <span class="char-count" id="titleRuCount">0 / 100</span>
+          </div>
+          <div class="field grow stack-field">
+            <label for="bodyRu">Message</label>
+            <textarea id="bodyRu" name="bodyRu" maxlength="300" rows="4"></textarea>
+            <span class="char-count" id="bodyRuCount">0 / 300</span>
+          </div>
+        </article>
       </div>
-      <div class="field grow stack-field">
-        <label for="pushBody">Message</label>
-        <textarea id="pushBody" name="body" maxlength="300" required rows="4"></textarea>
-        <span class="char-count" id="bodyCount">0 / 300</span>
-      </div>
+      <p class="push-hint">en/ru empty → that user receives az. Only az is required.</p>
       <div class="push-actions">
         <button class="btn btn-primary" type="submit" id="sendBtn">Send</button>
       </div>
@@ -133,8 +262,10 @@
 (function () {
   const TITLE_MAX = 100;
   const BODY_MAX = 300;
+  const PHONE_RE = /^\+994\d{9}$/;
   let lastPreview = null;
   let pollTimer = null;
+  const linkedPhones = [];
 
   function showError(msg) {
     const box = document.getElementById("errorBox");
@@ -143,7 +274,57 @@
     box.textContent = msg;
   }
 
+  function normalizePhoneCandidate(raw) {
+    if (raw == null) return null;
+    let p = String(raw).trim().replace(/[\s-]/g, "");
+    if (/^0\d{9}$/.test(p)) p = "+994" + p.slice(1);
+    if (/^994\d{9}$/.test(p)) p = "+" + p;
+    return PHONE_RE.test(p) ? p : null;
+  }
+
+  function renderPhoneChips() {
+    const list = document.getElementById("phoneChipList");
+    list.innerHTML = linkedPhones.map(function (phone, idx) {
+      return '<div class="phone-chip" data-idx="' + idx + '">' +
+        '<span>' + escapeHtml(phone) + '</span>' +
+        '<button type="button" aria-label="Remove ' + escapeHtml(phone) + '" data-remove="' + idx + '">&times;</button>' +
+        '</div>';
+    }).join("");
+  }
+
+  function addLinkedPhone(phone) {
+    if (!phone || linkedPhones.indexOf(phone) !== -1) return false;
+    linkedPhones.push(phone);
+    renderPhoneChips();
+    lastPreview = null;
+    return true;
+  }
+
+  function clearDraft() {
+    document.getElementById("phoneDraft").value = "";
+  }
+
+  function tryCommitDraft(opts) {
+    const draft = document.getElementById("phoneDraft");
+    const raw = (draft.value || "").trim();
+    if (!raw) {
+      clearDraft();
+      return false;
+    }
+    const phone = normalizePhoneCandidate(raw);
+    if (!phone) {
+      if (opts && opts.dropIncomplete) clearDraft();
+      return false;
+    }
+    addLinkedPhone(phone);
+    clearDraft();
+    return true;
+  }
+
   function audiencePayload() {
+    if (linkedPhones.length) {
+      return { phoneNumbers: linkedPhones.slice() };
+    }
     const gender = document.getElementById("filterGender").value;
     const brand = document.getElementById("filterBrand").value;
     const engine = document.getElementById("filterEngine").value;
@@ -152,6 +333,21 @@
     if (brand) body.brand = brand;
     if (engine) body.engineTypeId = Number(engine);
     return body;
+  }
+
+  function messagePayload() {
+    const payload = Object.assign({}, audiencePayload());
+    payload.titleAz = document.getElementById("titleAz").value.trim();
+    payload.bodyAz = document.getElementById("bodyAz").value.trim();
+    const titleEn = document.getElementById("titleEn").value.trim();
+    const bodyEn = document.getElementById("bodyEn").value.trim();
+    const titleRu = document.getElementById("titleRu").value.trim();
+    const bodyRu = document.getElementById("bodyRu").value.trim();
+    if (titleEn) payload.titleEn = titleEn;
+    if (bodyEn) payload.bodyEn = bodyEn;
+    if (titleRu) payload.titleRu = titleRu;
+    if (bodyRu) payload.bodyRu = bodyRu;
+    return payload;
   }
 
   async function api(url, options) {
@@ -181,8 +377,93 @@
     tick();
   }
 
-  bindCounter(document.getElementById("pushTitle"), document.getElementById("titleCount"), TITLE_MAX);
-  bindCounter(document.getElementById("pushBody"), document.getElementById("bodyCount"), BODY_MAX);
+  [
+    ["titleAz", "titleAzCount"],
+    ["titleEn", "titleEnCount"],
+    ["titleRu", "titleRuCount"]
+  ].forEach(function (pair) {
+    bindCounter(document.getElementById(pair[0]), document.getElementById(pair[1]), TITLE_MAX);
+  });
+  [
+    ["bodyAz", "bodyAzCount"],
+    ["bodyEn", "bodyEnCount"],
+    ["bodyRu", "bodyRuCount"]
+  ].forEach(function (pair) {
+    bindCounter(document.getElementById(pair[0]), document.getElementById(pair[1]), BODY_MAX);
+  });
+
+  const phoneDraft = document.getElementById("phoneDraft");
+  const phoneEditor = document.getElementById("phoneChipEditor");
+  const phoneList = document.getElementById("phoneChipList");
+
+  phoneEditor.addEventListener("click", function (e) {
+    if (e.target && e.target.getAttribute("data-remove") != null) return;
+    phoneDraft.focus();
+  });
+
+  phoneList.addEventListener("click", function (e) {
+    const btn = e.target.closest("[data-remove]");
+    if (!btn) return;
+    const idx = Number(btn.getAttribute("data-remove"));
+    if (!Number.isFinite(idx)) return;
+    linkedPhones.splice(idx, 1);
+    renderPhoneChips();
+    lastPreview = null;
+  });
+
+  phoneDraft.addEventListener("input", function () {
+    let value = phoneDraft.value.replace(/[^\d+]/g, "");
+    if (value && value.charAt(0) !== "+") {
+      if (value.indexOf("+") !== -1) value = "+" + value.replace(/\+/g, "");
+    }
+    if (value !== phoneDraft.value) phoneDraft.value = value;
+    const phone = normalizePhoneCandidate(phoneDraft.value);
+    if (phone && phoneDraft.value.replace(/[\s-]/g, "") === phone) {
+      addLinkedPhone(phone);
+      clearDraft();
+    }
+  });
+
+  phoneDraft.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!tryCommitDraft({ dropIncomplete: false }) && !(phoneDraft.value || "").trim()) {
+        /* empty enter ignored */
+      } else if (!(phoneDraft.value || "").trim()) {
+        /* committed */
+      } else {
+        showError("Phone must match +994XXXXXXXXX");
+      }
+      return;
+    }
+    if (e.key === "Backspace" && !(phoneDraft.value || "") && linkedPhones.length) {
+      linkedPhones.pop();
+      renderPhoneChips();
+      lastPreview = null;
+    }
+  });
+
+  phoneDraft.addEventListener("paste", function (e) {
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text || text.indexOf("\n") === -1 && text.indexOf(",") === -1 && text.indexOf(";") === -1) {
+      return;
+    }
+    e.preventDefault();
+    text.split(/[\n\r,;]+/).forEach(function (part) {
+      const phone = normalizePhoneCandidate(part);
+      if (phone) addLinkedPhone(phone);
+    });
+    clearDraft();
+  });
+
+  phoneDraft.addEventListener("blur", function () {
+    tryCommitDraft({ dropIncomplete: true });
+  });
+
+  document.addEventListener("mousedown", function (e) {
+    if (phoneEditor.contains(e.target)) return;
+    tryCommitDraft({ dropIncomplete: true });
+  });
 
   async function loadFilters() {
     const data = await api("/admin/push-notifications/filters");
@@ -219,10 +500,13 @@
     tbody.innerHTML = list.map(function (c) {
       const when = window.CarlandAdmin.formatAdminDate(c.createdAt) || "";
       const result = (c.successCount || 0) + " ok / " + (c.failedCount || 0) + " failed";
+      const audienceLabel = (c.phoneNumbers && c.phoneNumbers.length)
+        ? (c.audienceCount || 0) + " · " + c.phoneNumbers.length + " phones"
+        : String(c.audienceCount || 0);
       return "<tr>" +
         "<td>" + when + "</td>" +
         "<td>" + escapeHtml(c.title || "") + "</td>" +
-        "<td>" + (c.audienceCount || 0) + "</td>" +
+        "<td>" + escapeHtml(audienceLabel) + "</td>" +
         "<td><span class=\"" + statusBadge(c.status) + "\">" + escapeHtml(c.status || "") + "</span></td>" +
         "<td>" + result + "</td>" +
         "</tr>";
@@ -279,6 +563,7 @@
   document.getElementById("audienceForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     showError("");
+    tryCommitDraft({ dropIncomplete: true });
     const data = await api("/admin/push-notifications/preview", {
       method: "POST",
       body: JSON.stringify(audiencePayload())
@@ -287,19 +572,34 @@
     lastPreview = data;
     const el = document.getElementById("previewResult");
     el.hidden = false;
-    el.textContent = data.audienceCount === 0
-      ? "No users with a device token match these filters."
-      : data.audienceCount + " users with a device token match these filters.";
+    if (data.audienceCount === 0) {
+      el.textContent = linkedPhones.length
+        ? "No users with a device token match these phone numbers."
+        : "No users with a device token match these filters.";
+    } else if (linkedPhones.length) {
+      el.textContent = data.audienceCount + " users with a device token match these phone numbers.";
+    } else {
+      el.textContent = data.audienceCount + " users with a device token match these filters.";
+    }
   });
 
   document.getElementById("messageForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     showError("");
-    const title = document.getElementById("pushTitle").value.trim();
-    const body = document.getElementById("pushBody").value.trim();
-    if (!title || !body) { showError("Title and message are required."); return; }
-    if (title.length > TITLE_MAX) { showError("Title must be 100 characters or fewer."); return; }
-    if (body.length > BODY_MAX) { showError("Message must be 300 characters or fewer."); return; }
+    tryCommitDraft({ dropIncomplete: true });
+    const payload = messagePayload();
+    if (!payload.titleAz || !payload.bodyAz) {
+      showError("az title and message are required.");
+      return;
+    }
+    if (payload.titleAz.length > TITLE_MAX || (payload.titleEn && payload.titleEn.length > TITLE_MAX) || (payload.titleRu && payload.titleRu.length > TITLE_MAX)) {
+      showError("Title must be 100 characters or fewer.");
+      return;
+    }
+    if (payload.bodyAz.length > BODY_MAX || (payload.bodyEn && payload.bodyEn.length > BODY_MAX) || (payload.bodyRu && payload.bodyRu.length > BODY_MAX)) {
+      showError("Message must be 300 characters or fewer.");
+      return;
+    }
 
     const preview = await api("/admin/push-notifications/preview", {
       method: "POST",
@@ -308,18 +608,22 @@
     if (!preview) return;
     lastPreview = preview;
     if (preview.audienceCount === 0) {
-      showError("No users with a device token match these filters.");
+      showError(linkedPhones.length
+        ? "No users with a device token match these phone numbers."
+        : "No users with a device token match these filters.");
       return;
     }
+    const audienceLabel = linkedPhones.length
+      ? preview.audienceCount + " users (phone list)"
+      : preview.audienceCount + " users";
     const ok = await window.CarlandAdmin.confirmModal(
       "Send push?",
-      "This will queue a notification to " + preview.audienceCount + " users. Delivery runs in the background."
+      "This will queue a notification to " + audienceLabel + ". Delivery runs in the background."
     );
     if (!ok) return;
 
     const sendBtn = document.getElementById("sendBtn");
     sendBtn.disabled = true;
-    const payload = Object.assign({ title: title, body: body }, audiencePayload());
     const campaign = await api("/admin/push-notifications/campaigns", {
       method: "POST",
       body: JSON.stringify(payload)

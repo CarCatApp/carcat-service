@@ -1,10 +1,12 @@
 package com.carland.carland_service.service.commission;
 
-import java.util.Locale;
+import com.carland.carland_service.hyper.HyperVin;
 
 /**
- * tr: BAN komisyon anahtarı. Boşluklar silinir, böyük harf. Hyper sorğusu 17 simvol ister.
- * en: BAN commission key. Spaces are removed, then upper case. The Hyper query requires 17 characters.
+ * tr: BAN komisyon anahtarı. Tire/boşluk düşer ({@link HyperVin#compact}).
+ *     Hyper sorğusu kısa VIN'i sağdan 0 ile 17 yapar; 17 kontrolü pad sonrası.
+ * en: BAN commission key. Drops dash/space ({@link HyperVin#compact}).
+ *     Hyper query right-pads a short VIN with 0 to 17; the 17 check is after padding.
  */
 public final class CommissionVin {
 
@@ -12,14 +14,11 @@ public final class CommissionVin {
     }
 
     public static String normalize(String vin) {
-        if (vin == null) {
-            return null;
-        }
-        String value = vin.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
-        return value.isEmpty() ? null : value;
+        return HyperVin.compact(vin);
     }
 
+    /** tr: Hyper'a sorulabilir (pad sonrası 17). / en: Hyper-queryable (17 after pad). */
     public static boolean seventeen(String normalized) {
-        return normalized != null && normalized.length() == 17;
+        return HyperVin.hyperQueryable(normalized);
     }
 }

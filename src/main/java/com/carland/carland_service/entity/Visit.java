@@ -70,6 +70,10 @@ public class Visit {
     @Column(name = "inspection_note", length = 1000)
     private String inspectionNote;
 
+    /** Panel visits: one operator note for the whole visit (not per line). */
+    @Column(name = "notes", length = 1000)
+    private String notes;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "car_id", nullable = false)
     private Car car;

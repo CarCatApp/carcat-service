@@ -61,7 +61,7 @@ class StaffCarHistoryServiceTest {
         when(bookingStaffAccess.requireStaff(1L, false, "az")).thenReturn(staff);
         when(bookingStaffAccess.requireWritableBranch(staff, 22L, "az")).thenReturn(branch);
         when(carRepository.findByCarId(9L)).thenReturn(null);
-        when(carRepository.findAllByVinIgnoreCase("NOPE")).thenReturn(List.of());
+        when(carRepository.findAllByVinKey("NOPE")).thenReturn(List.of());
 
         StaffCarHistoryResponse response = service.history(1L, false, 9L, "NOPE", 22L, "az");
 
