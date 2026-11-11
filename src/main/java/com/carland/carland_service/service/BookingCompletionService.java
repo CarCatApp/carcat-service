@@ -341,6 +341,10 @@ public class BookingCompletionService {
         } else if (qty == null) {
             qty = BigDecimal.ONE;
         }
+        // Non-package: product price is required once a product is attached.
+        if (!included && productName != null && productGross == null) {
+            throw MissingFieldException.required("lines[" + index + "].productAmount");
+        }
 
         BigDecimal productDiscount = included
                 ? null
@@ -364,6 +368,9 @@ public class BookingCompletionService {
             productDiscount = null;
         }
 
+        if (!included && in.getPrice() == null) {
+            throw MissingFieldException.required("lines[" + index + "].price");
+        }
         BigDecimal servicePrice = included ? BigDecimal.ZERO : nonNegative(in.getPrice(), "lines[" + index + "].price");
         BigDecimal serviceBase = servicePrice == null ? BigDecimal.ZERO : servicePrice;
         BigDecimal serviceDiscount = included ? null : percent(in.getDiscountPercent(), "lines[" + index + "].discountPercent");

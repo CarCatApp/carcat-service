@@ -32,6 +32,7 @@ import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.security.AdminAccessService;
 import com.carland.carland_service.service.clientevent.ClientEventAdminService;
+import com.carland.carland_service.test_sima_idda.SimaAttemptLabels;
 import com.carland.carland_service.test_sima_idda.service.SimaAttemptLimitService;
 import com.carland.carland_service.service.AdminCarPurgeService;
 import com.carland.carland_service.service.PhotoService;
@@ -806,7 +807,7 @@ public class AdminController {
                 Long customerId = rec.getCustomer() == null ? null : rec.getCustomer().getUserId();
                 setNumericCell(row, 0, rec.getId());
                 setNumericCell(row, 1, customerId);
-                setCell(row, 2, rec.getChannel());
+                setCell(row, 2, SimaAttemptLabels.kind(rec.getChannel(), rec.getDocumentType()));
                 setCell(row, 3, String.valueOf(rec.isVerified()));
                 setCell(row, 4, String.valueOf(rec.isAppliedToProfile()));
                 setCell(row, 5, rec.getIdempotencyKey());
@@ -1144,8 +1145,12 @@ public class AdminController {
         } else if (beforeEver) {
             beforeLabel = "ümumi limitdən əvvəl";
         }
+        String documentType = record.getDocumentType() == null || record.getDocumentType().isBlank()
+                ? "—" : record.getDocumentType();
         return AdminSimaAttemptRow.builder()
                 .time(record.getCreatedAt() == null ? "—" : record.getCreatedAt().format(SIMA_TIME))
+                .channel(SimaAttemptLabels.kind(record.getChannel(), record.getDocumentType()))
+                .documentType(documentType)
                 .success(record.isVerified())
                 .outcome(record.getOutcome() == null ? "—" : record.getOutcome())
                 .liveness(formatScore(record.getLivenessScore()))
@@ -1167,7 +1172,11 @@ public class AdminController {
     }
 
     private String usersRedirect(int page, LocalDate from, LocalDate to, String phone, String sima, Long attempts) {
-        StringBuilder url = new StringBuilder("redirect:/admin/users?page=").append(Math.max(page, 1));
+        // Absolute host: relative redirect:/admin/... becomes :8000 behind Kong/nginx.
+        StringBuilder url = new StringBuilder("redirect:")
+                .append(ADMIN_URL)
+                .append("/admin/users?page=")
+                .append(Math.max(page, 1));
         if (from != null) {
             url.append("&from=").append(from);
         }

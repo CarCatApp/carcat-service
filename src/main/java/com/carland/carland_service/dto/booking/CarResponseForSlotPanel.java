@@ -9,10 +9,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * tr: Partner hover araç kutusu. Book anı kopyası varsa onu gösterir; yoksa canlı cars.
- *     Rəng snap doludursa o mətn; boşdursa colors cədvəlindən Accept-Language adı.
- * en: Partner hover vehicle box. Prefers the booking-time copy; otherwise live cars.
- *     Color is the frozen snap text when present; otherwise the colors-table Accept-Language name.
+ * tr: Partner hover araç kutusu. Book anı kopyası (bookings.car_*) — create sonrası canlı cars oxunmaz.
+ *     Yalnız snap boş köhnə sətirlərdə canlı cars / colors adı.
+ * en: Partner hover vehicle box. Booking-time copy (bookings.car_*); live cars is not read after create.
+ *     Only legacy rows with an empty snap fall back to live cars / colors-table name.
  */
 @Data
 @Builder

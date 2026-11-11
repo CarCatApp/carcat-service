@@ -36,7 +36,7 @@ public class BookingView {
     String plateNumber;
     String carBrand;
     String carModel;
-    /** tr: cars satırının ham alanları. / en: Raw columns from the cars row. */
+    /** tr: Book anı araç kopyası (hover). / en: Booking-time vehicle copy (hover). */
     CarResponseForSlotPanel car;
     String cancelReasonCode;
     String cancelNote;

@@ -366,6 +366,8 @@
         <thead>
         <tr>
           <th>Vaxt</th>
+          <th>Kanal</th>
+          <th>Document type</th>
           <th>Nəticə</th>
           <th>Outcome</th>
           <th>Liveness</th>
@@ -377,6 +379,8 @@
         <tbody>
         <tr th:each="a : ${simaPanel.attempts}">
           <td th:text="${a.time}"></td>
+          <td th:text="${a.channel}"></td>
+          <td th:text="${a.documentType}"></td>
           <td th:class="${a.success} ? 'sima-ok' : 'sima-bad'" th:text="${a.success} ? 'success' : 'fail'"></td>
           <td th:text="${a.outcome}"></td>
           <td th:text="${a.liveness}"></td>

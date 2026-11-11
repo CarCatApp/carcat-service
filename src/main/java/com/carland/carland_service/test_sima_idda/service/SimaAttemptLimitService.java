@@ -55,7 +55,7 @@ public class SimaAttemptLimitService {
     }
 
     public List<SimaKycRecord> listAttempts(Customer customer) {
-        return simaKycRecordRepository.findByCustomerAndChannelInOrderByCreatedAtAsc(
+        return simaKycRecordRepository.findByCustomerAndChannelInOrderByCreatedAtDesc(
                 customer, ATTEMPT_CHANNELS);
     }
 

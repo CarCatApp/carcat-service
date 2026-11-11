@@ -302,8 +302,8 @@ class StaffBookingServiceTest {
 
         BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
 
-        assertEquals("Mercedes", out.getItems().get(0).getCarBrand());
-        assertEquals("G 65 AMG", out.getItems().get(0).getCarModel());
+        assertEquals("Toyota", out.getItems().get(0).getCarBrand());
+        assertEquals("Camry", out.getItems().get(0).getCarModel());
         assertEquals("77 LL 999", out.getItems().get(0).getPlateNumber());
         assertEquals(7L, out.getItems().get(0).getCar().getBrandId());
         assertEquals("Toyota", out.getItems().get(0).getCar().getBrand());
@@ -313,6 +313,47 @@ class StaffBookingServiceTest {
         assertEquals("Hybrid", out.getItems().get(0).getCar().getEngineType());
         assertEquals(2019, out.getItems().get(0).getCar().getModelYear());
         assertEquals(2500, out.getItems().get(0).getCar().getEngineVolume());
+        assertEquals(20000L, out.getItems().get(0).getCar().getMileage());
+        verifyNoInteractions(colorRepository);
+    }
+
+    @Test
+    void inboxSnapIgnoresLaterLiveCarEditsEvenWhenSnapFieldBlank() {
+        booking.setCarId(15L);
+        booking.setCarBrand("Toyota");
+        booking.setCarModel("Camry");
+        booking.setCarColor(null);
+        booking.setCarBodyType("Sedan");
+        booking.setCarEngineType("Hybrid");
+        booking.setCarModelYear(2019);
+        booking.setCarEngineVolume(2500);
+        booking.setCarMileage(20000L);
+        Car car = Car.builder()
+                .carId(15L)
+                .brand("Mercedes")
+                .model("G 65 AMG")
+                .plateNumber("77 LL 999")
+                .vin("VIN1")
+                .bodyType("SUV")
+                .engineType("Petrol (Gasoline)")
+                .modelYear(2023)
+                .engineVolume(4500)
+                .mileage(99000L)
+                .colorId(3L)
+                .build();
+        when(bookingStaffAccess.requireActive(9L, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 7L, "az")).thenReturn(branch);
+        stubInbox(List.of(booking));
+        when(bookingItemRepository.findByBooking_IdIn(List.of(1L))).thenReturn(List.of());
+        when(carRepository.findByCarId(15L)).thenReturn(car);
+        when(brandRepository.findAllByBrandNameIgnoreCase("Toyota")).thenReturn(List.of(
+                Brand.builder().brandId(7L).brandName("Toyota").status("ACTIVE").isnew(".").build()));
+
+        BookingInboxResponse out = service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az");
+
+        assertEquals("Toyota", out.getItems().get(0).getCarBrand());
+        assertEquals("Camry", out.getItems().get(0).getCar().getModel());
+        assertNull(out.getItems().get(0).getCar().getColor());
         assertEquals(20000L, out.getItems().get(0).getCar().getMileage());
         verifyNoInteractions(colorRepository);
     }

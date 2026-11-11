@@ -7,6 +7,8 @@ import lombok.Value;
 @Builder
 public class AdminSimaAttemptRow {
     String time;
+    String channel;
+    String documentType;
     boolean success;
     String outcome;
     String liveness;

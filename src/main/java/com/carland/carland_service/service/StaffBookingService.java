@@ -785,8 +785,8 @@ public class StaffBookingService {
                 .phone(customer == null ? null : customer.getPhoneNumber())
                 .customerUserId(booking.getCustomerUserId())
                 .plateNumber(car == null ? null : PlateNumbers.format(car.getPlateNumber()))
-                .carBrand(car == null ? null : car.getBrand())
-                .carModel(car == null ? null : car.getModel())
+                .carBrand(rowBrand(booking, car))
+                .carModel(rowModel(booking, car))
                 .car(carPanel(booking, car, brandIds, lang))
                 .cancelReasonCode(booking.getCancelReasonCode())
                 .cancelNote(BookingSystemNotes.resolve(booking.getCancelReasonCode(), booking.getCancelNote(), lang))
@@ -866,17 +866,18 @@ public class StaffBookingService {
     }
 
     /**
-     * tr: Hover book anı kopyasını göstərir. Snap boşdursa canlı cars. Satırdakı marka/plaka ayrıca canlı qalır.
-     * en: Hover shows the booking-time copy. Empty snap falls back to live cars. Row brand/plate stay live.
+     * tr: Hover və satır marka/model book anı kopyasıdır. Snap doludursa canlı cars heç oxunmur.
+     *     Yalnız köhnə (snap boş) sətirlər canlı cars-a düşür. Plaka hələ cars-dandır.
+     * en: Hover and row brand/model are the booking-time copy. When snap is present, live cars is not read.
+     *     Only legacy rows with an empty snap fall back to live cars. Plate still comes from cars.
      */
     private CarResponseForSlotPanel carPanel(Booking booking, Car car, Map<String, Long> brandIds, String lang) {
         if (car == null && !hasVehicleSnap(booking)) {
             return null;
         }
-        String brand = firstText(booking == null ? null : booking.getCarBrand(),
-                car == null ? null : car.getBrand());
-        String model = firstText(booking == null ? null : booking.getCarModel(),
-                car == null ? null : car.getModel());
+        boolean snap = hasVehicleSnap(booking);
+        String brand = snap ? textOrNull(booking.getCarBrand()) : textOrNull(car == null ? null : car.getBrand());
+        String model = snap ? textOrNull(booking.getCarModel()) : textOrNull(car == null ? null : car.getModel());
         return CarResponseForSlotPanel.builder()
                 .carId(car == null ? (booking == null ? null : booking.getCarId()) : car.getCarId())
                 .brandId(brandId(brand, brandIds))
@@ -884,25 +885,29 @@ public class StaffBookingService {
                 .model(model)
                 .plateNumber(car == null ? null : PlateNumbers.format(car.getPlateNumber()))
                 .vin(car == null ? (booking == null ? null : booking.getVin()) : car.getVin())
-                .bodyType(firstText(booking == null ? null : booking.getCarBodyType(),
-                        car == null ? null : car.getBodyType()))
-                .engineType(firstText(booking == null ? null : booking.getCarEngineType(),
-                        car == null ? null : car.getEngineType()))
-                .modelYear(firstInt(booking == null ? null : booking.getCarModelYear(),
-                        car == null ? null : car.getModelYear()))
-                .engineVolume(firstInt(booking == null ? null : booking.getCarEngineVolume(),
-                        car == null ? null : car.getEngineVolume()))
-                .mileage(firstLong(booking == null ? null : booking.getCarMileage(),
-                        car == null ? null : car.getMileage()))
-                .color(snapColorOrLive(booking, car, lang))
+                .bodyType(snap ? textOrNull(booking.getCarBodyType())
+                        : textOrNull(car == null ? null : car.getBodyType()))
+                .engineType(snap ? textOrNull(booking.getCarEngineType())
+                        : textOrNull(car == null ? null : car.getEngineType()))
+                .modelYear(snap ? booking.getCarModelYear() : (car == null ? null : car.getModelYear()))
+                .engineVolume(snap ? booking.getCarEngineVolume() : (car == null ? null : car.getEngineVolume()))
+                .mileage(snap ? booking.getCarMileage() : (car == null ? null : car.getMileage()))
+                .color(snap ? textOrNull(booking.getCarColor()) : colorName(car, lang))
                 .build();
     }
 
-    private String snapColorOrLive(Booking booking, Car car, String lang) {
-        if (booking != null && notBlank(booking.getCarColor())) {
-            return booking.getCarColor().trim();
+    private static String rowBrand(Booking booking, Car car) {
+        if (hasVehicleSnap(booking)) {
+            return textOrNull(booking.getCarBrand());
         }
-        return colorName(car, lang);
+        return textOrNull(car == null ? null : car.getBrand());
+    }
+
+    private static String rowModel(Booking booking, Car car) {
+        if (hasVehicleSnap(booking)) {
+            return textOrNull(booking.getCarModel());
+        }
+        return textOrNull(car == null ? null : car.getModel());
     }
 
     private static boolean hasVehicleSnap(Booking booking) {
@@ -919,16 +924,8 @@ public class StaffBookingService {
                 || booking.getCarMileage() != null;
     }
 
-    private static String firstText(String snap, String live) {
-        return notBlank(snap) ? snap.trim() : (notBlank(live) ? live.trim() : null);
-    }
-
-    private static Integer firstInt(Integer snap, Integer live) {
-        return snap != null ? snap : live;
-    }
-
-    private static Long firstLong(Long snap, Long live) {
-        return snap != null ? snap : live;
+    private static String textOrNull(String value) {
+        return notBlank(value) ? value.trim() : null;
     }
 
     private static boolean notBlank(String value) {

@@ -30,6 +30,9 @@ public interface SimaKycRecordRepository extends JpaRepository<SimaKycRecord, Lo
     List<SimaKycRecord> findByCustomerAndChannelInOrderByCreatedAtAsc(
             Customer customer, Collection<String> channels);
 
+    List<SimaKycRecord> findByCustomerAndChannelInOrderByCreatedAtDesc(
+            Customer customer, Collection<String> channels);
+
     @Query("SELECT r FROM SimaKycRecord r JOIN FETCH r.customer ORDER BY r.id ASC")
     List<SimaKycRecord> findAllWithCustomerOrderByIdAsc();
 }

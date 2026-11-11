@@ -80,7 +80,7 @@ public class SimaKycService {
             return blocked;
         }
         SimaCall call = callCitizen(pin, documentNumber, birthDate, photo);
-        return finishAttempt(customer, call, "CITIZEN", acceptLanguage, pin, documentNumber, birthDate);
+        return finishAttempt(customer, call, "CITIZEN", acceptLanguage, pin, documentNumber, birthDate, null);
     }
 
     @Transactional
@@ -97,7 +97,7 @@ public class SimaKycService {
             return blocked;
         }
         SimaCall call = callPassport(pin, documentNumber, photo);
-        return finishAttempt(customer, call, "PASSPORT", acceptLanguage, pin, documentNumber, null);
+        return finishAttempt(customer, call, "PASSPORT", acceptLanguage, pin, documentNumber, null, null);
     }
 
     @Transactional
@@ -115,7 +115,7 @@ public class SimaKycService {
             return blocked;
         }
         SimaCall call = callForeign(pin, documentType, photo);
-        return finishAttempt(customer, call, "FOREIGN", acceptLanguage, pin, null, null);
+        return finishAttempt(customer, call, "FOREIGN", acceptLanguage, pin, null, null, documentType);
     }
 
     private SimaVerifyOutcome preflight(Customer customer, String pin, String acceptLanguage) {
@@ -181,7 +181,8 @@ public class SimaKycService {
             String acceptLanguage,
             String requestPin,
             String requestDocumentNumber,
-            String requestBirthDate
+            String requestBirthDate,
+            String requestDocumentType
     ) {
         SimaApiEnvelope envelope = call.envelope;
         SimaIdentityResult result = envelope != null ? envelope.getResult() : null;
@@ -233,7 +234,8 @@ public class SimaKycService {
         }
 
         persistRecord(customer, channel, call.idempotencyKey, envelope, result, error,
-                call.httpStatus, verified && applyProfile, applyProfile, outcome);
+                call.httpStatus, verified && applyProfile, applyProfile, outcome,
+                requestPin, requestDocumentNumber, requestDocumentType);
 
         if (applyProfile) {
             applyVerifiedProfile(customer, result);
@@ -301,7 +303,10 @@ public class SimaKycService {
             int simaHttpStatus,
             boolean verified,
             boolean applied,
-            String outcome
+            String outcome,
+            String requestPin,
+            String requestDocumentNumber,
+            String requestDocumentType
     ) {
         if (simaKycRecordRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
             log.info("SIMA idempotency hit key={} — skip insert", idempotencyKey);
@@ -342,6 +347,21 @@ public class SimaKycService {
         } else if (error != null) {
             row.transactionId(error.getTransactionId())
                     .processTime(error.getProcessTime());
+        }
+        if (result == null || result.getPin() == null || result.getPin().isBlank()) {
+            if (requestPin != null && !requestPin.isBlank()) {
+                row.pin(requestPin.trim().toUpperCase());
+            }
+        }
+        if (result == null || result.getDocumentNumber() == null || result.getDocumentNumber().isBlank()) {
+            if (requestDocumentNumber != null && !requestDocumentNumber.isBlank()) {
+                row.documentNumber(requestDocumentNumber.trim());
+            }
+        }
+        if (result == null || result.getDocumentType() == null || result.getDocumentType().isBlank()) {
+            if (requestDocumentType != null && !requestDocumentType.isBlank()) {
+                row.documentType(requestDocumentType.trim().toUpperCase());
+            }
         }
         simaKycRecordRepository.save(row.build());
     }

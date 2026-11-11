@@ -78,10 +78,10 @@ public class Booking {
     Long carId;
 
     /**
-     * tr: Partner hover üçün book anındakı avtomobil kopyası. Sonrakı cars dəyişikliyi bunu dəyişmir.
-     *     Köhnə sətir boş qala bilər; oxuyanda canlı cars-a düşülür.
-     * en: Car copy at booking time for the partner hover. Later cars edits do not change this.
-     *     Old rows may stay empty; reads fall back to the live cars row.
+     * tr: Partner hover / satır üçün book anındakı avtomobil kopyası. Sonrakı cars dəyişikliyi bunu dəyişmir.
+     *     Snap doludursa staff cavabı yalnız buradan oxuyur. Köhnə boş sətirlər hələ canlı cars-a düşür.
+     * en: Car copy at booking time for partner hover/row. Later cars edits do not change this.
+     *     When snap is present the staff response reads only these columns; legacy empty rows still use live cars.
      */
     @Column(name = "car_brand", length = 80)
     String carBrand;
