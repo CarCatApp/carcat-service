@@ -1239,14 +1239,14 @@
   </ol>
 </section>
 <section class="fn" id="impl-car-editpercentage">
-  <div class="fh"><code>editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lets the customer edit one percentage record unless a partner has locked it.</span></div>
+  <div class="fh"><code>editPercentage(request, phoneNumber, userIdHeader, timezone, acceptLanguage)</code><span class="fd">Lets the customer edit a percentage; partner-sourced last service stays locked, next stays editable.</span></div>
   <ol class="ladder">
     <li><span class="rid">IMPL-036</span><span class="q">Are the car id, percentage id, phone number and user id present?</span><span class="badge b4">400 bad_request</span></li>
     <li><span class="rid">IMPL-037</span><span class="q">Does an active customer exist for this user id and phone?</span><span class="badge b4">404 not_found</span></li>
     <li><span class="rid">IMPL-038</span><span class="q">Does this car belong to this customer?</span><span class="badge b4">404 not_found</span></li>
     <li><span class="rid">IMPL-039</span><span class="q">Does the percentage record exist?</span><span class="badge b4">404 not_found</span></li>
     <li><span class="rid">IMPL-040</span><span class="q">Does the percentage record belong to this car?</span><span class="badge b4">404 not_found</span></li>
-    <li><span class="rid">IMPL-041</span><span class="q">Is the record editable — not locked because a partner already recorded this service?</span><span class="badge b4">409 conflict</span></li>
+    <li><span class="rid">IMPL-041</span><span class="q">If partner-sourced, is the customer only changing next service (not last date/km)?</span><span class="badge b4">409 conflict</span></li>
     <li class="pass">all passed → proceeds</li>
   </ol>
 </section>

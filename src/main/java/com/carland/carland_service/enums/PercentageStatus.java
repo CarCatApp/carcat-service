@@ -24,7 +24,8 @@ public enum PercentageStatus {
     EDITED_BY_CUSTOMER,
 
     /**
-     * HyperService (partner) data overrode the value. Locked for customer edits.
+     * HyperService (partner) data overrode the value. Last service date/km stay
+     * locked for the customer; next service date/km remain editable.
      */
     EDITED_BY_PARTNER;
 
@@ -54,10 +55,11 @@ public enum PercentageStatus {
     }
 
     /**
-     * Only partner-locked rows are non-editable.
+     * Customer may always open the edit form. Partner-sourced last service
+     * fields are still rejected in {@code editPercentage}.
      */
     public boolean isEditable() {
-        return this != EDITED_BY_PARTNER;
+        return true;
     }
 
     /**

@@ -27,6 +27,7 @@ import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
 import com.carland.carland_service.repository.PartnerRepository;
 import com.carland.carland_service.util.AdminCarLabels;
+import com.carland.carland_service.util.AdminDateFormats;
 import com.carland.carland_service.util.PlateNumbers;
 import com.carland.carland_service.repository.SimaKycRecordRepository;
 import com.carland.carland_service.repository.VisitRepository;
@@ -904,7 +905,7 @@ public class AdminController {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Feedbacks");
             String[] headers = {
-                    "ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Has photo"
+                    "ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Created", "Has photo"
             };
             createHeaderRow(workbook, sheet, headers);
             int rowIndex = 1;
@@ -917,7 +918,8 @@ public class AdminController {
                 setNumericCell(row, 4, fb.getRating());
                 setNumericCell(row, 5, fb.getCustomerId());
                 setCell(row, 6, fb.getCustomerPhone());
-                setCell(row, 7, photoIds.contains(fb.getFeedbackId()) ? "Yes" : "No");
+                setCell(row, 7, AdminDateFormats.formatBaku(fb.getCreatedAt()));
+                setCell(row, 8, photoIds.contains(fb.getFeedbackId()) ? "Yes" : "No");
             }
             String baseName = (blankToNull(type) != null || blankToNull(phone) != null || photoOnly || oldestFirst)
                     ? "feedbacks-filtered" : "feedbacks";

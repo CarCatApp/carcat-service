@@ -704,14 +704,15 @@ public class CarServiceImpl implements CarService {
 
     /**
      * tr: Müşterinin bir yüzde kaydını (son/sonraki servis km ve tarihleri) düzenlemesini sağlar ve durumu
-     *     EDITED_BY_CUSTOMER yaparak günceller. Eksik alanlarda MissingFieldException; müşteri/araç
-     *     doğrulamasında UserNotFoundException/ResourceNotFoundException; yüzde bulunamaz veya araca ait
-     *     değilse ResourceNotFoundException; kayıt partner kilitliyse (EDITED_BY_PARTNER) ConflictException fırlatır.
+     *     EDITED_BY_CUSTOMER yaparak günceller. Partner kaynaklı kayıtlarda sonraki servis (next) serbesttir;
+     *     son servis (last) değiştirilirse ConflictException. Eksik alanlarda MissingFieldException;
+     *     müşteri/araç doğrulamasında UserNotFoundException/ResourceNotFoundException; yüzde bulunamaz
+     *     veya araca ait değilse ResourceNotFoundException.
      * en: Lets the customer edit a percentage record (last/next service km and dates) and saves it with the
-     *     EDITED_BY_CUSTOMER status. Throws MissingFieldException on missing fields;
+     *     EDITED_BY_CUSTOMER status. On partner-sourced rows next service stays editable; changing last
+     *     service throws ConflictException. Throws MissingFieldException on missing fields;
      *     UserNotFoundException/ResourceNotFoundException from the customer/car checks;
-     *     ResourceNotFoundException when the percentage is missing or belongs to another car; and
-     *     ConflictException when the record is partner-locked (EDITED_BY_PARTNER).
+     *     ResourceNotFoundException when the percentage is missing or belongs to another car.
      */
     @Override
     public CarServicePercentageResponse editPercentage(PercentageRequest request, String phoneNumber, String userIdHeader, String timezone, String acceptLanguage) {
@@ -737,10 +738,11 @@ public class CarServiceImpl implements CarService {
             throw new ResourceNotFoundException("Hesablama bu avtomobile aid deyil");
         }
 
-        // Partner-locked percentages cannot be edited by the customer (backend enforcement).
-        if (PercentageStatus.fromStored(percentage.getStatus()) == PercentageStatus.EDITED_BY_PARTNER) {
-            log.warn("editPercentage rejected: percentage is partner-locked | percentageId={}", percentage.getId());
-            throw new ConflictException("Bu hesablama partnyor tərəfindən yenilənib və redaktə edilə bilməz");
+        // Partner-sourced last service stays locked; next service date/km stay editable (CEO).
+        if (isPartnerSourcedLastLocked(percentage)
+                && (isLastServiceKmChanging(request, percentage) || isLastServiceDateChanging(request, percentage))) {
+            log.warn("editPercentage rejected: partner-sourced last service locked | percentageId={}", percentage.getId());
+            throw new ConflictException("Son xidmət tarixi və kilometri partnyor tərəfindən yazılıb və redaktə edilə bilməz");
         }
 
         if (request.getLastServiceKm() != null) {
@@ -2012,6 +2014,28 @@ public class CarServiceImpl implements CarService {
      * tr: Kalan km'yi hesaplar: max(nextServiceKm - araç km'si, 0); girdilerden biri null ise null döner.
      * en: Computes remaining km: max(nextServiceKm - car mileage, 0); returns null when any input is null.
      */
+    /** Partner wrote last service (status or Hyper record id) → last date/km stay locked. */
+    private static boolean isPartnerSourcedLastLocked(Percentage percentage) {
+        if (percentage == null) {
+            return false;
+        }
+        if (PercentageStatus.fromStored(percentage.getStatus()) == PercentageStatus.EDITED_BY_PARTNER) {
+            return true;
+        }
+        String partnerRecordId = percentage.getPartnerRecordId();
+        return partnerRecordId != null && !partnerRecordId.isBlank();
+    }
+
+    private static boolean isLastServiceKmChanging(PercentageRequest request, Percentage percentage) {
+        return request.getLastServiceKm() != null
+                && !Objects.equals(request.getLastServiceKm(), percentage.getLastServiceKm());
+    }
+
+    private static boolean isLastServiceDateChanging(PercentageRequest request, Percentage percentage) {
+        return request.getLastServiceDate() != null
+                && !Objects.equals(request.getLastServiceDate(), percentage.getLastServiceDate());
+    }
+
     private Integer computeRemainingKm(Integer lastServiceKm, Integer nextServiceKm, Long carMileage) {
         if (lastServiceKm == null || nextServiceKm == null || carMileage == null) {
             return null;

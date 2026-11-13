@@ -55,10 +55,30 @@ public final class CarIddaColor {
 
     /** tr: Prompttaki kısa Azerice renk cümlesi. Metin yoksa boş. / en: Short Azerbaijani color clause. Empty when there is no text. */
     public static String azerbaijaniClause(String iddaColor) {
-        String text = normalize(iddaColor);
+        String text = forPrompt(iddaColor);
         if (text == null) {
             return "";
         }
         return ", painted in the Azerbaijani color \"" + text + "\" (use the English paint color)";
+    }
+
+    /**
+     * tr: Yalnız AI prompt. IDDA bazen soft-g'siz "Ag" / "Ag mirvari" yazar; GPT bunu silver sanır.
+     *     DB ve senet metni değişmez — sadece prompttaki soft-g düzelir.
+     * en: Prompt only. IDDA sometimes sends ASCII "Ag" / "Ag mirvari"; GPT reads that as silver.
+     *     Stored / certificate text is unchanged — only the prompt soft-g is fixed.
+     */
+    static String forPrompt(String iddaColor) {
+        String text = normalize(iddaColor);
+        if (text == null) {
+            return null;
+        }
+        if (text.equalsIgnoreCase("ag")) {
+            return "ağ";
+        }
+        if (text.equalsIgnoreCase("ag mirvari")) {
+            return "ağ mirvari";
+        }
+        return text;
     }
 }

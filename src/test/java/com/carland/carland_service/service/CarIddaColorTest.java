@@ -31,4 +31,27 @@ class CarIddaColorTest {
                 CarIddaColor.azerbaijaniClause("tünd göy"));
         assertEquals("", CarIddaColor.azerbaijaniClause("  "));
     }
+
+    @Test
+    void promptFixesAsciiAgToSoftG() {
+        assertEquals(
+                ", painted in the Azerbaijani color \"ağ\" (use the English paint color)",
+                CarIddaColor.azerbaijaniClause("Ag"));
+        assertEquals(
+                ", painted in the Azerbaijani color \"ağ mirvari\" (use the English paint color)",
+                CarIddaColor.azerbaijaniClause("Ag mirvari"));
+        assertEquals("ağ", CarIddaColor.forPrompt("AG"));
+        assertEquals("ağ mirvari", CarIddaColor.forPrompt("AG MİRVARİ"));
+        assertEquals("ağ", CarIddaColor.forPrompt("ağ"));
+        assertEquals("Ağ mirvari", CarIddaColor.forPrompt("Ağ mirvari"));
+    }
+
+    @Test
+    void normalizeKeepsIddaAsciiAgUnchanged() {
+        Car car = Car.builder().build();
+        CarIddaColor.apply(car, null, "Ag");
+        assertEquals("Ag", car.getIddaColor());
+        CarIddaColor.apply(car, null, "Ag mirvari");
+        assertEquals("Ag mirvari", car.getIddaColor());
+    }
 }

@@ -14,9 +14,10 @@
     col.c-rating  { width: 80px; }
     col.c-user    { width: 110px; }
     col.c-phone   { width: 150px; }
+    col.c-created { width: 160px; }
     col.c-photo   { width: 130px; }
     col.c-cars    { width: 90px; }
-    .data-table { min-width: 1240px; }
+    .data-table { min-width: 1400px; }
     .cell-desc-td.is-open {
       white-space: normal;
       overflow: visible;
@@ -137,6 +138,7 @@
           <col class="c-rating">
           <col class="c-user">
           <col class="c-phone">
+          <col class="c-created">
           <col class="c-photo">
           <col class="c-cars">
         </colgroup>
@@ -149,6 +151,7 @@
           <th>Rating</th>
           <th>Customer ID</th>
           <th>Phone</th>
+          <th>Created</th>
           <th>Photo</th>
           <th></th>
         </tr>
@@ -173,6 +176,8 @@
           <td th:text="${f.rating != null ? f.rating : '—'}"></td>
           <td th:text="${f.customerId}"></td>
           <td th:text="${f.customerPhone}"></td>
+          <td class="muted"
+              th:text="${T(com.carland.carland_service.util.AdminDateFormats).formatBaku(f.createdAt)}"></td>
           <td>
             <button type="button" class="btn-photo"
                     th:if="${photoIds.contains(f.feedbackId)}"
@@ -187,7 +192,7 @@
           </td>
         </tr>
         <tr class="empty-row" th:if="${feedbacks.isEmpty()}">
-          <td colspan="9">Kayıt bulunamadı</td>
+          <td colspan="10">Kayıt bulunamadı</td>
         </tr>
         </tbody>
       </table>
@@ -239,7 +244,7 @@
   CarlandAdmin.initColumnToggle(
     document.getElementById("feedbacksTable"),
     "carland-admin-cols-feedbacks",
-    ["ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Photo", "Cars"],
+    ["ID", "Type", "Subject", "Description", "Rating", "Customer ID", "Phone", "Created", "Photo", "Cars"],
     []
   );
 
