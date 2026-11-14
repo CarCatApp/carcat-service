@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.booking.ChatAttachmentView;
 import com.carland.carland_service.dto.booking.ChatMessageView;
 import com.carland.carland_service.dto.booking.ChatMessagesPage;
 import com.carland.carland_service.dto.booking.ChatReadRequest;
@@ -20,7 +21,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -72,6 +75,31 @@ public class BookingChatController {
     ) {
         bookingChatService.ownerTyping(parseUserId(userIdHeader), bookingId, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/api/v1/booking/bookings/{bookingId}/uploads", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatAttachmentView> ownerUpload(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam String kind,
+            @RequestParam(required = false) String clientMessageId,
+            @RequestParam(required = false) String fileName,
+            @RequestParam(required = false) Integer width,
+            @RequestParam(required = false) Integer height
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                bookingChatService.ownerUpload(
+                        parseUserId(userIdHeader), bookingId, file, kind, clientMessageId, fileName, width, height));
+    }
+
+    @GetMapping("/api/v1/booking/bookings/{bookingId}/uploads/{uploadId}/file")
+    public ResponseEntity<byte[]> ownerDownload(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @PathVariable String uploadId
+    ) {
+        return bookingChatService.ownerDownload(parseUserId(userIdHeader), bookingId, uploadId);
     }
 
     @GetMapping(value = "/api/v1/booking/bookings/{bookingId}/messages/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -138,6 +166,40 @@ public class BookingChatController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 bookingId, requestBody, acceptLanguage);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(
+            value = "/api/v1/booking/staff/bookings/{bookingId}/uploads",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatAttachmentView> staffUpload(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam String kind,
+            @RequestParam(required = false) String clientMessageId,
+            @RequestParam(required = false) String fileName,
+            @RequestParam(required = false) Integer width,
+            @RequestParam(required = false) Integer height,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                bookingChatService.staffUpload(
+                        bookingStaffRequestAuth.userId(request),
+                        bookingStaffRequestAuth.mustChangePassword(request),
+                        bookingId, file, kind, clientMessageId, fileName, width, height, acceptLanguage));
+    }
+
+    @GetMapping("/api/v1/booking/staff/bookings/{bookingId}/uploads/{uploadId}/file")
+    public ResponseEntity<byte[]> staffDownload(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @PathVariable String uploadId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return bookingChatService.staffDownload(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, uploadId, acceptLanguage);
     }
 
     @GetMapping(

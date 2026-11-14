@@ -19,4 +19,10 @@ public class ChatSendRequest {
     String text;
     /** Client hint only; server clock wins. */
     String createdAt;
+    /** For kind image|file — from prior upload. */
+    String uploadId;
+    String fileName;
+    Long sizeBytes;
+    Integer width;
+    Integer height;
 }

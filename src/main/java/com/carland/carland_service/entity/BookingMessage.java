@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
 
 /**
- * tr: Booking sohbeti (CRCT-286). Metin MVP; medya sonra.
- * en: Booking chat (CRCT-286). Text MVP; media later.
+ * tr: Booking sohbeti (CRCT-286). Metin + resim/belge.
+ * en: Booking chat (CRCT-286). Text + image/file.
  */
 @Entity
 @Data
@@ -57,8 +57,25 @@ public class BookingMessage {
     @Builder.Default
     String kind = "text";
 
-    @Column(nullable = false, length = 2000)
+    /** Text body; for media may be empty or caption. */
+    @Column(length = 2000)
     String body;
+
+    /** booking_chat_uploads.public_id when kind is image|file */
+    @Column(name = "upload_id", length = 40)
+    String uploadId;
+
+    @Column(name = "file_name", length = 255)
+    String fileName;
+
+    @Column(name = "content_type", length = 120)
+    String contentType;
+
+    @Column(name = "size_bytes")
+    Long sizeBytes;
+
+    Integer width;
+    Integer height;
 
     /** sent | delivered | seen */
     @Column(nullable = false, length = 16)
@@ -85,6 +102,9 @@ public class BookingMessage {
         }
         if (rebook == null) {
             rebook = false;
+        }
+        if (body == null) {
+            body = "";
         }
     }
 }
