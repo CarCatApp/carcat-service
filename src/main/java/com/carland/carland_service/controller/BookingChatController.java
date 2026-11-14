@@ -2,7 +2,9 @@ package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.booking.ChatMessageView;
 import com.carland.carland_service.dto.booking.ChatMessagesPage;
+import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
+import com.carland.carland_service.dto.booking.ChatTypingRequest;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.service.BookingChatService;
@@ -22,8 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * tr: Owner + staff rezervasyon sohbeti (CRCT-286 faz 1).
- * en: Owner + staff booking chat (CRCT-286 phase 1).
+ * tr: Owner + staff rezervasyon sohbeti (CRCT-286).
+ * en: Owner + staff booking chat (CRCT-286).
  */
 @RestController
 @RequiredArgsConstructor
@@ -50,6 +52,26 @@ public class BookingChatController {
     ) {
         ChatMessageView view = bookingChatService.ownerSend(parseUserId(userIdHeader), bookingId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(view);
+    }
+
+    @PostMapping("/api/v1/booking/bookings/{bookingId}/read")
+    public ResponseEntity<Void> ownerRead(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @RequestBody(required = false) ChatReadRequest request
+    ) {
+        bookingChatService.ownerRead(parseUserId(userIdHeader), bookingId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/api/v1/booking/bookings/{bookingId}/typing")
+    public ResponseEntity<Void> ownerTyping(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @RequestBody(required = false) ChatTypingRequest request
+    ) {
+        bookingChatService.ownerTyping(parseUserId(userIdHeader), bookingId, request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping(value = "/api/v1/booking/bookings/{bookingId}/messages/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -88,6 +110,34 @@ public class BookingChatController {
                 bookingStaffRequestAuth.mustChangePassword(request),
                 bookingId, requestBody, acceptLanguage);
         return ResponseEntity.status(HttpStatus.CREATED).body(view);
+    }
+
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/read")
+    public ResponseEntity<Void> staffRead(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) ChatReadRequest requestBody,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        bookingChatService.staffRead(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, requestBody, acceptLanguage);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/typing")
+    public ResponseEntity<Void> staffTyping(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) ChatTypingRequest requestBody,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        bookingChatService.staffTyping(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId, requestBody, acceptLanguage);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping(

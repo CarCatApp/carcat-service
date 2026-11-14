@@ -3,7 +3,9 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.booking.ChatConversationView;
 import com.carland.carland_service.dto.booking.ChatMessageView;
 import com.carland.carland_service.dto.booking.ChatMessagesPage;
+import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
+import com.carland.carland_service.dto.booking.ChatTypingRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingMessage;
 import com.carland.carland_service.entity.BookingStaff;
@@ -30,8 +32,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * tr: Rezervasyon sohbeti — metin listele/gönder + SSE (CRCT-286 faz 1).
- * en: Booking chat — list/send text + SSE (CRCT-286 phase 1).
+ * tr: Rezervasyon sohbeti — metin + SSE + iletildi/görüldü/yazıyor (CRCT-286).
+ * en: Booking chat — text + SSE + delivered/seen/typing (CRCT-286).
  */
 @Service
 @RequiredArgsConstructor
@@ -60,10 +62,26 @@ public class BookingChatService {
         return send(booking, "customer", customerUserId, request);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public SseEmitter ownerLive(Long customerUserId, String bookingKey) {
         Booking booking = loadOwned(customerUserId, bookingKey);
-        return chatLiveService.listen(booking.getId());
+        SseEmitter emitter = chatLiveService.listen(booking.getId(), "customer");
+        markPeerDelivered(booking, "customer");
+        return emitter;
+    }
+
+    @Transactional
+    public void ownerRead(Long customerUserId, String bookingKey, ChatReadRequest request) {
+        Booking booking = loadOwned(customerUserId, bookingKey);
+        markSeen(booking, "customer", request);
+    }
+
+    @Transactional(readOnly = true)
+    public void ownerTyping(Long customerUserId, String bookingKey, ChatTypingRequest request) {
+        Booking booking = loadOwned(customerUserId, bookingKey);
+        requireOpen(booking);
+        boolean typing = request != null && Boolean.TRUE.equals(request.getIsTyping());
+        chatLiveService.publishTyping(booking.getId(), String.valueOf(customerUserId), "customer", typing);
     }
 
     @Transactional(readOnly = true)
@@ -80,10 +98,28 @@ public class BookingChatService {
         return send(booking, "branch", userId, request);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public SseEmitter staffLive(Long userId, boolean mustChangePassword, Long bookingId, String acceptLanguage) {
         Booking booking = loadStaffBooking(userId, mustChangePassword, bookingId, acceptLanguage);
-        return chatLiveService.listen(booking.getId());
+        SseEmitter emitter = chatLiveService.listen(booking.getId(), "branch");
+        markPeerDelivered(booking, "branch");
+        return emitter;
+    }
+
+    @Transactional
+    public void staffRead(
+            Long userId, boolean mustChangePassword, Long bookingId, ChatReadRequest request, String acceptLanguage) {
+        Booking booking = loadStaffBooking(userId, mustChangePassword, bookingId, acceptLanguage);
+        markSeen(booking, "branch", request);
+    }
+
+    @Transactional(readOnly = true)
+    public void staffTyping(
+            Long userId, boolean mustChangePassword, Long bookingId, ChatTypingRequest request, String acceptLanguage) {
+        Booking booking = loadStaffBooking(userId, mustChangePassword, bookingId, acceptLanguage);
+        requireOpen(booking);
+        boolean typing = request != null && Boolean.TRUE.equals(request.getIsTyping());
+        chatLiveService.publishTyping(booking.getId(), String.valueOf(userId), "branch", typing);
     }
 
     private ChatMessageView send(Booking booking, String fromRole, Long authorUserId, ChatSendRequest request) {
@@ -115,6 +151,9 @@ public class BookingChatService {
             return toView(existing.get());
         }
 
+        boolean peerOnline = chatLiveService.hasPeerListener(booking.getId(), fromRole);
+        String delivery = peerOnline ? "delivered" : "sent";
+
         BookingMessage row = BookingMessage.builder()
                 .booking(booking)
                 .clientMessageId(clientMessageId)
@@ -122,14 +161,71 @@ public class BookingChatService {
                 .authorUserId(authorUserId)
                 .kind("text")
                 .body(text)
-                .delivery("sent")
+                .delivery(delivery)
                 .rebook(false)
                 .createdAt(OffsetDateTime.now())
                 .build();
         row = messageRepository.save(row);
         ChatMessageView view = toView(row);
         chatLiveService.publishNewMessageAfterCommit(booking.getId(), view);
+        if (peerOnline) {
+            Long bookingId = booking.getId();
+            String sid = String.valueOf(row.getId());
+            String cid = row.getClientMessageId();
+            // afterCommit with new_message; delivery event after same commit
+            chatLiveService.publishDelivery(bookingId, cid, sid, "delivered");
+        }
         return view;
+    }
+
+    private void markPeerDelivered(Booking booking, String viewerRole) {
+        List<BookingMessage> pending = messageRepository.findByBooking_IdAndFromRoleNotAndDelivery(
+                booking.getId(), viewerRole, "sent");
+        if (pending.isEmpty()) {
+            return;
+        }
+        for (BookingMessage row : pending) {
+            row.setDelivery("delivered");
+        }
+        messageRepository.saveAll(pending);
+        for (BookingMessage row : pending) {
+            chatLiveService.publishDelivery(
+                    booking.getId(),
+                    row.getClientMessageId(),
+                    row.getId() == null ? null : String.valueOf(row.getId()),
+                    "delivered");
+        }
+    }
+
+    private void markSeen(Booking booking, String viewerRole, ChatReadRequest request) {
+        if (request == null || request.getClientMessageIds() == null || request.getClientMessageIds().isEmpty()) {
+            throw MissingFieldException.required("clientMessageIds");
+        }
+        List<String> ids = request.getClientMessageIds().stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            throw MissingFieldException.required("clientMessageIds");
+        }
+        List<BookingMessage> rows = messageRepository.findByBooking_IdAndClientMessageIdIn(booking.getId(), ids);
+        List<String> marked = new ArrayList<>();
+        for (BookingMessage row : rows) {
+            if (viewerRole.equals(row.getFromRole())) {
+                continue; // kendi mesajını seen yapma
+            }
+            if ("seen".equals(row.getDelivery())) {
+                marked.add(row.getClientMessageId());
+                continue;
+            }
+            row.setDelivery("seen");
+            marked.add(row.getClientMessageId());
+        }
+        if (!marked.isEmpty()) {
+            messageRepository.saveAll(rows);
+            chatLiveService.publishRead(booking.getId(), marked);
+        }
     }
 
     private ChatMessagesPage pageOf(Booking booking, String cursor, Integer limit) {

@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +18,11 @@ public interface BookingMessageRepository extends JpaRepository<BookingMessage, 
     List<BookingMessage> findByBooking_IdOrderByCreatedAtAsc(Long bookingId);
 
     Optional<BookingMessage> findByBooking_IdAndClientMessageId(Long bookingId, String clientMessageId);
+
+    List<BookingMessage> findByBooking_IdAndClientMessageIdIn(Long bookingId, Collection<String> clientMessageIds);
+
+    List<BookingMessage> findByBooking_IdAndFromRoleNotAndDelivery(
+            Long bookingId, String fromRole, String delivery);
 
     @Query("""
             select m from BookingMessage m
