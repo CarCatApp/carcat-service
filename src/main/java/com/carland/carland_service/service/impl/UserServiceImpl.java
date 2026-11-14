@@ -16,9 +16,12 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.UserNotFoundException;
+import com.carland.carland_service.enums.UserRoles;
+import com.carland.carland_service.messaging.CustomerEnsurePublisher;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
 import com.carland.carland_service.service.BookingMineService;
+import com.carland.carland_service.service.CustomerEnsureService;
 import com.carland.carland_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,8 @@ public class UserServiceImpl implements UserService {
     private final Helper helper;
     private final CustomerRepository customerRepository;
     private final NotificationRepository notificationRepository;
+    private final CustomerEnsureService customerEnsureService;
+    private final CustomerEnsurePublisher customerEnsurePublisher;
 
     /**
      * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda mesajlı UserResponse döner.
@@ -57,8 +62,20 @@ public class UserServiceImpl implements UserService {
             throw new MissingFieldException(MessagesLangValues.MISSING_FIELDS.getMessageByLang(acceptLanguage));
         }
 
+        boolean appUser = UserRoles.USER.name().equalsIgnoreCase(role.trim());
+        try {
+            helper.checkOrCreateUserByRole(userId, role, phoneNumber, null, null, acceptLanguage, inviterId);
+        } catch (RuntimeException ex) {
+            // Deploy/DB blip: keep trying ensure every 15s via Rabbit so the user is not stuck.
+            if (appUser) {
+                customerEnsurePublisher.publish(userId, phoneNumber, acceptLanguage);
+            }
+            throw ex;
+        }
 
-        helper.checkOrCreateUserByRole(userId, role, phoneNumber, null, null, acceptLanguage, inviterId);
+        if (appUser && !customerEnsureService.hasActiveCustomer(userId, phoneNumber)) {
+            customerEnsurePublisher.publish(userId, phoneNumber, acceptLanguage);
+        }
 
         return UserResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))

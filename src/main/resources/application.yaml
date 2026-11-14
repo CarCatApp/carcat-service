@@ -19,6 +19,13 @@ spring:
   application:
     name: carland_service
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT_MS:5000}
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -55,6 +62,16 @@ carland:
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
   issuer:
     key: ${CARLAND_ISSUER_KEY:carland}
+  customer-ensure:
+    exchange: ${CUSTOMER_ENSURE_EXCHANGE:customer.ensure}
+    queue: ${CUSTOMER_ENSURE_QUEUE:customer.ensure.work}
+    routing-key: ${CUSTOMER_ENSURE_ROUTING_KEY:ensure}
+    retry-queue: ${CUSTOMER_ENSURE_RETRY_QUEUE:customer.ensure.retry}
+    retry-routing-key: ${CUSTOMER_ENSURE_RETRY_ROUTING_KEY:ensure.retry}
+    dlq: ${CUSTOMER_ENSURE_DLQ:customer.ensure.dlq}
+    dlq-routing-key: ${CUSTOMER_ENSURE_DLQ_ROUTING_KEY:ensure.dlq}
+    retry-delay-ms: ${CUSTOMER_ENSURE_RETRY_DELAY_MS:15000}
+    max-attempts: ${CUSTOMER_ENSURE_MAX_ATTEMPTS:40}
   auth:
     base-url: ${AUTH_BASE_URL:http://auth-service:9090}
   admin:

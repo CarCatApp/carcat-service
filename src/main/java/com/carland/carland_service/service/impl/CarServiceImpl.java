@@ -26,9 +26,11 @@ import com.carland.carland_service.idda.IddaAddResult;
 import com.carland.carland_service.idda.IddaProvidedFields;
 import com.carland.carland_service.idda.IddaCarWriteService;
 import com.carland.carland_service.idda.IddaPlateKey;
+import com.carland.carland_service.service.CustomerEnsureService;
 import com.carland.carland_service.service.RedisCacheService;
 import com.carland.carland_service.service.VinBrandCatalog;
 import com.carland.carland_service.service.ServicedBadgeIds;
+import com.carland.carland_service.messaging.CustomerEnsurePublisher;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,6 +80,8 @@ public class CarServiceImpl implements CarService {
     private final EngineTypeRepository engineTypeRepository;
     private final AfterAddCarSyncService afterAddCarSyncService;
     private final HyperPercentageSyncService hyperPercentageSyncService;
+    private final CustomerEnsureService customerEnsureService;
+    private final CustomerEnsurePublisher customerEnsurePublisher;
     private final RedisCacheService redisCacheService;
     private final IddaCarWriteService iddaCarWriteService;
 //    private static final List<String> simulatedVins = List.of(
@@ -1266,6 +1270,17 @@ public class CarServiceImpl implements CarService {
             Customer customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
                     userId, phoneNumber.trim(), UserStatus.ACTIVE.name());
             if (customer == null) {
+                // Safety net when add-details was missed (deploy): try ensure, else queue 15s retries.
+                try {
+                    customerEnsureService.ensure(userId, phoneNumber.trim(), null, null, acceptLanguage);
+                } catch (Exception ensureEx) {
+                    log.warn("[addCar] lazy ensure failed | userId={}, err={}", userId, ensureEx.toString());
+                }
+                customer = customerRepository.findByUserIdAndPhoneNumberAndStatus(
+                        userId, phoneNumber.trim(), UserStatus.ACTIVE.name());
+            }
+            if (customer == null) {
+                customerEnsurePublisher.publish(userId, phoneNumber.trim(), acceptLanguage);
                 throwAddCarFailure(logUserId,
                         "customer not found | userId=" + userId + ", phoneNumber=" + phoneNumber,
                         new UserNotFoundException(MessagesLangValues.USER_NOT_FOUND.getMessageByLang(acceptLanguage)));

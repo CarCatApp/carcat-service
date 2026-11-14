@@ -1,11 +1,9 @@
 package com.carland.carland_service.service.impl;
 
-import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserRoles;
-import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
-import com.carland.carland_service.repository.CustomerRepository;
+import com.carland.carland_service.service.CustomerEnsureService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,7 +26,7 @@ import java.util.Locale;
 @Slf4j
 public class Helper {
 
-    private final CustomerRepository customerRepository;
+    private final CustomerEnsureService customerEnsureService;
 
     public void checkOrCreateUserByRole(Long userId, String role, String phoneNumber, String name,
                                         String surname, String acceptLanguage, Long inviterId) {
@@ -37,7 +35,7 @@ public class Helper {
         }
         String normalized = role.trim().toUpperCase();
         if (UserRoles.USER.name().equals(normalized)) {
-            ensureCustomer(userId, phoneNumber, name, surname, acceptLanguage);
+            customerEnsureService.ensure(userId, phoneNumber, name, surname, acceptLanguage);
             return;
         }
         if (UserRoles.PARTNER_ADMIN.name().equals(normalized)
@@ -48,31 +46,6 @@ public class Helper {
             return;
         }
         throw new ResourceNotFoundException(MessagesLangValues.INVALID_ROLE.getMessageByLang(acceptLanguage));
-    }
-
-    private void ensureCustomer(Long userId, String phoneNumber, String name, String surname, String acceptLanguage) {
-        Customer byId = customerRepository.findByUserId(userId);
-        Customer byPhone = customerRepository.findByPhoneNumber(phoneNumber);
-
-        if ((byId != null && UserStatus.ACTIVE.name().equalsIgnoreCase(byId.getStatus())) ||
-                (byPhone != null && UserStatus.ACTIVE.name().equalsIgnoreCase(byPhone.getStatus()))) {
-            log.info("Aktiv musteri tapildi, : {}", phoneNumber);
-            return;
-        }
-        if (byId != null || byPhone != null) {
-            log.info("musteri tapildi ama aktiv deyil,: {}", phoneNumber);
-            return;
-        }
-        customerRepository.save(Customer.builder()
-                .userId(userId)
-                .phoneNumber(phoneNumber)
-                .name(name)
-                .surname(surname)
-                .createdAt(LocalDate.now())
-                .status(UserStatus.ACTIVE.name())
-                .notificationLanguage(acceptLanguage)
-                .build());
-        log.info("musteri tapilmadi, yeni yaradildi: {}", phoneNumber);
     }
 
     public OffsetDateTime getUtcTimeFromDayAndTimeAndTimeZone(LocalDate date, LocalTime time, String timezone) {
