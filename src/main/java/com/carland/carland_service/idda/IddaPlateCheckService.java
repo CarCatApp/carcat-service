@@ -34,7 +34,7 @@ import java.util.UUID;
  * tr: Plaka check. Araç yalnız bu isteğin canlı IDDA başarısında döner, isRestrict false.
  *     İzin yok, dolu limit, hata ve diğer her status isRestrict true döner ve araç taşımaz.
  *     Eski Code 0 limite sayılır, ekrana basılmaz.
- *     Geçici test: aynı müşteri + plaka ayda 5 canlı, plaka geneli ayda 10 canlı.
+ *     Canlı: aynı müşteri + plaka ayda 1, plaka geneli ayda 2.
  *     Code 4 ve teknik HTTP hataları (timeout, host, HTTP≠2xx, bozuk gövde) hakka yazılmaz.
  *     Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
  *     Check araç satırı açmaz, sahip değiştirmez.
@@ -42,7 +42,7 @@ import java.util.UUID;
  * en: Plate check. The car is returned only from this request's live IDDA success, with isRestrict false.
  *     No permission, a full cap, errors and every other status return isRestrict true and no car.
  *     An old Code 0 still counts toward the cap and is not shown.
- *     Temporary test caps: 5 live calls per customer and plate, 10 live calls per plate.
+ *     Live caps: 1 call per customer and plate, 2 calls per plate each month.
  *     Code 4 and technical HTTP failures (timeout, host, non-2xx, unreadable body) do not count.
  *     A plate with two adjacent A's (10AA000) never calls IDDA.
  *     The check does not insert a car or change an owner.
@@ -54,11 +54,11 @@ import java.util.UUID;
 public class IddaPlateCheckService {
 
     /**
-     * tr: Geçici test hakkı. Canlıda aynı müşteri + plaka ayda 1, plaka geneli ayda 2 idi.
-     * en: Temporary test cap. Production was 1 per customer+plate and 2 per plate each month.
+     * tr: Aynı müşteri + plaka ayda 1, plaka geneli ayda 2.
+     * en: 1 per customer+plate and 2 per plate each month.
      */
-    private static final int USER_LIVE_CAP = 5;
-    private static final int PLATE_LIVE_CAP = 10;
+    private static final int USER_LIVE_CAP = 1;
+    private static final int PLATE_LIVE_CAP = 2;
     /**
      * tr: Geçici kullanım kılavuzu. Bu müşteri + plaka çiftleri limite takılmaz ve hak yazmaz.
      *     55 / 77BU669, 92 / 77RK011, 92 / 10SS001. Araç (plaka) ve kişi (müşteri) hakları ikisi de.

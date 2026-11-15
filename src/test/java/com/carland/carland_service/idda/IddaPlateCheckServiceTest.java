@@ -128,14 +128,12 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
-    void liveSuccessIsOpenAndTheSixthQueryIsRestrictedWithoutIdda() throws Exception {
+    void liveSuccessIsOpenAndTheSecondOwnQueryIsRestrictedWithoutIdda() throws Exception {
         customer();
-        List<IddaPlateCheck> four = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L));
-        List<IddaPlateCheck> five = List.of(successRow(7L), successRow(7L), successRow(7L), successRow(7L), successRow(7L));
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
-                .thenReturn(four)
-                .thenReturn(five);
+                .thenReturn(List.of())
+                .thenReturn(List.of(successRow(7L)));
         when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
                 .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", successJson()));
         when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -310,18 +308,14 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
-    void eleventhPlateQueryIsRestrictedAndHidesTheStoredCar() throws Exception {
+    void thirdPlateQueryIsRestrictedAndHidesTheStoredCar() throws Exception {
         customer();
-        List<IddaPlateCheck> ten = new java.util.ArrayList<>();
-        for (int i = 0; i < 9; i++) {
-            ten.add(successRow(1L));
-        }
-        IddaPlateCheck newest = successRow(2L);
-        newest.setVin("NEWERVIN000000001");
-        ten.add(0, newest);
+        IddaPlateCheck newer = successRow(2L);
+        newer.setVin("NEWERVIN000000001");
+        List<IddaPlateCheck> two = List.of(newer, successRow(1L));
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(eq("77BU669"), any()))
-                .thenReturn(ten);
+                .thenReturn(two);
 
         CarResponse response = service.check("77BU669", "050", "7", "az");
 
