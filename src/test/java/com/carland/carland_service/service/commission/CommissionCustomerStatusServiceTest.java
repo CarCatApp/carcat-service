@@ -69,7 +69,26 @@ class CommissionCustomerStatusServiceTest {
     }
 
     @Test
-    void oldVinBecomesNewAfterTwelveMonths() {
+    void recordedReactivatedDoesNotCallHyper() {
+        CommissionCustomerStatus existing = CommissionCustomerStatus.builder()
+                .vin(VIN)
+                .status(CommissionStatus.REACTIVATED)
+                .hyperOutcome(CommissionStatusRules.INACTIVE_365)
+                .decidedAt(OffsetDateTime.parse("2026-01-01T00:00:00+04:00"))
+                .build();
+        when(statusRepository.findByVin(VIN)).thenReturn(Optional.of(existing));
+
+        CommissionCustomerStatus result = service.ensure(booking(VIN));
+
+        assertSame(existing, result);
+        verify(hyperVinLookup, never()).lookup(any());
+        ArgumentCaptor<CommissionStatusAudit> audit = ArgumentCaptor.forClass(CommissionStatusAudit.class);
+        verify(auditRepository).save(audit.capture());
+        assertEquals(CommissionStatusRules.ALREADY_REACTIVATED, audit.getValue().getReason());
+    }
+
+    @Test
+    void oldVinBecomesReactivatedAfter365Days() {
         CommissionCustomerStatus existing = CommissionCustomerStatus.builder()
                 .vin(VIN)
                 .status(CommissionStatus.OLD)
@@ -83,14 +102,32 @@ class CommissionCustomerStatusServiceTest {
 
         CommissionCustomerStatus result = service.ensure(booking(VIN));
 
-        assertEquals(CommissionStatus.NEW, result.getStatus());
-        assertEquals(CommissionStatusRules.INACTIVE_12M, result.getHyperOutcome());
+        assertEquals(CommissionStatus.REACTIVATED, result.getStatus());
+        assertEquals(CommissionStatusRules.INACTIVE_365, result.getHyperOutcome());
         ArgumentCaptor<CommissionStatusAudit> audit = ArgumentCaptor.forClass(CommissionStatusAudit.class);
         verify(auditRepository).save(audit.capture());
         String request = audit.getValue().getRequestText();
         assertTrue(request.startsWith("GET /partner/v1/vehicles/by-vin/" + VIN + "\nrequest_datetime=2026-11-08T12:00"));
         assertFalse(request.contains("Bearer"));
         assertEquals("{\"exists\":true}", audit.getValue().getResponseText());
+    }
+
+    @Test
+    void oldDoesNotDowngradeToNewWhenHyperMissing() {
+        CommissionCustomerStatus existing = CommissionCustomerStatus.builder()
+                .vin(VIN)
+                .status(CommissionStatus.OLD)
+                .hyperOutcome(CommissionStatusRules.ACTIVE)
+                .decidedAt(OffsetDateTime.parse("2026-01-01T00:00:00+04:00"))
+                .build();
+        when(statusRepository.findByVin(VIN)).thenReturn(Optional.of(existing));
+        when(hyperVinLookup.lookup(VIN)).thenReturn(HyperVinSnapshot.notFound("vehicle_not_found"));
+        when(statusRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommissionCustomerStatus result = service.ensure(booking(VIN));
+
+        assertEquals(CommissionStatus.OLD, result.getStatus());
+        assertEquals(CommissionStatusRules.KEEP_OLD, result.getHyperOutcome());
     }
 
     @Test

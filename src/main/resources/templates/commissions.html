@@ -101,6 +101,7 @@
       <select id="status" name="status">
         <option value="" th:selected="${screen.query.status == null}">Hamısı</option>
         <option value="new" th:selected="${screen.query.status == 'new'}">Yeni</option>
+        <option value="reactivated" th:selected="${screen.query.status == 'reactivated'}">Geri qazanılmış</option>
         <option value="old" th:selected="${screen.query.status == 'old'}">Köhnə</option>
       </select>
     </div>
@@ -113,7 +114,7 @@
 
   <section class="commission-summary">
     <article>
-      <span class="label">Yeni</span>
+      <span class="label">Yeni + geri qazanılmış</span>
       <strong th:text="${screen.fresh.count}">0</strong>
       <span th:text="${screen.fresh.serviceText}">0,00 AZN</span>
       <span th:text="${screen.fresh.commissionText}">0,00 AZN</span>
@@ -187,7 +188,9 @@
           <td th:text="${row.vin}">VIN</td>
           <td th:text="${row.plate}">10-AA-100</td>
           <td>
-            <span class="badge" th:classappend="${row.status == 'old'} ? 'badge-neutral' : 'badge-info'" th:text="${row.statusLabel}">Yeni müştəri</span>
+            <span class="badge"
+                  th:classappend="${row.status == 'old'} ? 'badge-neutral' : (${row.status == 'reactivated'} ? 'badge-warning' : 'badge-info')"
+                  th:text="${row.statusLabel}">Yeni müştəri</span>
           </td>
           <td>
             <span th:if="${row.pending}" class="badge badge-warning" th:text="${row.serviceAmount}">Məbləğ gözlənilir</span>
@@ -226,7 +229,7 @@
     <input type="hidden" name="status" th:value="${screen.query.status}">
     <input type="hidden" name="q" th:value="${screen.query.search}">
     <div class="booking-form-title">Faiz</div>
-    <p class="muted">Partner üçün sətir yoxdursa yeni müştəri 6%, köhnə müştəri 2%. Yeni sətir köhnə randevuları yenidən hesablamır. Qüvvəyə minmə tarixi tamamlanma gününə baxır.</p>
+    <p class="muted">Partner üçün sətir yoxdursa yeni və geri qazanılmış 6%, köhnə 2%. Yeni sətir köhnə randevuları yenidən hesablamır. Qüvvəyə minmə tarixi tamamlanma gününə baxır.</p>
     <div class="ok-box" th:if="${rateMessage}" th:text="${rateMessage}"></div>
     <div class="error-box" th:if="${rateError}" th:text="${rateError}"></div>
     <div class="booking-form-grid">
@@ -241,6 +244,7 @@
         <label for="customerStatus">Status</label>
         <select id="customerStatus" name="customerStatus" required>
           <option value="new">Yeni müştəri</option>
+          <option value="reactivated">Geri qazanılmış müştəri</option>
           <option value="old">Köhnə müştəri</option>
         </select>
       </div>

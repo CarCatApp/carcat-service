@@ -72,13 +72,13 @@ public class CommissionEntry {
     OffsetDateTime completedAt;
 
     /** new | old */
-    @Column(name = "customer_status", nullable = false, length = 8)
+    @Column(name = "customer_status", nullable = false, length = 16)
     String customerStatus;
 
     @Column(name = "status_decided_at", columnDefinition = "TIMESTAMP WITH TIME ZONE")
     OffsetDateTime statusDecidedAt;
 
-    @Column(name = "hyper_outcome", length = 16)
+    @Column(name = "hyper_outcome", length = 32)
     String hyperOutcome;
 
     @Column(name = "earliest_service_date")

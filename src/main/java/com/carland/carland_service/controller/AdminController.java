@@ -19,9 +19,13 @@ import com.carland.carland_service.feign.AuthUsersFeign;
 import com.carland.carland_service.idda.IddaPlateCheck;
 import com.carland.carland_service.idda.IddaPlateCheckRepository;
 import com.carland.carland_service.idda.IddaRawFields;
+import com.carland.carland_service.entity.CommissionCustomerStatus;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CarSpec;
+import com.carland.carland_service.repository.CommissionCustomerStatusRepository;
 import com.carland.carland_service.repository.CustomerRepository;
+import com.carland.carland_service.service.commission.CommissionStatus;
+import com.carland.carland_service.service.commission.CommissionVin;
 import com.carland.carland_service.repository.FeedbackPhotoRepository;
 import com.carland.carland_service.repository.FeedbackRepository;
 import com.carland.carland_service.repository.FeedbackSpec;
@@ -114,6 +118,8 @@ public class AdminController {
     private final AdminCarPurgeService adminCarPurgeService;
 
     private final VisitHistoryService visitHistoryService;
+
+    private final CommissionCustomerStatusRepository commissionCustomerStatusRepository;
 
     private final IddaPlateCheckRepository iddaPlateCheckRepository;
 
@@ -231,9 +237,56 @@ public class AdminController {
         model.addAttribute("filterOwner", ownerFilter);
         model.addAttribute("filterPath", pathFilter);
         model.addAttribute("hyperVisitedCarIds", visitHistoryService.carIdsWithHyperBranchVisit(carIds));
+        model.addAttribute("hyperLoyaltyByCarId", hyperLoyaltyByCarId(carPage.getContent()));
         model.addAttribute("iddaFieldCounts", iddaFieldCounts(carPage.getContent()));
 
         return "cars";
+    }
+
+    /**
+     * tr: Admin Cars hyperLoyalty — commission_customer_status (yeni / geri qazanılmış / köhnə).
+     * en: Admin Cars hyperLoyalty — commission_customer_status (new / reactivated / old).
+     */
+    private Map<Long, String> hyperLoyaltyByCarId(List<Car> cars) {
+        Map<String, List<Long>> carIdsByVin = new LinkedHashMap<>();
+        for (Car car : cars) {
+            String vin = CommissionVin.normalize(car.getVin());
+            if (vin == null || car.getCarId() == null) {
+                continue;
+            }
+            carIdsByVin.computeIfAbsent(vin, ignored -> new ArrayList<>()).add(car.getCarId());
+        }
+        if (carIdsByVin.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> out = new LinkedHashMap<>();
+        for (CommissionCustomerStatus row : commissionCustomerStatusRepository.findByVinIn(carIdsByVin.keySet())) {
+            if (row.getVin() == null || !CommissionStatus.known(row.getStatus())) {
+                continue;
+            }
+            String label = CommissionStatus.loyaltyLabel(row.getStatus());
+            List<Long> ids = carIdsByVin.get(row.getVin());
+            if (ids == null) {
+                continue;
+            }
+            for (Long carId : ids) {
+                out.put(carId, label);
+            }
+        }
+        return out;
+    }
+
+    private Map<String, String> hyperLoyaltyLabelsByVin(List<Car> cars) {
+        Map<Long, String> byCar = hyperLoyaltyByCarId(cars);
+        Map<String, String> byVin = new LinkedHashMap<>();
+        for (Car car : cars) {
+            String vin = CommissionVin.normalize(car.getVin());
+            if (vin == null) {
+                continue;
+            }
+            byVin.put(vin, byCar.getOrDefault(car.getCarId(), "—"));
+        }
+        return byVin;
     }
 
 
@@ -270,6 +323,7 @@ public class AdminController {
                 CarSpec.filters(userId, vinFilter, plateFilter, ownerFilter, pathFilter),
                 Sort.by(Sort.Direction.DESC, "carId"));
         Set<Long> hyperVisited = hyperVisitedIds(cars);
+        Map<String, String> hyperLoyalty = hyperLoyaltyLabelsByVin(cars);
         Map<String, String> iddaText = iddaExcelText(cars);
 
         try (Workbook workbook = new XSSFWorkbook()) {
@@ -280,7 +334,7 @@ public class AdminController {
             iddaStyle.setVerticalAlignment(VerticalAlignment.TOP);
 
             String[] headers = {
-                    "VIN", "Path", "Owner", "Phone", "Hyper visited", "Plate Number", "Brand", "Model", "Model Year",
+                    "VIN", "Path", "Owner", "Phone", "Hyper visited", "hyperLoyalty", "Plate Number", "Brand", "Model", "Model Year",
                     "Engine Type", "Engine Type ID", "Engine Volume",
                     "Transmission Type", "Body Type", "Mileage",
                     "Created At", "Updated At", "IDDA fields"
@@ -293,26 +347,28 @@ public class AdminController {
 
                 Row row = sheet.createRow(rowIndex++);
                 Customer carOwner = car.getCustomer();
+                String loyaltyVin = CommissionVin.normalize(car.getVin());
 
                 setCell(row, 0, car.getVin());
                 setCell(row, 1, AdminCarLabels.pathOf(car));
                 setCell(row, 2, AdminCarLabels.ownerName(carOwner));
                 setCell(row, 3, AdminCarLabels.ownerPhone(carOwner));
                 setCell(row, 4, hyperVisited.contains(car.getCarId()) ? "Yes" : "No");
-                setCell(row, 5, PlateNumbers.format(car.getPlateNumber()));
-                setCell(row, 6, car.getBrand());
-                setCell(row, 7, car.getModel());
-                setNumericCell(row, 8, car.getModelYear());
-                setCell(row, 9, car.getEngineType());
-                setNumericCell(row, 10, car.getEngineTypeId());
-                setNumericCell(row, 11, car.getEngineVolume());
-                setCell(row, 12, car.getTransmissionType());
-                setCell(row, 13, car.getBodyType());
-                setNumericCell(row, 14, car.getMileage());
-                setCell(row, 15, formatDate(car.getCreatedAt()));
-                setCell(row, 16, formatDate(car.getUpdatedAt()));
+                setCell(row, 5, loyaltyVin == null ? "—" : hyperLoyalty.getOrDefault(loyaltyVin, "—"));
+                setCell(row, 6, PlateNumbers.format(car.getPlateNumber()));
+                setCell(row, 7, car.getBrand());
+                setCell(row, 8, car.getModel());
+                setNumericCell(row, 9, car.getModelYear());
+                setCell(row, 10, car.getEngineType());
+                setNumericCell(row, 11, car.getEngineTypeId());
+                setNumericCell(row, 12, car.getEngineVolume());
+                setCell(row, 13, car.getTransmissionType());
+                setCell(row, 14, car.getBodyType());
+                setNumericCell(row, 15, car.getMileage());
+                setCell(row, 16, formatDate(car.getCreatedAt()));
+                setCell(row, 17, formatDate(car.getUpdatedAt()));
                 String vinKey = vinKey(car.getVin());
-                setWrappedCell(row, 17, vinKey == null ? "" : iddaText.getOrDefault(vinKey, ""), iddaStyle);
+                setWrappedCell(row, 18, vinKey == null ? "" : iddaText.getOrDefault(vinKey, ""), iddaStyle);
             }
 
             String baseName = (userId != null || vinFilter != null || plateFilter != null

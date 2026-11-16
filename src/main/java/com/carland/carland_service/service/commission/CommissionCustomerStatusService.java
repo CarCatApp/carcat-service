@@ -20,8 +20,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * tr: Növbə yarananda VIN-i Hyper-a soruşur. Yeni yapışır. Köhnə hər yeni növbədə yenidən baxılır.
- * en: Asks Hyper when a booking is created. New sticks. Old is checked again on every new booking.
+ * tr: VIN Hyper loyalty. new / reactivated yapışır. old hər yoxlamada yenidən baxılır;
+ *     yalnız reactivated-ə keçə bilər. Branch list və book eyni qaydanı istifadə edir.
+ * en: VIN Hyper loyalty. new / reactivated stick. old is re-checked each time and may
+ *     only move to reactivated. Branch list and book share the same rule.
  */
 @Slf4j
 @Service
@@ -60,55 +62,90 @@ public class CommissionCustomerStatusService {
         return statusRepository.findByVin(key).orElse(null);
     }
 
+    /**
+     * tr: Branch list / loyalty oxuma. Sticky isə Hyper-ə getmir. old isə yenidən baxır.
+     * en: Branch list / loyalty read. Sticky skips Hyper. old is re-checked.
+     */
+    @Transactional
+    public String resolveStatus(String rawVin) {
+        CommissionCustomerStatus row = resolve(rawVin, OffsetDateTime.now(CommissionClock.BAKU), null);
+        return row == null ? null : row.getStatus();
+    }
+
     @Transactional
     public CommissionCustomerStatus ensure(Booking booking) {
         if (booking == null) {
             return null;
         }
-        String vin = CommissionVin.normalize(booking.getVin());
         OffsetDateTime bookingTime = booking.getCreatedAt() == null
                 ? OffsetDateTime.now(CommissionClock.BAKU)
                 : booking.getCreatedAt();
+        return resolve(booking.getVin(), bookingTime, booking.getId());
+    }
+
+    @Transactional
+    public CommissionCustomerStatus resolve(String rawVin, OffsetDateTime at, Long bookingId) {
+        String vin = CommissionVin.normalize(rawVin);
+        OffsetDateTime when = at == null ? OffsetDateTime.now(CommissionClock.BAKU) : at;
+        Booking auditBooking = bookingId == null ? null : Booking.builder().id(bookingId).vin(vin).createdAt(when).build();
         if (vin == null) {
-            audit(booking, null, bookingTime, null, null, CommissionStatus.NEW, CommissionStatusRules.NO_VIN, false);
+            audit(auditBooking, null, when, null, null, CommissionStatus.NEW, CommissionStatusRules.NO_VIN, false);
             return null;
         }
         CommissionCustomerStatus existing = statusRepository.findByVin(vin).orElse(null);
-        if (existing != null && CommissionStatus.NEW.equals(existing.getStatus())) {
-            audit(booking, vin, bookingTime, existing.getEarliestServiceDate(), null,
-                    CommissionStatus.NEW, CommissionStatusRules.ALREADY_NEW, false);
+        if (existing != null && CommissionStatus.sticky(existing.getStatus())) {
+            String reason = CommissionStatus.REACTIVATED.equals(existing.getStatus())
+                    ? CommissionStatusRules.ALREADY_REACTIVATED
+                    : CommissionStatusRules.ALREADY_NEW;
+            audit(auditBooking, vin, when, existing.getEarliestServiceDate(), null,
+                    existing.getStatus(), reason, false);
             return existing;
         }
         if (!CommissionVin.seventeen(vin)) {
-            audit(booking, vin, bookingTime, null, null, CommissionStatus.NEW, CommissionStatusRules.INVALID_VIN, false);
+            audit(auditBooking, vin, when, null, null, CommissionStatus.NEW, CommissionStatusRules.INVALID_VIN, false);
             return null;
         }
         HyperVinSnapshot snapshot = hyperVinLookup.lookup(vin);
-        CommissionDecision decision = CommissionStatusRules.decide(bookingTime, snapshot);
+        CommissionDecision decision = CommissionStatusRules.decide(when, snapshot);
         if (CommissionStatusRules.FUTURE_DATE.equals(decision.outcome())) {
             log.warn("commission future service date | vin={} bookingId={} date={}",
-                    vin, booking.getId(), decision.serviceDate());
+                    vin, bookingId, decision.serviceDate());
         }
-        return save(booking, vin, bookingTime, decision, snapshot);
+        return save(auditBooking, vin, when, decision, snapshot, existing);
     }
 
     private CommissionCustomerStatus save(Booking booking, String vin, OffsetDateTime bookingTime,
-                                          CommissionDecision decision, HyperVinSnapshot snapshot) {
-        CommissionCustomerStatus current = statusRepository.findByVin(vin).orElse(null);
-        if (current != null && CommissionStatus.NEW.equals(current.getStatus())) {
+                                          CommissionDecision decision, HyperVinSnapshot snapshot,
+                                          CommissionCustomerStatus current) {
+        if (current != null && CommissionStatus.sticky(current.getStatus())) {
+            String reason = CommissionStatus.REACTIVATED.equals(current.getStatus())
+                    ? CommissionStatusRules.ALREADY_REACTIVATED
+                    : CommissionStatusRules.ALREADY_NEW;
             audit(booking, vin, bookingTime, current.getEarliestServiceDate(), null,
-                    CommissionStatus.NEW, CommissionStatusRules.ALREADY_NEW, false);
+                    current.getStatus(), reason, false);
             return current;
         }
         OffsetDateTime now = OffsetDateTime.now(CommissionClock.BAKU);
+        String nextStatus = decision.status();
+        String reason = decision.outcome();
+        if (current != null && CommissionStatus.OLD.equals(current.getStatus())) {
+            if (CommissionStatus.NEW.equals(nextStatus)) {
+                nextStatus = CommissionStatus.OLD;
+                reason = CommissionStatusRules.KEEP_OLD;
+            } else if (!CommissionStatus.OLD.equals(nextStatus)
+                    && !CommissionStatus.REACTIVATED.equals(nextStatus)) {
+                nextStatus = CommissionStatus.OLD;
+                reason = CommissionStatusRules.KEEP_OLD;
+            }
+        }
         CommissionCustomerStatus row;
         if (current == null) {
             row = CommissionCustomerStatus.builder()
                     .vin(vin)
-                    .status(decision.status())
+                    .status(nextStatus)
                     .decidedAt(now)
-                    .firstBookingId(booking.getId())
-                    .hyperOutcome(decision.outcome())
+                    .firstBookingId(booking == null ? null : booking.getId())
+                    .hyperOutcome(reason)
                     .earliestServiceDate(decision.serviceDate())
                     .snapshot(trim(decision.snapshot()))
                     .build();
@@ -118,15 +155,15 @@ public class CommissionCustomerStatusService {
                 return statusRepository.findByVin(vin).orElseThrow(() -> ex);
             }
         } else {
-            current.setStatus(decision.status());
+            current.setStatus(nextStatus);
             current.setDecidedAt(now);
-            current.setHyperOutcome(decision.outcome());
+            current.setHyperOutcome(reason);
             current.setEarliestServiceDate(decision.serviceDate());
             current.setSnapshot(trim(decision.snapshot()));
             row = statusRepository.saveAndFlush(current);
         }
         boolean review = CommissionStatusRules.FUTURE_DATE.equals(decision.outcome());
-        audit(booking, vin, bookingTime, decision.serviceDate(), snapshot, decision.status(), decision.outcome(), review);
+        audit(booking, vin, bookingTime, decision.serviceDate(), snapshot, nextStatus, reason, review);
         return row;
     }
 

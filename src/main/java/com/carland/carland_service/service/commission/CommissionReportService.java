@@ -499,7 +499,7 @@ public class CommissionReportService {
     private static String why(CommissionEntry entry) {
         String outcome = entry.getHyperOutcome();
         if (CommissionStatusRules.ACTIVE.equals(outcome)) {
-            return "Son xidmət tarixi növbənin yarandığı andan əvvəlki 12 ayın içindədir.";
+            return "Son xidmət tarixi növbənin yarandığı andan əvvəlki 365 günün içindədir.";
         }
         if (CommissionStatusRules.FUTURE_DATE.equals(outcome)) {
             return "Hyper gələcək xidmət tarixi qaytardı. Əl ilə yoxlanmalıdır.";

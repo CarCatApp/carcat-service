@@ -19,8 +19,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * tr: VIN başına müştəri statusu. Yeni yapışır. Köhnə növbəti növbədə yeniyə keçə bilər.
- * en: Customer status per VIN. New sticks. Old may become new on a later booking.
+ * tr: VIN başına Hyper loyalty. new / reactivated yapışır. Yalnız old → reactivated ola bilər.
+ * en: Hyper loyalty per VIN. new / reactivated stick. Only old may become reactivated.
  */
 @Entity
 @Data
@@ -40,8 +40,8 @@ public class CommissionCustomerStatus {
     @Column(nullable = false, length = 32)
     String vin;
 
-    /** new | old */
-    @Column(nullable = false, length = 8)
+    /** new | reactivated | old */
+    @Column(nullable = false, length = 16)
     String status;
 
     @Column(name = "decided_at", nullable = false, columnDefinition = "TIMESTAMP WITH TIME ZONE")
@@ -50,8 +50,8 @@ public class CommissionCustomerStatus {
     @Column(name = "first_booking_id")
     Long firstBookingId;
 
-    /** ACTIVE | INACTIVE_12M | NO_DATE | NOT_FOUND | NO_RESPONSE | FUTURE_DATE, plus older codes */
-    @Column(name = "hyper_outcome", nullable = false, length = 16)
+    /** ACTIVE | INACTIVE_365 | ALREADY_REACTIVATED | … */
+    @Column(name = "hyper_outcome", nullable = false, length = 32)
     String hyperOutcome;
 
     /** tr: Son qərarda istifadə olunan son xidmət tarixi. en: Last service date used by the latest decision. */

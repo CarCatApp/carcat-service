@@ -42,7 +42,7 @@ public class CommissionRate {
     Long partnerId;
 
     /** new | old */
-    @Column(name = "customer_status", nullable = false, length = 8)
+    @Column(name = "customer_status", nullable = false, length = 16)
     String customerStatus;
 
     @Column(name = "rate_percent", nullable = false, precision = 5, scale = 2)

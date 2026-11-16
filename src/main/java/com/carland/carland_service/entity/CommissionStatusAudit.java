@@ -52,11 +52,11 @@ public class CommissionStatusAudit {
     @Column(name = "last_service_date")
     LocalDate lastServiceDate;
 
-    /** new | old */
-    @Column(length = 8)
+    /** new | reactivated | old */
+    @Column(length = 16)
     String status;
 
-    @Column(length = 16)
+    @Column(length = 32)
     String reason;
 
     @Column(name = "review_required", nullable = false)
