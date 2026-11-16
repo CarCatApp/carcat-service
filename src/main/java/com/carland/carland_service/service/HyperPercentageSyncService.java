@@ -50,9 +50,9 @@ public class HyperPercentageSyncService {
 
     /**
      * tr: Verilen ziyaret listesini aracın yüzdelerine uygular (zorla yeniden uygulama yapmaz;
-     *     EDITED_BY_PARTNER olan ve daha yeni verisi olmayan yüzdeler atlanır).
+     *     EDITED_BY_PARTNER / EDITED_BY_CUSTOMER ve daha yeni visit'i olmayan yüzdeler atlanır).
      * en: Applies the given list of visits onto the car's percentages (no forced reapply;
-     *     percentages already EDITED_BY_PARTNER without newer data are skipped).
+     *     EDITED_BY_PARTNER / EDITED_BY_CUSTOMER without a newer visit are skipped).
      */
     public void syncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, false);
@@ -60,9 +60,11 @@ public class HyperPercentageSyncService {
 
     /**
      * tr: Ziyaret listesini yüzdelere zorla yeniden uygular (EDITED_BY_PARTNER aynı recordId olsa bile).
+     *     EDITED_BY_CUSTOMER aynı/eski visit ile ezilmez; yalnızca daha yeni partner visit gelir.
      *     GET persist Hyper kaydını güncelledikten sonra last/next km'nin donmaması için kullanılır.
      * en: Force-reapplies the visit list onto percentages even when already EDITED_BY_PARTNER for the
-     *     same recordId. Used after GET persist refreshes a Hyper snapshot so last/next km do not stay frozen.
+     *     same recordId. EDITED_BY_CUSTOMER is kept until a newer partner visit arrives.
+     *     Used after GET persist refreshes a Hyper snapshot so last/next km do not stay frozen.
      */
     public void resyncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, true);
@@ -156,6 +158,18 @@ public class HyperPercentageSyncService {
 
             boolean sameRecord = matchedRecordId != null
                     && matchedRecordId.equals(percentage.getPartnerRecordId());
+            // Customer next edit wins over the same/older Hyper dump; a newer partner visit wins.
+            if (current == PercentageStatus.EDITED_BY_CUSTOMER
+                    && (sameRecord || !isNewerThanApplied(match.visit(), percentage))) {
+                log.info(
+                        "Skipping percentage sync — customer edit kept until newer partner visit | carId={}, nameEn={}, recordId={}, forced={}",
+                        car.getCarId(),
+                        nameEn,
+                        matchedRecordId,
+                        forceReapply
+                );
+                continue;
+            }
             if (!forceReapply && current == PercentageStatus.EDITED_BY_PARTNER) {
                 if (sameRecord || !isNewerThanApplied(match.visit(), percentage)) {
                     continue;

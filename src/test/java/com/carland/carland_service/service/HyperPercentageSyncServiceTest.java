@@ -95,6 +95,69 @@ class HyperPercentageSyncServiceTest {
         verify(percentageRepository, never()).save(any());
     }
 
+    @Test
+    void forcedReloadDoesNotOverwriteCustomerNextWithSameHyperRecord() {
+        Percentage percentage = customerEditedPercentage(LocalDate.of(2026, 10, 17), 93_473, 111_111, LocalDate.of(2030, 5, 22));
+        percentage.setPartnerRecordId("24554");
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit same = hyperVisit(1L, 24554L, LocalDate.of(2026, 10, 17), 93_473);
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(same));
+
+        service.resyncFromVisits(car, List.of(same));
+
+        verify(percentageRepository, never()).save(any());
+        assertEquals(PercentageStatus.EDITED_BY_CUSTOMER.name(), percentage.getStatus());
+        assertEquals(111_111, percentage.getNextServiceKm());
+        assertEquals(LocalDate.of(2030, 5, 22), percentage.getNextServiceDate());
+    }
+
+    @Test
+    void plainSyncDoesNotOverwriteCustomerNextWithSameHyperRecord() {
+        Percentage percentage = customerEditedPercentage(LocalDate.of(2026, 10, 17), 93_473, 111_111, LocalDate.of(2030, 5, 22));
+        percentage.setPartnerRecordId("24554");
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit same = hyperVisit(1L, 24554L, LocalDate.of(2026, 10, 17), 93_473);
+
+        service.syncFromVisits(car, List.of(same));
+
+        verify(percentageRepository, never()).save(any());
+        assertEquals(111_111, percentage.getNextServiceKm());
+    }
+
+    @Test
+    void forcedReloadAppliesNewerPartnerVisitOverCustomerEdit() {
+        Percentage percentage = customerEditedPercentage(LocalDate.of(2026, 10, 17), 93_473, 111_111, LocalDate.of(2030, 5, 22));
+        percentage.setPartnerRecordId("24554");
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit newer = hyperVisit(2L, 99999L, LocalDate.of(2026, 11, 16), 95_048);
+        newer.getServices().get(0).setNextServiceMileage(105_048);
+        newer.getServices().get(0).setNextServiceDate(LocalDate.of(2027, 5, 16));
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(newer));
+
+        service.resyncFromVisits(car, List.of(newer));
+
+        verify(percentageRepository).save(percentage);
+        assertEquals(PercentageStatus.EDITED_BY_PARTNER.name(), percentage.getStatus());
+        assertEquals(95_048, percentage.getLastServiceKm());
+        assertEquals(105_048, percentage.getNextServiceKm());
+        assertEquals(LocalDate.of(2027, 5, 16), percentage.getNextServiceDate());
+    }
+
+    private Percentage customerEditedPercentage(LocalDate lastDate, int lastKm, int nextKm, LocalDate nextDate) {
+        return Percentage.builder()
+                .id(3L)
+                .carId(5L)
+                .serviceNameEn("Engine oil & filter")
+                .intervalKm(10_000L)
+                .intervalMonth(6)
+                .lastServiceDate(lastDate)
+                .lastServiceKm(lastKm)
+                .nextServiceKm(nextKm)
+                .nextServiceDate(nextDate)
+                .status(PercentageStatus.EDITED_BY_CUSTOMER.name())
+                .build();
+    }
+
     private Percentage panelPercentage(LocalDate lastDate, int lastKm) {
         return Percentage.builder()
                 .id(3L)
