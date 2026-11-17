@@ -9,12 +9,12 @@ import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VinServiceOpenRepository;
 import com.carland.carland_service.service.commission.CommissionCustomerStatusService;
 import com.carland.carland_service.service.commission.CommissionStatus;
+import com.carland.carland_service.service.commission.CommissionVin;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -41,9 +41,15 @@ public class HyperBranchLockService {
     @Transactional
     public boolean locked(Long carId, Long userId) {
         Car car = ownedCar(carId, userId);
-        String vin = normalizeVin(car.getVin());
-        if (!vin.isEmpty()) {
+        String vin = CommissionVin.normalize(car.getVin());
+        if (vin != null && !vin.isEmpty()) {
             Optional<VinServiceOpen> open = vinServiceOpenRepository.findByVin(vin);
+            if (open.isEmpty()) {
+                String spaced = car.getVin() == null ? "" : car.getVin().replaceAll("\\s+", "").toUpperCase();
+                if (!spaced.isEmpty() && !spaced.equals(vin)) {
+                    open = vinServiceOpenRepository.findByVin(spaced);
+                }
+            }
             if (open.isPresent()) {
                 log.info("HYPER_LOCK carId={} vin={} rule=OPEN_FLAG reason={} locked=false",
                         carId, vin, open.get().getReason());
@@ -68,13 +74,5 @@ public class HyperBranchLockService {
             throw new ForbiddenException("car is not yours");
         }
         return car;
-    }
-
-    /** tr: Büyük harf, bütün boşluklar silinir. / en: Upper case, every space removed. */
-    static String normalizeVin(String raw) {
-        if (raw == null) {
-            return "";
-        }
-        return raw.replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
     }
 }

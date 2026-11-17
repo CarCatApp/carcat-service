@@ -6,9 +6,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 /**
- * tr: İlk təyinat: Hyper-də yox → new; son xidmət ≤365 gün → old; >365 → reactivated.
+ * tr: Uğurlu Hyper: yox → new; son xidmət ≤365 → old; >365 → reactivated.
+ *     Uğursuz Hyper/tx → failed. VIN yox / işlənməz → —.
  *     365-ci gün köhnədir. Müqayisə növbə / yoxlama anınadır. Gələcək tarix köhnə + əl yoxlama.
- * en: First assign: absent in Hyper → new; last service ≤365 days → old; >365 → reactivated.
+ * en: Successful Hyper: absent → new; last service ≤365 → old; >365 → reactivated.
+ *     Failed Hyper/tx → failed. No/unusable VIN → —.
  *     Day 365 counts as old. Compared at booking/check time. Future date stays old and needs review.
  */
 public final class CommissionStatusRules {
@@ -27,11 +29,12 @@ public final class CommissionStatusRules {
     public static final String ALREADY_REACTIVATED = "ALREADY_REACTIVATED";
     public static final String KEEP_OLD = "KEEP_OLD";
     public static final String INVALID_VIN = "INVALID_VIN";
-
     public static final String FOUND = "found";
     public static final String LEGACY_NOT_FOUND = "not_found";
     public static final String TIMEOUT = "timeout";
     public static final String NO_VIN = "no_vin";
+    public static final String CALCULATE_FAILED = "CALCULATE_FAILED";
+    public static final String NO_TX = "NO_TX";
 
     private CommissionStatusRules() {
     }
@@ -39,7 +42,7 @@ public final class CommissionStatusRules {
     public static CommissionDecision decide(OffsetDateTime bookingTime, HyperVinSnapshot snapshot) {
         String detail = snapshot == null ? "failed" : snapshot.detail();
         if (snapshot == null || snapshot.kind() == HyperVinSnapshot.Kind.FAILED) {
-            return new CommissionDecision(CommissionStatus.NEW, NO_RESPONSE, null, detail);
+            return new CommissionDecision(CommissionStatus.FAILED, NO_RESPONSE, null, detail);
         }
         if (snapshot.kind() == HyperVinSnapshot.Kind.NOT_FOUND) {
             return new CommissionDecision(CommissionStatus.NEW, NOT_FOUND, null, detail);
@@ -49,7 +52,7 @@ public final class CommissionStatusRules {
                 .max(LocalDate::compareTo)
                 .orElse(null);
         if (last == null) {
-            return new CommissionDecision(CommissionStatus.NEW, NO_DATE, null, detail);
+            return new CommissionDecision(CommissionStatus.FAILED, NO_DATE, null, detail);
         }
         OffsetDateTime created = bookingTime == null ? OffsetDateTime.now(CommissionClock.BAKU) : bookingTime;
         LocalDate day = CommissionClock.bakuDate(created);
@@ -92,10 +95,13 @@ public final class CommissionStatusRules {
             return "Köhnə status saxlanıldı";
         }
         if (INVALID_VIN.equals(outcome)) {
-            return "BAN 17 simvol deyil";
+            return "BAN Hyper sorğusu üçün uyğun deyil";
         }
         if (NO_VIN.equals(outcome)) {
             return "BAN yoxdur";
+        }
+        if (CALCULATE_FAILED.equals(outcome) || NO_TX.equals(outcome)) {
+            return "Status hesablana bilmədi";
         }
         return "Hyper cavab vermədi";
     }

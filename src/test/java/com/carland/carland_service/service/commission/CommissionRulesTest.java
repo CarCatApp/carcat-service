@@ -47,11 +47,11 @@ class CommissionRulesTest {
         assertEquals(CommissionStatusRules.ACTIVE, almost.outcome());
 
         CommissionDecision silent = CommissionStatusRules.decide(booking, HyperVinSnapshot.failed("timeout"));
-        assertEquals(CommissionStatus.NEW, silent.status());
+        assertEquals(CommissionStatus.FAILED, silent.status());
         assertEquals(CommissionStatusRules.NO_RESPONSE, silent.outcome());
 
         CommissionDecision blank = CommissionStatusRules.decide(booking, HyperVinSnapshot.found(List.of(), "no-date"));
-        assertEquals(CommissionStatus.NEW, blank.status());
+        assertEquals(CommissionStatus.FAILED, blank.status());
         assertEquals(CommissionStatusRules.NO_DATE, blank.outcome());
 
         CommissionDecision latest = CommissionStatusRules.decide(booking,

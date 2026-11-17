@@ -81,6 +81,14 @@ class HyperBranchLockServiceTest {
     }
 
     @Test
+    void failedLoyaltyStaysOpen() {
+        when(vinServiceOpenRepository.findByVin(VIN)).thenReturn(Optional.empty());
+        when(commissionCustomerStatusService.resolveStatus(" ab c123 ")).thenReturn(CommissionStatus.FAILED);
+
+        assertFalse(service.locked(CAR_ID, USER_ID));
+    }
+
+    @Test
     void missingCarIsNotFound() {
         when(carRepository.findByCarId(CAR_ID)).thenReturn(null);
 

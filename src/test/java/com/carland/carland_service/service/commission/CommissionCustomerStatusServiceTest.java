@@ -6,6 +6,7 @@ import com.carland.carland_service.entity.CommissionStatusAudit;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.CommissionCustomerStatusRepository;
 import com.carland.carland_service.repository.CommissionStatusAuditRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +48,11 @@ class CommissionCustomerStatusServiceTest {
 
     @InjectMocks
     private CommissionCustomerStatusService service;
+
+    @BeforeEach
+    void wireSelf() {
+        when(self.getObject()).thenReturn(service);
+    }
 
     @Test
     void recordedNewDoesNotCallHyper() {
@@ -128,6 +134,38 @@ class CommissionCustomerStatusServiceTest {
 
         assertEquals(CommissionStatus.OLD, result.getStatus());
         assertEquals(CommissionStatusRules.KEEP_OLD, result.getHyperOutcome());
+    }
+
+    @Test
+    void hyperTimeoutWritesFailedNotNew() {
+        when(statusRepository.findByVin(VIN)).thenReturn(Optional.empty());
+        when(hyperVinLookup.lookup(VIN)).thenReturn(HyperVinSnapshot.failed("timeout"));
+        when(statusRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommissionCustomerStatus result = service.ensure(booking(VIN));
+
+        assertEquals(CommissionStatus.FAILED, result.getStatus());
+        assertEquals(CommissionStatusRules.NO_RESPONSE, result.getHyperOutcome());
+        assertFalse(CommissionStatus.sticky(result.getStatus()));
+    }
+
+    @Test
+    void failedIsRecheckedAndCanBecomeOld() {
+        CommissionCustomerStatus existing = CommissionCustomerStatus.builder()
+                .vin(VIN)
+                .status(CommissionStatus.FAILED)
+                .hyperOutcome(CommissionStatusRules.NO_RESPONSE)
+                .decidedAt(OffsetDateTime.parse("2026-01-01T00:00:00+04:00"))
+                .build();
+        when(statusRepository.findByVin(VIN)).thenReturn(Optional.of(existing));
+        when(hyperVinLookup.lookup(VIN)).thenReturn(
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 8, 1)), "ok"));
+        when(statusRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommissionCustomerStatus result = service.ensure(booking(VIN));
+
+        assertEquals(CommissionStatus.OLD, result.getStatus());
+        assertEquals(CommissionStatusRules.ACTIVE, result.getHyperOutcome());
     }
 
     @Test

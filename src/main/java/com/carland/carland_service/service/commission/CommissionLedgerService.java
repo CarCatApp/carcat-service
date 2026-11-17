@@ -85,13 +85,17 @@ public class CommissionLedgerService {
         if (status == null && vin != null) {
             status = statusService.ensure(booking);
         }
-        String customerStatus = status == null ? CommissionStatus.NEW : status.getStatus();
+        String customerStatus = status == null ? CommissionStatus.DASH : status.getStatus();
+        if (!CommissionStatus.known(customerStatus)) {
+            customerStatus = CommissionStatus.FAILED;
+        }
         OffsetDateTime completedAt = OffsetDateTime.now(CommissionClock.BAKU);
         Branch branch = booking.getBranch();
         Partner partner = branch == null ? null : branch.getPartner();
         Long partnerId = partner == null ? null : partner.getId();
         Car car = booking.getCarId() == null ? null : cars.findByCarId(booking.getCarId());
         String plate = car == null ? null : cut(PlateNumbers.format(car.getPlateNumber()), 32);
+        boolean success = CommissionStatus.success(customerStatus);
         return CommissionEntry.builder()
                 .bookingId(booking.getId())
                 .ref(cut(booking.getRef(), 16))
@@ -102,12 +106,14 @@ public class CommissionLedgerService {
                 .vin(vin)
                 .plate(plate)
                 .completedAt(completedAt)
-                .customerStatus(CommissionStatus.known(customerStatus) ? customerStatus : CommissionStatus.NEW)
+                .customerStatus(customerStatus)
                 .statusDecidedAt(status == null ? completedAt : status.getDecidedAt())
                 .hyperOutcome(status == null ? CommissionStatusRules.NO_VIN : status.getHyperOutcome())
                 .earliestServiceDate(status == null ? null : status.getEarliestServiceDate())
                 .hyperSnapshot(status == null ? null : status.getSnapshot())
-                .ratePercent(rate(partnerId, customerStatus, CommissionClock.bakuDate(completedAt)))
+                .ratePercent(success
+                        ? rate(partnerId, customerStatus, CommissionClock.bakuDate(completedAt))
+                        : BigDecimal.ZERO)
                 .amountState(CommissionEntry.PENDING)
                 .build();
     }

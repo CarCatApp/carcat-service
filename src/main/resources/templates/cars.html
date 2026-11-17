@@ -176,7 +176,8 @@
             <span class="badge badge-info" th:if="${loyalty == 'yeni'}" th:text="${loyalty}">yeni</span>
             <span class="badge badge-warning" th:if="${loyalty == 'geri qazanılmış'}" th:text="${loyalty}">geri qazanılmış</span>
             <span class="badge badge-neutral" th:if="${loyalty == 'köhnə'}" th:text="${loyalty}">köhnə</span>
-            <span class="muted" th:if="${loyalty == null}">—</span>
+            <span class="badge badge-danger" th:if="${loyalty == 'failed'}" th:text="${loyalty}">failed</span>
+            <span class="muted" th:if="${loyalty == null || loyalty == '—'}">—</span>
           </td>
           <td th:text="${T(com.carland.carland_service.util.PlateNumbers).format(car.plateNumber)}"></td>
           <td th:text="${car.brand}"></td>
