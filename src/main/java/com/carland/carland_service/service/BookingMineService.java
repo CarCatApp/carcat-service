@@ -35,6 +35,7 @@ import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
+import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
@@ -62,9 +63,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285). unread=0 ta ki 286.
+ * tr: Owner rezervasyon listesi + detay + iptal (CRCT-285).
+ * unreadCount: şubenin gönderdiği ve müşterinin POST /read ile seen yapmadığı mesajlar.
  * purpose boş veya recently: her şubenin son rezervasyonu. all: bütün kayıtlar, en yeni önce.
- * en: Owner booking list + detail + cancel (CRCT-285). unread=0 until 286.
+ * en: Owner booking list + detail + cancel (CRCT-285).
+ * unreadCount: branch messages the customer has not marked seen with POST /read.
  * purpose blank or recently: latest booking per branch. all: every booking, newest first.
  */
 @Slf4j
@@ -93,6 +96,7 @@ public class BookingMineService {
     private final ObjectMapper objectMapper;
     private final StaffBookingLiveService staffBookingLiveService;
     private final BookingPushService bookingPushService;
+    private final BookingMessageRepository bookingMessageRepository;
 
     @Transactional(readOnly = true)
     public BookingMineResponse mine(Long customerUserId, String statusCsv, Long carId,
@@ -131,10 +135,11 @@ public class BookingMineService {
         List<Booking> rows = loadInIdOrder(ids.getContent());
         Map<Long, List<String>> keys = keysByBooking(rows);
         Set<Long> withPhoto = partnerIdsWithPhoto(rows);
+        Map<Long, Integer> unread = unreadByBooking(rows);
         List<BookingView> items = new ArrayList<>();
         for (Booking booking : rows) {
             items.add(toView(booking, keys.getOrDefault(booking.getId(), List.of()), timezone, withPhoto,
-                    acceptLanguage));
+                    acceptLanguage, unread.getOrDefault(booking.getId(), 0)));
         }
         return BookingMineResponse.builder()
                 .counts(countsOf(customerUserId, carId))
@@ -215,7 +220,7 @@ public class BookingMineService {
                 .priceMax(booking.getPriceMax())
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
-                .unreadCount(0)
+                .unreadCount(unreadOf(booking.getId()))
                 .canceledBy(canceledBy(booking.getStatus()))
                 .canceledReason(canceledReasonOf(booking, acceptLanguage))
                 .build();
@@ -566,8 +571,48 @@ public class BookingMineService {
                 ));
     }
 
+    private Map<Long, Integer> unreadByBooking(List<Booking> rows) {
+        List<Long> ids = new ArrayList<>();
+        for (Booking booking : rows) {
+            if (booking.getId() != null) {
+                ids.add(booking.getId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> counts = bookingMessageRepository.countBranchUnreadByBookingId(ids);
+        if (counts == null || counts.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Integer> out = new LinkedHashMap<>();
+        for (Object[] row : counts) {
+            if (row == null || row.length < 2 || !(row[0] instanceof Number) || !(row[1] instanceof Number)) {
+                continue;
+            }
+            long id = ((Number) row[0]).longValue();
+            long total = ((Number) row[1]).longValue();
+            out.put(id, asCount(total));
+        }
+        return out;
+    }
+
+    private int unreadOf(Long bookingId) {
+        if (bookingId == null) {
+            return 0;
+        }
+        return asCount(bookingMessageRepository.countBranchUnread(bookingId));
+    }
+
+    private static int asCount(long total) {
+        if (total < 0) {
+            return 0;
+        }
+        return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+    }
+
     private BookingView toView(Booking booking, List<String> keys, String timezone, Set<Long> withPhoto,
-                               String acceptLanguage) {
+                               String acceptLanguage, int unreadCount) {
         Range range = booking.getRange();
         Calendar calendar = range == null ? null : range.getCalendar();
         Branch branch = booking.getBranch();
@@ -598,7 +643,7 @@ public class BookingMineService {
                 .priceMax(booking.getPriceMax())
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
-                .unreadCount(0)
+                .unreadCount(unreadCount)
                 .canceledReason(canceledReasonOf(booking, acceptLanguage))
                 .build();
     }

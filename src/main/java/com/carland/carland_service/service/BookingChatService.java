@@ -63,6 +63,7 @@ public class BookingChatService {
     private final BookingChatUploadRepository uploadRepository;
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingChatLiveService chatLiveService;
+    private final BookingPushService bookingPushService;
 
     @Transactional(readOnly = true)
     public ChatMessagesPage ownerMessages(Long customerUserId, String bookingKey, String cursor, Integer limit) {
@@ -334,6 +335,8 @@ public class BookingChatService {
         if (peerOnline) {
             chatLiveService.publishDelivery(
                     booking.getId(), row.getClientMessageId(), String.valueOf(row.getId()), "delivered");
+        } else if ("branch".equals(fromRole) && "sent".equals(row.getDelivery())) {
+            bookingPushService.chatNewMessage(booking, row.getKind(), row.getBody());
         }
         return view;
     }

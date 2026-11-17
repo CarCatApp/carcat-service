@@ -23,6 +23,7 @@ import com.carland.carland_service.repository.BookingCancelReasonRepository;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingItemRepository;
+import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.CarRepository;
@@ -69,6 +70,7 @@ class BookingMineServiceTest {
     @Mock PartnerPhotoRepository partnerPhotoRepository;
     @Mock StaffBookingLiveService staffBookingLiveService;
     @Mock BookingPushService bookingPushService;
+    @Mock BookingMessageRepository bookingMessageRepository;
 
     BookingMineService service;
     Booking booking;
@@ -80,7 +82,7 @@ class BookingMineServiceTest {
                 bookingRepository, bookingItemRepository, bookingSelectedServiceRepository,
                 individualLineRepository, inspectionRepository, carRepository,
                 bookingCreateService, cancelReasonRepository, partnerPhotoRepository, new ObjectMapper(),
-                staffBookingLiveService, bookingPushService);
+                staffBookingLiveService, bookingPushService, bookingMessageRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").address("Xeqani").active(true).partner(hyper).build();
         Calendar calendar = Calendar.builder().day(LocalDate.of(2026, 10, 27)).branch(branch).build();
@@ -140,6 +142,31 @@ class BookingMineServiceTest {
         assertTrue(pageable.getValue().getSort().isUnsorted());
         assertEquals(0, pageable.getValue().getPageNumber());
         assertEquals(20, pageable.getValue().getPageSize());
+        assertEquals(0, out.getItems().get(0).getUnreadCount());
+    }
+
+    @Test
+    void unreadCountIsBranchMessagesTheCustomerHasNotRead() {
+        @SuppressWarnings("unchecked")
+        Page<Long> idPage = mock(Page.class);
+        when(idPage.getContent()).thenReturn(List.of(3L));
+        when(idPage.getTotalElements()).thenReturn(1L);
+        when(bookingRepository.findLatestIdPerBranch(eq(54L), any(Pageable.class))).thenReturn(idPage);
+        when(bookingRepository.findForMineByIdIn(any())).thenReturn(List.of(booking));
+        when(bookingRepository.countGroupByStatus(54L)).thenReturn(List.of());
+        when(bookingItemRepository.findByBooking_IdIn(any())).thenReturn(List.of());
+        when(bookingMessageRepository.countBranchUnreadByBookingId(any()))
+                .thenReturn(List.<Object[]>of(new Object[]{3L, 2L}));
+
+        BookingMineResponse list = service.mine(54L, null, null, 1, 20, null, "Asia/Baku");
+        assertEquals(2, list.getItems().get(0).getUnreadCount());
+
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(bookingItemRepository.findByBooking_IdOrderByIdAsc(3L)).thenReturn(List.of());
+        when(bookingMessageRepository.countBranchUnread(3L)).thenReturn(2L);
+
+        BookingDetailResponse detail = service.detail(54L, "3", "Asia/Baku");
+        assertEquals(2, detail.getUnreadCount());
     }
 
     @Test

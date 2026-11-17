@@ -52,7 +52,7 @@ body {
 
 button, .btn, input, select, textarea { font-family: inherit; }
 
-button, .btn, .nav-link, .page-link, .page-arrow, .btn-cars, .btn-photo, summary, .flag-head, .seg-btn, .ver-item, .set-current {
+button, .btn, .nav-link, .nav-toggle, .nav-close, .page-link, .page-arrow, .btn-cars, .btn-photo, summary, .flag-head, .seg-btn, .ver-item, .set-current {
   cursor: pointer;
 }
 
@@ -115,12 +115,99 @@ button, .btn, .nav-link, .page-link, .page-arrow, .btn-cars, .btn-photo, summary
 .brand .logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand .logo svg { width: 20px; height: 20px; display: block; }
 
+.admin-nav { display: flex; align-items: center; }
+
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-left: 4px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.nav-toggle:hover { background: var(--primary-soft); }
+.nav-toggle svg { width: 16px; height: 16px; display: block; }
+
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(17, 17, 17, 0.32);
+}
+.nav-backdrop[hidden] { display: none; }
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 60;
+  width: min(320px, 88vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  color: var(--text);
+  border-right: 1px solid var(--border);
+  box-shadow: var(--shadow-float);
+  transform: translateX(-105%);
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 0.22s ease, visibility 0s linear 0.22s;
+}
+.admin-nav.is-open .nav-drawer {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.22s ease, visibility 0s linear 0s;
+}
+
+.nav-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.nav-close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+}
+.nav-close:hover { background: var(--primary-soft); }
+
 .nav-links {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: 8px;
   flex-wrap: wrap;
+}
+
+.nav-drawer .nav-links {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 4px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
 }
 
 .nav-link {
@@ -136,8 +223,15 @@ button, .btn, .nav-link, .page-link, .page-arrow, .btn-cars, .btn-photo, summary
   transition: background 0.2s ease, color 0.2s ease;
 }
 
+.nav-drawer .nav-link {
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
 .nav-link:hover { background: var(--primary-soft); color: var(--text); }
 .nav-link.active { background: var(--text); color: #fff; }
+
+body.nav-open { overflow: hidden; }
 
 .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 

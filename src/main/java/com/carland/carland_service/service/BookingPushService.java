@@ -27,8 +27,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * tr: Qəbul, rədd, ləğv, gəlmədi və tamamlamadan sonra eyni title/body-ni bildiriş siyahısına yazır və müştərinin cihaz tokeninə FCM göndərir. Commitdən sonra işləyir; xəta statusu geri almır.
- * en: After accept, reject, cancel, no-show, or complete, writes the same title/body into the notification list and sends FCM to the customer's device token. Runs after commit; a failure does not undo the status.
+ * tr: Qəbul, rədd, ləğv, gəlmədi və tamamlamadan sonra eyni title/body-ni bildiriş siyahısına yazır və müştərinin cihaz tokeninə FCM göndərir. Söhbət mesajı yalnız FCM gedir, bildiriş siyahısına yazılmır. Commitdən sonra işləyir; xəta statusu geri almır.
+ * en: After accept, reject, cancel, no-show, or complete, writes the same title/body into the notification list and sends FCM to the customer's device token. A chat message is FCM only and is not written to the notification list. Runs after commit; a failure does not undo the status.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +47,8 @@ public class BookingPushService {
     static final String TYPE_COMPLETED = "BOOKING_COMPLETED";
     static final String TYPE_REMIND_24H = "BOOKING_REMINDER_24H";
     static final String TYPE_REMIND_3H = "BOOKING_REMINDER_3H";
+    static final String TYPE_CHAT_NEW_MESSAGE = "chat_new_message";
+    static final int CHAT_BODY_LIMIT = 180;
 
     private final DeviceTokenRepository deviceTokenRepository;
     private final CustomerRepository customerRepository;
@@ -114,6 +116,22 @@ public class BookingPushService {
         schedule(booking, Kind.REMIND_3H);
     }
 
+    /**
+     * tr: Şube söhbət mesajı. Müşteri canlı həttdə deyilsə (mesaj sent qalıbsa) çağırılır. Bildiriş siyahısına yazılmır.
+     * en: Branch chat message. Called when the customer is not on the live line (the message stays sent). It is not written to the notification list.
+     */
+    public void chatNewMessage(Booking booking, String kind, String text) {
+        try {
+            ChatNotice notice = chatNotice(booking, kind, text);
+            if (notice == null) {
+                return;
+            }
+            runAfterCommit(() -> deliverChat(notice));
+        } catch (Exception ex) {
+            log.warn("chat push schedule skipped id={}", booking == null ? null : booking.getId());
+        }
+    }
+
     private static boolean hasStart(Booking booking) {
         return booking != null && booking.getRange() != null && booking.getRange().getStart() != null;
     }
@@ -172,6 +190,84 @@ public class BookingPushService {
             log.warn("booking inbox save failed userId={} ref={} error={}",
                     notice.customerUserId(), notice.ref(), ex.getClass().getSimpleName());
         }
+    }
+
+    private void deliverChat(ChatNotice notice) {
+        String lang = "az";
+        try {
+            lang = languageOf(notice.customerUserId());
+        } catch (Exception ex) {
+            log.warn("chat language lookup failed userId={} bookingId={} error={}",
+                    notice.customerUserId(), notice.bookingId(), ex.getClass().getSimpleName());
+        }
+        sendChatPush(notice, notice.branchName(), chatBody(lang, notice.kind(), notice.text()));
+    }
+
+    private void sendChatPush(ChatNotice notice, String heading, String text) {
+        try {
+            DeviceToken row = deviceTokenRepository.findByUserId(notice.customerUserId());
+            if (row == null || row.getDeviceToken() == null || row.getDeviceToken().isBlank()) {
+                log.info("chat push skipped, no device token userId={} bookingId={}",
+                        notice.customerUserId(), notice.bookingId());
+                return;
+            }
+            Map<String, String> data = new LinkedHashMap<>();
+            data.put("type", TYPE_CHAT_NEW_MESSAGE);
+            data.put("bookingId", Long.toString(notice.bookingId()));
+            data.put("branchId", Long.toString(notice.branchId()));
+            pushNotificationService.send(heading, text, row.getDeviceToken().trim(), data);
+        } catch (Exception ex) {
+            log.warn("chat push failed userId={} bookingId={} error={}",
+                    notice.customerUserId(), notice.bookingId(), ex.getClass().getSimpleName());
+        }
+    }
+
+    private static ChatNotice chatNotice(Booking booking, String kind, String text) {
+        if (booking == null || booking.getId() == null || booking.getCustomerUserId() == null) {
+            return null;
+        }
+        Branch branch = booking.getBranch();
+        if (branch == null || branch.getId() == null) {
+            return null;
+        }
+        String branchName = branch.getName() == null ? "" : branch.getName().trim();
+        if (branchName.isEmpty()) {
+            return null;
+        }
+        return new ChatNotice(
+                booking.getId(), booking.getCustomerUserId(), branch.getId(), branchName, kind, text);
+    }
+
+    static String chatBody(String lang, String kind, String text) {
+        String normalized = kind == null ? "text" : kind.trim().toLowerCase(Locale.ROOT);
+        if ("image".equals(normalized)) {
+            return switch (lang) {
+                case "en" -> "Sent a photo";
+                case "ru" -> "Отправил фото";
+                default -> "Şəkil göndərdi";
+            };
+        }
+        if ("file".equals(normalized)) {
+            return switch (lang) {
+                case "en" -> "Sent a file";
+                case "ru" -> "Отправил файл";
+                default -> "Fayl göndərdi";
+            };
+        }
+        return clipChat(text);
+    }
+
+    static String clipChat(String text) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        int count = trimmed.codePointCount(0, trimmed.length());
+        if (count <= CHAT_BODY_LIMIT) {
+            return trimmed;
+        }
+        int end = trimmed.offsetByCodePoints(0, CHAT_BODY_LIMIT - 1);
+        return trimmed.substring(0, end) + "…";
     }
 
     private void sendPush(Notice notice, String heading, String text) {
@@ -446,5 +542,14 @@ public class BookingPushService {
             String note,
             String reasonCode,
             Kind kind
+    ) {}
+
+    private record ChatNotice(
+            Long bookingId,
+            Long customerUserId,
+            Long branchId,
+            String branchName,
+            String kind,
+            String text
     ) {}
 }

@@ -1,19 +1,23 @@
 package com.carland.carland_service.service;
 
+import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingMessage;
+import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +34,7 @@ class BookingChatServiceTest {
     @Mock BookingMessageRepository messageRepository;
     @Mock BookingStaffAccess bookingStaffAccess;
     @Mock BookingChatLiveService chatLiveService;
+    @Mock BookingPushService bookingPushService;
     @InjectMocks BookingChatService service;
 
     @Test
@@ -72,6 +77,7 @@ class BookingChatServiceTest {
         assertEquals("customer", view.getFromRole());
         assertEquals("salam", view.getText());
         verify(chatLiveService).publishNewMessageAfterCommit(org.mockito.ArgumentMatchers.eq(5L), any());
+        verify(bookingPushService, never()).chatNewMessage(any(), any(), any());
     }
 
     @Test
@@ -101,6 +107,87 @@ class BookingChatServiceTest {
         assertEquals("7", view.getServerId());
         verify(messageRepository, never()).save(any());
         verify(chatLiveService, never()).publishNewMessageAfterCommit(any(), any());
+        verify(bookingPushService, never()).chatNewMessage(any(), any(), any());
+    }
+
+    @Test
+    void staffSendPushesOnlyWhenCustomerIsNotOnTheLiveLine() {
+        Branch branch = Branch.builder().id(9L).name("Hyper Xəqani").build();
+        Booking booking = pendingBooking(branch);
+        BookingStaff staff = BookingStaff.builder().id(1L).userId(8L).build();
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 9L, "az")).thenReturn(branch);
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+        when(messageRepository.findByBooking_IdAndClientMessageId(5L, "b1")).thenReturn(Optional.empty());
+        when(messageRepository.save(any(BookingMessage.class))).thenAnswer(inv -> {
+            BookingMessage row = inv.getArgument(0);
+            row.setId(11L);
+            return row;
+        });
+        when(chatLiveService.hasPeerListener(5L, "branch")).thenReturn(false);
+
+        service.staffSend(8L, false, 5L, text("b1", "Salam"), "az");
+
+        ArgumentCaptor<BookingMessage> saved = ArgumentCaptor.forClass(BookingMessage.class);
+        verify(messageRepository).save(saved.capture());
+        assertEquals("sent", saved.getValue().getDelivery());
+        verify(bookingPushService).chatNewMessage(booking, "text", "Salam");
+    }
+
+    @Test
+    void staffSendDoesNotPushWhenCustomerIsListening() {
+        Branch branch = Branch.builder().id(9L).name("Hyper Xəqani").build();
+        Booking booking = pendingBooking(branch);
+        BookingStaff staff = BookingStaff.builder().id(1L).userId(8L).build();
+        when(bookingStaffAccess.requireStaff(8L, false, "az")).thenReturn(staff);
+        when(bookingStaffAccess.requireWritableBranch(staff, 9L, "az")).thenReturn(branch);
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+        when(messageRepository.findByBooking_IdAndClientMessageId(5L, "b1")).thenReturn(Optional.empty());
+        when(messageRepository.save(any(BookingMessage.class))).thenAnswer(inv -> {
+            BookingMessage row = inv.getArgument(0);
+            row.setId(11L);
+            return row;
+        });
+        when(chatLiveService.hasPeerListener(5L, "branch")).thenReturn(true);
+
+        service.staffSend(8L, false, 5L, text("b1", "Salam"), "az");
+
+        ArgumentCaptor<BookingMessage> saved = ArgumentCaptor.forClass(BookingMessage.class);
+        verify(messageRepository).save(saved.capture());
+        assertEquals("delivered", saved.getValue().getDelivery());
+        verify(bookingPushService, never()).chatNewMessage(any(), any(), any());
+    }
+
+    @Test
+    void ownerReadMarksBranchMessagesSeenAndLeavesOwnMessages() {
+        Booking booking = pendingBooking(Branch.builder().id(9L).build());
+        booking.setCustomerUserId(42L);
+        BookingMessage branchMessage = BookingMessage.builder()
+                .id(1L)
+                .booking(booking)
+                .clientMessageId("b1")
+                .fromRole("branch")
+                .kind("text")
+                .body("salam")
+                .delivery("sent")
+                .build();
+        BookingMessage ownMessage = BookingMessage.builder()
+                .id(2L)
+                .booking(booking)
+                .clientMessageId("c1")
+                .fromRole("customer")
+                .kind("text")
+                .body("ozum")
+                .delivery("sent")
+                .build();
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+        when(messageRepository.findByBooking_IdAndClientMessageIdIn(5L, List.of("b1", "c1")))
+                .thenReturn(List.of(branchMessage, ownMessage));
+
+        service.ownerRead(42L, "5", ChatReadRequest.builder().clientMessageIds(List.of("b1", "c1")).build());
+
+        assertEquals("seen", branchMessage.getDelivery());
+        assertEquals("sent", ownMessage.getDelivery());
     }
 
     @Test
@@ -113,6 +200,23 @@ class BookingChatServiceTest {
                 .kind("text")
                 .text("x")
                 .build()));
+    }
+
+    private static Booking pendingBooking(Branch branch) {
+        return Booking.builder()
+                .id(5L)
+                .status("pending")
+                .customerUserId(42L)
+                .branch(branch)
+                .build();
+    }
+
+    private static ChatSendRequest text(String clientMessageId, String text) {
+        return ChatSendRequest.builder()
+                .clientMessageId(clientMessageId)
+                .kind("text")
+                .text(text)
+                .build();
     }
 
     @Test

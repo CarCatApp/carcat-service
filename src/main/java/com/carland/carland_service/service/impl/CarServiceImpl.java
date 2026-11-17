@@ -746,7 +746,7 @@ public class CarServiceImpl implements CarService {
         if (isPartnerSourcedLastLocked(percentage)
                 && (isLastServiceKmChanging(request, percentage) || isLastServiceDateChanging(request, percentage))) {
             log.warn("editPercentage rejected: partner-sourced last service locked | percentageId={}", percentage.getId());
-            throw new ConflictException("Son xidmət tarixi və kilometri partnyor tərəfindən yazılıb və redaktə edilə bilməz");
+            throw new ConflictException(MessagesLangValues.PARTNER_LAST_SERVICE_LOCKED.getMessageByLang(acceptLanguage));
         }
 
         if (request.getLastServiceKm() != null) {

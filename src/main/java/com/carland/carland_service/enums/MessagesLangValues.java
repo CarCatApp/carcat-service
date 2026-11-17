@@ -627,6 +627,12 @@ public enum MessagesLangValues {
             "Dil yalnız az, en və ya ru ola bilər",
             "Language must be az, en, or ru",
             "Язык может быть только az, en или ru"
+    ),
+
+    PARTNER_LAST_SERVICE_LOCKED(
+            "Son xidmət tarixi və kilometri partnyor tərəfindən daxil edildiyi üçün redaktə edilə bilməz",
+            "The last service date and mileage cannot be edited because they were entered by the partner",
+            "Дата и пробег последнего обслуживания нельзя изменить, так как они введены партнёром"
     );
 
     private final String azMessage;

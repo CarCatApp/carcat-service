@@ -24,6 +24,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -312,6 +313,83 @@ class BookingPushServiceTest {
                     eq("Booking confirmed"),
                     eq("Nərimanov: Your booking is confirmed. Time: 12.10.2026, 14:30. See you soon!"),
                     eq("tok-1"), eq(PUSH_IDS));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void chatPushCarriesBranchNameAndSkipsTheNotificationList() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
+
+        service.chatNewMessage(sample(null), "text", "Salam, saat 15:00 uyğundur?");
+
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("type", BookingPushService.TYPE_CHAT_NEW_MESSAGE);
+        data.put("bookingId", "4");
+        data.put("branchId", "1");
+        verify(pushNotificationService).send(
+                eq("Nərimanov"), eq("Salam, saat 15:00 uyğundur?"), eq("tok-1"), eq(data));
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    void chatImageAndFileBodiesFollowCustomerLanguage() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(
+                customer("az"), customer("en"), customer("ru"), customer("az"));
+
+        service.chatNewMessage(sample(null), "image", "caption");
+        service.chatNewMessage(sample(null), "image", "caption");
+        service.chatNewMessage(sample(null), "image", "caption");
+        service.chatNewMessage(sample(null), "file", "caption");
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(pushNotificationService, times(4)).send(eq("Nərimanov"), body.capture(), eq("tok-1"), any());
+        assertEquals(List.of("Şəkil göndərdi", "Sent a photo", "Отправил фото", "Fayl göndərdi"), body.getAllValues());
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    void chatTextIsClippedAndAMissingBranchSendsNothing() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("en"));
+
+        service.chatNewMessage(sample(null), "text", "a".repeat(181));
+
+        verify(pushNotificationService).send(eq("Nərimanov"), eq("a".repeat(179) + "…"), eq("tok-1"), any());
+
+        Booking nameless = sample(null);
+        nameless.getBranch().setName(" ");
+        service.chatNewMessage(nameless, "text", "salam");
+        Booking noBranch = sample(null);
+        noBranch.setBranch(null);
+        service.chatNewMessage(noBranch, "text", "salam");
+
+        verify(pushNotificationService, times(1)).send(any(), any(), any(), any());
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    void chatPushFailureDoesNotEscapeAndWaitsForCommit() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
+        doThrow(new RuntimeException("fcm")).when(pushNotificationService).send(any(), any(), any(), any());
+
+        assertDoesNotThrow(() -> service.chatNewMessage(sample(null), "text", "salam"));
+        verify(notificationRepository, never()).save(any());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            org.mockito.Mockito.reset(pushNotificationService);
+            service.chatNewMessage(sample(null), "text", "sonra");
+            verify(pushNotificationService, never()).send(any(), any(), any(), any());
+            for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
+                sync.afterCommit();
+            }
+            verify(pushNotificationService).send(eq("Nərimanov"), eq("sonra"), eq("tok-1"), any());
+            verify(notificationRepository, never()).save(any());
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
