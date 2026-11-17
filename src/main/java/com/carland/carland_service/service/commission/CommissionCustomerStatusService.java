@@ -146,10 +146,6 @@ public class CommissionCustomerStatusService {
         }
 
         CommissionDecision decision = CommissionStatusRules.decide(when, snapshot);
-        if (CommissionStatusRules.FUTURE_DATE.equals(decision.outcome())) {
-            log.warn("commission future service date | vin={} bookingId={} date={}",
-                    vin, bookingId, decision.serviceDate());
-        }
         return self.getObject().persistDecision(auditBooking, vin, when, decision, snapshot, existing);
     }
 
@@ -260,8 +256,7 @@ public class CommissionCustomerStatusService {
             current.setSnapshot(trim(decision.snapshot()));
             row = statusRepository.saveAndFlush(current);
         }
-        boolean review = CommissionStatusRules.FUTURE_DATE.equals(decision.outcome())
-                || CommissionStatus.FAILED.equals(nextStatus)
+        boolean review = CommissionStatus.FAILED.equals(nextStatus)
                 || CommissionStatus.DASH.equals(nextStatus);
         audit(booking, vin, bookingTime, decision.serviceDate(), snapshot, nextStatus, reason, review);
         return row;

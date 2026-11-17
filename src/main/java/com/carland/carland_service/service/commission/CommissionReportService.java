@@ -501,8 +501,8 @@ public class CommissionReportService {
         if (CommissionStatusRules.ACTIVE.equals(outcome)) {
             return "Son xidmət tarixi növbənin yarandığı andan əvvəlki 365 günün içindədir.";
         }
-        if (CommissionStatusRules.FUTURE_DATE.equals(outcome)) {
-            return "Hyper gələcək xidmət tarixi qaytardı. Əl ilə yoxlanmalıdır.";
+        if (CommissionStatusRules.NO_PRIOR.equals(outcome) || CommissionStatusRules.FUTURE_DATE.equals(outcome)) {
+            return "Növbədən əvvəl Hyper xidməti yoxdur (yeni müştəri).";
         }
         if (CommissionStatusRules.FOUND.equals(outcome) && CommissionStatus.OLD.equals(entry.getCustomerStatus())) {
             return "Ən erkən servis günü randevunun açıldığı gündən əvvəldir.";

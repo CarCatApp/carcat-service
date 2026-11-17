@@ -51,21 +51,30 @@ class CommissionRulesTest {
         assertEquals(CommissionStatusRules.NO_RESPONSE, silent.outcome());
 
         CommissionDecision blank = CommissionStatusRules.decide(booking, HyperVinSnapshot.found(List.of(), "no-date"));
-        assertEquals(CommissionStatus.FAILED, blank.status());
-        assertEquals(CommissionStatusRules.NO_DATE, blank.outcome());
+        assertEquals(CommissionStatus.NEW, blank.status());
+        assertEquals(CommissionStatusRules.NO_PRIOR, blank.outcome());
 
         CommissionDecision latest = CommissionStatusRules.decide(booking,
                 HyperVinSnapshot.found(List.of(LocalDate.of(2025, 10, 8), LocalDate.of(2026, 8, 8)), "mix"));
         assertEquals(CommissionStatus.OLD, latest.status());
         assertEquals(LocalDate.of(2026, 8, 8), latest.serviceDate());
 
+        // After booking day / same day = not prior → new (Aziz rule).
         CommissionDecision future = CommissionStatusRules.decide(booking,
                 HyperVinSnapshot.found(List.of(LocalDate.of(2026, 11, 9)), "future"));
-        assertEquals(CommissionStatus.OLD, future.status());
-        assertEquals(CommissionStatusRules.FUTURE_DATE, future.outcome());
+        assertEquals(CommissionStatus.NEW, future.status());
+        assertEquals(CommissionStatusRules.NO_PRIOR, future.outcome());
 
-        assertEquals(CommissionStatus.OLD, CommissionStatusRules.decide(booking,
+        assertEquals(CommissionStatus.NEW, CommissionStatusRules.decide(booking,
                 HyperVinSnapshot.found(List.of(LocalDate.of(2026, 11, 8)), "same")).status());
+        assertEquals(CommissionStatusRules.NO_PRIOR, CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 11, 8)), "same")).outcome());
+
+        // Mix: ignore after-booking, use prior only.
+        CommissionDecision mixIgnoreLater = CommissionStatusRules.decide(booking,
+                HyperVinSnapshot.found(List.of(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 11, 20)), "mix2"));
+        assertEquals(CommissionStatus.OLD, mixIgnoreLater.status());
+        assertEquals(LocalDate.of(2026, 8, 8), mixIgnoreLater.serviceDate());
     }
 
     private static OffsetDateTime noon(LocalDate day) {
