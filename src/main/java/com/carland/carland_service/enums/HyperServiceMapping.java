@@ -28,6 +28,7 @@ public enum HyperServiceMapping {
     POWER_STEERING_FLUID("Power steering fluid", "POWER_STEERING_FLUID"),
     REDUCTION_GEAR_OIL("Reduction-gear oil", "REDUCTION_GEAR_OIL"),
     SPARK_PLUGS("Spark plugs", "SPARK_PLUGS"),
+    DRIVE_BELT("Drive belt", "DRIVE_BELT"),
     TIMING_BELT("Timing belt", "TIMING_BELT"),
     TRANSMISSION_FLUID("Transmission fluid", "TRANSMISSION_FLUID"),
     /** Legacy Hyper may send Tyres/Tires; new contract TYRES/TIRES. */
