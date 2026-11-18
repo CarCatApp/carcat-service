@@ -16,9 +16,9 @@ import java.io.IOException;
 
 /**
  * tr: Hukuki içerik REST controller'ı; kullanım koşulları ve gizlilik politikasını az/en/ru dillerinde döner.
- *     Metin kaynağı: Terms v3.5, Privacy v3.5 — "CarCat" MMC (az/en/ru).
+ *     Metin kaynağı: Terms v4.0, Privacy v4.0 — "CarCat" MMC (az/en/ru). Tek belge iki mobil ekrana bölündü.
  * en: Legal content REST controller; serves terms and privacy policy in az/en/ru.
- *     Source: Terms v3.5, Privacy v3.5 — "CarCat" LLC (az/en/ru).
+ *     Source: Terms v4.0, Privacy v4.0 — "CarCat" LLC (az/en/ru). One document, two mobile screens.
  */
 @RestController
 @RequestMapping("/legal")
@@ -84,93 +84,79 @@ public class LegalController {
     }
 
     // -------------------------------------------------------------------------
-    // Terms of Use v3.5 — AZ / EN / RU
+    // Terms of Use v4.0 — AZ / EN / RU
+    // Sections 1–6, 11, 12 of the combined document.
     // -------------------------------------------------------------------------
 
     private static final String TERMS_JSON_AZ = """
             {
               "metadata": {
-                "lastUpdated": "5 sentyabr 2026",
-                "version": "3.5",
+                "lastUpdated": "15 noyabr 2026",
+                "version": "4.0",
                 "language": "az",
                 "company": "\\"CarCat\\" MMC",
                 "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "https://carcat.app/",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Bakı, Azərbaycan",
                 "country": "Azərbaycan Respublikası",
                 "phone": "+994 70 575 75 70"
               },
               "header": {
                 "title": "CarCat — İstifadə şərtləri",
-                "subtitle": "Tətbiq yalnız şəxsi istifadə üçündür. Üçüncü tərəf ödənişlərində CarCat nümayəndə (agent) kimi çıxış edir. Tətbiq \\"olduğu kimi\\" təqdim olunur."
+                "subtitle": "Son yenilənmə: 15 noyabr 2026 | Versiya: 4.0 | \\"CarCat\\" MMC"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. Giriş",
-                  "content": "Bu İstifadə şərtləri (\\"Şərtlər\\") \\"CarCat\\" MMC (\\"CarCat\\", \\"biz\\") ilə istifadəçi (\\"siz\\") arasındakı hüquqi münasibətləri tənzimləyir. Tətbiqdən istifadə etməklə bu \\"Şərtləri və Məxfilik siyasətimizi\\" qəbul etmiş olursunuz. CarCat bu Şərtləri istənilən vaxt birtərəfli qaydada dəyişdirmək hüququnu saxlayır. Həmçinin:\\n\\n• Şəxsi istifadə: Tətbiq yalnız şəxsi istifadə üçün nəzərdə tutulub. Kommersiya məqsədilə istifadə edilə, satıla və ya yenidən paylanıla bilməz.\\n• Vasitəçilik və ödənişlər: Tətbiq vasitəsilə üçüncü tərəf Xidmət göstəricilərinə (servislər və s.) ödəniş etdikdə, CarCat sizin adınızdan nümayəndə (agent) kimi çıxış edir. Xidmət göstəricilərinin xətalarına və ya xidmət keyfiyyətinə görə CarCat məsuliyyət daşımır.\\n• \\"Olduğu kimi\\" prinsipi: Tətbiq \\"olduğu kimi\\" təqdim olunur. Məlumatların hər an 100% dəqiq və ya yenilənmiş olmasına zəmanət verilmir."
+                  "title": "1. Ümumi müddəalar",
+                  "content": "1.1. Bu İstifadə şərtləri və Məxfilik siyasəti (bundan sonra \\"Sənəd\\") \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti (bundan sonra \\"CarCat\\") ilə \\"CarCat\\" mobil tətbiqindən və rəqəmsal platformasından (bundan sonra \\"Tətbiq\\") istifadə edən şəxs (bundan sonra \\"İstifadəçi\\") arasında yaranan münasibətləri, habelə İstifadəçinin fərdi məlumatlarının toplanması, işlənməsi və qorunması qaydalarını müəyyən edir.\\n\\n1.2. İstifadəçi Tətbiqdə qeydiyyatdan keçməklə bu Sənədin şərtlərini tam həcmdə qəbul etdiyini və fərdi məlumatlarının Sənəddə göstərilən qaydada işlənməsinə razılıq verdiyini təsdiq edir.\\n\\n1.3. Fərdi məlumatların işlənməsi Azərbaycan Respublikasının qanunvericiliyinə uyğun olaraq həyata keçirilir."
                 },
                 {
                   "id": 2,
-                  "title": "2. Biz kimik?",
-                  "content": "Biz Azərbaycan Respublikasının qanunvericiliyinə uyğun olaraq \\"bir pəncərə\\" prinsipi ilə dövlət qeydiyyatına alınmış \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyətiyik.\\n\\n• Hüquqi şəxsin tam adı: \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti\\n• VÖEN: 1309963601\\n• İnformasiya sisteminin dövlət reyestr qeydiyyatı: CarCat tətbiqinin informasiya sistemi — \\"Nəqliyyat vasitələrinin servis xidmətlərinin elektron idarə edilməsi sistemi (CarCat MİS)\\" AR Rəqəmsal İnkişaf və Nəqliyyat Nazirliyi yanında Milli Kibertəhlükəsizlik Agentliyi tərəfindən 31 iyul 2026-cı il tarixində İS647005001 nömrəsi ilə Fərdi Məlumatların İnformasiya Sistemlərinin Dövlət Reyestrində qeydiyyata alınmışdır.\\n• E-poçt: nemat.mirzayev@carcat.app\\n• Veb-sayt: https://carcat.app/"
+                  "title": "2. Şirkət haqqında məlumat",
+                  "content": "2.1. Tətbiqin və fərdi məlumatların informasiya sisteminin mülkiyyətçisi və operatoru \\"CarCat\\" MMC-dir:\\n• Hüquqi şəxsin adı: \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti\\n• VÖEN: 1309963601\\n• Dövlət reyestri: \\"Nəqliyyat vasitələrinin servis xidmətlərinin elektron idarə edilməsi sistemi (CarCat MİS)\\" informasiya sistemi Azərbaycan Respublikası Rəqəmsal İnkişaf və Nəqliyyat Nazirliyi yanında Milli Kibertəhlükəsizlik Agentliyi tərəfindən 31 iyul 2026-cı il tarixində İS647005001 nömrəsi ilə Fərdi Məlumatların İnformasiya Sistemlərinin Dövlət Reyestrində qeydiyyata alınmışdır.\\n• Ünvan: Bakı şəhəri, Azərbaycan Respublikası\\n• Elektron poçt: info@carcat.app\\n• Telefon: +994 70 575 75 70\\n• Veb-sayt: https://carcat.app"
                 },
                 {
                   "id": 3,
-                  "title": "3. Tətbiq necə işləyir?",
-                  "content": "CarCat avtomobilinizlə bağlı bütün işləri tək məkandan idarə etməyə imkan verən müstəqil rəqəmsal platformadır. Tətbiq vasitəsilə üçüncü tərəf Xidmət göstəricisindən xidmət aldıqda, CarCat-a həmin xidməti sizin adınızdan almaq və məlumatlarınızı (o cümlədən avtomobil və əlaqə məlumatlarını) təchizatçıya ötürmək və ya inteqrasiya çərçivəsində mübadilə etmək səlahiyyəti (agentlik) verirsiniz. Yaranan müqavilə birbaşa siz və Xidmət göstəricisi arasında bağlanır. Xidmətin icrası zamanı ortaya çıxan problemlərə görə birbaşa xidmət göstərən tərəflə əlaqə saxlanılmalıdır."
+                  "title": "3. Xidmətlərin təsviri",
+                  "content": "3.1. Tətbiq İstifadəçiyə avtomobili və ya digər nəqliyyat vasitəsi (bundan sonra \\"Nəqliyyat vasitəsi\\") ilə bağlı xidmətləri vahid platformada idarə etmək imkanı verir. CarCat servis, sığorta və digər xidmətləri bilavasitə göstərmir, İstifadəçini servis mərkəzləri, sığorta təşkilatları, digər xidmət təchizatçıları və tərəfdaşlar (bundan sonra \\"Xidmət təchizatçıları və Tərəfdaşlar\\") ilə əlaqələndirir.\\n\\n3.2. Tətbiq vasitəsilə aşağıdakı xidmətlər təqdim olunur:\\na) servis xidmətləri: tərəfdaş servis mərkəzlərində texniki baxış, yağdəyişmə, təmir, diaqnostika, alqı-satqı öncəsi yoxlama və digər servis xidmətlərinin bron edilməsi;\\nb) CarCat Passport: VIN kod əsasında Nəqliyyat vasitəsinin tarixçəsinin yoxlanılması, xidmət tarixçəsinin, yürüşünün və texniki xəbərdarlıqlarının izlənilməsi;\\nc) sığorta xidmətləri: sığorta təşkilatlarından və müvafiq dövlət qurumlarından sığorta məlumatlarının və təkliflərinin əldə edilməsi, sığorta müqavilələrinin rəsmiləşdirilməsi;\\nç) cərimələr: dövlət qeydiyyat nişanı və FİN kod əsasında inzibati xətalara görə tətbiq edilmiş cərimələr barədə məlumatların əldə edilməsi və onların ödənilməsi;\\nd) nəqliyyat vasitələri ekosistemi ilə bağlı digər xidmətlər.\\n\\n3.3. Tətbiq vasitəsilə sifariş edilən xidmət üzrə müqavilə bilavasitə İstifadəçi ilə müvafiq Xidmət təchizatçısı və ya Tərəfdaş arasında bağlanır. İstifadəçi sifarişin rəsmiləşdirilməsi və bunun üçün zəruri olan məlumatların Xidmət təchizatçısına və ya Tərəfdaşa ötürülməsi üçün CarCat-a səlahiyyət verir.\\n\\n3.4. Tətbiq daxilində ödənişlər, o cümlədən cərimə ödənişləri lisenziyalı bank və ödəniş təşkilatları vasitəsilə həyata keçirilir.\\n\\n3.5. CarCat Tətbiqin funksiyalarını və təqdim olunan xidmətlərin tərkibini dəyişdirmək, məhdudlaşdırmaq və ya dayandırmaq hüququna malikdir."
                 },
                 {
                   "id": 4,
-                  "title": "4. Xidmətlərimiz",
-                  "content": "CarCat tətbiqi daxilində aşağıdakı modulları və xidmətləri təqdim edir:\\n\\n• CarCat texniki qulluq və əlavə dəyər verən xidmətlər (Servis və təmir): Tərəfdaş servis mərkəzlərində texniki baxış, yağdəyişmə, təmir xidmətlərini bron etmək və digər məlumatlar\\n• CarCat Passport (Avtomobil pasportu): VIN kod vasitəsilə avtomobilin xidmət tarixçəsini, yürüşünü və texniki xəbərdarlıqlarını izləmək"
+                  "title": "4. İstifadəçinin hüquq və öhdəlikləri",
+                  "content": "4.1. Tətbiqdən mobil nömrə ilə qeydiyyatdan keçmiş və qeydiyyata aldığı Nəqliyyat vasitəsinin mülkiyyətçisi olan və ya ondan istifadə hüququna malik şəxslər istifadə edə bilər.\\n\\n4.2. Tətbiq şəxsi istifadə üçün nəzərdə tutulub. Tətbiqdən kommersiya məqsədilə istifadə yalnız CarCat ilə ayrıca razılaşma əsasında mümkündür.\\n\\n4.3. İstifadəçi:\\na) hesab məlumatlarının və təsdiq kodlarının məxfiliyini təmin etməlidir;\\nb) mobil nömrəyə nəzarəti itirdikdə dərhal CarCat-a məlumat verməlidir;\\nc) Nəqliyyat vasitəsi özgəninkiləşdirildikdə və ya dövlət qeydiyyat nişanı dəyişdikdə Tətbiqdəki məlumatları yeniləməlidir;\\nç) Tətbiqə yanlış məlumat daxil etməməli, Tətbiqdən sui-istifadə etməməli və onun işinə müdaxilə etməməlidir.\\n\\n4.4. İstifadəçi Tətbiqə başqa şəxsə məxsus FİN kod, Nəqliyyat vasitəsi və ya digər fərdi məlumatı yalnız həmin şəxsin razılığı əsasında daxil etməlidir. İstifadəçi belə razılığı əldə etdiyini təsdiq edir və bununla bağlı bütün məsuliyyəti daşıyır.\\n\\n4.5. Bu Sənədin şərtləri pozulduqda və ya saxtakarlıq şübhəsi yarandıqda CarCat İstifadəçinin hesabını dayandırmaq hüququna malikdir.\\n\\n4.6. İstifadəçi bu Sənədin şərtlərini pozması nəticəsində CarCat-a dəyən zərərə və üçüncü şəxslərin iddialarına görə məsuliyyət daşıyır."
                 },
                 {
                   "id": 5,
-                  "title": "5. Kimlər istifadə edə bilər?",
-                  "content": "Tətbiqdən istifadə etmək üçün aşağıdakı şərtlərə cavab verməlisiniz:\\n\\n• Tətbiqdə qeydiyyat mobil nömrə vasitəsilə aparıldığı üçün yalnız özünüzə məxsus qanuni mobil nömrədən istifadə etmək;\\n• Tətbiqdən yalnız şəxsi (qeyri-kommersiya) məqsədlər üçün istifadə etmək;\\n• Qeydiyyata aldığınız avtomobilin qanuni mülkiyyətçisi olmaq və ya idarəetmə hüququna malik olmaq."
+                  "title": "5. Məsuliyyətin məhdudlaşdırılması",
+                  "content": "5.1. Xidmət təchizatçılarının və Tərəfdaşların göstərdiyi xidmətlərin keyfiyyətinə, bu zaman Nəqliyyat vasitəsinə dəyən zərərə və qiymətlə bağlı mübahisələrə görə məsuliyyəti müvafiq Xidmət təchizatçısı və ya Tərəfdaş daşıyır.\\n\\n5.2. Tətbiqdə göstərilən tarixlər və xatırlatmalar məlumat xarakteri daşıyır. Nəqliyyat vasitəsinin qanunvericiliyin tələblərinə uyğunluğuna görə məsuliyyət İstifadəçinin üzərinə düşür.\\n\\n5.3. Tətbiq \\"olduğu kimi\\" prinsipi əsasında təqdim olunur. Texniki işlər və ya nasazlıqlarla əlaqədar Tətbiqin işində müvəqqəti fasilələr ola bilər.\\n\\n5.4. Qanunvericiliyin icazə verdiyi həddə CarCat dolayı zərərə və əldən çıxmış faydaya görə məsuliyyət daşımır.\\n\\n5.5. Tətbiqdə əks olunan cərimə, sığorta, Nəqliyyat vasitəsinin tarixçəsi və digər məlumatlar dövlət qurumlarından, sığorta təşkilatlarından, açıq mənbələrdən və digər mənbələrdən əldə edilir. CarCat bu məlumatların düzgünlüyünə, tamlığına və aktuallığına görə məsuliyyət daşımır.\\n\\n5.6. Cərimə ödənişləri bank və ödəniş təşkilatları vasitəsilə həyata keçirilir. Ödənişin müvafiq dövlət informasiya sistemlərində əks olunmasında yaranan gecikmələrə görə CarCat məsuliyyət daşımır.\\n\\n5.7. CarCat sığortaçı deyil. Sığorta müqaviləsinin şərtləri, sığorta haqqı və sığorta hadisəsi üzrə ödəniş öhdəlikləri müvafiq sığorta təşkilatı tərəfindən müəyyən edilir və icra olunur."
                 },
                 {
                   "id": 6,
-                  "title": "6. Məsuliyyətin məhdudlaşdırılması (Liability Disclaimer)",
-                  "content": "• Xidmət keyfiyyəti: Üçüncü tərəf servis mərkəzlərinin göstərdiyi təmirlərin keyfiyyətinə, avtomobilə dəyən zərərə və ya qiymət mübahisələrinə görə CarCat məsuliyyət daşımır.\\n• Dəqiqlik: Tətbiqdə avtomatik xatırladılan texniki baxış və ya yeniləmə tarixləri məlumat xarakterlidir. Avtomobilinizin qanuni tələblərə uyğunluğuna görə cavabdehlik tam olaraq sizin üzərinizdədir.\\n• Maliyyə məhdudiyyəti: Qanunla icazə verilən maksimum həddə, CarCat-ın sizə vurduğu zərərə görə ümumi maliyyə məsuliyyəti 1 AZN məbləği ilə məhdudlaşır."
-                },
-                {
-                  "id": 7,
-                  "title": "7. Hesabın idarə edilməsi və təhlükəsizlik",
-                  "content": "• Siz hesab məlumatlarınızın məxfiliyini qorumağa cavabdehsiniz.\\n• Qeydiyyatda olan mobil nömrənizə sahibliyi və ya nəzarəti itirdiyiniz halda, hesabınızı dərhal silməlisiniz.\\n• Avtomobil satıldıqda və ya dövlət nömrə nişanı dəyişdikdə tətbiqdəki məlumatları güncəlləməlisiniz.\\n• CarCat şərtlər pozulduqda və ya saxtakarlıq şübhəsi olduqda hesabı xəbərdarlıq etmədən dayandırmaq hüququnu saxlayır."
-                },
-                {
-                  "id": 8,
-                  "title": "8. Məlumatların işlənməsi, inteqrasiya və transsərhəd ötürülməsi",
-                  "content": "Tətbiqdən istifadə etməklə və ya qeydiyyatdan keçməklə xidmətlərin icrası və sistem inteqrasiyaları zamanı məlumatlarınızın üçüncü tərəf tərəfdaşlarla mübadilə edilməsinə, habelə xarici serverlərdə təhlükəsiz saxlanılmasına razılıq verirsiniz."
-                },
-                {
-                  "id": 9,
-                  "title": "9. Şikayətlər və dəstək",
-                  "content": "Tətbiqlə bağlı hər hansı sual, şikayət və ya təklifiniz olduqda aşağıdakı kanallarla bizimlə əlaqə saxlaya bilərsiniz:\\n\\n• Tətbiq daxilində: Çat dəstək bölməsi\\n• E-poçt: nemat.mirzayev@carcat.app\\n• Əlaqə nömrəsi: +994 70 575 75 70\\n\\nSorğularınıza 5 iş günü ərzində ilkin cavab verilir və maksimum 30 gün müddətində tam həll edilir."
-                },
-                {
-                  "id": 10,
-                  "title": "10. Qanunvericilik və məhkəmə aidiyyəti",
-                  "content": "Bu Şərtlər Azərbaycan Respublikasının qanunvericiliyi ilə tənzimlənir. Yaranan mübahisələr tərəflər arasında həll edilmədikdə Bakı şəhərinin müvafiq məhkəmələri tərəfindən baxılır."
+                  "title": "6. Əqli mülkiyyət",
+                  "content": "6.1. Tətbiq, onun proqram təminatı, dizaynı, \\"CarCat\\" adı və loqosu, habelə məlumat bazaları CarCat-a məxsusdur və qanunvericiliklə qorunur.\\n\\n6.2. CarCat-ın yazılı razılığı olmadan Tətbiqin və onun məzmununun surətinin çıxarılması, dəyişdirilməsi, yayılması və kommersiya məqsədilə istifadəsi qadağandır."
                 },
                 {
                   "id": 11,
-                  "title": "11. Şərtlərin birtərəfli dəyişdirilməsi",
-                  "content": "CarCat bu İstifadə şərtlərini istənilən vaxt birtərəfli qaydada dəyişdirmək və ya yeniləmək hüququnu saxlayır. Yenilənmiş Şərtlər Tətbiqdə dərc edildiyi andan qüvvəyə minir. Dəyişikliklərdən sonra Tətbiqdən istifadəyə davam etməyiniz yenilənmiş Şərtləri qəbul etdiyiniz anlamına gəlir.",
+                  "title": "11. Fors-major",
+                  "content": "11.1. CarCat təbii fəlakətlər, hərbi əməliyyatlar, dövlət orqanlarının qərarları, kiberhücumlar, rabitə və enerji təchizatında kəsintilər və digər qarşısıalınmaz qüvvə halları nəticəsində öhdəliklərinin icra edilməməsinə və ya lazımi qaydada icra edilməməsinə görə məsuliyyət daşımır."
+                },
+                {
+                  "id": 12,
+                  "title": "12. Yekun müddəalar",
+                  "content": "12.1. CarCat bu Sənədə dəyişiklik etmək hüququna malikdir. Sənədin yeni redaksiyası Tətbiqdə dərc edildiyi andan qüvvəyə minir.\\n\\n12.2. Bu Sənəd Azərbaycan Respublikasının qanunvericiliyi ilə tənzimlənir. Tərəflər arasında yaranan mübahisələr danışıqlar yolu ilə həll edilmədikdə müvafiq məhkəmələrdə baxılır.\\n\\n12.3. Sənədin hər hansı müddəası etibarsız hesab edilərsə, bu, digər müddəaların qüvvədə olmasına təsir göstərmir.\\n\\n12.4. Sənəd Azərbaycan dilində tərtib edilmişdir. Digər dillərə tərcümə ilə ziddiyyət yarandıqda Azərbaycan dilindəki mətn üstün tutulur.\\n\\n12.5. Bu Sənədlə bağlı suallar üzrə info@carcat.app elektron poçt ünvanı vasitəsilə CarCat ilə əlaqə saxlamaq olar.",
                   "contact": {
                     "companyEn": "\\"CarCat\\" LLC",
-                    "companyAz": "\\"CarCat\\" MMC",
-                    "email": "nemat.mirzayev@carcat.app",
-                    "website": "https://carcat.app/",
+                    "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
+                    "email": "info@carcat.app",
+                    "website": "https://carcat.app",
                     "location": "Bakı, Azərbaycan"
                   }
                 }
               ],
               "footer": {
-                "acceptanceText": "Tətbiqdən istifadə etməklə bu İstifadə şərtlərini və Məxfilik siyasətimizi qəbul etmiş olursunuz."
+                "acceptanceText": "İstifadəçi Tətbiqdə qeydiyyatdan keçməklə bu Sənədin şərtlərini tam həcmdə qəbul etdiyini və fərdi məlumatlarının Sənəddə göstərilən qaydada işlənməsinə razılıq verdiyini təsdiq edir."
               }
             }
             """;
@@ -178,87 +164,72 @@ public class LegalController {
     private static final String TERMS_JSON_EN = """
             {
               "metadata": {
-                "lastUpdated": "5 September 2026",
-                "version": "3.5",
+                "lastUpdated": "15 November 2026",
+                "version": "4.0",
                 "language": "en",
                 "company": "\\"CarCat\\" LLC",
                 "companyAz": "\\"CarCat\\" Limited Liability Company",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "https://carcat.app/",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Baku, Azerbaijan",
                 "country": "Republic of Azerbaijan",
                 "phone": "+994 70 575 75 70"
               },
               "header": {
                 "title": "CarCat — Terms of Use",
-                "subtitle": "The Application is for personal use only. For payments to third-party Service Providers, CarCat acts as an agent. The Application is provided \\"as is\\"."
+                "subtitle": "Last updated: 15 November 2026 | Version: 4.0 | \\"CarCat\\" LLC"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. Introduction",
-                  "content": "These Terms of Use (\\"Terms\\") govern the legal relationship between \\"CarCat\\" LLC (\\"CarCat\\", \\"we\\") and the user (\\"you\\"). By using the Application, you accept these \\"Terms and our Privacy Policy\\". CarCat reserves the right to amend these Terms unilaterally at any time. In addition:\\n\\n• Personal use: The Application is intended for personal use only. It may not be used, sold or redistributed for commercial purposes.\\n• Intermediation and payments: When you make payments to third-party Service Providers (service centres, etc.) through the Application, CarCat acts as a representative (agent) on your behalf. CarCat is not liable for errors of Service Providers or for the quality of their services.\\n• \\"As is\\" principle: The Application is provided \\"as is\\". We do not guarantee that the information will be 100% accurate or up to date at all times."
+                  "title": "1. General provisions",
+                  "content": "1.1. These Terms of use and Privacy policy (the \\"Document\\") govern the relationship between \\"CarCat\\" Limited Liability Company (\\"CarCat\\") and any person using the \\"CarCat\\" mobile application and digital platform (the \\"Application\\") (the \\"User\\"), and set out the rules for the collection, processing and protection of the User's personal data.\\n\\n1.2. By registering in the Application, the User confirms that they accept the terms of this Document in full and consent to the processing of their personal data as described herein.\\n\\n1.3. Personal data is processed in accordance with the legislation of the Republic of Azerbaijan."
                 },
                 {
                   "id": 2,
-                  "title": "2. Who are we?",
-                  "content": "We are \\"CarCat\\" Limited Liability Company, state-registered under the \\"one-stop shop\\" principle in accordance with the legislation of the Republic of Azerbaijan.\\n\\n• Full legal name: \\"CarCat\\" Limited Liability Company\\n• TIN (VÖEN): 1309963601\\n• Registration of the information system in the state register: The information system of the CarCat application — \\"Electronic management system for vehicle maintenance services (CarCat MİS)\\" — was registered in the State Register of Personal Data Information Systems under number İS647005001 on 31 July 2026 by the National Cybersecurity Agency under the Ministry of Digital Development and Transport of the Republic of Azerbaijan.\\n• Email: nemat.mirzayev@carcat.app\\n• Website: https://carcat.app/"
+                  "title": "2. Company information",
+                  "content": "2.1. \\"CarCat\\" LLC is the owner and operator of the Application and of the personal data information system:\\n• Legal name: \\"CarCat\\" Limited Liability Company\\n• Taxpayer ID (VÖEN): 1309963601\\n• State register: The information system \\"Digital Management System for Vehicle Maintenance Services (CarCat MİS)\\" was entered in the State Register of Personal Data Information Systems under No. İS647005001 on 31 July 2026 by the National Cybersecurity Agency under the Ministry of Digital Development and Transport of the Republic of Azerbaijan.\\n• Address: Baku, Republic of Azerbaijan\\n• Email: info@carcat.app\\n• Phone: +994 70 575 75 70\\n• Website: https://carcat.app"
                 },
                 {
                   "id": 3,
-                  "title": "3. How does the Application work?",
-                  "content": "CarCat is an independent digital platform that allows you to manage all matters related to your car from a single place. When you obtain a service from a third-party Service Provider through the Application, you authorise CarCat (as your agent) to purchase that service on your behalf and to transfer your data (including vehicle and contact details) to the provider or exchange it within the framework of integration. The resulting contract is concluded directly between you and the Service Provider. For any issues arising during the performance of the service, you should contact the party providing the service directly."
+                  "title": "3. Description of services",
+                  "content": "3.1. The Application enables the User to manage services related to their car or other vehicle (the \\"Vehicle\\") on a single platform. CarCat does not itself provide maintenance, insurance or other services; it connects the User with service centres, insurance companies, other service suppliers and partners (\\"Service suppliers and Partners\\").\\n\\n3.2. The following services are offered through the Application:\\na) maintenance services: booking roadworthiness inspections, oil changes, repairs, diagnostics, pre-purchase inspections and other services at partner service centres;\\nb) CarCat Passport: checking the Vehicle's history by VIN and tracking its service history, mileage and technical alerts;\\nc) insurance services: obtaining insurance information and quotes from insurance companies and relevant government authorities, and arranging insurance contracts;\\nd) fines: obtaining information on fines imposed for administrative offences, based on the vehicle registration number and personal identification number (FIN), and paying those fines;\\ne) other services related to the vehicle ecosystem.\\n\\n3.3. The contract for any service ordered through the Application is concluded directly between the User and the relevant Service supplier or Partner. The User authorises CarCat to place the order and to transfer the data required for it to the Service supplier or Partner.\\n\\n3.4. Payments in the Application, including payment of fines, are processed by licensed banks and payment institutions.\\n\\n3.5. CarCat reserves the right to change, restrict or discontinue the Application's features and the range of services offered."
                 },
                 {
                   "id": 4,
-                  "title": "4. Our services",
-                  "content": "CarCat offers the following modules and services within the Application:\\n\\n• CarCat maintenance and value-added services (Service and repair): Booking technical inspection, oil change and repair services at partner service centres, and other information\\n• CarCat Passport (Vehicle passport): Tracking the vehicle's service history, mileage and technical alerts via the VIN code"
+                  "title": "4. Rights and obligations of the User",
+                  "content": "4.1. The Application may be used by persons who have registered with a mobile number and who own, or have the right to use, the Vehicle they register.\\n\\n4.2. The Application is intended for personal use. Commercial use of the Application is permitted only under a separate agreement with CarCat.\\n\\n4.3. The User shall:\\na) keep their account details and verification codes confidential;\\nb) notify CarCat immediately if they lose control of their mobile number;\\nc) update the information in the Application if the Vehicle is sold or otherwise transferred, or if its registration number changes;\\nd) not enter false information into the Application, misuse the Application or interfere with its operation.\\n\\n4.4. The User may enter another person's FIN, Vehicle details or other personal data into the Application only with that person's consent. The User confirms that such consent has been obtained and bears full responsibility in this regard.\\n\\n4.5. CarCat may suspend the User's account if the terms of this Document are breached or fraud is suspected.\\n\\n4.6. The User is liable for any loss incurred by CarCat, and for any third-party claims, arising from the User's breach of this Document."
                 },
                 {
                   "id": 5,
-                  "title": "5. Who can use the Application?",
-                  "content": "To use the Application, you must meet the following conditions:\\n\\n• Since registration in the Application is carried out via a mobile number, use only a lawful mobile number that belongs to you;\\n• Use the Application only for personal (non-commercial) purposes;\\n• Be the legal owner of the vehicle you register or have the right to operate it."
+                  "title": "5. Limitation of liability",
+                  "content": "5.1. The relevant Service supplier or Partner is responsible for the quality of the services it provides, for any damage caused to the Vehicle in the course of those services and for any pricing disputes.\\n\\n5.2. Dates and reminders shown in the Application are for information purposes only. The User is responsible for ensuring that the Vehicle complies with legal requirements.\\n\\n5.3. The Application is provided \\"as is\\". Its operation may be temporarily interrupted due to maintenance or technical faults.\\n\\n5.4. To the extent permitted by law, CarCat shall not be liable for indirect losses or loss of profit.\\n\\n5.5. Information on fines, insurance, Vehicle history and other data shown in the Application is obtained from government authorities, insurance companies, open sources and other sources. CarCat is not responsible for the accuracy, completeness or timeliness of such information.\\n\\n5.6. Fines are paid through banks and payment institutions. CarCat is not liable for delays in a payment being reflected in the relevant government information systems.\\n\\n5.7. CarCat is not an insurer. The terms of an insurance contract, the premium and any obligation to pay out on an insured event are determined and performed by the relevant insurance company."
                 },
                 {
                   "id": 6,
-                  "title": "6. Limitation of liability",
-                  "content": "• Service quality: CarCat is not liable for the quality of repairs performed by third-party service centres, damage caused to the vehicle, or pricing disputes.\\n• Accuracy: Technical inspection or renewal dates automatically reminded in the Application are for information purposes only. You bear full responsibility for your vehicle's compliance with legal requirements.\\n• Financial limitation: To the maximum extent permitted by law, CarCat's total financial liability for any damage caused to you is limited to 1 AZN."
-                },
-                {
-                  "id": 7,
-                  "title": "7. Account management and security",
-                  "content": "• You are responsible for maintaining the confidentiality of your account information.\\n• If you lose ownership of or control over your registered mobile number, you must delete your account immediately.\\n• If the vehicle is sold or its state registration plate is changed, you must update the information in the Application.\\n• CarCat reserves the right to suspend an account without notice in the event of a breach of the Terms or suspected fraud."
-                },
-                {
-                  "id": 8,
-                  "title": "8. Data processing, integration and cross-border transfer",
-                  "content": "By using the Application or registering, you consent to your data being exchanged with third-party partners during the performance of services and system integrations, as well as being securely stored on foreign servers."
-                },
-                {
-                  "id": 9,
-                  "title": "9. Complaints and support",
-                  "content": "If you have any questions, complaints or suggestions regarding the Application, you can contact us through the following channels:\\n\\n• In the Application: Chat support section\\n• Email: nemat.mirzayev@carcat.app\\n• Contact number: +994 70 575 75 70\\n\\nAn initial response to your requests is provided within 5 business days, and they are fully resolved within a maximum of 30 days."
-                },
-                {
-                  "id": 10,
-                  "title": "10. Governing law and jurisdiction",
-                  "content": "These Terms are governed by the legislation of the Republic of Azerbaijan. Disputes not resolved between the parties shall be considered by the competent courts of the city of Baku."
+                  "title": "6. Intellectual property",
+                  "content": "6.1. The Application, its software and design, the \\"CarCat\\" name and logo, and its databases belong to CarCat and are protected by law.\\n\\n6.2. Copying, modifying, distributing or commercially using the Application or its content without CarCat's written consent is prohibited."
                 },
                 {
                   "id": 11,
-                  "title": "11. Unilateral amendment of the Terms",
-                  "content": "CarCat reserves the right to amend or update these Terms of Use unilaterally at any time. The updated Terms take effect from the moment they are published in the Application. Your continued use of the Application after the changes means that you accept the updated Terms.",
+                  "title": "11. Force majeure",
+                  "content": "11.1. CarCat shall not be liable for any failure to perform, or improper performance of, its obligations resulting from natural disasters, military operations, decisions of government authorities, cyberattacks, communications or power outages, or other force majeure events."
+                },
+                {
+                  "id": 12,
+                  "title": "12. Final provisions",
+                  "content": "12.1. CarCat may amend this Document. A new version of the Document takes effect upon its publication in the Application.\\n\\n12.2. This Document is governed by the legislation of the Republic of Azerbaijan. Disputes between the parties that cannot be resolved through negotiation shall be referred to the competent courts.\\n\\n12.3. If any provision of this Document is held invalid, the remaining provisions shall remain in force.\\n\\n12.4. This Document is drawn up in Azerbaijani. In the event of any inconsistency between the Azerbaijani text and a translation, the Azerbaijani text shall prevail.\\n\\n12.5. Questions regarding this Document may be sent to CarCat at info@carcat.app.",
                   "contact": {
                     "companyEn": "\\"CarCat\\" LLC",
-                    "companyAz": "\\"CarCat\\" MMC",
-                    "email": "nemat.mirzayev@carcat.app",
-                    "website": "https://carcat.app/",
+                    "companyAz": "\\"CarCat\\" Limited Liability Company",
+                    "email": "info@carcat.app",
+                    "website": "https://carcat.app",
                     "location": "Baku, Azerbaijan"
                   }
                 }
               ],
               "footer": {
-                "acceptanceText": "By using the Application, you accept these Terms of Use and our Privacy Policy."
+                "acceptanceText": "By registering in the Application, the User confirms that they accept the terms of this Document in full and consent to the processing of their personal data as described herein."
               }
             }
             """;
@@ -266,199 +237,171 @@ public class LegalController {
     private static final String TERMS_JSON_RU = """
             {
               "metadata": {
-                "lastUpdated": "5 сентября 2026",
-                "version": "3.5",
+                "lastUpdated": "15 ноября 2026 г.",
+                "version": "4.0",
                 "language": "ru",
                 "company": "ООО «CarCat»",
                 "companyAz": "Общество с ограниченной ответственностью «CarCat»",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "https://carcat.app/",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Баку, Азербайджан",
                 "country": "Азербайджанская Республика",
                 "phone": "+994 70 575 75 70"
               },
               "header": {
                 "title": "CarCat — Условия использования",
-                "subtitle": "Приложение предназначено только для личного использования. При оплате услуг сторонних поставщиков CarCat выступает как агент. Приложение предоставляется «как есть»."
+                "subtitle": "Дата последнего обновления: 15 ноября 2026 г. | Версия: 4.0 | ООО «CarCat»"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. Введение",
-                  "content": "Настоящие Условия использования («Условия») регулируют правовые отношения между ООО «CarCat» («CarCat», «мы») и пользователем («вы»). Используя Приложение, вы принимаете настоящие «Условия и нашу Политику конфиденциальности». CarCat оставляет за собой право в любое время в одностороннем порядке изменять настоящие Условия. Кроме того:\\n\\n• Личное использование: Приложение предназначено исключительно для личного использования. Оно не может использоваться в коммерческих целях, продаваться или распространяться повторно.\\n• Посредничество и платежи: При оплате услуг сторонних Поставщиков услуг (сервисов и т. д.) через Приложение CarCat выступает от вашего имени в качестве представителя (агента). CarCat не несёт ответственности за ошибки Поставщиков услуг или качество их услуг.\\n• Принцип «как есть»: Приложение предоставляется «как есть». Мы не гарантируем, что информация в любой момент будет на 100% точной или актуальной."
+                  "title": "1. Общие положения",
+                  "content": "1.1. Настоящие Условия использования и Политика конфиденциальности (далее – «Документ») регулируют отношения между Обществом с ограниченной ответственностью «CarCat» (далее – «CarCat») и лицом, использующим мобильное приложение и цифровую платформу «CarCat» (далее – «Приложение»; такое лицо далее – «Пользователь»), а также определяют порядок сбора, обработки и защиты персональных данных Пользователя.\\n\\n1.2. Регистрируясь в Приложении, Пользователь подтверждает, что принимает условия настоящего Документа в полном объеме и дает согласие на обработку своих персональных данных в порядке, предусмотренном Документом.\\n\\n1.3. Обработка персональных данных осуществляется в соответствии с законодательством Азербайджанской Республики."
                 },
                 {
                   "id": 2,
-                  "title": "2. Кто мы?",
-                  "content": "Мы — Общество с ограниченной ответственностью «CarCat», прошедшее государственную регистрацию по принципу «одного окна» в соответствии с законодательством Азербайджанской Республики.\\n\\n• Полное наименование юридического лица: Общество с ограниченной ответственностью «CarCat»\\n• ИНН (VÖEN): 1309963601\\n• Регистрация информационной системы в государственном реестре: Информационная система приложения CarCat — «Система электронного управления сервисными услугами для транспортных средств (CarCat MİS)» — зарегистрирована Национальным агентством кибербезопасности при Министерстве цифрового развития и транспорта Азербайджанской Республики 31 июля 2026 года под номером İS647005001 в Государственном реестре информационных систем персональных данных.\\n• Эл. почта: nemat.mirzayev@carcat.app\\n• Веб-сайт: https://carcat.app/"
+                  "title": "2. Сведения о компании",
+                  "content": "2.1. Собственником и оператором Приложения и информационной системы персональных данных является ООО «CarCat»:\\n• Полное наименование: Общество с ограниченной ответственностью «CarCat»\\n• ИНН (VÖEN): 1309963601\\n• Государственный реестр: информационная система «Система электронного управления сервисным обслуживанием транспортных средств (CarCat MİS)» зарегистрирована Национальным агентством кибербезопасности при Министерстве цифрового развития и транспорта Азербайджанской Республики 31 июля 2026 года в Государственном реестре информационных систем персональных данных под номером İS647005001.\\n• Адрес: г. Баку, Азербайджанская Республика\\n• Электронная почта: info@carcat.app\\n• Телефон: +994 70 575 75 70\\n• Веб-сайт: https://carcat.app"
                 },
                 {
                   "id": 3,
-                  "title": "3. Как работает Приложение?",
-                  "content": "CarCat — независимая цифровая платформа, позволяющая управлять всеми вопросами, связанными с вашим автомобилем, из одного места. Получая услугу у стороннего Поставщика услуг через Приложение, вы предоставляете CarCat полномочия (агентские) приобрести эту услугу от вашего имени и передать ваши данные (в том числе данные об автомобиле и контактные данные) поставщику либо обмениваться ими в рамках интеграции. Возникающий договор заключается непосредственно между вами и Поставщиком услуг. По вопросам, возникающим в ходе оказания услуги, следует обращаться непосредственно к стороне, оказывающей услугу."
+                  "title": "3. Описание услуг",
+                  "content": "3.1. Приложение позволяет Пользователю управлять услугами, связанными с его автомобилем или иным транспортным средством (далее – «Транспортное средство»), на единой платформе. CarCat не оказывает сервисные, страховые и иные услуги непосредственно, а связывает Пользователя с сервисными центрами, страховыми организациями, иными поставщиками услуг и партнерами (далее – «Поставщики услуг и Партнеры»).\\n\\n3.2. Через Приложение предоставляются следующие услуги:\\nа) сервисные услуги: бронирование технического осмотра, замены масла, ремонта, диагностики, проверки перед покупкой и иных сервисных услуг в партнерских сервисных центрах;\\nб) CarCat Passport: проверка истории Транспортного средства по VIN-коду, отслеживание истории обслуживания, пробега и технических уведомлений;\\nв) страховые услуги: получение страховой информации и предложений от страховых организаций и соответствующих государственных органов, оформление договоров страхования;\\nг) штрафы: получение сведений о штрафах, наложенных за административные правонарушения, по государственному регистрационному номеру и FIN-коду, а также их оплата;\\nд) иные услуги, связанные с экосистемой транспортных средств.\\n\\n3.3. Договор на услугу, заказанную через Приложение, заключается непосредственно между Пользователем и соответствующим Поставщиком услуг или Партнером. Пользователь уполномочивает CarCat оформить заказ и передать необходимые для этого данные Поставщику услуг или Партнеру.\\n\\n3.4. Платежи в Приложении, в том числе оплата штрафов, осуществляются через лицензированные банки и платежные организации.\\n\\n3.5. CarCat вправе изменять, ограничивать или прекращать функции Приложения и состав предоставляемых услуг."
                 },
                 {
                   "id": 4,
-                  "title": "4. Наши услуги",
-                  "content": "CarCat предоставляет в Приложении следующие модули и услуги:\\n\\n• Техническое обслуживание и дополнительные услуги CarCat (Сервис и ремонт): Бронирование техосмотра, замены масла и ремонтных услуг в партнёрских сервисных центрах, а также другая информация\\n• CarCat Passport (Паспорт автомобиля): Отслеживание истории обслуживания, пробега и технических уведомлений автомобиля по VIN-коду"
+                  "title": "4. Права и обязанности Пользователя",
+                  "content": "4.1. Приложением могут пользоваться лица, зарегистрировавшиеся по номеру мобильного телефона и являющиеся собственниками регистрируемого Транспортного средства либо имеющие право на его использование.\\n\\n4.2. Приложение предназначено для личного использования. Использование Приложения в коммерческих целях допускается только на основании отдельного соглашения с CarCat.\\n\\n4.3. Пользователь обязан:\\nа) обеспечивать конфиденциальность данных учетной записи и кодов подтверждения;\\nб) незамедлительно сообщить CarCat об утрате контроля над номером мобильного телефона;\\nв) обновить сведения в Приложении при отчуждении Транспортного средства или изменении государственного регистрационного номера;\\nг) не вводить в Приложение недостоверные сведения, не злоупотреблять Приложением и не вмешиваться в его работу.\\n\\n4.4. Пользователь вправе вводить в Приложение FIN-код, данные о Транспортном средстве или иные персональные данные другого лица только с согласия этого лица. Пользователь подтверждает получение такого согласия и несет всю связанную с этим ответственность.\\n\\n4.5. CarCat вправе приостановить учетную запись Пользователя при нарушении условий настоящего Документа или подозрении в мошенничестве.\\n\\n4.6. Пользователь несет ответственность за ущерб, причиненный CarCat в результате нарушения им условий настоящего Документа, а также по связанным с этим претензиям третьих лиц."
                 },
                 {
                   "id": 5,
-                  "title": "5. Кто может пользоваться Приложением?",
-                  "content": "Для использования Приложения вы должны соответствовать следующим условиям:\\n\\n• Поскольку регистрация в Приложении осуществляется по номеру мобильного телефона, использовать только законно принадлежащий вам номер мобильного телефона;\\n• Использовать Приложение только в личных (некоммерческих) целях;\\n• Быть законным владельцем регистрируемого автомобиля или иметь право на управление им."
+                  "title": "5. Ограничение ответственности",
+                  "content": "5.1. Ответственность за качество услуг, оказываемых Поставщиками услуг и Партнерами, за ущерб, причиненный при этом Транспортному средству, и за споры о цене несет соответствующий Поставщик услуг или Партнер.\\n\\n5.2. Даты и напоминания, отображаемые в Приложении, носят информационный характер. Ответственность за соответствие Транспортного средства требованиям законодательства несет Пользователь.\\n\\n5.3. Приложение предоставляется по принципу «как есть». В работе Приложения возможны временные перерывы в связи с техническими работами или сбоями.\\n\\n5.4. В пределах, допускаемых законодательством, CarCat не несет ответственности за косвенный ущерб и упущенную выгоду.\\n\\n5.5. Сведения о штрафах, страховании, истории Транспортного средства и иные данные, отображаемые в Приложении, получаются от государственных органов, страховых организаций, из открытых и иных источников. CarCat не несет ответственности за достоверность, полноту и актуальность таких сведений.\\n\\n5.6. Оплата штрафов осуществляется через банки и платежные организации. CarCat не несет ответственности за задержки в отражении платежа в соответствующих государственных информационных системах.\\n\\n5.7. CarCat не является страховщиком. Условия договора страхования, размер страховой премии и обязательства по выплате при наступлении страхового случая определяются и исполняются соответствующей страховой организацией."
                 },
                 {
                   "id": 6,
-                  "title": "6. Ограничение ответственности",
-                  "content": "• Качество услуг: CarCat не несёт ответственности за качество ремонта, выполненного сторонними сервисными центрами, ущерб, причинённый автомобилю, или споры о ценах.\\n• Точность: Даты техосмотра или обновления, о которых Приложение напоминает автоматически, носят информационный характер. Полная ответственность за соответствие вашего автомобиля требованиям законодательства лежит на вас.\\n• Финансовое ограничение: В максимальной степени, допускаемой законом, общая финансовая ответственность CarCat за причинённый вам ущерб ограничивается суммой 1 AZN."
-                },
-                {
-                  "id": 7,
-                  "title": "7. Управление учётной записью и безопасность",
-                  "content": "• Вы несёте ответственность за сохранение конфиденциальности данных вашей учётной записи.\\n• В случае утраты права владения или контроля над зарегистрированным номером мобильного телефона вы должны немедленно удалить свою учётную запись.\\n• При продаже автомобиля или замене государственного номерного знака вы должны обновить данные в Приложении.\\n• CarCat оставляет за собой право приостановить учётную запись без предупреждения в случае нарушения Условий или подозрения в мошенничестве."
-                },
-                {
-                  "id": 8,
-                  "title": "8. Обработка данных, интеграция и трансграничная передача",
-                  "content": "Используя Приложение или регистрируясь в нём, вы даёте согласие на обмен вашими данными со сторонними партнёрами при оказании услуг и системной интеграции, а также на их безопасное хранение на зарубежных серверах."
-                },
-                {
-                  "id": 9,
-                  "title": "9. Жалобы и поддержка",
-                  "content": "Если у вас есть вопросы, жалобы или предложения, связанные с Приложением, вы можете связаться с нами по следующим каналам:\\n\\n• В Приложении: раздел чат-поддержки\\n• Эл. почта: nemat.mirzayev@carcat.app\\n• Контактный номер: +994 70 575 75 70\\n\\nПервичный ответ на ваши обращения предоставляется в течение 5 рабочих дней, а полное решение — в срок не более 30 дней."
-                },
-                {
-                  "id": 10,
-                  "title": "10. Применимое право и подсудность",
-                  "content": "Настоящие Условия регулируются законодательством Азербайджанской Республики. Споры, не урегулированные между сторонами, рассматриваются соответствующими судами города Баку."
+                  "title": "6. Интеллектуальная собственность",
+                  "content": "6.1. Приложение, его программное обеспечение и дизайн, наименование и логотип «CarCat», а также базы данных принадлежат CarCat и охраняются законодательством.\\n\\n6.2. Копирование, изменение, распространение и коммерческое использование Приложения и его содержимого без письменного согласия CarCat запрещены."
                 },
                 {
                   "id": 11,
-                  "title": "11. Одностороннее изменение Условий",
-                  "content": "CarCat оставляет за собой право в любое время в одностороннем порядке изменять или обновлять настоящие Условия использования. Обновлённые Условия вступают в силу с момента их публикации в Приложении. Продолжение использования Приложения после внесения изменений означает ваше согласие с обновлёнными Условиями.",
+                  "title": "11. Форс-мажор",
+                  "content": "11.1. CarCat не несет ответственности за неисполнение или ненадлежащее исполнение своих обязательств вследствие стихийных бедствий, военных действий, решений государственных органов, кибератак, перебоев в связи и энергоснабжении и иных обстоятельств непреодолимой силы."
+                },
+                {
+                  "id": 12,
+                  "title": "12. Заключительные положения",
+                  "content": "12.1. CarCat вправе вносить изменения в настоящий Документ. Новая редакция Документа вступает в силу с момента ее опубликования в Приложении.\\n\\n12.2. Настоящий Документ регулируется законодательством Азербайджанской Республики. Споры между сторонами, не урегулированные путем переговоров, рассматриваются в соответствующих судах.\\n\\n12.3. Признание какого-либо положения настоящего Документа недействительным не влияет на действительность остальных положений.\\n\\n12.4. Документ составлен на азербайджанском языке. В случае расхождений между текстом на азербайджанском языке и его переводом на другие языки преимущественную силу имеет текст на азербайджанском языке.\\n\\n12.5. По вопросам, связанным с настоящим Документом, можно обратиться в CarCat по адресу электронной почты info@carcat.app.",
                   "contact": {
                     "companyEn": "\\"CarCat\\" LLC",
-                    "companyAz": "ООО «CarCat»",
-                    "email": "nemat.mirzayev@carcat.app",
-                    "website": "https://carcat.app/",
+                    "companyAz": "Общество с ограниченной ответственностью «CarCat»",
+                    "email": "info@carcat.app",
+                    "website": "https://carcat.app",
                     "location": "Баку, Азербайджан"
                   }
                 }
               ],
               "footer": {
-                "acceptanceText": "Используя Приложение, вы принимаете настоящие Условия использования и нашу Политику конфиденциальности."
+                "acceptanceText": "Регистрируясь в Приложении, Пользователь подтверждает, что принимает условия настоящего Документа в полном объеме и дает согласие на обработку своих персональных данных в порядке, предусмотренном Документом."
               }
             }
             """;
 
     // -------------------------------------------------------------------------
-    // Privacy Policy v3.5 — AZ / EN / RU
+    // Privacy Policy v4.0 — AZ / EN / RU
+    // Sections 1, 2, 7–10, 12 of the combined document.
     // -------------------------------------------------------------------------
 
     private static final String POLICY_JSON_AZ = """
             {
               "metadata": {
-                "lastUpdated": "5 sentyabr 2026",
-                "version": "3.5",
+                "lastUpdated": "15 noyabr 2026",
+                "version": "4.0",
                 "language": "az",
                 "company": "\\"CarCat\\" MMC",
                 "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Bakı, Azərbaycan",
                 "country": "Azərbaycan Respublikası",
-                "responseTime": "30 gün",
-                "phone": "+994 70 575 75 70"
+                "phone": "+994 70 575 75 70",
+                "responseTime": ""
               },
               "header": {
                 "title": "CarCat — Məxfilik siyasəti",
-                "subtitle": "Bu Siyasət \\"CarCat\\" MMC tərəfindən idarə olunan CarCat mobil tətbiqi və rəqəmsal platforması vasitəsilə fərdi məlumatlarınızın toplanması, işlənməsi, saxlanılması, qorunması və üçüncü tərəflərə ötürülməsi qaydalarını müəyyən edir."
+                "subtitle": "Son yenilənmə: 15 noyabr 2026 | Versiya: 4.0 | \\"CarCat\\" MMC"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. Ümumi müddəalar və hüquqi əsaslar",
-                  "content": "Bu Məxfilik siyasəti (\\"Siyasət\\") \\"CarCat\\" MMC (\\"CarCat\\", \\"biz\\") tərəfindən idarə olunan “CarCat” mobil tətbiqi və rəqəmsal platforması vasitəsilə istifadəçilərin (\\"siz\\") fərdi məlumatlarının toplanması, işlənməsi, saxlanılması, qorunması və üçüncü tərəflərə ötürülməsi qaydalarını müəyyən edir. Fərdi məlumatlarınızın işlənməsi Azərbaycan Respublikasının \\"Fərdi məlumatlar haqqında\\" Qanununa uyğun olaraq həyata keçirilir. Tətbiqdə qeydiyyatdan keçməklə və ya xidmətlərdən istifadə etməklə siz bu Məxfilik siyasətində göstərilən şərtlərlə fərdi məlumatlarınızın işlənməsinə razılıq vermiş olursunuz.",
+                  "title": "1. Ümumi müddəalar",
+                  "content": "1.1. Bu İstifadə şərtləri və Məxfilik siyasəti (bundan sonra \\"Sənəd\\") \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti (bundan sonra \\"CarCat\\") ilə \\"CarCat\\" mobil tətbiqindən və rəqəmsal platformasından (bundan sonra \\"Tətbiq\\") istifadə edən şəxs (bundan sonra \\"İstifadəçi\\") arasında yaranan münasibətləri, habelə İstifadəçinin fərdi məlumatlarının toplanması, işlənməsi və qorunması qaydalarını müəyyən edir.\\n\\n1.2. İstifadəçi Tətbiqdə qeydiyyatdan keçməklə bu Sənədin şərtlərini tam həcmdə qəbul etdiyini və fərdi məlumatlarının Sənəddə göstərilən qaydada işlənməsinə razılıq verdiyini təsdiq edir.\\n\\n1.3. Fərdi məlumatların işlənməsi Azərbaycan Respublikasının qanunvericiliyinə uyğun olaraq həyata keçirilir.",
                   "icon": "info_outline",
                   "highlighted": false
                 },
                 {
                   "id": 2,
-                  "title": "2. Məlumat nəzarətçisi və dövlət reyestr qeydiyyatı",
-                  "content": "Fərdi məlumatlarınızın işlənməsinə cavabdeh olan hüquqi şəxs:\\n\\n• Hüquqi şəxsin tam adı: \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti\\n• VÖEN: 1309963601\\n• Dövlət reyestr qeydiyyatı: CarCat tətbiqinin informasiya sistemi — \\"Nəqliyyat vasitələrinin servis xidmətlərinin elektron idarə edilməsi sistemi (CarCat MİS)\\" AR Rəqəmsal İnkişaf və Nəqliyyat Nazirliyi yanında Milli Kibertəhlükəsizlik Agentliyi tərəfindən 31 iyul 2026-cı il tarixində İS647005001 nömrəsi ilə Fərdi Məlumatların İnformasiya Sistemlərinin Dövlət Reyestrində qeydiyyata alınmışdır.\\n• Hüquqi / əlaqə ünvanı: Bakı şəhəri, Azərbaycan\\n• E-poçt: nemat.mirzayev@carcat.app\\n• Əlaqə nömrəsi: +994 70 575 75 70 (bu nömrəyə WhatsApp vasitəsilə yazmağınız tövsiyə olunur)\\n• Veb-sayt: www.carcat.app",
+                  "title": "2. Şirkət haqqında məlumat",
+                  "content": "2.1. Tətbiqin və fərdi məlumatların informasiya sisteminin mülkiyyətçisi və operatoru \\"CarCat\\" MMC-dir:\\n• Hüquqi şəxsin adı: \\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti\\n• VÖEN: 1309963601\\n• Dövlət reyestri: \\"Nəqliyyat vasitələrinin servis xidmətlərinin elektron idarə edilməsi sistemi (CarCat MİS)\\" informasiya sistemi Azərbaycan Respublikası Rəqəmsal İnkişaf və Nəqliyyat Nazirliyi yanında Milli Kibertəhlükəsizlik Agentliyi tərəfindən 31 iyul 2026-cı il tarixində İS647005001 nömrəsi ilə Fərdi Məlumatların İnformasiya Sistemlərinin Dövlət Reyestrində qeydiyyata alınmışdır.\\n• Ünvan: Bakı şəhəri, Azərbaycan Respublikası\\n• Elektron poçt: info@carcat.app\\n• Telefon: +994 70 575 75 70\\n• Veb-sayt: https://carcat.app",
                   "icon": "business_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 3,
-                  "title": "3. Toplanılan məlumatlar",
-                  "content": "CarCat tətbiqi xidmətlərin keyfiyyətli və fasiləsiz göstərilməsi üçün aşağıdakı fərdi və texniki məlumatları toplayır:\\n\\n• Şəxsi identifikasiya məlumatları: Ad, soyad, mobil telefon nömrəsi, e-poçt ünvanı və sair;\\n• Avtomobil məlumatları: Avtomobilin VIN kodu, dövlət qeydiyyat nişanı, markası, modeli, buraxılış ili, cari yürüşü (odometr göstəricisi), xidmət/təmir tarixçəsi məlumatları və sair;\\n• Geolokasiya məlumatları: Ən yaxın servis mərkəzlərinin tapılması və xəritə inteqrasiyaları üçün cihazınızın naviqasiya/GPS məlumatları (icazəniz daxilində);\\n• Ödəniş və maliyyə məlumatları: Tətbiq daxilində həyata keçirilən ödənişlər zamanı bank kartı məlumatları birbaşa lisenziyalı ödəniş təşkilatları/banklar tərəfindən emal olunur; CarCat kartın tam rekvizitlərini öz serverlərində saxlamır;\\n• Texniki və cihaz məlumatları: IP ünvanı, cihaz modeli, əməliyyat sistemi versiyası, unikal cihaz identifikatorları (UUID), tətbiqdən istifadə loqları və xəta hesabatları.",
+                  "id": 7,
+                  "title": "7. Toplanılan fərdi məlumatlar",
+                  "content": "7.1. CarCat aşağıdakı məlumatları toplayır:\\na) şəxsiyyəti müəyyən edən məlumatlar: ad, soyad, şəxsiyyət vəsiqəsinin FİN kodu, mobil telefon nömrəsi, elektron poçt ünvanı və digər məlumatlar;\\nb) Nəqliyyat vasitəsinə dair məlumatlar: VIN kod, dövlət qeydiyyat nişanı, marka, model, buraxılış ili, yürüş, xidmət və təmir tarixçəsi, sığorta, cərimə və digər məlumatlar;\\nc) geolokasiya və digər məkan məlumatları: İstifadəçinin icazəsi ilə, yaxınlıqdakı servis mərkəzlərinin müəyyən edilməsi və digər xidmətlərin göstərilməsi məqsədilə;\\nç) texniki məlumatlar: IP ünvanı, cihazın modeli, əməliyyat sisteminin versiyası, cihaz identifikatorları, istifadə qeydləri, xəta hesabatları və digər məlumatlar.\\n\\n7.2. Bank kartı məlumatları bilavasitə bank və ödəniş təşkilatları tərəfindən emal olunur və CarCat tərəfindən saxlanılmır.\\n\\n7.3. Qanunvericiliklə müəyyən edilmiş məhdudiyyətlər nəzərə alınmaqla, qanunvericiliklə nəzərdə tutulmuş hallarda CarCat İstifadəçiyə və onun Nəqliyyat vasitəsinə dair məlumatları xidmət təminatçılarından, sığorta təşkilatlarından, müvafiq dövlət qurumlarından, bank və ödəniş təşkilatlarından və digər mənbələrdən əldə edə bilər. Bu məlumatlar İstifadəçiyə daha dolğun məlumat təqdim edilməsi məqsədilə istifadə olunur.",
                   "icon": "folder_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 4,
-                  "title": "4. Məlumatların toplanması və işlənməsi məqsədləri",
-                  "content": "Toplanılan məlumatlar aşağıdakı məqsədlərlə işlənir:\\n\\n• CarCat texniki qulluq və CarCat Passport modulları üzrə xidmətlərin təşkili və avtomobilin rəqəmsal servis pasportunun formalaşdırılması;\\n• Tərəfdaş servis mərkəzlərində texniki baxış, təmir və yağdəyişmə vaxtlarının bron edilməsi və xidmət sorğularının icrası;\\n• Avtomobilin texniki baxış, sığorta, yürüş və xidmət xəbərdarlıqlarının avtomatik bildiriş (push notification/SMS) vasitəsilə istifadəçiyə çatdırılması;\\n• Tətbiqin təhlükəsizliyinin təmin edilməsi, dələduzluq hallarının qarşısının alınması və sistem tənzimləmələrinin həyata keçirilməsi;\\n• Müştəri dəstəyi xidmətinin göstərilməsi, şikayət və sorğuların cavablandırılması;\\n• Qanunvericilikdən doğan hüquqi öhdəliklərin yerinə yetirilməsi.",
+                  "id": 8,
+                  "title": "8. Məlumatların işlənməsi məqsədləri",
+                  "content": "8.1. Fərdi məlumatlar aşağıdakı məqsədlərlə işlənir:\\na) Tətbiq vasitəsilə xidmətlərin göstərilməsi və Nəqliyyat vasitəsinin rəqəmsal servis pasportunun formalaşdırılması;\\nb) Xidmət təchizatçıları və Tərəfdaşlar vasitəsilə bronların, sığorta müqavilələrinin rəsmiləşdirilməsinin və cərimə ödənişlərinin həyata keçirilməsi;\\nc) texniki baxış, sığorta, yürüş və servis xatırlatmalarının göndərilməsi;\\nç) Tətbiqin təhlükəsizliyinin təmin edilməsi və saxtakarlığın qarşısının alınması;\\nd) İstifadəçi müraciətlərinin cavablandırılması;\\ne) qanunvericilikdən irəli gələn öhdəliklərin icrası.\\n\\n8.2. İstifadəçi Tətbiqdə qeydiyyatdan keçməklə xidmətlərlə bağlı SMS, push və elektron poçt bildirişlərinin alınmasına razılıq verir.",
                   "icon": "settings_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 5,
-                  "title": "5. Məlumatların üçüncü tərəflərə ötürülməsi",
-                  "content": "CarCat fərdi məlumatlarınızı üçüncü tərəflərə satmır və kommersiya məqsədilə icarəyə vermir. Məlumatlar yalnız aşağıdakı hallarda ötürülə bilər:\\n\\n• Tərəfdaş servis mərkəzlərinə: Seçdiyiniz xidmətin göstərilməsi üçün zəruri olan həcmdə (ad, telefon, avtomobilin markası/modeli və VIN kodu);\\n• Ekosistem və inteqrasiya tərəfdaşlarına: Xidmət zəncirinin təmin edilməsi, identifikasiya və məlumat dəqiqləşdirilməsi məqsədilə inteqrasiya olunmuş tərəfdaşlar;\\n• Hüquq-mühafizə və dövlət qurumlarına: Qanunla nəzərdə tutulmuş hallarda, səlahiyyətli dövlət orqanlarının rəsmi və əsaslandırılmış tələbi əsasında;\\n• Xidmət təminatçılarına: Server, bulud saxlanma, analitika və bildiriş göndərişi xidmətlərini təmin edən IT subpodratçılara (məxfiliyin qorunması öhdəlikləri çərçivəsində).",
+                  "id": 9,
+                  "title": "9. Məlumatların ötürülməsi",
+                  "content": "9.1. CarCat fərdi məlumatları bu Sənəddə və qanunvericilikdə nəzərdə tutulmuş hallar istisna olmaqla üçüncü şəxslərə ötürmür.\\n\\n9.2. Fərdi məlumatlar yalnız zəruri həcmdə aşağıdakı şəxslərə ötürülə bilər:\\na) İstifadəçinin seçdiyi xidməti göstərən Xidmət təchizatçısına və ya Tərəfdaşa;\\nb) sığorta təşkilatlarına, müvafiq dövlət qurumlarına, bank və ödəniş təşkilatlarına, İstifadəçinin sifariş etdiyi xidmətin icrası üçün;\\nc) Tətbiqlə inteqrasiya olunmuş digər tərəfdaşlara;\\nç) server, bulud saxlama və bildiriş xidmətlərini təmin edən informasiya texnologiyaları təminatçılarına, məxfilik öhdəlikləri çərçivəsində;\\nd) qanunvericiliklə nəzərdə tutulmuş hallarda səlahiyyətli dövlət orqanlarına.\\n\\n9.3. Fərdi məlumatlar qanunvericiliyin tələblərinə uyğun olaraq xarici (transsərhəd) bulud serverlərində saxlanıla və işlənə bilər.",
                   "icon": "share_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 6,
-                  "title": "6. Transsərhəd məlumat ötürülməsi",
-                  "content": "Tətbiqin fasiləsiz və təhlükəsiz fəaliyyətini təmin etmək üçün fərdi məlumatlarınız beynəlxalq təhlükəsizlik standartlarına cavab verən xarici bulud serverlərində (Cloud Infrastructure) saxlanıla və işlənə bilər. Tətbiqdən istifadə etməklə məlumatlarınızın təhlükəsiz transsərhəd ötürülməsinə razılıq vermiş olursunuz.",
-                  "icon": "public_outlined",
-                  "highlighted": false
-                },
-                {
-                  "id": 7,
-                  "title": "7. Məlumatların təhlükəsizliyi, məsuliyyət məhdudiyyəti və saxlanılma müddəti",
-                  "content": "CarCat fərdi məlumatların qanunsuz girişdən, dəyişdirilmədən, açıqlanmadan və ya məhv edilmədən qorunması üçün müasir şifrələmə protokollarından, təhlükəsizlik divarlarından (Firewall) və giriş məhdudiyyəti mexanizmlərindən istifadə edir.\\n\\nMəsuliyyətin məhdudlaşdırılması: CarCat platformasının təhlükəsizliyini təmin etmək üçün bütün zəruri texniki və təşkilati tədbirlər görülsə də, gözlənilməz kiberhücumlar, zərərli proqram təminatı hücumları (malware, ransomware), genişmiqyaslı kiberqəsd, qarşısıalınmaz fors-major halları və ya qlobal infrastruktur kəsintiləri (DDoS hücumları və s.) nəticəsində yaranmış məlumat sızması, itkisi və ya xidmət kəsintilərinə görə \\"CarCat\\" MMC qanunvericiliyin icazə verdiyi maksimum həddə hüquqi və maliyyə məsuliyyəti daşımır.\\n\\nMəlumatlarınız hesabınız aktiv olduğu müddətdə saxlanılır. Hesab silindikdə və ya qanunvericiliklə müəyyən edilmiş saxlanılma müddəti bitdikdə fərdi məlumatlar təhlükəsiz şəkildə silinir və ya anonimləşdirilir.",
+                  "id": 10,
+                  "title": "10. Məlumatların qorunması",
+                  "content": "10.1. CarCat fərdi məlumatların qanunsuz əldə edilməsinin, dəyişdirilməsinin və yayılmasının qarşısını almaq üçün zəruri texniki və təşkilati tədbirlər görür.",
                   "icon": "security_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 8,
-                  "title": "8. Hesabın və məlumatların silinməsi",
-                  "content": "İstifadəçi istənilən vaxt nemat.mirzayev@carcat.app e-poçt ünvanına rəsmi sorğu göndərməklə hesabının və ona bağlı fərdi məlumatların silinməsini tələb edə bilər. Sorğunuz maksimum 30 gün ərzində emal olunur.",
-                  "icon": "delete_outline",
-                  "highlighted": false
-                },
-                {
-                  "id": 9,
-                  "title": "9. Məxfilik siyasətində dəyişikliklər",
-                  "content": "CarCat bu Məxfilik siyasətini istənilən vaxt yeniləmək hüququnu saxlayır. Yenilənmiş Siyasət tətbiqdə dərc edildiyi andan qüvvəyə minir.",
+                  "id": 12,
+                  "title": "12. Yekun müddəalar",
+                  "content": "12.1. CarCat bu Sənədə dəyişiklik etmək hüququna malikdir. Sənədin yeni redaksiyası Tətbiqdə dərc edildiyi andan qüvvəyə minir.\\n\\n12.2. Bu Sənəd Azərbaycan Respublikasının qanunvericiliyi ilə tənzimlənir. Tərəflər arasında yaranan mübahisələr danışıqlar yolu ilə həll edilmədikdə müvafiq məhkəmələrdə baxılır.\\n\\n12.3. Sənədin hər hansı müddəası etibarsız hesab edilərsə, bu, digər müddəaların qüvvədə olmasına təsir göstərmir.\\n\\n12.4. Sənəd Azərbaycan dilində tərtib edilmişdir. Digər dillərə tərcümə ilə ziddiyyət yarandıqda Azərbaycan dilindəki mətn üstün tutulur.\\n\\n12.5. Bu Sənədlə bağlı suallar üzrə info@carcat.app elektron poçt ünvanı vasitəsilə CarCat ilə əlaqə saxlamaq olar.",
                   "icon": "update_outlined",
                   "highlighted": false
                 }
               ],
               "highlightedBox": {
                 "id": "no_data_selling",
-                "title": "Məlumat satılmır",
-                "content": "CarCat fərdi məlumatlarınızı üçüncü tərəflərə satmır və kommersiya məqsədilə icarəyə vermir.",
+                "title": "Üçüncü şəxslərə ötürülmə",
+                "content": "CarCat fərdi məlumatları bu Sənəddə və qanunvericilikdə nəzərdə tutulmuş hallar istisna olmaqla üçüncü şəxslərə ötürmür.",
                 "icon": "shield_outlined"
               },
               "contactSection": {
-                "id": 10,
-                "title": "10. Əlaqə və dəstək",
-                "subtitle": "Bu Məxfilik siyasəti və ya fərdi məlumatlarınızın işlənməsi ilə bağlı hər hansı sualınız, sorğunuz və ya şikayətiniz olduqda aşağıdakı vasitələrlə bizimlə əlaqə saxlaya bilərsiniz:",
+                "id": 13,
+                "title": "Əlaqə",
+                "subtitle": "Bu Sənədlə bağlı suallar üzrə info@carcat.app elektron poçt ünvanı vasitəsilə CarCat ilə əlaqə saxlamaq olar.",
                 "company": "\\"CarCat\\" MMC",
-                "companyAz": "\\"CarCat\\" MMC",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Bakı, Azərbaycan",
                 "phone": "+994 70 575 75 70",
-                "responseNote": "Bu nömrəyə WhatsApp vasitəsilə yazmağınız tövsiyə olunur."
+                "responseNote": ""
               },
               "footer": {
-                "consentText": "Tətbiqdə qeydiyyatdan keçməklə və ya xidmətlərdən istifadə etməklə siz bu Məxfilik siyasətində göstərilən şərtlərlə fərdi məlumatlarınızın işlənməsinə razılıq vermiş olursunuz."
+                "consentText": "İstifadəçi Tətbiqdə qeydiyyatdan keçməklə bu Sənədin şərtlərini tam həcmdə qəbul etdiyini və fərdi məlumatlarının Sənəddə göstərilən qaydada işlənməsinə razılıq verdiyini təsdiq edir."
               }
             }
             """;
@@ -466,107 +409,93 @@ public class LegalController {
     private static final String POLICY_JSON_EN = """
             {
               "metadata": {
-                "lastUpdated": "5 September 2026",
-                "version": "3.5",
+                "lastUpdated": "15 November 2026",
+                "version": "4.0",
                 "language": "en",
                 "company": "\\"CarCat\\" LLC",
                 "companyAz": "\\"CarCat\\" Limited Liability Company",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Baku, Azerbaijan",
                 "country": "Republic of Azerbaijan",
-                "responseTime": "30 days",
-                "phone": "+994 70 575 75 70"
+                "phone": "+994 70 575 75 70",
+                "responseTime": ""
               },
               "header": {
                 "title": "CarCat — Privacy Policy",
-                "subtitle": "This Policy sets out the rules for the collection, processing, storage, protection and transfer to third parties of personal data through the CarCat mobile application and digital platform operated by \\"CarCat\\" LLC."
+                "subtitle": "Last updated: 15 November 2026 | Version: 4.0 | \\"CarCat\\" LLC"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. General provisions and legal basis",
-                  "content": "This Privacy Policy (\\"Policy\\") sets out the rules for the collection, processing, storage, protection and transfer to third parties of the personal data of users (\\"you\\") through the “CarCat” mobile application and digital platform operated by \\"CarCat\\" LLC (\\"CarCat\\", \\"we\\"). Your personal data is processed in accordance with the Law of the Republic of Azerbaijan \\"On Personal Data\\". By registering in the Application or using the services, you consent to the processing of your personal data under the terms set out in this Privacy Policy.",
+                  "title": "1. General provisions",
+                  "content": "1.1. These Terms of use and Privacy policy (the \\"Document\\") govern the relationship between \\"CarCat\\" Limited Liability Company (\\"CarCat\\") and any person using the \\"CarCat\\" mobile application and digital platform (the \\"Application\\") (the \\"User\\"), and set out the rules for the collection, processing and protection of the User's personal data.\\n\\n1.2. By registering in the Application, the User confirms that they accept the terms of this Document in full and consent to the processing of their personal data as described herein.\\n\\n1.3. Personal data is processed in accordance with the legislation of the Republic of Azerbaijan.",
                   "icon": "info_outline",
                   "highlighted": false
                 },
                 {
                   "id": 2,
-                  "title": "2. Data controller and state register registration",
-                  "content": "The legal entity responsible for processing your personal data:\\n\\n• Full legal name: \\"CarCat\\" Limited Liability Company\\n• TIN (VÖEN): 1309963601\\n• State register registration: The information system of the CarCat application — \\"Electronic management system for vehicle maintenance services (CarCat MİS)\\" — was registered in the State Register of Personal Data Information Systems under number İS647005001 on 31 July 2026 by the National Cybersecurity Agency under the Ministry of Digital Development and Transport of the Republic of Azerbaijan.\\n• Legal / contact address: Baku, Azerbaijan\\n• Email: nemat.mirzayev@carcat.app\\n• Contact number: +994 70 575 75 70 (we recommend contacting this number via WhatsApp)\\n• Website: www.carcat.app",
+                  "title": "2. Company information",
+                  "content": "2.1. \\"CarCat\\" LLC is the owner and operator of the Application and of the personal data information system:\\n• Legal name: \\"CarCat\\" Limited Liability Company\\n• Taxpayer ID (VÖEN): 1309963601\\n• State register: The information system \\"Digital Management System for Vehicle Maintenance Services (CarCat MİS)\\" was entered in the State Register of Personal Data Information Systems under No. İS647005001 on 31 July 2026 by the National Cybersecurity Agency under the Ministry of Digital Development and Transport of the Republic of Azerbaijan.\\n• Address: Baku, Republic of Azerbaijan\\n• Email: info@carcat.app\\n• Phone: +994 70 575 75 70\\n• Website: https://carcat.app",
                   "icon": "business_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 3,
-                  "title": "3. Data we collect",
-                  "content": "The CarCat application collects the following personal and technical data to ensure the high-quality and uninterrupted provision of services:\\n\\n• Personal identification data: First name, last name, mobile phone number, email address, etc.;\\n• Vehicle data: Vehicle VIN code, state registration plate, make, model, year of manufacture, current mileage (odometer reading), service/repair history, etc.;\\n• Geolocation data: Your device's navigation/GPS data for finding the nearest service centres and for map integrations (subject to your permission);\\n• Payment and financial data: For payments made within the Application, bank card data is processed directly by licensed payment institutions/banks; CarCat does not store full card details on its servers;\\n• Technical and device data: IP address, device model, operating system version, unique device identifiers (UUID), application usage logs and error reports.",
+                  "id": 7,
+                  "title": "7. Personal data collected",
+                  "content": "7.1. CarCat collects the following data:\\na) identification data: first name, surname, ID card FIN, mobile phone number, email address and other data;\\nb) Vehicle data: VIN, registration number, make, model, year of manufacture, mileage, service and repair history, insurance, fines and other data;\\nc) geolocation and other location data: with the User's permission, to identify nearby service centres and to provide other services;\\nd) technical data: IP address, device model, operating system version, device identifiers, usage logs, error reports and other data.\\n\\n7.2. Bank card details are processed directly by banks and payment institutions and are not stored by CarCat.\\n\\n7.3. Subject to the restrictions established by law, and in the cases provided for by law, CarCat may obtain data about the User and their Vehicle from service providers, insurance companies, relevant government authorities, banks and payment institutions, and other sources. Such data is used to provide the User with more complete information.",
                   "icon": "folder_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 4,
-                  "title": "4. Purposes of data collection and processing",
-                  "content": "The collected data is processed for the following purposes:\\n\\n• Organising services under the CarCat maintenance and CarCat Passport modules and creating the vehicle's digital service passport;\\n• Booking technical inspection, repair and oil change appointments at partner service centres and fulfilling service requests;\\n• Delivering vehicle technical inspection, insurance, mileage and service alerts to the user via automatic notifications (push notification/SMS);\\n• Ensuring the security of the Application, preventing fraud and carrying out system adjustments;\\n• Providing customer support and responding to complaints and requests;\\n• Fulfilling legal obligations arising from legislation.",
+                  "id": 8,
+                  "title": "8. Purposes of processing",
+                  "content": "8.1. Personal data is processed for the following purposes:\\na) providing services through the Application and creating the Vehicle's digital service passport;\\nb) making bookings, arranging insurance contracts and processing fine payments through Service suppliers and Partners;\\nc) sending reminders about roadworthiness inspections, insurance, mileage and servicing;\\nd) ensuring the security of the Application and preventing fraud;\\ne) responding to User enquiries;\\nf) complying with legal obligations.\\n\\n8.2. By registering in the Application, the User consents to receiving service-related SMS, push and email notifications.",
                   "icon": "settings_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 5,
-                  "title": "5. Transfer of data to third parties",
-                  "content": "CarCat does not sell your personal data to third parties or rent it out for commercial purposes. Data may be transferred only in the following cases:\\n\\n• To partner service centres: To the extent necessary to provide the service you have selected (name, phone number, vehicle make/model and VIN code);\\n• To ecosystem and integration partners: Integrated partners, for the purposes of ensuring the service chain, identification and data verification;\\n• To law enforcement and government authorities: In cases provided for by law, on the basis of an official and substantiated request from competent state authorities;\\n• To service providers: IT subcontractors providing server, cloud storage, analytics and notification delivery services (subject to confidentiality obligations).",
+                  "id": 9,
+                  "title": "9. Transfer of data",
+                  "content": "9.1. CarCat does not transfer personal data to third parties except in the cases provided for in this Document and by law.\\n\\n9.2. Personal data may be transferred, only to the extent necessary, to:\\na) the Service supplier or Partner providing the service selected by the User;\\nb) insurance companies, relevant government authorities, banks and payment institutions, in order to perform the service ordered by the User;\\nc) other partners integrated with the Application;\\nd) information technology providers supplying server, cloud storage and notification services, subject to confidentiality obligations;\\ne) competent government authorities, in the cases provided for by law.\\n\\n9.3. Personal data may be stored and processed on foreign (cross-border) cloud servers in accordance with the requirements of law.",
                   "icon": "share_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 6,
-                  "title": "6. Cross-border data transfer",
-                  "content": "To ensure the uninterrupted and secure operation of the Application, your personal data may be stored and processed on foreign cloud servers (Cloud Infrastructure) that meet international security standards. By using the Application, you consent to the secure cross-border transfer of your data.",
-                  "icon": "public_outlined",
-                  "highlighted": false
-                },
-                {
-                  "id": 7,
-                  "title": "7. Data security, limitation of liability and retention period",
-                  "content": "CarCat uses modern encryption protocols, firewalls and access restriction mechanisms to protect personal data from unlawful access, alteration, disclosure or destruction.\\n\\nLimitation of liability: Although all necessary technical and organisational measures are taken to ensure the security of the CarCat platform, \\"CarCat\\" LLC, to the maximum extent permitted by law, bears no legal or financial liability for data leaks, data loss or service interruptions resulting from unforeseen cyberattacks, malicious software attacks (malware, ransomware), large-scale cyber sabotage, force majeure circumstances or global infrastructure outages (DDoS attacks, etc.).\\n\\nYour data is retained for as long as your account is active. When the account is deleted or the retention period established by law expires, personal data is securely deleted or anonymised.",
+                  "id": 10,
+                  "title": "10. Data protection",
+                  "content": "10.1. CarCat takes the necessary technical and organisational measures to prevent unlawful access to, alteration or disclosure of personal data.",
                   "icon": "security_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 8,
-                  "title": "8. Deletion of account and data",
-                  "content": "The user may at any time request the deletion of their account and the related personal data by sending an official request to nemat.mirzayev@carcat.app. Your request will be processed within a maximum of 30 days.",
-                  "icon": "delete_outline",
-                  "highlighted": false
-                },
-                {
-                  "id": 9,
-                  "title": "9. Changes to the Privacy Policy",
-                  "content": "CarCat reserves the right to update this Privacy Policy at any time. The updated Policy takes effect from the moment it is published in the Application.",
+                  "id": 12,
+                  "title": "12. Final provisions",
+                  "content": "12.1. CarCat may amend this Document. A new version of the Document takes effect upon its publication in the Application.\\n\\n12.2. This Document is governed by the legislation of the Republic of Azerbaijan. Disputes between the parties that cannot be resolved through negotiation shall be referred to the competent courts.\\n\\n12.3. If any provision of this Document is held invalid, the remaining provisions shall remain in force.\\n\\n12.4. This Document is drawn up in Azerbaijani. In the event of any inconsistency between the Azerbaijani text and a translation, the Azerbaijani text shall prevail.\\n\\n12.5. Questions regarding this Document may be sent to CarCat at info@carcat.app.",
                   "icon": "update_outlined",
                   "highlighted": false
                 }
               ],
               "highlightedBox": {
                 "id": "no_data_selling",
-                "title": "We do not sell your data",
-                "content": "CarCat does not sell your personal data to third parties or rent it out for commercial purposes.",
+                "title": "Transfer to third parties",
+                "content": "CarCat does not transfer personal data to third parties except in the cases provided for in this Document and by law.",
                 "icon": "shield_outlined"
               },
               "contactSection": {
-                "id": 10,
-                "title": "10. Contact and support",
-                "subtitle": "If you have any questions, requests or complaints regarding this Privacy Policy or the processing of your personal data, you can contact us through the following channels:",
+                "id": 13,
+                "title": "Contact",
+                "subtitle": "Questions regarding this Document may be sent to CarCat at info@carcat.app.",
                 "company": "\\"CarCat\\" LLC",
-                "companyAz": "\\"CarCat\\" MMC",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "companyAz": "\\"CarCat\\" Limited Liability Company",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Baku, Azerbaijan",
                 "phone": "+994 70 575 75 70",
-                "responseNote": "We recommend contacting this number via WhatsApp."
+                "responseNote": ""
               },
               "footer": {
-                "consentText": "By registering in the Application or using the services, you consent to the processing of your personal data under the terms set out in this Privacy Policy."
+                "consentText": "By registering in the Application, the User confirms that they accept the terms of this Document in full and consent to the processing of their personal data as described herein."
               }
             }
             """;
@@ -574,107 +503,93 @@ public class LegalController {
     private static final String POLICY_JSON_RU = """
             {
               "metadata": {
-                "lastUpdated": "5 сентября 2026",
-                "version": "3.5",
+                "lastUpdated": "15 ноября 2026 г.",
+                "version": "4.0",
                 "language": "ru",
                 "company": "ООО «CarCat»",
                 "companyAz": "Общество с ограниченной ответственностью «CarCat»",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Баку, Азербайджан",
                 "country": "Азербайджанская Республика",
-                "responseTime": "30 дней",
-                "phone": "+994 70 575 75 70"
+                "phone": "+994 70 575 75 70",
+                "responseTime": ""
               },
               "header": {
                 "title": "CarCat — Политика конфиденциальности",
-                "subtitle": "Настоящая Политика определяет правила сбора, обработки, хранения, защиты и передачи третьим лицам персональных данных через мобильное приложение и цифровую платформу CarCat, управляемые ООО «CarCat»."
+                "subtitle": "Дата последнего обновления: 15 ноября 2026 г. | Версия: 4.0 | ООО «CarCat»"
               },
               "sections": [
                 {
                   "id": 1,
-                  "title": "1. Общие положения и правовые основания",
-                  "content": "Настоящая Политика конфиденциальности («Политика») определяет правила сбора, обработки, хранения, защиты и передачи третьим лицам персональных данных пользователей («вы») посредством мобильного приложения и цифровой платформы «CarCat», управляемых ООО «CarCat» («CarCat», «мы»). Обработка ваших персональных данных осуществляется в соответствии с Законом Азербайджанской Республики «О персональных данных». Регистрируясь в Приложении или пользуясь услугами, вы даёте согласие на обработку ваших персональных данных на условиях, изложенных в настоящей Политике конфиденциальности.",
+                  "title": "1. Общие положения",
+                  "content": "1.1. Настоящие Условия использования и Политика конфиденциальности (далее – «Документ») регулируют отношения между Обществом с ограниченной ответственностью «CarCat» (далее – «CarCat») и лицом, использующим мобильное приложение и цифровую платформу «CarCat» (далее – «Приложение»; такое лицо далее – «Пользователь»), а также определяют порядок сбора, обработки и защиты персональных данных Пользователя.\\n\\n1.2. Регистрируясь в Приложении, Пользователь подтверждает, что принимает условия настоящего Документа в полном объеме и дает согласие на обработку своих персональных данных в порядке, предусмотренном Документом.\\n\\n1.3. Обработка персональных данных осуществляется в соответствии с законодательством Азербайджанской Республики.",
                   "icon": "info_outline",
                   "highlighted": false
                 },
                 {
                   "id": 2,
-                  "title": "2. Оператор персональных данных и регистрация в государственном реестре",
-                  "content": "Юридическое лицо, ответственное за обработку ваших персональных данных:\\n\\n• Полное наименование юридического лица: Общество с ограниченной ответственностью «CarCat»\\n• ИНН (VÖEN): 1309963601\\n• Регистрация в государственном реестре: Информационная система приложения CarCat — «Система электронного управления сервисными услугами для транспортных средств (CarCat MİS)» — зарегистрирована Национальным агентством кибербезопасности при Министерстве цифрового развития и транспорта Азербайджанской Республики 31 июля 2026 года под номером İS647005001 в Государственном реестре информационных систем персональных данных.\\n• Юридический / контактный адрес: город Баку, Азербайджан\\n• Эл. почта: nemat.mirzayev@carcat.app\\n• Контактный номер: +994 70 575 75 70 (рекомендуем писать на этот номер через WhatsApp)\\n• Веб-сайт: www.carcat.app",
+                  "title": "2. Сведения о компании",
+                  "content": "2.1. Собственником и оператором Приложения и информационной системы персональных данных является ООО «CarCat»:\\n• Полное наименование: Общество с ограниченной ответственностью «CarCat»\\n• ИНН (VÖEN): 1309963601\\n• Государственный реестр: информационная система «Система электронного управления сервисным обслуживанием транспортных средств (CarCat MİS)» зарегистрирована Национальным агентством кибербезопасности при Министерстве цифрового развития и транспорта Азербайджанской Республики 31 июля 2026 года в Государственном реестре информационных систем персональных данных под номером İS647005001.\\n• Адрес: г. Баку, Азербайджанская Республика\\n• Электронная почта: info@carcat.app\\n• Телефон: +994 70 575 75 70\\n• Веб-сайт: https://carcat.app",
                   "icon": "business_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 3,
-                  "title": "3. Собираемые данные",
-                  "content": "Приложение CarCat собирает следующие персональные и технические данные для качественного и бесперебойного оказания услуг:\\n\\n• Данные для идентификации личности: Имя, фамилия, номер мобильного телефона, адрес электронной почты и т. д.;\\n• Данные об автомобиле: VIN-код автомобиля, государственный регистрационный знак, марка, модель, год выпуска, текущий пробег (показания одометра), история обслуживания/ремонта и т. д.;\\n• Данные геолокации: Навигационные/GPS-данные вашего устройства для поиска ближайших сервисных центров и интеграции с картами (с вашего разрешения);\\n• Платёжные и финансовые данные: При оплате в Приложении данные банковской карты обрабатываются непосредственно лицензированными платёжными организациями/банками; CarCat не хранит полные реквизиты карты на своих серверах;\\n• Технические данные и данные устройства: IP-адрес, модель устройства, версия операционной системы, уникальные идентификаторы устройства (UUID), журналы использования приложения и отчёты об ошибках.",
+                  "id": 7,
+                  "title": "7. Собираемые персональные данные",
+                  "content": "7.1. CarCat собирает следующие данные:\\nа) идентификационные данные: имя, фамилия, FIN-код удостоверения личности, номер мобильного телефона, адрес электронной почты и иные данные;\\nб) данные о Транспортном средстве: VIN-код, государственный регистрационный номер, марка, модель, год выпуска, пробег, история обслуживания и ремонта, сведения о страховании, штрафах и иные данные;\\nв) данные геолокации и иные данные о местоположении: с разрешения Пользователя, для определения ближайших сервисных центров и оказания иных услуг;\\nг) технические данные: IP-адрес, модель устройства, версия операционной системы, идентификаторы устройства, журналы использования, отчеты об ошибках и иные данные.\\n\\n7.2. Данные банковских карт обрабатываются непосредственно банками и платежными организациями и не хранятся CarCat.\\n\\n7.3. С учетом ограничений, установленных законодательством, и в случаях, предусмотренных законодательством, CarCat может получать данные о Пользователе и его Транспортном средстве от поставщиков услуг, страховых организаций, соответствующих государственных органов, банков и платежных организаций, а также из иных источников. Эти данные используются для предоставления Пользователю более полной информации.",
                   "icon": "folder_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 4,
-                  "title": "4. Цели сбора и обработки данных",
-                  "content": "Собранные данные обрабатываются в следующих целях:\\n\\n• Организация услуг в рамках модулей технического обслуживания CarCat и CarCat Passport и формирование цифрового сервисного паспорта автомобиля;\\n• Бронирование времени техосмотра, ремонта и замены масла в партнёрских сервисных центрах и выполнение запросов на обслуживание;\\n• Доведение до пользователя уведомлений о техосмотре, страховании, пробеге и обслуживании автомобиля посредством автоматических оповещений (push-уведомления/SMS);\\n• Обеспечение безопасности Приложения, предотвращение мошенничества и выполнение системных настроек;\\n• Оказание клиентской поддержки, ответы на жалобы и запросы;\\n• Выполнение правовых обязательств, вытекающих из законодательства.",
+                  "id": 8,
+                  "title": "8. Цели обработки данных",
+                  "content": "8.1. Персональные данные обрабатываются в следующих целях:\\nа) оказание услуг через Приложение и формирование цифрового сервисного паспорта Транспортного средства;\\nб) осуществление бронирований, оформление договоров страхования и оплата штрафов через Поставщиков услуг и Партнеров;\\nв) направление напоминаний о техническом осмотре, страховании, пробеге и обслуживании;\\nг) обеспечение безопасности Приложения и предотвращение мошенничества;\\nд) рассмотрение обращений Пользователей;\\nе) исполнение обязательств, предусмотренных законодательством.\\n\\n8.2. Регистрируясь в Приложении, Пользователь дает согласие на получение связанных с услугами SMS, push-уведомлений и сообщений по электронной почте.",
                   "icon": "settings_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 5,
-                  "title": "5. Передача данных третьим лицам",
-                  "content": "CarCat не продаёт ваши персональные данные третьим лицам и не предоставляет их в аренду в коммерческих целях. Данные могут передаваться только в следующих случаях:\\n\\n• Партнёрским сервисным центрам: В объёме, необходимом для оказания выбранной вами услуги (имя, телефон, марка/модель автомобиля и VIN-код);\\n• Партнёрам экосистемы и интеграции: Интегрированным партнёрам в целях обеспечения цепочки услуг, идентификации и уточнения данных;\\n• Правоохранительным и государственным органам: В случаях, предусмотренных законом, на основании официального и обоснованного запроса уполномоченных государственных органов;\\n• Поставщикам услуг: ИТ-субподрядчикам, предоставляющим услуги серверов, облачного хранения, аналитики и отправки уведомлений (в рамках обязательств по соблюдению конфиденциальности).",
+                  "id": 9,
+                  "title": "9. Передача данных",
+                  "content": "9.1. CarCat не передает персональные данные третьим лицам, за исключением случаев, предусмотренных настоящим Документом и законодательством.\\n\\n9.2. Персональные данные могут передаваться только в необходимом объеме следующим лицам:\\nа) Поставщику услуг или Партнеру, оказывающему выбранную Пользователем услугу;\\nб) страховым организациям, соответствующим государственным органам, банкам и платежным организациям – для исполнения заказанной Пользователем услуги;\\nв) иным партнерам, интегрированным с Приложением;\\nг) поставщикам информационных технологий, обеспечивающим услуги серверов, облачного хранения и уведомлений, – в рамках обязательств о конфиденциальности;\\nд) уполномоченным государственным органам – в случаях, предусмотренных законодательством.\\n\\n9.3. Персональные данные могут храниться и обрабатываться на зарубежных (трансграничных) облачных серверах в соответствии с требованиями законодательства.",
                   "icon": "share_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 6,
-                  "title": "6. Трансграничная передача данных",
-                  "content": "Для обеспечения бесперебойной и безопасной работы Приложения ваши персональные данные могут храниться и обрабатываться на зарубежных облачных серверах (Cloud Infrastructure), соответствующих международным стандартам безопасности. Используя Приложение, вы даёте согласие на безопасную трансграничную передачу ваших данных.",
-                  "icon": "public_outlined",
-                  "highlighted": false
-                },
-                {
-                  "id": 7,
-                  "title": "7. Безопасность данных, ограничение ответственности и срок хранения",
-                  "content": "CarCat использует современные протоколы шифрования, межсетевые экраны (Firewall) и механизмы ограничения доступа для защиты персональных данных от незаконного доступа, изменения, раскрытия или уничтожения.\\n\\nОграничение ответственности: Несмотря на принятие всех необходимых технических и организационных мер для обеспечения безопасности платформы CarCat, ООО «CarCat» в максимальной степени, допускаемой законодательством, не несёт правовой и финансовой ответственности за утечку или утрату данных либо перебои в работе сервиса, возникшие в результате непредвиденных кибератак, атак вредоносного программного обеспечения (malware, ransomware), масштабных кибердиверсий, непреодолимых форс-мажорных обстоятельств или глобальных сбоев инфраструктуры (DDoS-атаки и т. д.).\\n\\nВаши данные хранятся в течение всего срока действия вашей учётной записи. При удалении учётной записи или по истечении установленного законодательством срока хранения персональные данные безопасно удаляются или обезличиваются.",
+                  "id": 10,
+                  "title": "10. Защита данных",
+                  "content": "10.1. CarCat принимает необходимые технические и организационные меры для предотвращения неправомерного доступа к персональным данным, их изменения и распространения.",
                   "icon": "security_outlined",
                   "highlighted": false
                 },
                 {
-                  "id": 8,
-                  "title": "8. Удаление учётной записи и данных",
-                  "content": "Пользователь в любое время может потребовать удаления своей учётной записи и связанных с ней персональных данных, направив официальный запрос на адрес электронной почты nemat.mirzayev@carcat.app. Ваш запрос будет обработан в срок не более 30 дней.",
-                  "icon": "delete_outline",
-                  "highlighted": false
-                },
-                {
-                  "id": 9,
-                  "title": "9. Изменения в Политике конфиденциальности",
-                  "content": "CarCat оставляет за собой право в любое время обновлять настоящую Политику конфиденциальности. Обновлённая Политика вступает в силу с момента её публикации в Приложении.",
+                  "id": 12,
+                  "title": "12. Заключительные положения",
+                  "content": "12.1. CarCat вправе вносить изменения в настоящий Документ. Новая редакция Документа вступает в силу с момента ее опубликования в Приложении.\\n\\n12.2. Настоящий Документ регулируется законодательством Азербайджанской Республики. Споры между сторонами, не урегулированные путем переговоров, рассматриваются в соответствующих судах.\\n\\n12.3. Признание какого-либо положения настоящего Документа недействительным не влияет на действительность остальных положений.\\n\\n12.4. Документ составлен на азербайджанском языке. В случае расхождений между текстом на азербайджанском языке и его переводом на другие языки преимущественную силу имеет текст на азербайджанском языке.\\n\\n12.5. По вопросам, связанным с настоящим Документом, можно обратиться в CarCat по адресу электронной почты info@carcat.app.",
                   "icon": "update_outlined",
                   "highlighted": false
                 }
               ],
               "highlightedBox": {
                 "id": "no_data_selling",
-                "title": "Данные не продаются",
-                "content": "CarCat не продаёт ваши персональные данные третьим лицам и не предоставляет их в аренду в коммерческих целях.",
+                "title": "Передача третьим лицам",
+                "content": "CarCat не передает персональные данные третьим лицам, за исключением случаев, предусмотренных настоящим Документом и законодательством.",
                 "icon": "shield_outlined"
               },
               "contactSection": {
-                "id": 10,
-                "title": "10. Контакты и поддержка",
-                "subtitle": "Если у вас есть вопросы, запросы или жалобы, связанные с настоящей Политикой конфиденциальности или обработкой ваших персональных данных, вы можете связаться с нами следующими способами:",
+                "id": 13,
+                "title": "Контакты",
+                "subtitle": "По вопросам, связанным с настоящим Документом, можно обратиться в CarCat по адресу электронной почты info@carcat.app.",
                 "company": "ООО «CarCat»",
-                "companyAz": "ООО «CarCat»",
-                "email": "nemat.mirzayev@carcat.app",
-                "website": "www.carcat.app",
+                "companyAz": "Общество с ограниченной ответственностью «CarCat»",
+                "email": "info@carcat.app",
+                "website": "https://carcat.app",
                 "location": "Баку, Азербайджан",
                 "phone": "+994 70 575 75 70",
-                "responseNote": "Рекомендуем писать на этот номер через WhatsApp."
+                "responseNote": ""
               },
               "footer": {
-                "consentText": "Регистрируясь в Приложении или пользуясь услугами, вы даёте согласие на обработку ваших персональных данных на условиях, изложенных в настоящей Политике конфиденциальности."
+                "consentText": "Регистрируясь в Приложении, Пользователь подтверждает, что принимает условия настоящего Документа в полном объеме и дает согласие на обработку своих персональных данных в порядке, предусмотренном Документом."
               }
             }
             """;
