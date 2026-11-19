@@ -21,9 +21,18 @@ public final class TechnicalProfileOptions {
     public static List<LabeledOptionResponse> driveTypes(String acceptLanguage) {
         String lang = norm(acceptLanguage);
         List<LabeledOptionResponse> out = new ArrayList<>();
-        out.add(opt(CarDriveType.FWD.name(), label(lang, "Ön çəkiş", "Front-wheel drive", "Передний привод")));
-        out.add(opt(CarDriveType.RWD.name(), label(lang, "Arxa çəkiş", "Rear-wheel drive", "Задний привод")));
-        out.add(opt(CarDriveType.AWD.name(), label(lang, "4x4 / Tam ötürücü", "4x4 / All-wheel drive", "4x4 / Полный привод")));
+        out.add(opt(CarDriveType.FWD.name(),
+                label(lang, "Ön çəkiş", "Front-wheel drive", "Передний привод"),
+                label(lang, "Əlavə yağ xidməti yoxdur", "No additional oil services", "Дополнительных услуг по маслу нет")));
+        out.add(opt(CarDriveType.RWD.name(),
+                label(lang, "Arxa çəkiş", "Rear-wheel drive", "Задний привод"),
+                label(lang, "Diferensial yağı xidməti", "Differential oil service", "Обслуживание масла дифференциала")));
+        out.add(opt(CarDriveType.AWD.name(),
+                label(lang, "4x4 / Tam ötürücü", "4x4 / All-wheel drive", "4x4 / Полный привод"),
+                label(lang,
+                        "Diferensial və paylama qutusu yağı xidmətləri",
+                        "Differential & transfer case oil services",
+                        "Обслуживание масла дифференциала и раздаточной коробки")));
         return out;
     }
 
@@ -52,7 +61,11 @@ public final class TechnicalProfileOptions {
     }
 
     private static LabeledOptionResponse opt(String code, String label) {
-        return LabeledOptionResponse.builder().code(code).label(label).build();
+        return opt(code, label, null);
+    }
+
+    private static LabeledOptionResponse opt(String code, String label, String description) {
+        return LabeledOptionResponse.builder().code(code).label(label).description(description).build();
     }
 
     private static String norm(String acceptLanguage) {
