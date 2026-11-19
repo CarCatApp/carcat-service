@@ -25,6 +25,7 @@ import com.carland.carland_service.repository.PercentageRepository;
 import com.carland.carland_service.service.CarIddaColor;
 import com.carland.carland_service.service.CarMileage;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.technicalprofile.KiaBrand;
 import com.carland.carland_service.service.technicalprofile.KiaPercentageProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -114,6 +115,7 @@ public class IddaCarWriteService {
         car.setCustomer(customer);
         car.setPlateNumber(snapshot.getPlateNumber());
         car.setBrand(snapshot.getBrand());
+        car.setIsKia(KiaBrand.isKia(snapshot.getBrand()));
         car.setModel(snapshot.getModel());
         car.setModelYear(snapshot.getModelYear());
         car.setEngineVolume(snapshot.getEngineCapacity());
@@ -158,6 +160,7 @@ public class IddaCarWriteService {
                 .vin(snapshot.getVin().trim().toUpperCase(Locale.ROOT))
                 .plateNumber(snapshot.getPlateNumber())
                 .brand(snapshot.getBrand())
+                .isKia(KiaBrand.isKia(snapshot.getBrand()))
                 .model(snapshot.getModel())
                 .modelYear(snapshot.getModelYear())
                 .engineType(engineType.getEngineType())

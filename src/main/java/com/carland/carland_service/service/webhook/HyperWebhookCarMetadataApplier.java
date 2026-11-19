@@ -3,6 +3,7 @@ package com.carland.carland_service.service.webhook;
 import com.carland.carland_service.dto.response.hyper.HyperVehicleByVinResponse;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.repository.CarRepository;
+import com.carland.carland_service.service.technicalprofile.KiaBrand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +35,7 @@ public class HyperWebhookCarMetadataApplier {
         }
         if (hyper.getBrand() != null && !hyper.getBrand().isBlank()) {
             car.setBrand(hyper.getBrand());
+            car.setIsKia(KiaBrand.isKia(hyper.getBrand()));
             changed = true;
         }
         if (hyper.getModel() != null && !hyper.getModel().isBlank()) {

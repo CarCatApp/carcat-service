@@ -88,6 +88,15 @@ public class Car {
     private String timingBeltChoice;
 
     /**
+     * tr: Marka metni Kia içeriyorsa true. Add, edit, IDDA ve Hyper markayı yazınca birlikte set edilir.
+     * en: True when the brand text contains Kia. Set together with the brand on add, edit, IDDA and Hyper.
+     */
+    @Column(name = "is_kia", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private Boolean isKia = false;
+
+    /**
      * tr: Müştərinin özü km yazdığı Bakı vaxtı. Staff, Hyper və booking bu sahəni dəyişmir.
      *     carlist JSON-una girmir.
      * en: Baku time when the customer themselves wrote the mileage. Staff, Hyper and booking do not change it.

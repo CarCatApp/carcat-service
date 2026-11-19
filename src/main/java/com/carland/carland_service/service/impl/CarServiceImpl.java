@@ -333,6 +333,7 @@ public class CarServiceImpl implements CarService {
             log.info("blank");
         } else {
             car.setBrand(carRequest.getBrand());
+            car.setIsKia(KiaBrand.isKia(carRequest.getBrand()));
         }
 
         if (carRequest.getModel() == null) {
@@ -502,6 +503,9 @@ public class CarServiceImpl implements CarService {
         for (ServiceEntity serviceEntity : serviceEntities) {
             CustomerServiceRecord record = customerServiceRecordRepository.findByServiceIdAndCar(serviceEntity.getId(), car);
 
+            if (KiaPercentageProfileService.hiddenFromPercentageList(car, serviceEntity.getNameEn())) {
+                continue;
+            }
             Percentage percentage = percentageRepository.findByServiceIdAndCarId(serviceEntity.getId(), car.getCarId());
             if (KiaPercentageProfileService.isDeactivated(percentage)) {
                 continue;
@@ -888,6 +892,12 @@ public class CarServiceImpl implements CarService {
                 percentage.setServiceNameAz(service.getNameAz());
                 percentage.setServiceNameEn(service.getNameEn());
                 percentage.setServiceNameRu(service.getNameRu());
+            }
+            String visibleName = service != null && service.getNameEn() != null
+                    ? service.getNameEn()
+                    : percentage.getServiceNameEn();
+            if (KiaPercentageProfileService.hiddenFromPercentageList(car, visibleName)) {
+                continue;
             }
 
             PercentageStatus execStatus = PercentageStatus.fromStored(percentage.getStatus());
@@ -1380,6 +1390,7 @@ public class CarServiceImpl implements CarService {
                     .vin(vin)
                     .plateNumber(plateNumber)
                     .brand(carRequest.getBrand())
+                    .isKia(KiaBrand.isKia(carRequest.getBrand()))
                     .model(carRequest.getModel())
                     .modelYear(carRequest.getModelYear())
                     .engineType(engineType.getEngineType())
@@ -1528,6 +1539,7 @@ public class CarServiceImpl implements CarService {
         car.setPlateNumber(plateNumber);
         if (carRequest.getBrand() != null && !carRequest.getBrand().isBlank()) {
             car.setBrand(carRequest.getBrand());
+            car.setIsKia(KiaBrand.isKia(carRequest.getBrand()));
         }
         if (carRequest.getModel() != null && !carRequest.getModel().isBlank()) {
             car.setModel(carRequest.getModel());
@@ -2163,7 +2175,7 @@ public class CarServiceImpl implements CarService {
                 .resource(resource)
                 .lockedUntil(car.getAiPhotoGenerateLockedUntil())
                 .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
-                .isKia(KiaBrand.isKia(car.getBrand()))
+                .isKia(Boolean.TRUE.equals(car.getIsKia()))
                 .driveIsSet(car.getDriveType() != null && !car.getDriveType().isBlank())
                 .driveType(blankToNull(car.getDriveType()))
                 .transmissionVariantIsSet(car.getTransmissionVariant() != null
