@@ -65,6 +65,29 @@ public class Car {
     private Long mileage;
 
     /**
+     * tr: Kia çekiş tipi {@code FWD|RWD|AWD}. Null = henüz seçilmedi. Bir kez set; geri alma SQL.
+     * en: Kia drive type {@code FWD|RWD|AWD}. Null = not chosen yet. Set once; revert via SQL.
+     */
+    @Column(name = "drive_type", length = 16)
+    private String driveType;
+
+    /**
+     * tr: Kia transmisyon varyantı {@code AT4|AT6_8|CVT_DCT|MANUAL}. Null = henüz seçilmedi.
+     *     VIN'deki {@code transmissionType} (otomatik/manuel metni) ile karıştırma.
+     * en: Kia transmission variant {@code AT4|AT6_8|CVT_DCT|MANUAL}. Null = not chosen yet.
+     *     Do not confuse with VIN {@code transmissionType} (automatic/manual text).
+     */
+    @Column(name = "transmission_variant", length = 16)
+    private String transmissionVariant;
+
+    /**
+     * tr: {@code BELT|CHAIN}. Null = henüz sorulmadı. Zincir → timing belt percentage DEACTIVATED.
+     * en: {@code BELT|CHAIN}. Null = not asked yet. Chain → timing belt percentage DEACTIVATED.
+     */
+    @Column(name = "timing_belt_choice", length = 16)
+    private String timingBeltChoice;
+
+    /**
      * tr: Müştərinin özü km yazdığı Bakı vaxtı. Staff, Hyper və booking bu sahəni dəyişmir.
      *     carlist JSON-una girmir.
      * en: Baku time when the customer themselves wrote the mileage. Staff, Hyper and booking do not change it.

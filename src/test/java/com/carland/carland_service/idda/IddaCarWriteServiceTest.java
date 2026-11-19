@@ -45,6 +45,7 @@ class IddaCarWriteServiceTest {
     @Mock PercentageRepository percentageRepository;
     @Mock CustomerServiceRecordRepository customerServiceRecordRepository;
     @Mock RedisCacheService redisCacheService;
+    @Mock com.carland.carland_service.service.technicalprofile.KiaPercentageProfileService kiaPercentageProfileService;
 
     IddaCarWriteService service;
 
@@ -59,7 +60,8 @@ class IddaCarWriteServiceTest {
                 maintenanceTemplateRepository,
                 percentageRepository,
                 customerServiceRecordRepository,
-                redisCacheService);
+                redisCacheService,
+                kiaPercentageProfileService);
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(9L, "050", "ACTIVE"))
                 .thenReturn(Customer.builder().userId(9L).phoneNumber("050").cars(new ArrayList<>()).build());
         when(carRepository.save(any())).thenAnswer(invocation -> {

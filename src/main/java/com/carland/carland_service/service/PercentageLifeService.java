@@ -69,6 +69,11 @@ public class PercentageLifeService {
             if (service.getId() == null) {
                 continue;
             }
+            Percentage percentageRow = percentageRepository.findByServiceIdAndCarId(service.getId(), car.getCarId());
+            if (percentageRow != null
+                    && PercentageStatus.fromStored(percentageRow.getStatus()) == PercentageStatus.DEACTIVATED) {
+                continue;
+            }
             out.put(service.getId(), of(car, service,
                     records == null ? List.of() : records,
                     histories == null ? List.of() : histories));

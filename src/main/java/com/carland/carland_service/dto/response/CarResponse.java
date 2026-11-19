@@ -81,6 +81,49 @@ public class CarResponse {
     private Long remainingSeconds;
 
     /**
+     * tr: Marka Kia ise true. Flutter çekiş UI / transmisyon picker için.
+     * en: True when brand is Kia. Flutter uses this for drive UI / transmission picker.
+     */
+    @JsonProperty("isKia")
+    private Boolean isKia;
+
+    /**
+     * tr: Kia çekiş tipi seçildi mi. false iken araç resmi altında çekiş UI.
+     * en: Whether Kia drive type was chosen. When false, show drive UI under the car image.
+     */
+    private Boolean driveIsSet;
+
+    /**
+     * tr: Seçilen çekiş {@code FWD|RWD|AWD}. Set değilse null.
+     * en: Chosen drive {@code FWD|RWD|AWD}. Null when not set.
+     */
+    private String driveType;
+
+    /**
+     * tr: Kia transmisyon varyantı seçildi mi. false iken Transmission fluid tıklanınca picker.
+     * en: Whether Kia transmission variant was chosen. When false, tapping Transmission fluid opens the picker.
+     */
+    private Boolean transmissionVariantIsSet;
+
+    /**
+     * tr: Seçilen varyant {@code AT4|AT6_8|CVT_DCT|MANUAL}. VIN {@code transmissionType} değil.
+     * en: Chosen variant {@code AT4|AT6_8|CVT_DCT|MANUAL}. Not the VIN {@code transmissionType}.
+     */
+    private String transmissionVariant;
+
+    /**
+     * tr: Dişli kayış / zincir sorusu soruldu mu.
+     * en: Whether the timing belt vs chain question was answered.
+     */
+    private Boolean timingBeltChoiceIsSet;
+
+    /**
+     * tr: true = kayış (percentage aktif), false = zincir (percentage yok). Sorulmadıysa null.
+     * en: true = belt (percentage active), false = chain (no percentage). Null when not asked.
+     */
+    private Boolean hasTimingBelt;
+
+    /**
      * tr: JSON plakayı görüntü formatında verir. Kayıt bitişik kalabilir ({@code 00XX000} → {@code 00 XX 000}).
      * en: JSON returns the display plate. The stored value may stay concatenated ({@code 00XX000} → {@code 00 XX 000}).
      */

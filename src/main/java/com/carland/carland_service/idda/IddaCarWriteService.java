@@ -25,6 +25,7 @@ import com.carland.carland_service.repository.PercentageRepository;
 import com.carland.carland_service.service.CarIddaColor;
 import com.carland.carland_service.service.CarMileage;
 import com.carland.carland_service.service.RedisCacheService;
+import com.carland.carland_service.service.technicalprofile.KiaPercentageProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -61,6 +62,7 @@ public class IddaCarWriteService {
     private final PercentageRepository percentageRepository;
     private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final RedisCacheService redisCacheService;
+    private final KiaPercentageProfileService kiaPercentageProfileService;
 
     public IddaAddResult add(CarRequest carRequest, String phoneNumber, String userIdHeader, String acceptLanguage) {
         if (carRequest == null) {
@@ -205,6 +207,7 @@ public class IddaCarWriteService {
                     .car(car)
                     .build());
         }
+        kiaPercentageProfileService.bootstrapAfterAdd(car);
         attach(customer, car);
         return car;
     }

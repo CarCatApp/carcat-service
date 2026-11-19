@@ -30,6 +30,9 @@ import com.carland.carland_service.service.CustomerEnsureService;
 import com.carland.carland_service.service.RedisCacheService;
 import com.carland.carland_service.service.VinBrandCatalog;
 import com.carland.carland_service.service.ServicedBadgeIds;
+import com.carland.carland_service.service.technicalprofile.KiaBrand;
+import com.carland.carland_service.service.technicalprofile.KiaPercentageProfileService;
+import com.carland.carland_service.enums.TimingBeltChoice;
 import com.carland.carland_service.messaging.CustomerEnsurePublisher;
 import com.carland.carland_service.util.PlateNumbers;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +87,7 @@ public class CarServiceImpl implements CarService {
     private final CustomerEnsurePublisher customerEnsurePublisher;
     private final RedisCacheService redisCacheService;
     private final IddaCarWriteService iddaCarWriteService;
+    private final KiaPercentageProfileService kiaPercentageProfileService;
 //    private static final List<String> simulatedVins = List.of(
 //            "JTJGB7CX2R4121777",
 //            "LFMAAA0C6S0640604",
@@ -499,6 +503,9 @@ public class CarServiceImpl implements CarService {
             CustomerServiceRecord record = customerServiceRecordRepository.findByServiceIdAndCar(serviceEntity.getId(), car);
 
             Percentage percentage = percentageRepository.findByServiceIdAndCarId(serviceEntity.getId(), car.getCarId());
+            if (KiaPercentageProfileService.isDeactivated(percentage)) {
+                continue;
+            }
 
             PercentageStatus listStatus = percentage != null
                     ? PercentageStatus.fromStored(percentage.getStatus())
@@ -737,6 +744,9 @@ public class CarServiceImpl implements CarService {
         log.info("[pct-status-debug] editPercentage START | carId={}, percentageId={}, serviceId={}, serviceName={}, statusBefore={}, thread={}",
                 request.getCarId(), percentage.getId(), percentage.getServiceId(), percentage.getServiceName(),
                 percentage.getStatus(), Thread.currentThread().getName());
+        if (KiaPercentageProfileService.isDeactivated(percentage)) {
+            throw new ResourceNotFoundException("Hesablama tapilmadi");
+        }
         if (!percentage.getCarId().equals(car.getCarId())) {
             log.error("Hesablama bu avtomobile aid deyil");
             throw new ResourceNotFoundException("Hesablama bu avtomobile aid deyil");
@@ -862,6 +872,12 @@ public class CarServiceImpl implements CarService {
 
         for (Percentage loaded : percentages) {
             Percentage percentage = percentageRepository.findById(loaded.getId()).orElse(loaded);
+            if (KiaPercentageProfileService.isDeactivated(percentage)) {
+                continue;
+            }
+            if (kiaPercentageProfileService.isInertUntilChoice(car, percentage)) {
+                continue;
+            }
 
             ServiceEntity service = percentage.getServiceId() != null
                     ? servicesById.get(percentage.getServiceId())
@@ -1437,6 +1453,7 @@ public class CarServiceImpl implements CarService {
                 customerServiceRecordRepository.save(customerServiceRecord);
             }
             log.info("[addCar] PASS all service records created | count={}", templateServices.size());
+            kiaPercentageProfileService.bootstrapAfterAdd(newCar);
 
             if (customer.getCars() == null) {
                 customer.setCars(new ArrayList<>());
@@ -2146,7 +2163,28 @@ public class CarServiceImpl implements CarService {
                 .resource(resource)
                 .lockedUntil(car.getAiPhotoGenerateLockedUntil())
                 .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
+                .isKia(KiaBrand.isKia(car.getBrand()))
+                .driveIsSet(car.getDriveType() != null && !car.getDriveType().isBlank())
+                .driveType(blankToNull(car.getDriveType()))
+                .transmissionVariantIsSet(car.getTransmissionVariant() != null
+                        && !car.getTransmissionVariant().isBlank())
+                .transmissionVariant(blankToNull(car.getTransmissionVariant()))
+                .timingBeltChoiceIsSet(car.getTimingBeltChoice() != null
+                        && !car.getTimingBeltChoice().isBlank())
+                .hasTimingBelt(hasTimingBeltFlag(car.getTimingBeltChoice()))
                 .build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static Boolean hasTimingBeltFlag(String timingBeltChoice) {
+        TimingBeltChoice choice = TimingBeltChoice.fromStored(timingBeltChoice);
+        if (choice == null) {
+            return null;
+        }
+        return choice == TimingBeltChoice.BELT;
     }
 
     /**

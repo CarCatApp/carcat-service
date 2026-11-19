@@ -27,7 +27,13 @@ public enum PercentageStatus {
      * HyperService (partner) data overrode the value. Last service date/km stay
      * locked for the customer; next service date/km remain editable.
      */
-    EDITED_BY_PARTNER;
+    EDITED_BY_PARTNER,
+
+    /**
+     * Hidden and inert: not listed, no push, no recalculation side effects.
+     * Used for Kia drive/transmission variants and timing-belt=chain.
+     */
+    DEACTIVATED;
 
     /**
      * Legacy stored value, kept for backward compatibility with old rows.
@@ -59,7 +65,7 @@ public enum PercentageStatus {
      * fields are still rejected in {@code editPercentage}.
      */
     public boolean isEditable() {
-        return true;
+        return this != DEACTIVATED;
     }
 
     /**
@@ -67,5 +73,12 @@ public enum PercentageStatus {
      */
     public boolean isManuallySet() {
         return this == EDITED_BY_CUSTOMER || this == EDITED_BY_PARTNER;
+    }
+
+    /**
+     * Listed in the app and eligible for push / execute when true.
+     */
+    public boolean isActiveForUser() {
+        return this != DEACTIVATED;
     }
 }
