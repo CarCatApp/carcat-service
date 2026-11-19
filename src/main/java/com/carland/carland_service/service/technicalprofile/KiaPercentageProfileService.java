@@ -44,16 +44,10 @@ public class KiaPercentageProfileService {
             return;
         }
         List<Percentage> rows = percentageRepository.findAllByCarId(car.getCarId());
-        boolean kia = KiaBrand.isKia(car.getBrand());
         for (Percentage p : rows) {
             String nameEn = p.getServiceNameEn();
-            if (MaintenanceItemNames.isTransmissionVariant(nameEn)) {
-                deactivate(p);
-            }
-            if (!kia) {
-                continue;
-            }
-            if (MaintenanceItemNames.isTransferCase(nameEn)
+            if (MaintenanceItemNames.isTransmissionVariant(nameEn)
+                    || MaintenanceItemNames.isTransferCase(nameEn)
                     || MaintenanceItemNames.isDifferential(nameEn)) {
                 deactivate(p);
             }
@@ -67,23 +61,39 @@ public class KiaPercentageProfileService {
             return;
         }
         boolean electric = isElectricEngine(car.getEngineType());
+        boolean wantDifferential = showsDifferential(driveType);
+        boolean wantTransfer = showsTransfer(driveType, electric);
         List<Percentage> rows = percentageRepository.findAllByCarId(car.getCarId());
+        Percentage differential = null;
+        Percentage transfer = null;
         for (Percentage p : rows) {
             String nameEn = p.getServiceNameEn();
             if (MaintenanceItemNames.isTransferCase(nameEn)) {
-                if (electric) {
-                    deactivate(p);
-                } else if (driveType == CarDriveType.AWD) {
-                    activateIfDeactivated(p);
+                if (wantTransfer) {
+                    transfer = p;
                 } else {
                     deactivate(p);
                 }
             } else if (MaintenanceItemNames.isDifferential(nameEn)) {
-                if (driveType == CarDriveType.RWD || driveType == CarDriveType.AWD) {
-                    activateIfDeactivated(p);
+                if (wantDifferential) {
+                    differential = p;
                 } else {
                     deactivate(p);
                 }
+            }
+        }
+        if (wantDifferential) {
+            if (differential != null) {
+                activateIfDeactivated(differential);
+            } else {
+                createVariantPercentage(car, MaintenanceItemNames.DIFFERENTIAL_OIL);
+            }
+        }
+        if (wantTransfer) {
+            if (transfer != null) {
+                activateIfDeactivated(transfer);
+            } else {
+                createVariantPercentage(car, MaintenanceItemNames.TRANSFER_CASE_OIL);
             }
         }
         log.info("Kia drive applied | carId={} driveType={} electric={}", car.getCarId(), driveType, electric);
@@ -165,6 +175,13 @@ public class KiaPercentageProfileService {
         if (MaintenanceItemNames.isTransmissionGateway(nameEn)) {
             return selectedVariantName(car) != null;
         }
+        if (MaintenanceItemNames.isDifferential(nameEn)) {
+            return !showsDifferential(CarDriveType.fromStored(car == null ? null : car.getDriveType()));
+        }
+        if (MaintenanceItemNames.isTransferCase(nameEn)) {
+            boolean electric = isElectricEngine(car == null ? null : car.getEngineType());
+            return !showsTransfer(CarDriveType.fromStored(car == null ? null : car.getDriveType()), electric);
+        }
         return false;
     }
 
@@ -229,6 +246,14 @@ public class KiaPercentageProfileService {
         }
         CarTransmissionVariant variant = CarTransmissionVariant.fromStored(car.getTransmissionVariant());
         return variant == null ? null : nameEnForVariant(variant);
+    }
+
+    private static boolean showsDifferential(CarDriveType driveType) {
+        return driveType == CarDriveType.RWD || driveType == CarDriveType.AWD;
+    }
+
+    private static boolean showsTransfer(CarDriveType driveType, boolean electric) {
+        return !electric && driveType == CarDriveType.AWD;
     }
 
     private static String nameEnForVariant(CarTransmissionVariant variant) {
