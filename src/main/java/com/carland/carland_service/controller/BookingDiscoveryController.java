@@ -72,9 +72,9 @@ public class BookingDiscoveryController {
     }
 
     /**
-     * tr: carId zorunlu. Seçili araç kilitliyse partner 1 dışındaki şubeler dönmez.
+     * tr: carId yoksa eski liste. carId varsa seçili araç kilitliyse partner 1 dışındaki şubeler dönmez.
      *     BMW, Kia partner şubelerini görmez.
-     * en: carId is required. A locked car omits branches that are not partner 1.
+     * en: Without carId the list stays as before. With carId, a locked car omits branches that are not partner 1.
      *     BMW does not see Kia partner branches.
      */
     @GetMapping("/api/v1/booking/branches")
@@ -85,7 +85,7 @@ public class BookingDiscoveryController {
             @RequestParam(required = false) Long carId
     ) {
         if (carId == null) {
-            throw MissingFieldException.required("carId");
+            return bookingDiscoveryService.listActive(findService, false, null);
         }
         Long userId = parseUserId(userIdHeader);
         Car car = kiaServicePolicy.requireOwned(carId, userId);
@@ -129,9 +129,6 @@ public class BookingDiscoveryController {
             @PathVariable Long branchId,
             @RequestParam(required = false) Long carId
     ) {
-        if (carId == null) {
-            throw MissingFieldException.required("carId");
-        }
         return bookingCarePackageCatalogService.list(branchId, acceptLanguage);
     }
 
