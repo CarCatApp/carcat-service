@@ -59,6 +59,8 @@ server:
   forward-headers-strategy: framework
 
 carland:
+  booking:
+    kia-partner-id: ${KIA_PARTNER_ID:12}
   internal-token: ${CARLAND_INTERNAL_TOKEN:}
   issuer:
     key: ${CARLAND_ISSUER_KEY:carland}

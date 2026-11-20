@@ -128,6 +128,15 @@ public class BookingDiscoveryService {
      */
     @Transactional(readOnly = true)
     public BookingBranchListResponse listActive(Long findService, boolean hyperOnly) {
+        return listActive(findService, hyperOnly, null);
+    }
+
+    /**
+     * tr: excludePartnerId doluysa o partnerin şubeleri düşer.
+     * en: When excludePartnerId is set, that partner's branches are omitted.
+     */
+    @Transactional(readOnly = true)
+    public BookingBranchListResponse listActive(Long findService, boolean hyperOnly, Long excludePartnerId) {
         List<Branch> loaded = branchRepository.findActiveWithActivePartner();
         if (findService != null) {
             Set<Long> ready = readyBranchIds(findService);
@@ -137,6 +146,10 @@ public class BookingDiscoveryService {
         List<BookingDiscoveryBranchView> branches = new ArrayList<>();
         for (Branch branch : loaded) {
             if (hyperOnly && !hyperPartner(branch)) {
+                continue;
+            }
+            if (excludePartnerId != null && branch.getPartner() != null
+                    && excludePartnerId.equals(branch.getPartner().getId())) {
                 continue;
             }
             branches.add(toBranch(branch, repair.on(branch.getId())));

@@ -36,6 +36,7 @@ public class HyperWebhookCarMetadataApplier {
         if (hyper.getBrand() != null && !hyper.getBrand().isBlank()) {
             car.setBrand(hyper.getBrand());
             car.setIsKia(KiaBrand.isKia(hyper.getBrand()));
+            car.setIsHyundai(KiaBrand.isHyundai(hyper.getBrand()));
             changed = true;
         }
         if (hyper.getModel() != null && !hyper.getModel().isBlank()) {

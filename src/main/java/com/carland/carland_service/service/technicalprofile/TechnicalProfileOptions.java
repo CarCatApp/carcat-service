@@ -22,15 +22,15 @@ public final class TechnicalProfileOptions {
         String lang = norm(acceptLanguage);
         List<LabeledOptionResponse> out = new ArrayList<>();
         out.add(opt(CarDriveType.FWD.name(),
-                label(lang, "Ön çəkiş", "Front-wheel drive", "Передний привод"),
+                label(lang, "Ön ötürücü", "Front-wheel drive", "Передний привод"),
                 label(lang, "Əlavə yağ xidməti yoxdur", "No additional oil services", "Дополнительных услуг по маслу нет")));
         out.add(opt(CarDriveType.RWD.name(),
-                label(lang, "Arxa çəkiş", "Rear-wheel drive", "Задний привод"),
-                label(lang, "Diferensial yağı xidməti", "Differential oil service", "Обслуживание масла дифференциала")));
+                label(lang, "Arxa ötürücü", "Rear-wheel drive", "Задний привод"),
+                label(lang, "Differensial yağı xidməti", "Differential oil service", "Обслуживание масла дифференциала")));
         out.add(opt(CarDriveType.AWD.name(),
-                label(lang, "4x4 / Tam ötürücü", "4x4 / All-wheel drive", "4x4 / Полный привод"),
+                label(lang, "Tam ötürücü", "All-wheel drive", "Полный привод"),
                 label(lang,
-                        "Diferensial və paylama qutusu yağı xidmətləri",
+                        "Differensial və paylama qutusu yağı xidmətləri",
                         "Differential & transfer case oil services",
                         "Обслуживание масла дифференциала и раздаточной коробки")));
         return out;
@@ -40,11 +40,11 @@ public final class TechnicalProfileOptions {
         String lang = norm(acceptLanguage);
         List<LabeledOptionResponse> out = new ArrayList<>();
         out.add(opt(CarTransmissionVariant.AT4.name(),
-                label(lang, "4 pilləli avtomat (AT4)", "4-speed automatic (AT4)", "4-ступенчатый автомат (AT4)")));
+                label(lang, "4 pilləli avtomat", "4-speed automatic", "4-ступенчатый автомат")));
         out.add(opt(CarTransmissionVariant.AT6_8.name(),
                 label(lang, "6/8 pilləli avtomat", "6/8-speed automatic", "6/8-ступенчатый автомат")));
         out.add(opt(CarTransmissionVariant.CVT_DCT.name(),
-                label(lang, "CVT / DCT", "CVT / DCT", "CVT / DCT")));
+                label(lang, "CVT/DCT", "CVT/DCT", "CVT/DCT")));
         out.add(opt(CarTransmissionVariant.MANUAL.name(),
                 label(lang, "Mexaniki", "Manual", "Механика")));
         return out;

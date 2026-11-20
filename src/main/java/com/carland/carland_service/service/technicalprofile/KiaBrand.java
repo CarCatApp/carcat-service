@@ -12,9 +12,21 @@ public final class KiaBrand {
     }
 
     public static boolean isKia(String brand) {
+        return contains(brand, "kia");
+    }
+
+    public static boolean isHyundai(String brand) {
+        return contains(brand, "hyundai");
+    }
+
+    public static boolean isBmw(String brand) {
+        return contains(brand, "bmw");
+    }
+
+    private static boolean contains(String brand, String token) {
         if (brand == null || brand.isBlank()) {
             return false;
         }
-        return brand.toLowerCase(Locale.ROOT).contains("kia");
+        return brand.toLowerCase(Locale.ROOT).contains(token);
     }
 }

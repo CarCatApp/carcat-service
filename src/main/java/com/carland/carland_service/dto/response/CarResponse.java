@@ -88,6 +88,13 @@ public class CarResponse {
     private Boolean isKia;
 
     /**
+     * tr: Marka Hyundai ise true.
+     * en: True when the brand is Hyundai.
+     */
+    @JsonProperty("isHyundai")
+    private Boolean isHyundai;
+
+    /**
      * tr: Kia çekiş tipi seçildi mi. false iken araç resmi altında çekiş UI.
      * en: Whether Kia drive type was chosen. When false, show drive UI under the car image.
      */

@@ -116,6 +116,7 @@ public class IddaCarWriteService {
         car.setPlateNumber(snapshot.getPlateNumber());
         car.setBrand(snapshot.getBrand());
         car.setIsKia(KiaBrand.isKia(snapshot.getBrand()));
+        car.setIsHyundai(KiaBrand.isHyundai(snapshot.getBrand()));
         car.setModel(snapshot.getModel());
         car.setModelYear(snapshot.getModelYear());
         car.setEngineVolume(snapshot.getEngineCapacity());
@@ -161,6 +162,7 @@ public class IddaCarWriteService {
                 .plateNumber(snapshot.getPlateNumber())
                 .brand(snapshot.getBrand())
                 .isKia(KiaBrand.isKia(snapshot.getBrand()))
+                .isHyundai(KiaBrand.isHyundai(snapshot.getBrand()))
                 .model(snapshot.getModel())
                 .modelYear(snapshot.getModelYear())
                 .engineType(engineType.getEngineType())

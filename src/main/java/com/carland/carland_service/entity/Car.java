@@ -97,6 +97,15 @@ public class Car {
     private Boolean isKia = false;
 
     /**
+     * tr: Marka metni Hyundai içeriyorsa true. Add, edit, IDDA ve Hyper markayı yazınca birlikte set edilir.
+     * en: True when the brand text contains Hyundai. Set together with the brand on add, edit, IDDA and Hyper.
+     */
+    @Column(name = "is_hyundai", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private Boolean isHyundai = false;
+
+    /**
      * tr: Müştərinin özü km yazdığı Bakı vaxtı. Staff, Hyper və booking bu sahəni dəyişmir.
      *     carlist JSON-una girmir.
      * en: Baku time when the customer themselves wrote the mileage. Staff, Hyper and booking do not change it.

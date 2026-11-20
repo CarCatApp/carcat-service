@@ -54,6 +54,7 @@ public class BookingIndividualCatalogService {
     private final PercentageLifeService percentageLifeService;
     private final CustomerServiceRecordRepository customerServiceRecordRepository;
     private final ObjectMapper objectMapper;
+    private final KiaServicePolicy kiaServicePolicy;
 
     @Transactional(readOnly = true)
     public BookingIndividualServiceFiltersResponse filters(String acceptLanguage) {
@@ -102,6 +103,9 @@ public class BookingIndividualCatalogService {
                 continue;
             }
             if (!all && !matches(catalog.getFilter(), filter)) {
+                continue;
+            }
+            if (skipForCar(branch, car, catalog)) {
                 continue;
             }
             Integer percentage = null;
@@ -256,6 +260,17 @@ public class BookingIndividualCatalogService {
             }
         }
         return chosen;
+    }
+
+    private boolean skipForCar(Branch branch, Car car, IndividualService catalog) {
+        if (kiaServicePolicy.hideCatalog(branch, car)) {
+            return true;
+        }
+        if (!kiaServicePolicy.limitedCatalog(branch, car)) {
+            return false;
+        }
+        Map<String, String> title = titles(catalog.getTitleJson());
+        return !kiaServicePolicy.allowedWhenLimited(title.get("az"), title.get("en"));
     }
 
     private static String missingNote(String lang) {

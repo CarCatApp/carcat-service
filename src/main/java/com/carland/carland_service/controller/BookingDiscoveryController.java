@@ -24,11 +24,13 @@ import com.carland.carland_service.service.BookingBranchProfileService;
 import com.carland.carland_service.service.BookingCatalogService;
 import com.carland.carland_service.service.BookingDiscoveryService;
 import com.carland.carland_service.service.HyperBranchLockService;
+import com.carland.carland_service.service.KiaServicePolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -53,6 +55,7 @@ public class BookingDiscoveryController {
     private final BookingIndividualCatalogService bookingIndividualCatalogService;
     private final BookingCarePackageCatalogService bookingCarePackageCatalogService;
     private final BookingPackagePriceInfoService bookingPackagePriceInfoService;
+    private final KiaServicePolicy kiaServicePolicy;
 
     @GetMapping("/api/v1/booking/partners")
     public BookingDiscoveryResponse discover(
@@ -69,8 +72,10 @@ public class BookingDiscoveryController {
     }
 
     /**
-     * tr: carId yoksa eski liste. carId varsa seçili araç kilitliyse partner 1 dışındaki şubeler dönmez.
-     * en: Without carId the list stays as before. With carId, a locked car omits branches that are not partner 1.
+     * tr: carId zorunlu. Seçili araç kilitliyse partner 1 dışındaki şubeler dönmez.
+     *     BMW, Kia partner şubelerini görmez.
+     * en: carId is required. A locked car omits branches that are not partner 1.
+     *     BMW does not see Kia partner branches.
      */
     @GetMapping("/api/v1/booking/branches")
     public BookingBranchListResponse branches(
@@ -79,11 +84,13 @@ public class BookingDiscoveryController {
             @RequestParam(required = false) Long findService,
             @RequestParam(required = false) Long carId
     ) {
-        boolean hyperOnly = false;
-        if (carId != null) {
-            hyperOnly = hyperBranchLockService.locked(carId, parseUserId(userIdHeader));
+        if (carId == null) {
+            throw MissingFieldException.required("carId");
         }
-        return bookingDiscoveryService.listActive(findService, hyperOnly);
+        Long userId = parseUserId(userIdHeader);
+        Car car = kiaServicePolicy.requireOwned(carId, userId);
+        boolean hyperOnly = hyperBranchLockService.locked(carId, userId);
+        return bookingDiscoveryService.listActive(findService, hyperOnly, kiaServicePolicy.hiddenPartnerId(car));
     }
 
     @GetMapping("/api/v1/booking/branches/{branchId}")
@@ -119,8 +126,12 @@ public class BookingDiscoveryController {
     public BookingCarePackagesResponse carePackages(
             @RequestHeader("Authorization") String token,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
-            @PathVariable Long branchId
+            @PathVariable Long branchId,
+            @RequestParam(required = false) Long carId
     ) {
+        if (carId == null) {
+            throw MissingFieldException.required("carId");
+        }
         return bookingCarePackageCatalogService.list(branchId, acceptLanguage);
     }
 
@@ -143,7 +154,10 @@ public class BookingDiscoveryController {
             @RequestParam(required = false) Long catalogServiceId,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        Long userId = carId == null ? null : parseUserId(userIdHeader);
+        if (carId == null) {
+            throw MissingFieldException.required("carId");
+        }
+        Long userId = parseUserId(userIdHeader);
         return bookingIndividualCatalogService.list(
                 branchId, acceptLanguage, filter, carId, userId, bookingEntry, catalogServiceId);
     }

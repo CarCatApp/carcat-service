@@ -334,6 +334,7 @@ public class CarServiceImpl implements CarService {
         } else {
             car.setBrand(carRequest.getBrand());
             car.setIsKia(KiaBrand.isKia(carRequest.getBrand()));
+            car.setIsHyundai(KiaBrand.isHyundai(carRequest.getBrand()));
         }
 
         if (carRequest.getModel() == null) {
@@ -1391,6 +1392,7 @@ public class CarServiceImpl implements CarService {
                     .plateNumber(plateNumber)
                     .brand(carRequest.getBrand())
                     .isKia(KiaBrand.isKia(carRequest.getBrand()))
+                    .isHyundai(KiaBrand.isHyundai(carRequest.getBrand()))
                     .model(carRequest.getModel())
                     .modelYear(carRequest.getModelYear())
                     .engineType(engineType.getEngineType())
@@ -1540,6 +1542,7 @@ public class CarServiceImpl implements CarService {
         if (carRequest.getBrand() != null && !carRequest.getBrand().isBlank()) {
             car.setBrand(carRequest.getBrand());
             car.setIsKia(KiaBrand.isKia(carRequest.getBrand()));
+            car.setIsHyundai(KiaBrand.isHyundai(carRequest.getBrand()));
         }
         if (carRequest.getModel() != null && !carRequest.getModel().isBlank()) {
             car.setModel(carRequest.getModel());
@@ -2176,6 +2179,7 @@ public class CarServiceImpl implements CarService {
                 .lockedUntil(car.getAiPhotoGenerateLockedUntil())
                 .remainingSeconds(CarAiPhotoGenerateLock.remainingSeconds(car.getAiPhotoGenerateLockedUntil()))
                 .isKia(Boolean.TRUE.equals(car.getIsKia()))
+                .isHyundai(Boolean.TRUE.equals(car.getIsHyundai()))
                 .driveIsSet(car.getDriveType() != null && !car.getDriveType().isBlank())
                 .driveType(blankToNull(car.getDriveType()))
                 .transmissionVariantIsSet(car.getTransmissionVariant() != null

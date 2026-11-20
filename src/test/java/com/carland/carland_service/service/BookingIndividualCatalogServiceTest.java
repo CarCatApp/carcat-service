@@ -65,7 +65,8 @@ class BookingIndividualCatalogServiceTest {
                 individualServiceSourceRepository,
                 percentageLifeService,
                 customerServiceRecordRepository,
-                new ObjectMapper());
+                new ObjectMapper(),
+                org.mockito.Mockito.mock(KiaServicePolicy.class));
     }
 
     @Test
