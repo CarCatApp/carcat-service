@@ -185,7 +185,8 @@ public class LegalController {
                     "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
                     "email": "info@carcat.app",
                     "website": "https://carcat.app",
-                    "location": "Bakı, Azərbaycan"
+                    "location": "Bakı, Azərbaycan",
+                    "phone": "+994 70 575 75 70"
                   }
                 }
               ],
@@ -194,18 +195,6 @@ public class LegalController {
                 "title": "Üçüncü şəxslərə ötürülmə",
                 "content": "CarCat fərdi məlumatları bu Sənəddə və qanunvericilikdə nəzərdə tutulmuş hallar istisna olmaqla üçüncü şəxslərə ötürmür.",
                 "icon": "shield_outlined"
-              },
-              "contactSection": {
-                "id": 13,
-                "title": "Əlaqə",
-                "subtitle": "Bu Sənədlə bağlı suallar üzrə info@carcat.app elektron poçt ünvanı vasitəsilə CarCat ilə əlaqə saxlamaq olar.",
-                "company": "\\"CarCat\\" MMC",
-                "companyAz": "\\"CarCat\\" Məhdud Məsuliyyətli Cəmiyyəti",
-                "email": "info@carcat.app",
-                "website": "https://carcat.app",
-                "location": "Bakı, Azərbaycan",
-                "phone": "+994 70 575 75 70",
-                "responseNote": ""
               },
               "footer": {
                 "acceptanceText": "İstifadəçi Tətbiqdə qeydiyyatdan keçməklə bu Sənədin şərtlərini tam həcmdə qəbul etdiyini və fərdi məlumatlarının Sənəddə göstərilən qaydada işlənməsinə razılıq verdiyini təsdiq edir.",
@@ -322,7 +311,8 @@ public class LegalController {
                     "companyAz": "\\"CarCat\\" Limited Liability Company",
                     "email": "info@carcat.app",
                     "website": "https://carcat.app",
-                    "location": "Baku, Azerbaijan"
+                    "location": "Baku, Azerbaijan",
+                    "phone": "+994 70 575 75 70"
                   }
                 }
               ],
@@ -331,18 +321,6 @@ public class LegalController {
                 "title": "Transfer to third parties",
                 "content": "CarCat does not transfer personal data to third parties except in the cases provided for in this Document and by law.",
                 "icon": "shield_outlined"
-              },
-              "contactSection": {
-                "id": 13,
-                "title": "Contact",
-                "subtitle": "Questions regarding this Document may be sent to CarCat at info@carcat.app.",
-                "company": "\\"CarCat\\" LLC",
-                "companyAz": "\\"CarCat\\" Limited Liability Company",
-                "email": "info@carcat.app",
-                "website": "https://carcat.app",
-                "location": "Baku, Azerbaijan",
-                "phone": "+994 70 575 75 70",
-                "responseNote": ""
               },
               "footer": {
                 "acceptanceText": "By registering in the Application, the User confirms that they accept the terms of this Document in full and consent to the processing of their personal data as described herein.",
@@ -459,7 +437,8 @@ public class LegalController {
                     "companyAz": "Общество с ограниченной ответственностью «CarCat»",
                     "email": "info@carcat.app",
                     "website": "https://carcat.app",
-                    "location": "Баку, Азербайджан"
+                    "location": "Баку, Азербайджан",
+                    "phone": "+994 70 575 75 70"
                   }
                 }
               ],
@@ -468,18 +447,6 @@ public class LegalController {
                 "title": "Передача третьим лицам",
                 "content": "CarCat не передает персональные данные третьим лицам, за исключением случаев, предусмотренных настоящим Документом и законодательством.",
                 "icon": "shield_outlined"
-              },
-              "contactSection": {
-                "id": 13,
-                "title": "Контакты",
-                "subtitle": "По вопросам, связанным с настоящим Документом, можно обратиться в CarCat по адресу электронной почты info@carcat.app.",
-                "company": "ООО «CarCat»",
-                "companyAz": "Общество с ограниченной ответственностью «CarCat»",
-                "email": "info@carcat.app",
-                "website": "https://carcat.app",
-                "location": "Баку, Азербайджан",
-                "phone": "+994 70 575 75 70",
-                "responseNote": ""
               },
               "footer": {
                 "acceptanceText": "Регистрируясь в Приложении, Пользователь подтверждает, что принимает условия настоящего Документа в полном объеме и дает согласие на обработку своих персональных данных в порядке, предусмотренном Документом.",
