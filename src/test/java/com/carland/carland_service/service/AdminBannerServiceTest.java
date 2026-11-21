@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.response.AdminBannerRow;
 import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -114,6 +115,23 @@ class AdminBannerServiceTest {
         assertTrue(rows.get(0).isShowing());
         assertEquals(Banner.ACTIVE, rows.get(0).getStatus());
         verify(bannerRepository).findVisible(Banner.ACTIVE);
+    }
+
+    @Test
+    void oldHyperListDropsOtherShops() {
+        Banner other = Banner.builder().id(1L).title("Kia").description("Yağ dəyişimi").branchId(20L)
+                .showing(true).status(Banner.ACTIVE).build();
+        Banner hyper = Banner.builder().id(2L).title("Hyper").description("Yağ dəyişimi").branchId(10L)
+                .showing(true).status(Banner.ACTIVE).build();
+        Banner info = Banner.builder().id(3L).title("CarCat").description("Elan").type(Banner.INFO)
+                .showing(true).status(Banner.ACTIVE).build();
+        when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(other, hyper, info));
+        when(branchRepository.findByPartnerIdOrderByIdAsc(PartnerId.HYPER.getId()))
+                .thenReturn(List.of(Branch.builder().id(10L).build()));
+
+        List<BannerItem> rows = service.visibleForOldHyper();
+
+        assertEquals(List.of(2L, 3L), rows.stream().map(BannerItem::getId).toList());
     }
 
     @Test

@@ -1,7 +1,9 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.BannerItem;
+import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.service.AdminBannerService;
+import com.carland.carland_service.service.HyperBranchLockService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +12,9 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -18,8 +22,10 @@ import java.util.List;
 /**
  * tr: Mobil banner listesi. Kimlik doğrulamaz. Boş sonuç {@code 200 []}.
  *     showing=true ve status=active olanların hepsi, sortOrder küçükten büyüğe.
+ *     carId köhnə Hyper loyalty ise başqa servisin branchId'si düşer.
  * en: Mobile banner list. No authentication. Empty result is {@code 200 []}.
  *     Every showing=true and status=active row, sortOrder ascending.
+ *     A carId with old Hyper loyalty drops a branchId that is not Hyper.
  */
 @Tag(name = "banners", description = "Public banner list. No JWT. Empty list is 200 [].")
 @SecurityRequirements
@@ -31,13 +37,20 @@ public class BannerController {
     static final String JSON_UTF8 = "application/json;charset=UTF-8";
 
     private final AdminBannerService adminBannerService;
+    private final HyperBranchLockService hyperBranchLockService;
 
     @Operation(summary = "Visible banners",
             description = "Public. No headers required. Every showing=true and status=active banner, "
-                    + "ordered by sortOrder then newer id. Never 401. Empty list is 200 [].")
+                    + "ordered by sortOrder then newer id. Never 401. Empty list is 200 []. "
+                    + "Optional carId plus X-User-Id: an old Hyper car omits banners whose branchId is not Hyper. "
+                    + "Banners with an empty branchId stay.")
     @GetMapping(produces = JSON_UTF8)
-    public ResponseEntity<List<BannerItem>> list() {
-        List<BannerItem> items = adminBannerService.visible();
+    public ResponseEntity<List<BannerItem>> list(
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestParam(required = false) Long carId) {
+        List<BannerItem> items = hyperOnly(carId, userIdHeader)
+                ? adminBannerService.visibleForOldHyper()
+                : adminBannerService.visible();
         if (items == null) {
             items = List.of();
         }
@@ -45,5 +58,23 @@ public class BannerController {
                 .contentType(MediaType.parseMediaType(JSON_UTF8))
                 .cacheControl(CacheControl.noStore())
                 .body(items);
+    }
+
+    private boolean hyperOnly(Long carId, String userIdHeader) {
+        if (carId == null) {
+            return false;
+        }
+        return hyperBranchLockService.locked(carId, parseUserId(userIdHeader));
+    }
+
+    private static Long parseUserId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw MissingFieldException.required("X-User-Id");
+        }
+        try {
+            return Long.valueOf(raw.trim());
+        } catch (NumberFormatException ex) {
+            throw MissingFieldException.required("X-User-Id");
+        }
     }
 }

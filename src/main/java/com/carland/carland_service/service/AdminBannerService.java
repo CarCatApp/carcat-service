@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.response.AdminBannerRow;
 import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
@@ -17,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * tr: Admin banner. Redis yok. showing=true birden fazla olabilir.
@@ -46,6 +49,27 @@ public class AdminBannerService {
     @Transactional(readOnly = true)
     public List<BannerItem> visible() {
         return bannerRepository.findVisible(Banner.ACTIVE).stream()
+                .map(this::toItem)
+                .toList();
+    }
+
+    /**
+     * tr: Köhnə Hyper müştəri. Başqa servisin branchId'si düşer. branchId boş olan adds/info kalır.
+     * en: Old Hyper customer. A branchId that is not Hyper is dropped. adds/info with an empty branchId stay.
+     */
+    @Transactional(readOnly = true)
+    public List<BannerItem> visibleForOldHyper() {
+        Set<Long> hyperBranchIds = new HashSet<>();
+        List<Branch> hyperBranches = branchRepository.findByPartnerIdOrderByIdAsc(PartnerId.HYPER.getId());
+        if (hyperBranches != null) {
+            for (Branch branch : hyperBranches) {
+                if (branch != null && branch.getId() != null) {
+                    hyperBranchIds.add(branch.getId());
+                }
+            }
+        }
+        return bannerRepository.findVisible(Banner.ACTIVE).stream()
+                .filter(banner -> banner.getBranchId() == null || hyperBranchIds.contains(banner.getBranchId()))
                 .map(this::toItem)
                 .toList();
     }

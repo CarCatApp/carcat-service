@@ -5,6 +5,7 @@ import com.carland.carland_service.security.CustomFilter;
 import com.carland.carland_service.security.JWTConfiguration;
 import com.carland.carland_service.service.AdminBannerService;
 import com.carland.carland_service.service.FeatureFlagService;
+import com.carland.carland_service.service.HyperBranchLockService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -32,6 +34,9 @@ class BannerControllerTest {
 
     @MockitoBean
     private AdminBannerService adminBannerService;
+
+    @MockitoBean
+    private HyperBranchLockService hyperBranchLockService;
 
     @MockitoBean
     private FeatureFlagService featureFlagService;
@@ -67,5 +72,19 @@ class BannerControllerTest {
                 .andExpect(jsonPath("$[0].branchId").value(12))
                 .andExpect(jsonPath("$[0].showing").value(true))
                 .andExpect(jsonPath("$[0].status").value("active"));
+    }
+
+    @Test
+    void oldHyperCarUsesTheHyperBannerList() throws Exception {
+        when(hyperBranchLockService.locked(15L, 9L)).thenReturn(true);
+        when(adminBannerService.visibleForOldHyper()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/banners")
+                        .param("carId", "15")
+                        .header("X-User-Id", "9"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        verify(adminBannerService).visibleForOldHyper();
     }
 }
