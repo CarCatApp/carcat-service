@@ -22,10 +22,11 @@ import java.util.List;
 /**
  * tr: Mobil banner listesi. Kimlik doğrulamaz. Boş sonuç {@code 200 []}.
  *     showing=true ve status=active olanların hepsi, sortOrder küçükten büyüğe.
- *     carId köhnə Hyper loyalty ise başqa servisin branchId'si düşer.
+ *     Carousel'da görünen arabanın carId'si query'de gelir. O araba köhnə Hyper ise
+ *     başqa servisin branchId'si düşer.
  * en: Mobile banner list. No authentication. Empty result is {@code 200 []}.
  *     Every showing=true and status=active row, sortOrder ascending.
- *     A carId with old Hyper loyalty drops a branchId that is not Hyper.
+ *     The carousel sends the visible car as carId. An old Hyper car drops a branchId that is not Hyper.
  */
 @Tag(name = "banners", description = "Public banner list. No JWT. Empty list is 200 [].")
 @SecurityRequirements
@@ -42,8 +43,9 @@ public class BannerController {
     @Operation(summary = "Visible banners",
             description = "Public. No headers required. Every showing=true and status=active banner, "
                     + "ordered by sortOrder then newer id. Never 401. Empty list is 200 []. "
-                    + "Optional carId plus X-User-Id: an old Hyper car omits banners whose branchId is not Hyper. "
-                    + "Banners with an empty branchId stay.")
+                    + "Query carId is the car visible in the carousel, with X-User-Id. "
+                    + "An old Hyper car omits banners whose branchId is not Hyper. "
+                    + "Without carId the full list stays. Banners with an empty branchId stay.")
     @GetMapping(produces = JSON_UTF8)
     public ResponseEntity<List<BannerItem>> list(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
