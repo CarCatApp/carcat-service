@@ -99,10 +99,16 @@ public class KiaPercentageProfileService {
         log.info("Kia drive applied | carId={} driveType={} electric={}", car.getCarId(), driveType, electric);
     }
 
+    /**
+     * tr: Seçilen varyantın percentage satırını açar. Dönüş, o satırın
+     *     {@code customer_service_records.id} değeridir. {@code PUT /update/record} bunu ister.
+     * en: Activates the chosen variant's percentage. Returns that row's
+     *     {@code customer_service_records.id}. {@code PUT /update/record} requires it.
+     */
     @Transactional
-    public void applyTransmissionVariant(Car car, CarTransmissionVariant variant) {
+    public Long applyTransmissionVariant(Car car, CarTransmissionVariant variant) {
         if (car == null || car.getCarId() == null || variant == null) {
-            return;
+            return null;
         }
         String keepNameEn = nameEnForVariant(variant);
         List<Percentage> rows = percentageRepository.findAllByCarId(car.getCarId());
@@ -122,9 +128,11 @@ public class KiaPercentageProfileService {
         if (kept != null) {
             activateIfDeactivated(kept);
         } else {
-            createVariantPercentage(car, keepNameEn);
+            kept = createVariantPercentage(car, keepNameEn);
         }
-        log.info("Kia transmission applied | carId={} variant={}", car.getCarId(), variant);
+        Long recordId = recordIdOf(car, kept);
+        log.info("Kia transmission applied | carId={} variant={} recordId={}", car.getCarId(), variant, recordId);
+        return recordId;
     }
 
     @Transactional
@@ -190,11 +198,11 @@ public class KiaPercentageProfileService {
                 && PercentageStatus.fromStored(percentage.getStatus()) == PercentageStatus.DEACTIVATED;
     }
 
-    private void createVariantPercentage(Car car, String nameEn) {
+    private Percentage createVariantPercentage(Car car, String nameEn) {
         MaintenanceTemplate template = car.getMaintenanceTemplate();
         if (template == null || nameEn == null) {
             log.info("Kia transmission variant has no template | carId={} nameEn={}", car.getCarId(), nameEn);
-            return;
+            return null;
         }
         ServiceEntity source = null;
         List<ServiceEntity> services = serviceEntityRepository.findAllByMaintenanceTemplate(template);
@@ -209,12 +217,13 @@ public class KiaPercentageProfileService {
         }
         if (source == null || source.getId() == null) {
             log.info("Kia transmission variant missing from template | carId={} nameEn={}", car.getCarId(), nameEn);
-            return;
+            return null;
         }
-        if (percentageRepository.findByServiceIdAndCarId(source.getId(), car.getCarId()) != null) {
-            return;
+        Percentage existing = percentageRepository.findByServiceIdAndCarId(source.getId(), car.getCarId());
+        if (existing != null) {
+            return existing;
         }
-        percentageRepository.save(Percentage.builder()
+        Percentage created = percentageRepository.save(Percentage.builder()
                 .intervalKm(source.getIntervalKm())
                 .intervalMonth(source.getIntervalMonth())
                 .serviceName(source.getServiceName())
@@ -238,6 +247,26 @@ public class KiaPercentageProfileService {
                     .car(car)
                     .build());
         }
+        return created;
+    }
+
+    private Long recordIdOf(Car car, Percentage percentage) {
+        if (car == null || percentage == null || percentage.getServiceId() == null) {
+            return null;
+        }
+        CustomerServiceRecord record = customerServiceRecordRepository.findByServiceIdAndCar(percentage.getServiceId(), car);
+        if (record == null) {
+            record = customerServiceRecordRepository.save(CustomerServiceRecord.builder()
+                    .serviceName(percentage.getServiceName())
+                    .serviceNameAz(percentage.getServiceNameAz())
+                    .serviceNameEn(percentage.getServiceNameEn())
+                    .serviceNameRu(percentage.getServiceNameRu())
+                    .actionType(percentage.getActionType())
+                    .serviceId(percentage.getServiceId())
+                    .car(car)
+                    .build());
+        }
+        return record.getId();
     }
 
     private static String selectedVariantName(Car car) {

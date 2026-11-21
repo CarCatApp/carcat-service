@@ -119,6 +119,16 @@ public class CarResponse {
     private String transmissionVariant;
 
     /**
+     * tr: Yalnız {@code POST /transmission-variant}. Aktive edilen yağ satırının
+     *     {@code customer_service_records.id} değeri. Mobil bunu {@code PUT /update/record}
+     *     gövdesindeki {@code recordId} olarak gönderir.
+     * en: Only {@code POST /transmission-variant}. {@code customer_service_records.id} of the
+     *     activated oil row. Mobile sends it as {@code recordId} on {@code PUT /update/record}.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long recordId;
+
+    /**
      * tr: Dişli kayış / zincir sorusu soruldu mu.
      * en: Whether the timing belt vs chain question was answered.
      */

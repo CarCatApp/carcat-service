@@ -122,9 +122,13 @@ public class CarTechnicalProfileService {
         }
         car.setTransmissionVariant(variant.name());
         carRepository.save(car);
-        kiaPercentageProfileService.applyTransmissionVariant(car, variant);
+        Long recordId = kiaPercentageProfileService.applyTransmissionVariant(car, variant);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
-        return reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        CarResponse response = reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        if (response != null) {
+            response.setRecordId(recordId);
+        }
+        return response;
     }
 
     @Transactional
