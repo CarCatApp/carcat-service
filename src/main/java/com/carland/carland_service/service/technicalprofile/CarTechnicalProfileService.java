@@ -125,8 +125,8 @@ public class CarTechnicalProfileService {
         Long recordId = kiaPercentageProfileService.applyTransmissionVariant(car, variant);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
         CarResponse response = reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
-        if (response != null) {
-            response.setRecordId(recordId);
+        if (response != null && recordId != null) {
+            response.includeRecordId(recordId);
         }
         return response;
     }
@@ -154,9 +154,13 @@ public class CarTechnicalProfileService {
         }
         car.setTimingBeltChoice(choice.name());
         carRepository.save(car);
-        kiaPercentageProfileService.applyTimingBeltChoice(car, choice);
+        Long recordId = kiaPercentageProfileService.applyTimingBeltChoice(car, choice);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
-        return reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        CarResponse response = reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        if (response != null) {
+            response.includeRecordId(recordId);
+        }
+        return response;
     }
 
     private CarResponse reloadCar(Car car, String phoneNumber, String userIdHeader, String acceptLanguage) {

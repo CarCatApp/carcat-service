@@ -135,23 +135,44 @@ public class KiaPercentageProfileService {
         return recordId;
     }
 
+    /**
+     * tr: Kayış seçilince dişli qayış kaydının id'si. Zincir seçilince null.
+     *     Kayıt satırı silinmez; percentage kapanır ve listeden düşer.
+     * en: Timing-belt record id when the choice is belt. Null when the choice is chain.
+     *     The record row stays; the percentage is deactivated and leaves the list.
+     */
     @Transactional
-    public void applyTimingBeltChoice(Car car, TimingBeltChoice choice) {
+    public Long applyTimingBeltChoice(Car car, TimingBeltChoice choice) {
         if (car == null || car.getCarId() == null || choice == null) {
-            return;
+            return null;
         }
         List<Percentage> rows = percentageRepository.findAllByCarId(car.getCarId());
-        for (Percentage p : rows) {
-            if (!MaintenanceItemNames.isTimingBelt(p.getServiceNameEn())) {
-                continue;
-            }
-            if (choice == TimingBeltChoice.CHAIN) {
-                deactivate(p);
-            } else {
-                activateIfDeactivated(p);
+        Percentage kept = null;
+        if (rows != null) {
+            for (Percentage p : rows) {
+                if (!MaintenanceItemNames.isTimingBelt(p.getServiceNameEn())) {
+                    continue;
+                }
+                if (choice == TimingBeltChoice.CHAIN) {
+                    deactivate(p);
+                } else {
+                    activateIfDeactivated(p);
+                    if (kept == null) {
+                        kept = p;
+                    }
+                }
             }
         }
-        log.info("Timing belt choice applied | carId={} choice={}", car.getCarId(), choice);
+        if (choice == TimingBeltChoice.CHAIN) {
+            log.info("Timing belt choice applied | carId={} choice={} recordId=null", car.getCarId(), choice);
+            return null;
+        }
+        if (kept == null) {
+            kept = createTimingBeltPercentage(car);
+        }
+        Long recordId = recordIdOf(car, kept);
+        log.info("Timing belt choice applied | carId={} choice={} recordId={}", car.getCarId(), choice, recordId);
+        return recordId;
     }
 
     /**
@@ -248,6 +269,23 @@ public class KiaPercentageProfileService {
                     .build());
         }
         return created;
+    }
+
+    private Percentage createTimingBeltPercentage(Car car) {
+        MaintenanceTemplate template = car.getMaintenanceTemplate();
+        if (template == null) {
+            return null;
+        }
+        List<ServiceEntity> services = serviceEntityRepository.findAllByMaintenanceTemplate(template);
+        if (services == null) {
+            return null;
+        }
+        for (ServiceEntity service : services) {
+            if (service != null && MaintenanceItemNames.isTimingBelt(service.getNameEn())) {
+                return createVariantPercentage(car, service.getNameEn().trim());
+            }
+        }
+        return null;
     }
 
     private Long recordIdOf(Car car, Percentage percentage) {

@@ -3,6 +3,8 @@ package com.carland.carland_service.dto.response;
 
 import com.carland.carland_service.util.PlateNumberSerializer;
 import com.carland.carland_service.util.PlateNumbers;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -13,7 +15,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * tr: CarController araç sorgularında dönen yanıt DTO'su. Aracın kimlik, teknik özellik, kilometre ve toplam masraf bilgilerini içerir.
@@ -119,14 +123,19 @@ public class CarResponse {
     private String transmissionVariant;
 
     /**
-     * tr: Yalnız {@code POST /transmission-variant}. Aktive edilen yağ satırının
-     *     {@code customer_service_records.id} değeri. Mobil bunu {@code PUT /update/record}
-     *     gövdesindeki {@code recordId} olarak gönderir.
-     * en: Only {@code POST /transmission-variant}. {@code customer_service_records.id} of the
-     *     activated oil row. Mobile sends it as {@code recordId} on {@code PUT /update/record}.
+     * tr: {@code POST /transmission-variant} ve {@code POST /timing-belt-choice}.
+     *     Aktive edilen satırın {@code customer_service_records.id} değeri.
+     *     Zincir seçilince {@code null}. Mobil bunu {@code PUT /update/record} gövdesindeki {@code recordId} olarak gönderir.
+     * en: {@code POST /transmission-variant} and {@code POST /timing-belt-choice}.
+     *     {@code customer_service_records.id} of the activated row.
+     *     {@code null} when the choice is chain. Mobile sends it as {@code recordId} on {@code PUT /update/record}.
      */
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonIgnore
     private Long recordId;
+
+    /** tr: true iken JSON {@code recordId} yazar; değer null olsa da. / en: When true, JSON writes {@code recordId} even when the value is null. */
+    @JsonIgnore
+    private boolean recordIdIncluded;
 
     /**
      * tr: Dişli kayış / zincir sorusu soruldu mu.
@@ -150,6 +159,25 @@ public class CarResponse {
 
     public void setPlateNumber(String plateNumber) {
         this.plateNumber = PlateNumbers.format(plateNumber);
+    }
+
+    /**
+     * tr: Bu cevapta {@code recordId} alanı görünsün. Zincir için {@code null} geçilir.
+     * en: Include {@code recordId} on this response. Pass {@code null} for chain.
+     */
+    public void includeRecordId(Long recordId) {
+        this.recordId = recordId;
+        this.recordIdIncluded = true;
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> recordIdMember() {
+        if (!recordIdIncluded) {
+            return Map.of();
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("recordId", recordId);
+        return body;
     }
 
     /**
