@@ -93,7 +93,11 @@ public class CarTechnicalProfileService {
         carRepository.save(car);
         kiaPercentageProfileService.applyDriveType(car, driveType);
         redisCacheService.evictCarListAfterCommit(userIdHeader);
-        return reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        CarResponse response = reloadCar(car, phoneNumber, userIdHeader, acceptLanguage);
+        if (response != null) {
+            response.setInfo(TechnicalProfileOptions.driveTypeSelectedInfo(driveType, acceptLanguage));
+        }
+        return response;
     }
 
     @Transactional

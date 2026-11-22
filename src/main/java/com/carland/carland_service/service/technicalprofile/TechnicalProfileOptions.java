@@ -36,6 +36,31 @@ public final class TechnicalProfileOptions {
         return out;
     }
 
+    /**
+     * tr: Çekiş seçildikten sonra POST cevabındaki bilgi cümlesi.
+     * en: Info sentence on the POST response after a drive type is chosen.
+     */
+    public static String driveTypeSelectedInfo(CarDriveType driveType, String acceptLanguage) {
+        if (driveType == null) {
+            return null;
+        }
+        String lang = norm(acceptLanguage);
+        return switch (driveType) {
+            case FWD -> label(lang,
+                    "Ön ötürücü seçildi.",
+                    "Front-wheel drive selected.",
+                    "Выбран передний привод.");
+            case RWD -> label(lang,
+                    "Arxa ötürücü seçildi. Differensial yağı xidməti əlavə edildi.",
+                    "Rear-wheel drive selected. Differential oil service was added.",
+                    "Выбран задний привод. Добавлена услуга масла дифференциала.");
+            case AWD -> label(lang,
+                    "Tam ötürücü seçildi. Differensial və Paylayıcı qutusu yağı xidmətləri əlavə edildi.",
+                    "All-wheel drive selected. Differential and transfer case oil services were added.",
+                    "Выбран полный привод. Добавлены услуги масла дифференциала и раздаточной коробки.");
+        };
+    }
+
     public static List<LabeledOptionResponse> transmissionVariants(String acceptLanguage) {
         String lang = norm(acceptLanguage);
         List<LabeledOptionResponse> out = new ArrayList<>();

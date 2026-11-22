@@ -111,6 +111,13 @@ public class CarResponse {
     private String driveType;
 
     /**
+     * tr: Yalnız {@code POST /drive-type}. Seçilen çekişin bilgi cümlesi. Sonraki GET bunu taşımaz.
+     * en: Only {@code POST /drive-type}. Info sentence for the chosen drive. Later GETs do not carry it.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String info;
+
+    /**
      * tr: Kia transmisyon varyantı seçildi mi. false iken Transmission fluid tıklanınca picker.
      * en: Whether Kia transmission variant was chosen. When false, tapping Transmission fluid opens the picker.
      */
