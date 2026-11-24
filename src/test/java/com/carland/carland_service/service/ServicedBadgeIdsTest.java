@@ -28,6 +28,20 @@ class ServicedBadgeIdsTest {
     }
 
     @Test
+    void dealerNamesPickHyperBranchesUntilHyperSendsBranchId() {
+        Visit xaqani = Visit.builder().serviceCenterId(PartnerId.HYPER.getId()).dealer("Xəqani Express").build();
+        Visit babek = Visit.builder().serviceCenterId(PartnerId.HYPER.getId()).dealer("Babək Ekspress").build();
+        Visit junk = Visit.builder().serviceCenterId(PartnerId.HYPER.getId()).dealer("Babək dbdbbddb").build();
+        Visit blank = Visit.builder().serviceCenterId(PartnerId.HYPER.getId()).dealer("  ").build();
+
+        assertEquals(ServicedBadgeIds.HYPER_XAQANI_BRANCH_ID, ServicedBadgeIds.resolvedBranchId(xaqani));
+        assertEquals(ServicedBadgeIds.HYPER_TEMPORARY_BRANCH_ID, ServicedBadgeIds.resolvedBranchId(babek));
+        assertEquals(ServicedBadgeIds.HYPER_TEMPORARY_BRANCH_ID, ServicedBadgeIds.resolvedBranchId(junk));
+        assertEquals(ServicedBadgeIds.HYPER_TEMPORARY_BRANCH_ID, ServicedBadgeIds.resolvedBranchId(blank));
+        assertEquals(null, xaqani.getBranchId());
+    }
+
+    @Test
     void applyIfChangedWritesBranchIdsOnce() {
         Car car = Car.builder().servicedPartnerIds(List.of("3")).build();
         Visit visit = Visit.builder().branchId(7L).serviceCenterId(3L).build();

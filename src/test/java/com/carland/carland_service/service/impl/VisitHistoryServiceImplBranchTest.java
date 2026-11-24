@@ -131,6 +131,38 @@ class VisitHistoryServiceImplBranchTest {
     }
 
     @Test
+    void hyperDealerNamesResolveToBabekAndXaqaniWithoutStoringBranchId() {
+        Car car = Car.builder().carId(5L).vin("KNAKU815BEA419818").build();
+        Branch babek = Branch.builder().id(10L).name("Hyper Servis Babək").address("Babək pr. 43A").build();
+        Branch xaqani = Branch.builder().id(13L).name("Hyper Servis 28 May").address("Xaqani89").build();
+        Visit babekVisit = Visit.builder().id(1L).car(car).hyperRecordId(14367L).serviceCenterId(1L)
+                .dealer("Babək Ekspress").build();
+        Visit xaqaniVisit = Visit.builder().id(2L).car(car).hyperRecordId(25830L).serviceCenterId(1L)
+                .dealer("Xəqani Express").build();
+
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car))
+                .thenReturn(List.of(xaqaniVisit, babekVisit));
+        when(partnerLookupService.resolvePartnerId(any(), any())).thenAnswer(inv -> {
+            Long stored = inv.getArgument(0);
+            PartnerId fallback = inv.getArgument(1);
+            return stored != null ? stored : fallback.getId();
+        });
+        when(partnerLookupService.loadByIds(any())).thenReturn(Map.of());
+        when(branchRepository.findById(10L)).thenReturn(Optional.of(babek));
+        when(branchRepository.findAllById(any())).thenReturn(List.of(babek, xaqani));
+
+        List<VisitHistoryItemResponse> items = service.listStoredByCar(car, "az");
+
+        assertEquals(13L, items.get(0).getBranchId());
+        assertEquals("Hyper Servis 28 May", items.get(0).getBranchName());
+        assertEquals("Xaqani89", items.get(0).getBranchAddress());
+        assertEquals(10L, items.get(1).getBranchId());
+        assertEquals("Hyper Servis Babək", items.get(1).getBranchName());
+        assertNull(xaqaniVisit.getBranchId());
+        assertNull(babekVisit.getBranchId());
+    }
+
+    @Test
     void hyperVisitedFlagQueriesPartner1AndBranch10() {
         when(visitRepository.findCarIdsWithPartnerBranchOrNullBranch(List.of(3L, 4L), 1L, 10L))
                 .thenReturn(Set.of(3L));

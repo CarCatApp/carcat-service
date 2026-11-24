@@ -38,9 +38,9 @@ public class StaffCarHistoryService {
 
     /**
      * tr: Staff'ın yetkili olduğu şubede, aracın o şubeye ait ziyaretlerini döner.
-     *     Partner 1 ve boş branch_id, şube 10 sayılır.
+     *     Hyper ve boş branch_id: Xəqani Express şube 13, Babək Ekspress ve diğer Hyper yazısı şube 10.
      * en: Returns the car's visits that belong to a branch the staff may open.
-     *     Partner 1 with an empty branch_id counts as branch 10.
+     *     Hyper with an empty branch_id: Xəqani Express is branch 13, Babək Ekspress and other Hyper text stay branch 10.
      */
     @Transactional(readOnly = true)
     public StaffCarHistoryResponse history(

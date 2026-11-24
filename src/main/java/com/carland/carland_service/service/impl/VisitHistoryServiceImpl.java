@@ -83,16 +83,18 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     /**
      * GEÇİCİ / TEMPORARY — yalnız Hyper GET/webhook satırı.
      * Hyper şube id'si göndermez; o satırda {@code visits.branch_id} boş kalır.
-     * {@code serviceCenterId == 1} ve {@code branch_id} boşsa cevapta {@code branches.id = 10}
-     * (Hyper Service, Babək pr. 43A) yazılır. Detailed panel ziyareti bunu kullanmaz:
+     * Dealer "Xəqani Express" cevapta şube 13, "Babək Ekspress" şube 10 olur.
+     * Diğer Hyper yazısı ve boş dealer hâlâ şube 10'dur.
+     * Detailed panel ziyareti bunu kullanmaz:
      * tamamlamada yazılan {@code branch_id} cevapta ad, lat ve lng ile döner.
      * Hyper'a ikinci şube gelince veya partner 1 refactor edilince bu sabiti ve
      * {@link #hyperBranchFor(Long, Branch)} bağını sil.
      * history:v2 TTL geçici olarak 2 dakika ({@code RedisCacheService#HISTORY_V2_TEMPORARY_TTL}).
      * TEMPORARY — Hyper GET/webhook rows only.
      * Hyper sends no branch id, so those rows keep {@code visits.branch_id} empty.
-     * When {@code serviceCenterId == 1} and {@code branch_id} is empty the response uses
-     * {@code branches.id = 10}. A detailed panel visit does not: the {@code branch_id}
+     * Dealer "Xəqani Express" is branch 13 and "Babək Ekspress" is branch 10.
+     * Any other Hyper text and a blank dealer stay on branch 10.
+     * A detailed panel visit does not: the {@code branch_id}
      * stored at completion is returned with name, lat and lng.
      * Remove this constant and {@link #hyperBranchFor(Long, Branch)} when Hyper gets a
      * second branch or partner 1 is refactored.
@@ -170,8 +172,9 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         Map<Long, Partner> partnerById = loadPartnersForVisits(visits);
         Branch hyperBranch = loadHyperTemporaryBranch(visits);
         Map<Long, Branch> branchById = loadStoredBranches(visits);
+        Map<Long, Branch> dealerBranches = loadDealerBranches(visits);
         return visits.stream()
-                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById))
+                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById, dealerBranches))
                 .toList();
     }
 
@@ -264,8 +267,9 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         Map<Long, Partner> partnerById = loadPartnersForVisits(visits);
         Branch hyperBranch = loadHyperTemporaryBranch(visits);
         Map<Long, Branch> branchById = loadStoredBranches(visits);
+        Map<Long, Branch> dealerBranches = loadDealerBranches(visits);
         List<VisitHistoryItemResponse> items = visits.stream()
-                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById))
+                .map(visit -> mapVisit(visit, partnerById, acceptLanguage, hyperBranch, branchById, dealerBranches))
                 .toList();
 
         return VisitHistoryResponse.builder()
@@ -312,14 +316,47 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
     }
 
     /**
-     * Panel ziyaretindeki şubeyi döner. {@code branch_id} boşsa Hyper geçici şubesine düşer.
-     * Returns the branch stored on a panel visit. An empty {@code branch_id} falls back to the temporary Hyper branch.
+     * Panel ziyaretindeki şubeyi döner. {@code branch_id} boşsa dealer eşlemesi, o da yoksa Hyper geçici şubesi.
+     * Returns the branch stored on a panel visit. An empty {@code branch_id} uses the dealer map, then the temporary Hyper branch.
      */
-    private Branch shownBranch(Visit visit, Long partnerId, Branch hyperTemporaryBranch, Map<Long, Branch> branchById) {
+    private Branch shownBranch(Visit visit, Long partnerId, Branch hyperTemporaryBranch,
+                               Map<Long, Branch> branchById, Map<Long, Branch> dealerBranches) {
         if (visit.getBranchId() != null) {
             return branchById.get(visit.getBranchId());
         }
+        Long dealerBranchId = ServicedBadgeIds.temporaryDealerBranchId(visit.getDealer());
+        if (dealerBranchId != null) {
+            Branch mapped = dealerBranches.get(dealerBranchId);
+            if (mapped != null) {
+                return mapped;
+            }
+        }
         return hyperBranchFor(partnerId, hyperTemporaryBranch);
+    }
+
+    /**
+     * tr: GEÇİCİ dealer adının şubesini yükler. Eşleşme yoksa sorgu yok.
+     * en: Loads the branch for a TEMPORARY dealer name. No query when nothing matches.
+     */
+    private Map<Long, Branch> loadDealerBranches(List<Visit> visits) {
+        Set<Long> ids = new HashSet<>();
+        for (Visit visit : visits) {
+            if (visit.getBranchId() != null) {
+                continue;
+            }
+            Long id = ServicedBadgeIds.temporaryDealerBranchId(visit.getDealer());
+            if (id != null) {
+                ids.add(id);
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Branch> byId = new HashMap<>();
+        for (Branch branch : branchRepository.findAllById(ids)) {
+            byId.put(branch.getId(), branch);
+        }
+        return byId;
     }
 
     /**
@@ -376,12 +413,13 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
      * en: Maps a single Visit entity into the response model enriched with partner and translation info.
      */
     private VisitHistoryItemResponse mapVisit(Visit visit, Map<Long, Partner> partnerById, String acceptLanguage,
-                                               Branch hyperTemporaryBranch, Map<Long, Branch> branchById) {
+                                               Branch hyperTemporaryBranch, Map<Long, Branch> branchById,
+                                               Map<Long, Branch> dealerBranches) {
         Long partnerId = partnerLookupService.resolvePartnerId(visit.getServiceCenterId(), HYPER_PARTNER);
         PartnerId enumPartner = PartnerId.fromId(partnerId).orElse(HYPER_PARTNER);
         String partnerName = partnerLookupService.resolvePartnerName(
                 visit.getServiceCenterId(), visit.getServiceCenterName(), partnerById, enumPartner);
-        Branch shownBranch = shownBranch(visit, partnerId, hyperTemporaryBranch, branchById);
+        Branch shownBranch = shownBranch(visit, partnerId, hyperTemporaryBranch, branchById, dealerBranches);
 
         List<String> serviceGroups = visit.getServiceGroups() == null
                 ? Collections.emptyList()
