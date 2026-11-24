@@ -11,6 +11,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
@@ -27,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -322,6 +328,145 @@ class AdminIddaBalanceControllerTest {
     }
 
     @Test
+    void pageOffersAnExcelDownload() throws Exception {
+        mockMvc.perform(get("/admin/idda-balance").param("tab", "expense").accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("formaction=\"/admin/idda-balance/export\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Excel")));
+
+        verifyNoInteractions(digitalFinanceClient);
+    }
+
+    @Test
+    void expenseExcelContainsEveryTableFieldAndExtraJsonFields() throws Exception {
+        when(digitalFinanceClient.exchange(eq("POST"), eq("/api/v1/Info/Expenses"), any(byte[].class), eq("req-x"), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", expensePage(2, "77BU669", "alpha")),
+                        new DigitalFinanceClient.Upstream(200, "application/json", expensePage(2, "10AA010", "beta")));
+
+        byte[] file = mockMvc.perform(post("/admin/idda-balance/export")
+                        .param("tab", "expense")
+                        .param("RequestIdentifier", "req-x")
+                        .param("StartDate", "2026-10-01")
+                        .param("EndDate", "2026-10-03")
+                        .param("Offset", "50")
+                        .param("Limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("idda-expense-")))
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString(".xlsx")))
+                .andReturn()
+                .getResponse()
+                .getContentAsByteArray();
+
+        org.mockito.ArgumentCaptor<byte[]> body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+        verify(digitalFinanceClient, org.mockito.Mockito.times(2))
+                .exchange(eq("POST"), eq("/api/v1/Info/Expenses"), body.capture(), eq("req-x"), isNull());
+        assertEquals(
+                "{\"StartDate\":\"2026-10-01 00:00:00\",\"EndDate\":\"2026-10-03 23:59:59\",\"Offset\":0,\"Limit\":100}",
+                new String(body.getAllValues().get(0), StandardCharsets.UTF_8));
+        assertTrue(new String(body.getAllValues().get(1), StandardCharsets.UTF_8).contains("\"Offset\":1"));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
+            Sheet sheet = workbook.getSheet("Expense");
+            Row header = sheet.getRow(0);
+            assertEquals("Value", header.getCell(0).getStringCellValue());
+            assertEquals("Date", header.getCell(1).getStringCellValue());
+            assertEquals("Service", header.getCell(2).getStringCellValue());
+            assertEquals("Amount (qəpik)", header.getCell(3).getStringCellValue());
+            assertEquals("AZN", header.getCell(4).getStringCellValue());
+            assertEquals("RequestIdentifier", header.getCell(5).getStringCellValue());
+            assertEquals("IpAddress", header.getCell(6).getStringCellValue());
+            assertEquals("Note", header.getCell(7).getStringCellValue());
+            assertEquals("77BU669", sheet.getRow(1).getCell(0).getStringCellValue());
+            assertEquals("2026-10-03 14:00:00", sheet.getRow(1).getCell(1).getStringCellValue());
+            assertEquals(250d, sheet.getRow(1).getCell(3).getNumericCellValue(), 0.001);
+            assertEquals(2.50d, sheet.getRow(1).getCell(4).getNumericCellValue(), 0.001);
+            assertEquals("alpha", sheet.getRow(1).getCell(7).getStringCellValue());
+            assertEquals("10AA010", sheet.getRow(2).getCell(0).getStringCellValue());
+            assertEquals("beta", sheet.getRow(2).getCell(7).getStringCellValue());
+        }
+    }
+
+    @Test
+    void paymentExcelKeepsAmountAsReturned() throws Exception {
+        byte[] json = ("{\"Status\":{\"Name\":\"Successful\",\"Code\":0,\"Message\":\"\"},"
+                + "\"Response\":{\"Count\":1,\"Payments\":[{\"Date\":\"2026-10-02 09:15:00\",\"Amount\":4321}]}}")
+                .getBytes(StandardCharsets.UTF_8);
+        when(digitalFinanceClient.exchange(eq("POST"), eq("/api/v1/Info/Payments"), any(byte[].class), eq("pay-x"), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", json));
+
+        byte[] file = mockMvc.perform(post("/admin/idda-balance/export")
+                        .param("tab", "payment")
+                        .param("RequestIdentifier", "pay-x")
+                        .param("EndDate", "2026-10-21"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("idda-payment-")))
+                .andReturn()
+                .getResponse()
+                .getContentAsByteArray();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
+            Sheet sheet = workbook.getSheet("Payment");
+            assertEquals("Date", sheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("Amount", sheet.getRow(0).getCell(1).getStringCellValue());
+            assertEquals("2026-10-02 09:15:00", sheet.getRow(1).getCell(0).getStringCellValue());
+            assertEquals(4321d, sheet.getRow(1).getCell(1).getNumericCellValue(), 0.001);
+            assertEquals(2, sheet.getRow(0).getLastCellNum());
+        }
+    }
+
+    @Test
+    void balanceExcelContainsBalanceFields() throws Exception {
+        byte[] json = ("{\"RequestIdentifier\":\"bal-1\",\"Status\":{\"Name\":\"Successful\",\"Code\":0,\"Message\":\"ok\"},"
+                + "\"Response\":{\"Balance\":15000}}").getBytes(StandardCharsets.UTF_8);
+        when(digitalFinanceClient.exchange(eq("GET"), eq("/api/v1/Info/Balance"), isNull(), eq("bal-1"), isNull()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", json));
+
+        byte[] file = mockMvc.perform(post("/admin/idda-balance/export")
+                        .param("tab", "balance")
+                        .param("RequestIdentifier", "bal-1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("idda-balance-")))
+                .andReturn()
+                .getResponse()
+                .getContentAsByteArray();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
+            Sheet sheet = workbook.getSheet("Balance");
+            assertEquals("Balance (qəpik)", sheet.getRow(0).getCell(1).getStringCellValue());
+            assertEquals("AZN", sheet.getRow(0).getCell(2).getStringCellValue());
+            assertEquals("bal-1", sheet.getRow(1).getCell(0).getStringCellValue());
+            assertEquals(15000d, sheet.getRow(1).getCell(1).getNumericCellValue(), 0.001);
+            assertEquals(150d, sheet.getRow(1).getCell(2).getNumericCellValue(), 0.001);
+            assertEquals("Successful", sheet.getRow(1).getCell(4).getStringCellValue());
+        }
+    }
+
+    @Test
+    void exportGuestIsSentToLogin() throws Exception {
+        when(adminAccessService.isPanelAdmin(any())).thenReturn(false);
+
+        mockMvc.perform(post("/admin/idda-balance/export").param("tab", "expense"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("https://digital-innovation.agency/admin/"));
+
+        verifyNoInteractions(digitalFinanceClient);
+    }
+
+    @Test
+    void exportWithEndBeforeStartDoesNotCallUpstream() throws Exception {
+        mockMvc.perform(post("/admin/idda-balance/export")
+                        .param("tab", "expense")
+                        .param("StartDate", "2026-10-02")
+                        .param("EndDate", "2026-10-01")
+                        .accept("text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Bitiş, başlangıçtan önce olamaz.")));
+
+        verifyNoInteractions(digitalFinanceClient);
+    }
+
+    @Test
     void nonJsonBodyIsShownRaw() throws Exception {
         when(digitalFinanceClient.exchange(eq("GET"), eq("/api/v1/Info/Balance"), isNull(), anyString(), isNull()))
                 .thenReturn(new DigitalFinanceClient.Upstream(502, "text/plain", "not-json".getBytes(StandardCharsets.UTF_8)));
@@ -335,6 +480,14 @@ class AdminIddaBalanceControllerTest {
     private static byte[] counted(long count) {
         return ("{\"Status\":{\"Name\":\"Successful\",\"Code\":0,\"Message\":\"\"},\"Response\":{\"Count\":"
                 + count + ",\"Payments\":[]}}").getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] expensePage(long count, String value, String note) {
+        return ("{\"RequestIdentifier\":\"req-x\",\"Status\":{\"Name\":\"Successful\",\"Code\":0,\"Message\":\"\"},"
+                + "\"Response\":{\"Count\":" + count + ",\"Expenses\":[{\"Value\":\"" + value
+                + "\",\"Date\":\"2026-10-03 14:00:00\",\"Service\":\"DIN.Vehicle\",\"Amount\":250,"
+                + "\"RequestIdentifier\":\"car-1\",\"IpAddress\":\"10.1.1.1\",\"Note\":\"" + note + "\"}]}}")
+                .getBytes(StandardCharsets.UTF_8);
     }
 
     private static byte[] expenseJson() {

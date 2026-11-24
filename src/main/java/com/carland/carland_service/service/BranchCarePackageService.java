@@ -205,6 +205,7 @@ public class BranchCarePackageService {
                     .offeredServiceId(service.getId())
                     .title(json.read(service.getTitleJson()))
                     .enabled(Boolean.TRUE.equals(item.getEnabled()))
+                    .periodic(Boolean.TRUE.equals(service.getPeriodic()))
                     .behaviorId(behavior == null ? null : behavior.getId())
                     .behaviorCode(behavior == null ? null : behavior.getCode())
                     .behaviorTitle(behavior == null ? Map.of() : json.read(behavior.getTitleJson()))

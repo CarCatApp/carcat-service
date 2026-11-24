@@ -25,6 +25,13 @@ public class StaffCompleteRequest {
     BigDecimal discountPercent;
     /** One operator note for the whole visit. */
     String notes;
+    /**
+     * tr: true olanda formadakı paket booking və ziyarətin paketidir. carePackageId null paketi silir.
+     * en: When true, the form's package is the booking and visit package. A null carePackageId removes it.
+     */
+    Boolean syncPackage;
+    /** Branch care package chosen on the form. Null removes the package when syncPackage is true. */
+    Long carePackageId;
     List<StaffCompleteLine> lines;
 
     @Data
@@ -44,10 +51,12 @@ public class StaffCompleteRequest {
         Integer nextMileage;
         /** brand_models id. */
         Long brandModelId;
-        /** Free-text / overridden product name. */
+        /** Free-text product name. Required on non-package lines. Package lines may still use the catalog. */
         String productName;
         BigDecimal productQty;
-        /** Product total before product discount; null → brand unit price × qty. Ignored for package lines. */
+        /** ədəd, litr, dəst or kq. Required on non-package lines. */
+        String productUnit;
+        /** Product total before product discount (the amount the operator typed, not a unit price). Ignored for package lines. */
         BigDecimal productAmount;
         /** Product-only discount % (0–100). */
         BigDecimal productDiscountPercent;

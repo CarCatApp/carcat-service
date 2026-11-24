@@ -20,8 +20,10 @@ public class StaffCompletionDraftView {
     String ref;
     /** detailed | webhook. Webhook branches complete without the form. */
     String completionMode;
-    /** Car mileage on file; the operator overwrites it with the mileage on arrival. */
+    /** Car mileage on file. The arrival field starts empty; the operator types it. */
     Long carMileage;
+    /** Package currently stored on the booking. Null when the booking has none. */
+    Long carePackageId;
     String packageName;
     BigDecimal packagePrice;
     /** Package lines with periodic=false: written as info lines, no card. */
@@ -32,6 +34,8 @@ public class StaffCompletionDraftView {
     List<StaffCompletionCardView> cards;
     /** "Yeni xidmət → Dövri": individual services this branch has enabled. */
     List<StaffCompletionCardView> individualCatalog;
+    /** "Yeni xidmət → Paket": active packages of this branch. One package at a time. */
+    List<StaffCompletionPackageOption> packageCatalog;
     /** Brand/models by heading (Settings → Xidmətlərə uyğun marka və model), with unit prices. */
     List<BookingBrandModelGroupView> goods;
 }

@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.request.StaffCompleteRequest;
 import com.carland.carland_service.dto.request.StaffCompleteRequest.StaffCompleteLine;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchCarePackageItem;
 import com.carland.carland_service.entity.BrandModel;
 import com.carland.carland_service.entity.Car;
@@ -14,10 +15,13 @@ import com.carland.carland_service.entity.Visit;
 import com.carland.carland_service.entity.VisitServiceLine;
 import com.carland.carland_service.exceptions.ConflictException;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
+import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.BranchCarePackageItemRepository;
+import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
 import com.carland.carland_service.repository.BrandModelServiceRepository;
@@ -51,6 +55,8 @@ import static org.mockito.Mockito.when;
 class BookingCompletionServiceTest {
 
     @Mock BranchCarePackageItemRepository carePackageItemRepository;
+    @Mock BranchCarePackageRepository carePackageRepository;
+    @Mock BookingRepository bookingRepository;
     @Mock BookingIndividualLineRepository individualLineRepository;
     @Mock BookingSelectedServiceRepository selectedServiceRepository;
     @Mock BookingInspectionRepository inspectionRepository;
@@ -80,7 +86,8 @@ class BookingCompletionServiceTest {
                 selectedServiceRepository, inspectionRepository, branchIndividualServiceRepository,
                 individualServiceRepository, offeredServiceRepository, brandModelRepository,
                 brandModelServiceRepository, carRepository, carByVin, visitRepository, serviceEntityRepository, json,
-                bookingPercentageSnapshot, visitWebhookSupport, detailedPercentageService, redisCacheService);
+                bookingPercentageSnapshot, visitWebhookSupport, detailedPercentageService, redisCacheService,
+                bookingRepository, carePackageRepository);
         Partner partner = Partner.builder().id(1L).name("HyperService").active(true).build();
         Branch branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(partner).build();
         booking = Booking.builder().id(50L).ref("CC-042197").branch(branch).carId(5L)
@@ -115,17 +122,24 @@ class BookingCompletionServiceTest {
                 .notes("ümumi qeyd")
                 .lines(List.of(
                         // Paket: qiymət daxildir, göndərilən qiymət nəzərə alınmır.
-                        StaffCompleteLine.builder().kind("package").offeredServiceId(1L).brandModelId(11L)
-                                .productQty(new BigDecimal("4")).price(new BigDecimal("999"))
+                        StaffCompleteLine.builder().kind("package").offeredServiceId(1L)
+                                .productName("Castrol").productUnit("litr")
+                                .productQty(new BigDecimal("4")).productAmount(BigDecimal.ZERO)
+                                .price(new BigDecimal("999"))
                                 .nextMileage(52580).build(),
-                        // product 15×2=30 −10% → 27; service 50 −10% → 45; line final 72
-                        StaffCompleteLine.builder().kind("individual").individualServiceId(20L).brandModelId(12L)
+                        // typed total 30 −10% → 27; service 50 −10% → 45; line final 72
+                        StaffCompleteLine.builder().kind("individual").individualServiceId(20L)
+                                .productName("Brembo")
+                                .productUnit("ədəd")
                                 .productQty(new BigDecimal("2"))
+                                .productAmount(new BigDecimal("30"))
                                 .productDiscountPercent(new BigDecimal("10"))
                                 .price(new BigDecimal("50"))
                                 .discountPercent(new BigDecimal("10")).build(),
-                        // service 100 → manual 90, discount back-computed as 10%
+                        // service 100 → manual 90, discount back-computed as 10%. Product total is typed as 0.
                         StaffCompleteLine.builder().kind("one_time").title("Dəmir qapının dəyişdirilməsi")
+                                .productName("Boya").productUnit("ədəd").productQty(BigDecimal.ONE)
+                                .productAmount(BigDecimal.ZERO)
                                 .price(new BigDecimal("100")).finalAmount(new BigDecimal("90"))
                                 .nextDate(LocalDate.of(2027, 1, 1)).build()))
                 .build();
@@ -142,7 +156,7 @@ class BookingCompletionServiceTest {
         assertEquals(7L, visit.getBranchId());
         assertEquals(1L, visit.getServiceCenterId());
         assertEquals("HyperService", visit.getServiceCenterName());
-        assertEquals(4, visit.getServices().size(), "3 cards + 1 package info line");
+        assertEquals(3, visit.getServices().size());
 
         VisitServiceLine pkg = visit.getServices().get(0);
         assertEquals("package", pkg.getKind());
@@ -161,10 +175,11 @@ class BookingCompletionServiceTest {
         assertNull(oneTime.getNextServiceDate(), "AC9: one-off lines have no next date");
         assertNull(oneTime.getUniversalServiceId());
 
-        assertEquals("package_info", visit.getServices().get(3).getKind());
-        assertEquals(2, visit.getParts().size());
-        assertNull(visit.getParts().get(0).getPrice(), "package product is included in the package price");
+        assertEquals(3, visit.getParts().size());
+        assertNull(visit.getParts().get(0).getPrice());
+        assertEquals("litr", visit.getParts().get(0).getUnit());
         assertEquals(new BigDecimal("27.00"), visit.getParts().get(1).getPrice());
+        assertEquals("ədəd", visit.getParts().get(1).getUnit());
         assertEquals(42580L, car.getMileage());
         verify(detailedPercentageService).applyFromVisit(car, booking, visit);
     }
@@ -189,16 +204,100 @@ class BookingCompletionServiceTest {
         StaffCompleteRequest above = StaffCompleteRequest.builder()
                 .mileage(42580)
                 .lines(List.of(StaffCompleteLine.builder().kind("one_time").title("X")
+                        .productName("Boya").productUnit("ədəd").productQty(BigDecimal.ONE)
+                        .productAmount(BigDecimal.ONE)
                         .price(BigDecimal.TEN).finalAmount(new BigDecimal("11")).build()))
                 .build();
         assertThrows(ConflictException.class, () -> service.write(booking, above, "Asia/Baku", "az"));
     }
 
     @Test
+    void removedPackageDropsTheBookingPriceAndTheVisit() {
+        booking.setPriceMin(20000);
+        booking.setPriceMax(30000);
+        Visit visit = service.write(booking, StaffCompleteRequest.builder()
+                .mileage(42580)
+                .syncPackage(true)
+                .build(), "Asia/Baku", "az");
+
+        assertNull(visit.getPackageName());
+        assertNull(visit.getPackagePrice());
+        assertEquals(new BigDecimal("0.00"), visit.getFinalCostAmount());
+        assertEquals(0, visit.getServices().size());
+        assertNull(booking.getCarePackageId());
+        assertNull(booking.getPackageName());
+        assertNull(booking.getPackagePrice());
+        assertEquals(7100, booking.getPriceMin());
+        assertEquals(17100, booking.getPriceMax());
+        verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    void replacedPackageTakesTheCatalogPrice() {
+        booking.setPriceMin(20000);
+        booking.setPriceMax(30000);
+        BranchCarePackage newer = BranchCarePackage.builder()
+                .id(9L).name("Standart").price(50).active(true).branch(booking.getBranch()).build();
+        when(carePackageRepository.findById(9L)).thenReturn(Optional.of(newer));
+        when(carePackageItemRepository.findByCarePackage_IdOrderByIdAsc(9L)).thenReturn(List.of());
+
+        Visit visit = service.write(booking, StaffCompleteRequest.builder()
+                .mileage(42580)
+                .syncPackage(true)
+                .carePackageId(9L)
+                .build(), "Asia/Baku", "az");
+
+        assertEquals("Standart", visit.getPackageName());
+        assertEquals(new BigDecimal("50.00"), visit.getPackagePrice());
+        assertEquals(new BigDecimal("50.00"), visit.getFinalCostAmount());
+        assertEquals(9L, booking.getCarePackageId());
+        assertEquals("Standart", booking.getPackageName());
+        assertEquals(5000, booking.getPackagePrice());
+        assertEquals(12100, booking.getPriceMin());
+        assertEquals(22100, booking.getPriceMax());
+    }
+
+    @Test
+    void samePackageKeepsTheBookedPrice() {
+        Visit visit = service.write(booking, StaffCompleteRequest.builder()
+                .mileage(42580)
+                .syncPackage(true)
+                .carePackageId(3L)
+                .build(), "Asia/Baku", "az");
+
+        assertEquals(new BigDecimal("129.00"), visit.getPackagePrice());
+        assertEquals("Hyper extra", visit.getPackageName());
+        assertEquals(12900, booking.getPackagePrice());
+        assertEquals(3L, booking.getCarePackageId());
+    }
+
+    @Test
+    void packageFromAnotherBranchIsRejected() {
+        Branch other = Branch.builder().id(8L).name("Digər").active(true).build();
+        when(carePackageRepository.findById(9L)).thenReturn(Optional.of(
+                BranchCarePackage.builder().id(9L).name("Başqa").price(10).active(true).branch(other).build()));
+        StaffCompleteRequest request = StaffCompleteRequest.builder()
+                .mileage(42580)
+                .syncPackage(true)
+                .carePackageId(9L)
+                .build();
+        assertThrows(ResourceNotFoundException.class, () -> service.write(booking, request, "Asia/Baku", "az"));
+    }
+
+    @Test
+    void nonPackageLineRequiresAManualProduct() {
+        StaffCompleteRequest request = StaffCompleteRequest.builder()
+                .mileage(42580)
+                .lines(List.of(StaffCompleteLine.builder().kind("one_time").title("X")
+                        .price(BigDecimal.TEN).build()))
+                .build();
+        assertThrows(MissingFieldException.class, () -> service.write(booking, request, "Asia/Baku", "az"));
+    }
+
+    @Test
     void emptyFormStillWritesVisit() {
-        // AC18: operator təsdiq etdisə, xidmətsiz ziyarət də yazılır (yalnız paket + info sətri).
         Visit visit = service.write(booking, StaffCompleteRequest.builder().mileage(42580).build(), "Asia/Baku", "az");
         assertEquals(new BigDecimal("129.00"), visit.getFinalCostAmount());
-        assertEquals(1, visit.getServices().size());
+        assertEquals(0, visit.getServices().size());
     }
 }

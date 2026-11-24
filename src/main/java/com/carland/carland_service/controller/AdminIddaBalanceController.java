@@ -11,7 +11,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +47,11 @@ public class AdminIddaBalanceController {
 
     private static final String ADMIN_URL = "https://digital-innovation.agency";
     private static final long DEFAULT_PAGE_SIZE = 50L;
+    private static final long EXPORT_PAGE_SIZE = 100L;
+    private static final int EXPORT_MAX_PAGES = 100;
+    private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final MediaType XLSX = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AdminAccessService adminAccessService;
@@ -195,6 +204,177 @@ public class AdminIddaBalanceController {
             bindPager(model, pageOffset, pageSize);
         }
         return "idda-balance";
+    }
+
+    /**
+     * tr: Seçilen sekmenin bütün kayıtlarını Excel olarak indirir. Sayfa dilimi yazılmaz.
+     *     Expense sütunları tablodaki alanlardır; JSON'da fazla alan varsa sona eklenir.
+     * en: Downloads every row of the selected tab. The on-screen page is not the file.
+     *     Expense columns match the table; extra JSON fields are appended.
+     */
+    @PostMapping("/admin/idda-balance/export")
+    public Object export(
+            @RequestParam(name = "tab", required = false) String tab,
+            @RequestParam(name = "RequestIdentifier", required = false) String requestIdentifier,
+            @RequestParam(name = "StartDate", required = false) String startDate,
+            @RequestParam(name = "EndDate", required = false) String endDate,
+            @RequestParam(name = "Offset", required = false) String offset,
+            @RequestParam(name = "Limit", required = false) String limit,
+            HttpServletRequest request,
+            Model model
+    ) {
+        if (!adminAccessService.isPanelAdmin(request)) {
+            return "redirect:" + ADMIN_URL + "/admin/";
+        }
+        Tab selected = Tab.from(tab);
+        clearResult(model);
+
+        LocalDate startDay = null;
+        LocalDate endDay = null;
+        if (selected != Tab.BALANCE) {
+            try {
+                startDay = parseDay(startDate);
+            } catch (DateTimeParseException ex) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Başlangıç günü yyyy-MM-dd olmalı.");
+                return "idda-balance";
+            }
+            try {
+                endDay = parseDay(endDate);
+            } catch (DateTimeParseException ex) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Bitiş günü yyyy-MM-dd olmalı.");
+                return "idda-balance";
+            }
+            if (startDay != null && endDay != null && endDay.isBefore(startDay)) {
+                fillForm(model, selected, requestIdentifier, startDate, endDate, offset, limit);
+                model.addAttribute("error", "Bitiş, başlangıçtan önce olamaz.");
+                return "idda-balance";
+            }
+        }
+        fillForm(
+                model,
+                selected,
+                requestIdentifier,
+                startDay == null ? startDate : startDay.toString(),
+                endDay == null ? endDate : endDay.toString(),
+                offset,
+                limit
+        );
+        String requestId = blankToNull(requestIdentifier);
+        if (requestId == null) {
+            requestId = UUID.randomUUID().toString();
+        }
+        model.addAttribute("requestIdentifier", requestId);
+
+        try {
+            if (selected == Tab.BALANCE) {
+                DigitalFinanceClient.Upstream upstream = digitalFinanceClient.exchange(
+                        selected.method(), selected.path(), null, requestId, null);
+                if (upstream.statusCode() < 200 || upstream.statusCode() >= 300) {
+                    applyUpstream(model, upstream);
+                    model.addAttribute("error", "Digital Finance HTTP " + upstream.statusCode());
+                    return "idda-balance";
+                }
+                byte[] file = IddaBalanceExcel.balance(upstream.body());
+                if (file == null) {
+                    model.addAttribute("error", "Cevap okunamadı.");
+                    return "idda-balance";
+                }
+                return xlsx(file, "idda-balance-" + LocalDateTime.now().format(FILE_STAMP) + ".xlsx");
+            }
+
+            List<JsonNode> rows = new ArrayList<>();
+            long pageOffset = 0L;
+            Long total = null;
+            boolean more = true;
+            int page = 0;
+            while (more && page < EXPORT_MAX_PAGES) {
+                byte[] body = listBody(startDay, endDay, pageOffset, EXPORT_PAGE_SIZE);
+                DigitalFinanceClient.Upstream upstream = digitalFinanceClient.exchange(
+                        selected.method(), selected.path(), body, requestId, null);
+                if (upstream.statusCode() < 200 || upstream.statusCode() >= 300) {
+                    applyUpstream(model, upstream);
+                    model.addAttribute("error", "Digital Finance HTTP " + upstream.statusCode());
+                    return "idda-balance";
+                }
+                ListPage parsed = readListPage(upstream.body(), selected);
+                if (parsed.unreadable()) {
+                    model.addAttribute("error", "Cevap okunamadı.");
+                    return "idda-balance";
+                }
+                if (total == null) {
+                    total = parsed.count();
+                }
+                rows.addAll(parsed.items());
+                page++;
+                if (parsed.items().isEmpty()) {
+                    more = false;
+                } else {
+                    pageOffset += parsed.items().size();
+                    more = total != null
+                            ? pageOffset < total
+                            : parsed.items().size() == EXPORT_PAGE_SIZE;
+                }
+            }
+            if (more) {
+                model.addAttribute("error", "Aralık 10000 kayıttan uzun. Tarihi daralt.");
+                return "idda-balance";
+            }
+            byte[] file = selected == Tab.PAYMENT
+                    ? IddaBalanceExcel.payments(rows)
+                    : IddaBalanceExcel.expenses(rows);
+            String prefix = selected == Tab.PAYMENT ? "idda-payment-" : "idda-expense-";
+            return xlsx(file, prefix + LocalDateTime.now().format(FILE_STAMP) + ".xlsx");
+        } catch (IOException | IllegalStateException ex) {
+            log.warn("Digital Finance admin export {} failed: {}", selected.path(), ex.getClass().getSimpleName());
+            model.addAttribute("error", callError(ex));
+            return "idda-balance";
+        }
+    }
+
+    private static ResponseEntity<byte[]> xlsx(byte[] body, String fileName) {
+        return ResponseEntity.ok()
+                .contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(body);
+    }
+
+    private static byte[] listBody(LocalDate startDay, LocalDate endDay, long offset, long limit) throws IOException {
+        ObjectNode node = MAPPER.createObjectNode();
+        if (startDay != null) {
+            node.put("StartDate", startDay + " 00:00:00");
+        }
+        if (endDay != null) {
+            node.put("EndDate", endDay + " 23:59:59");
+        }
+        node.put("Offset", offset);
+        node.put("Limit", limit);
+        return MAPPER.writeValueAsBytes(node);
+    }
+
+    private static ListPage readListPage(byte[] bytes, Tab tab) {
+        try {
+            JsonNode root = MAPPER.readTree(bytes == null ? new byte[0] : bytes);
+            JsonNode response = root.get("Response");
+            Long count = null;
+            List<JsonNode> items = new ArrayList<>();
+            if (response != null && response.isObject()) {
+                if (response.has("Count") && !response.get("Count").isNull()) {
+                    count = countOrNull(scalar(response.get("Count")));
+                }
+                JsonNode array = response.get(tab == Tab.PAYMENT ? "Payments" : "Expenses");
+                if (array != null && array.isArray()) {
+                    array.forEach(items::add);
+                }
+            }
+            return new ListPage(items, count, false);
+        } catch (Exception ex) {
+            return new ListPage(List.of(), null, true);
+        }
+    }
+
+    private record ListPage(List<JsonNode> items, Long count, boolean unreadable) {
     }
 
     private static void fillForm(Model model, Tab tab, String requestIdentifier, String startDate,

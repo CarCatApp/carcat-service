@@ -105,7 +105,7 @@ public class VisitServiceLine {
     @Column(name = "product_qty", precision = 10, scale = 2)
     private BigDecimal productQty;
 
-    /** Product total before its own discount (unit price × qty), AZN. Null when included in the package. */
+    /** Product total before its own discount, AZN. Null when included in the package. */
     @Column(name = "product_amount", precision = 12, scale = 2)
     private BigDecimal productAmount;
 

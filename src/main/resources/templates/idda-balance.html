@@ -76,6 +76,8 @@
   <p class="field-note" th:if="${tab != 'balance'}">Header: RequestIdentifier. Body: StartDate, EndDate, Offset, Limit.</p>
   <p class="field-note">ApiKey sunucuda kalır. Boş RequestIdentifier sunucuda üretilir.</p>
   <p class="field-note" th:if="${tab != 'balance'}">Gün takvimden seçilir. Başlangıç <code>00:00:00</code>, bitiş <code>23:59:59</code>. Boş gün JSON'a yazılmaz. Sorgula 1. sayfayı açar.</p>
+  <p class="field-note" th:if="${tab != 'balance'}">Excel, seçilen gün aralığındaki bütün kayıtları indirir. Ekrandaki sayfa dosyaya yazılmaz. Expense dosyasında tablodaki alanlar ve cevapta gelen fazla alanlar vardır.</p>
+  <p class="field-note" th:if="${tab == 'balance'}">Excel, bakiye alanlarını indirir.</p>
 
   <form class="filter-bar" id="idda-query" method="post" action="/admin/idda-balance">
     <input type="hidden" name="tab" th:value="${tab}">
@@ -108,6 +110,10 @@
     <input type="hidden" th:if="${tab == 'balance'}" name="Offset" th:value="${offset}">
     <input type="hidden" th:if="${tab == 'balance'}" name="Limit" th:value="${limit}">
     <button class="btn btn-filter" type="submit" name="nav" value="search">Sorgula</button>
+    <button class="btn btn-excel" type="submit" formaction="/admin/idda-balance/export">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+      Excel
+    </button>
   </form>
 
   <div class="error-box" th:if="${error != null}" th:text="${error}"></div>

@@ -19,6 +19,8 @@ public class StaffCarePackageItemView {
     Long offeredServiceId;
     Map<String, String> title;
     Boolean enabled;
+    /** true: own card on complete. false: info line under the package name. */
+    Boolean periodic;
     Long behaviorId;
     String behaviorCode;
     Map<String, String> behaviorTitle;

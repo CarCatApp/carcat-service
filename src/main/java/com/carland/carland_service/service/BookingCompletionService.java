@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.booking.BookingBrandChipView;
 import com.carland.carland_service.dto.booking.BookingBrandModelGroupView;
 import com.carland.carland_service.dto.booking.StaffCompletionCardView;
 import com.carland.carland_service.dto.booking.StaffCompletionDraftView;
+import com.carland.carland_service.dto.booking.StaffCompletionPackageOption;
 import com.carland.carland_service.dto.request.StaffCompleteRequest;
 import com.carland.carland_service.dto.request.StaffCompleteRequest.StaffCompleteLine;
 import com.carland.carland_service.entity.Booking;
@@ -11,6 +12,7 @@ import com.carland.carland_service.entity.BookingIndividualLine;
 import com.carland.carland_service.entity.BookingInspection;
 import com.carland.carland_service.entity.BookingSelectedService;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.BranchCarePackage;
 import com.carland.carland_service.entity.BranchCarePackageItem;
 import com.carland.carland_service.entity.BranchCompletion;
 import com.carland.carland_service.entity.BranchIndividualService;
@@ -31,8 +33,10 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.BookingIndividualLineRepository;
 import com.carland.carland_service.repository.BookingInspectionRepository;
+import com.carland.carland_service.repository.BookingRepository;
 import com.carland.carland_service.repository.BookingSelectedServiceRepository;
 import com.carland.carland_service.repository.BranchCarePackageItemRepository;
+import com.carland.carland_service.repository.BranchCarePackageRepository;
 import com.carland.carland_service.repository.BranchIndividualServiceRepository;
 import com.carland.carland_service.repository.BrandModelRepository;
 import com.carland.carland_service.repository.BrandModelServiceRepository;
@@ -49,10 +53,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -73,6 +77,8 @@ public class BookingCompletionService {
     static final String SOURCE_PANEL = "panel";
     private static final String CURRENCY = "AZN";
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+    /** Units the completion form offers in front of the quantity. Stored on the visit part. */
+    private static final Set<String> PRODUCT_UNITS = Set.of("ədəd", "litr", "dəst", "kq");
     private static final int TITLE_MAX = 200;
     private static final int NOTE_MAX = 1000;
 
@@ -94,9 +100,33 @@ public class BookingCompletionService {
     private final VisitWebhookSupport visitWebhookSupport;
     private final DetailedPercentageService detailedPercentageService;
     private final RedisCacheService redisCacheService;
+    private final BookingRepository bookingRepository;
+    private final BranchCarePackageRepository carePackageRepository;
 
     /** Package line split: periodic lines become cards, the rest are info lines. */
     private record PackageLines(List<OfferedService> periodic, List<OfferedService> info) {
+    }
+
+    /** The package the visit is written with. changed means the booking row must follow. */
+    private record PackageChoice(Long id, String name, BigDecimal priceAzn, boolean changed) {
+        static PackageChoice kept(Booking booking) {
+            return new PackageChoice(
+                    booking.getCarePackageId(),
+                    blankToNull(booking.getPackageName()),
+                    packagePriceAzn(booking),
+                    false);
+        }
+
+        static PackageChoice cleared(Booking booking) {
+            boolean had = booking.getCarePackageId() != null
+                    || booking.getPackagePrice() != null
+                    || blankToNull(booking.getPackageName()) != null;
+            return new PackageChoice(null, null, null, had);
+        }
+    }
+
+    /** A service line plus the part unit, which lives on visit_parts rather than the line. */
+    private record BuiltLine(VisitServiceLine line, String productUnit) {
     }
 
     private record NextOpen(boolean date, boolean mileage) {
@@ -113,15 +143,9 @@ public class BookingCompletionService {
         Car car = findCar(booking);
 
         List<StaffCompletionCardView> cards = new ArrayList<>();
-        PackageLines pkg = packageLines(booking);
+        PackageLines pkg = packageLines(booking.getCarePackageId());
         for (OfferedService service : pkg.periodic()) {
-            cards.add(cardBuilder(VisitLineKind.PACKAGE.apiValue(), car, service.getMaintenanceCode())
-                    .offeredServiceId(service.getId())
-                    .title(text(service.getTitleJson(), lang))
-                    .groupTitle(service.getBehavior() == null ? null : text(service.getBehavior().getTitleJson(), lang))
-                    .maintenanceCode(service.getMaintenanceCode())
-                    .priceIncluded(true)
-                    .build());
+            cards.add(packageCard(service, car, lang));
         }
 
         Map<Long, BranchIndividualService> branchPrices = branchIndividualPrices(branch.getId());
@@ -177,12 +201,14 @@ public class BookingCompletionService {
                 .ref(booking.getRef())
                 .completionMode(BranchCompletion.shown(branch.getCompletionMode()))
                 .carMileage(car == null ? null : car.getMileage())
+                .carePackageId(booking.getCarePackageId())
                 .packageName(blankToNull(booking.getPackageName()))
-                .packagePrice(packagePriceAzn(booking))
+                .packagePrice(resolvedPackagePrice(booking))
                 .packageInfoLines(pkg.info().stream().map(s -> text(s.getTitleJson(), lang)).toList())
                 .inspectionNote(inspectionNote)
                 .cards(cards)
                 .individualCatalog(catalog)
+                .packageCatalog(packageCatalog(branch, car, lang))
                 .goods(brandModelGroups(branch.getId(), lang))
                 .build();
     }
@@ -208,7 +234,8 @@ public class BookingCompletionService {
         Partner partner = branch.getPartner();
         LocalDate visitDate = request.getDate() != null ? request.getDate() : LocalDate.now(zone(timezone));
         BigDecimal overallPercent = percent(request.getDiscountPercent(), "discountPercent");
-        BigDecimal packagePrice = packagePriceAzn(booking);
+        PackageChoice choice = packageChoice(booking, request);
+        BigDecimal packagePrice = choice.priceAzn();
 
         Visit visit = Visit.builder()
                 .car(car)
@@ -220,7 +247,7 @@ public class BookingCompletionService {
                 .invoiceNumber(booking.getRef())
                 .serviceCenterId(partner == null ? null : partner.getId())
                 .serviceCenterName(partner == null ? branch.getName() : partner.getName())
-                .packageName(blankToNull(booking.getPackageName()))
+                .packageName(choice.name())
                 .packagePrice(packagePrice)
                 .discountPercent(overallPercent)
                 .inspectionNote(inspectionNote(booking))
@@ -230,12 +257,12 @@ public class BookingCompletionService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        Map<Long, BrandModel> models = brandModelsById(branch.getId());
         BigDecimal gross = packagePrice == null ? BigDecimal.ZERO : packagePrice;
         BigDecimal net = gross;
         List<StaffCompleteLine> lines = request.getLines() == null ? List.of() : request.getLines();
         for (int i = 0; i < lines.size(); i++) {
-            VisitServiceLine line = toLine(lines.get(i), i, visitDate, request.getMileage(), models, lang);
+            BuiltLine built = toLine(lines.get(i), i, visitDate, request.getMileage(), lang);
+            VisitServiceLine line = built.line();
             visit.addService(line);
             gross = gross.add(line.getCostAmount());
             net = net.add(line.getFinalAmount());
@@ -243,21 +270,24 @@ public class BookingCompletionService {
                 visit.addPart(VisitPart.builder()
                         .name(line.getProductName())
                         .qty(line.getProductQty())
+                        .unit(built.productUnit())
                         .price(line.getProductAmount() == null ? null : productFinalOf(line))
                         .build());
             }
         }
-        for (OfferedService info : packageLines(booking).info()) {
-            visit.addService(VisitServiceLine.builder()
-                    .kind(VisitLineKind.PACKAGE_INFO.apiValue())
-                    .offeredServiceId(info.getId())
-                    .serviceName(text(info.getTitleJson(), lang))
-                    .doneDate(visitDate)
-                    .doneKm(request.getMileage())
-                    .costAmount(BigDecimal.ZERO)
-                    .costCurrency(CURRENCY)
-                    .finalAmount(BigDecimal.ZERO)
-                    .build());
+        if (choice.id() != null) {
+            for (OfferedService info : packageLines(choice.id()).info()) {
+                visit.addService(VisitServiceLine.builder()
+                        .kind(VisitLineKind.PACKAGE_INFO.apiValue())
+                        .offeredServiceId(info.getId())
+                        .serviceName(text(info.getTitleJson(), lang))
+                        .doneDate(visitDate)
+                        .doneKm(request.getMileage())
+                        .costAmount(BigDecimal.ZERO)
+                        .costCurrency(CURRENCY)
+                        .finalAmount(BigDecimal.ZERO)
+                        .build());
+            }
         }
 
         BigDecimal total = overallPercent == null
@@ -265,6 +295,7 @@ public class BookingCompletionService {
                 : net.subtract(net.multiply(overallPercent).divide(HUNDRED, 2, RoundingMode.HALF_UP));
         visit.setCostAmount(money(gross));
         visit.setFinalCostAmount(money(total));
+        applyPackageChoice(booking, choice);
         visitRepository.saveAndFlush(visit);
 
         if (car.getMileage() == null || car.getMileage() < request.getMileage()) {
@@ -280,8 +311,7 @@ public class BookingCompletionService {
         return visit;
     }
 
-    private VisitServiceLine toLine(StaffCompleteLine in, int index, LocalDate visitDate, Integer visitKm,
-                                    Map<Long, BrandModel> models, String lang) {
+    private BuiltLine toLine(StaffCompleteLine in, int index, LocalDate visitDate, Integer visitKm, String lang) {
         if (in == null) {
             throw MissingFieldException.required("lines[" + index + "]");
         }
@@ -318,40 +348,30 @@ public class BookingCompletionService {
         }
 
         boolean included = kind == VisitLineKind.PACKAGE;
+        if (!included && in.getPrice() != null && in.getPrice().signum() < 0) {
+            throw new MissingFieldException("lines[" + index + "].price must be >= 0");
+        }
         String productName = blankToNull(in.getProductName());
-        BigDecimal qty = nonNegative(in.getProductQty(), "lines[" + index + "].productQty");
-        BigDecimal productGross = included ? null : nonNegative(in.getProductAmount(), "lines[" + index + "].productAmount");
-        Long brandModelId = in.getBrandModelId();
-        if (brandModelId != null) {
-            BrandModel model = models.get(brandModelId);
-            if (model == null) {
-                throw new ResourceNotFoundException("brand model not found");
-            }
-            if (productName == null) {
-                productName = brandLabel(model, lang);
-            }
-            if (!included && productGross == null && model.getPrice() != null) {
-                productGross = model.getPrice().multiply(qty == null ? BigDecimal.ONE : qty);
-            }
-        }
         if (productName == null) {
-            productGross = null;
-            qty = null;
-            brandModelId = null;
-        } else if (qty == null) {
-            qty = BigDecimal.ONE;
+            throw MissingFieldException.required("lines[" + index + "].productName");
         }
-        // Non-package: product price is required once a product is attached.
-        if (!included && productName != null && productGross == null) {
-            throw MissingFieldException.required("lines[" + index + "].productAmount");
+        String productUnit = requiredUnit(in.getProductUnit(), index);
+        BigDecimal qty = nonNegative(in.getProductQty(), "lines[" + index + "].productQty");
+        if (qty == null || qty.signum() == 0) {
+            throw MissingFieldException.required("lines[" + index + "].productQty");
         }
-
-        BigDecimal productDiscount = included
-                ? null
-                : percent(in.getProductDiscountPercent(), "lines[" + index + "].productDiscountPercent");
-        BigDecimal productFinal = included
-                ? null
-                : nonNegative(in.getProductFinalAmount(), "lines[" + index + "].productFinalAmount");
+        Long brandModelId = null;
+        BigDecimal productGross = null;
+        BigDecimal productDiscount = null;
+        BigDecimal productFinal = null;
+        if (!included) {
+            productGross = nonNegative(in.getProductAmount(), "lines[" + index + "].productAmount");
+            if (productGross == null) {
+                throw MissingFieldException.required("lines[" + index + "].productAmount");
+            }
+            productDiscount = percent(in.getProductDiscountPercent(), "lines[" + index + "].productDiscountPercent");
+            productFinal = nonNegative(in.getProductFinalAmount(), "lines[" + index + "].productFinalAmount");
+        }
         if (!included && productName != null) {
             BigDecimal productBase = productGross == null ? BigDecimal.ZERO : productGross;
             if (productFinal == null) {
@@ -392,7 +412,7 @@ public class BookingCompletionService {
         BigDecimal gross = serviceBase.add(productBase);
         BigDecimal finalAmount = serviceFinal.add(productNet);
 
-        return VisitServiceLine.builder()
+        return new BuiltLine(VisitServiceLine.builder()
                 .kind(kind.apiValue())
                 .offeredServiceId(in.getOfferedServiceId())
                 .individualServiceId(in.getIndividualServiceId())
@@ -412,25 +432,130 @@ public class BookingCompletionService {
                 .costCurrency(CURRENCY)
                 .discountPercent(serviceDiscount)
                 .finalAmount(money(finalAmount))
-                .build();
+                .build(), productUnit);
     }
 
     // ================= HELPERS =================
 
-    private PackageLines packageLines(Booking booking) {
+    private PackageLines packageLines(Long packageId) {
         List<OfferedService> periodic = new ArrayList<>();
         List<OfferedService> info = new ArrayList<>();
-        if (booking.getCarePackageId() == null) {
+        if (packageId == null) {
             return new PackageLines(periodic, info);
         }
-        for (BranchCarePackageItem item : carePackageItemRepository.findByCarePackage_IdOrderByIdAsc(booking.getCarePackageId())) {
+        for (BranchCarePackageItem item : carePackageItemRepository.findByCarePackage_IdOrderByIdAsc(packageId)) {
             OfferedService service = item.getOfferedService();
             if (!Boolean.TRUE.equals(item.getEnabled()) || service == null || !Boolean.TRUE.equals(service.getActive())) {
                 continue;
             }
-            (Boolean.TRUE.equals(service.getPeriodic()) ? periodic : info).add(service);
+            periodic.add(service);
         }
         return new PackageLines(periodic, info);
+    }
+
+    /**
+     * tr: syncPackage true ikən formadakı paket booking sətrinin və ziyarətin paketidir.
+     *     Eyni id köhnə qiyməti saxlayır. Başqa id kataloqdan gəlir. Null paketi silir.
+     * en: When syncPackage is true, the form's package is the booking row and the visit.
+     *     The same id keeps the booked price. Another id comes from the catalog. Null removes it.
+     */
+    private PackageChoice packageChoice(Booking booking, StaffCompleteRequest request) {
+        if (!Boolean.TRUE.equals(request.getSyncPackage())) {
+            return keptWithCatalogPrice(booking);
+        }
+        Long id = request.getCarePackageId();
+        if (id == null) {
+            return PackageChoice.cleared(booking);
+        }
+        if (id.equals(booking.getCarePackageId())) {
+            return keptWithCatalogPrice(booking);
+        }
+        BranchCarePackage pkg = carePackageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("care package not found"));
+        Branch branch = booking.getBranch();
+        if (!Boolean.TRUE.equals(pkg.getActive())
+                || pkg.getBranch() == null
+                || branch == null
+                || branch.getId() == null
+                || !branch.getId().equals(pkg.getBranch().getId())) {
+            throw new ResourceNotFoundException("care package not found");
+        }
+        int manat = pkg.getPrice() == null ? 0 : pkg.getPrice();
+        return new PackageChoice(pkg.getId(), blankToNull(pkg.getName()),
+                BigDecimal.valueOf(manat).setScale(2, RoundingMode.HALF_UP), true);
+    }
+
+    /** Moves the booked quote by the package-price delta and stores the chosen package. */
+    private void applyPackageChoice(Booking booking, PackageChoice choice) {
+        if (!choice.changed()) {
+            return;
+        }
+        int oldQepik = booking.getPackagePrice() == null ? 0 : booking.getPackagePrice();
+        int newQepik = choice.priceAzn() == null
+                ? 0
+                : choice.priceAzn().movePointRight(2).setScale(0, RoundingMode.HALF_UP).intValueExact();
+        int delta = newQepik - oldQepik;
+        if (delta != 0 && booking.getPriceMin() != null) {
+            booking.setPriceMin(Math.max(0, booking.getPriceMin() + delta));
+        }
+        if (delta != 0 && booking.getPriceMax() != null) {
+            booking.setPriceMax(Math.max(0, booking.getPriceMax() + delta));
+        }
+        booking.setCarePackageId(choice.id());
+        booking.setPackageName(choice.name());
+        booking.setPackagePrice(choice.id() == null ? null : newQepik);
+        bookingRepository.save(booking);
+    }
+
+    private List<StaffCompletionPackageOption> packageCatalog(Branch branch, Car car, String lang) {
+        if (branch == null || branch.getId() == null) {
+            return List.of();
+        }
+        List<BranchCarePackage> rows = carePackageRepository.findByBranch_IdOrderByIdAsc(branch.getId());
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        List<StaffCompletionPackageOption> out = new ArrayList<>();
+        for (BranchCarePackage row : rows) {
+            if (!Boolean.TRUE.equals(row.getActive())) {
+                continue;
+            }
+            PackageLines lines = packageLines(row.getId());
+            List<StaffCompletionCardView> cards = new ArrayList<>();
+            for (OfferedService service : lines.periodic()) {
+                cards.add(packageCard(service, car, lang));
+            }
+            int manat = row.getPrice() == null ? 0 : row.getPrice();
+            out.add(StaffCompletionPackageOption.builder()
+                    .id(row.getId())
+                    .name(row.getName())
+                    .price(BigDecimal.valueOf(manat).setScale(2, RoundingMode.HALF_UP))
+                    .infoLines(lines.info().stream().map(service -> text(service.getTitleJson(), lang)).toList())
+                    .cards(cards)
+                    .build());
+        }
+        return out;
+    }
+
+    private StaffCompletionCardView packageCard(OfferedService service, Car car, String lang) {
+        return cardBuilder(VisitLineKind.PACKAGE.apiValue(), car, service.getMaintenanceCode())
+                .offeredServiceId(service.getId())
+                .title(text(service.getTitleJson(), lang))
+                .groupTitle(service.getBehavior() == null ? null : text(service.getBehavior().getTitleJson(), lang))
+                .maintenanceCode(service.getMaintenanceCode())
+                .priceIncluded(true)
+                .build();
+    }
+
+    private static String requiredUnit(String raw, int index) {
+        if (raw == null || raw.isBlank()) {
+            throw MissingFieldException.required("lines[" + index + "].productUnit");
+        }
+        String unit = raw.trim();
+        if (!PRODUCT_UNITS.contains(unit)) {
+            throw new MissingFieldException("lines[" + index + "].productUnit is invalid");
+        }
+        return unit;
     }
 
     private Map<Long, BranchIndividualService> branchIndividualPrices(Long branchId) {
@@ -439,14 +564,6 @@ public class BookingCompletionService {
             if (row.getIndividualService() != null) {
                 out.put(row.getIndividualService().getId(), row);
             }
-        }
-        return out;
-    }
-
-    private Map<Long, BrandModel> brandModelsById(Long branchId) {
-        Map<Long, BrandModel> out = new HashMap<>();
-        for (BrandModel model : brandModelRepository.findByBranch_IdOrderByIdAsc(branchId)) {
-            out.put(model.getId(), model);
         }
         return out;
     }
@@ -539,16 +656,6 @@ public class BookingCompletionService {
         return new NextOpen(date, km);
     }
 
-    private String brandLabel(BrandModel model, String lang) {
-        BrandModelService heading = model.getBrandModelService();
-        String head = heading == null ? null : text(heading.getTitleJson(), lang);
-        String name = model.getName();
-        if (model.getSeries() != null && !model.getSeries().isBlank()) {
-            name = name + " · " + model.getSeries();
-        }
-        return head == null || head.isBlank() ? name : head + " · " + name;
-    }
-
     private static BigDecimal productFinalOf(VisitServiceLine line) {
         BigDecimal gross = line.getProductAmount() == null ? BigDecimal.ZERO : line.getProductAmount();
         return applyPercent(gross, line.getProductDiscountPercent());
@@ -572,6 +679,48 @@ public class BookingCompletionService {
             car = carByVin.findOne(booking.getVin());
         }
         return car;
+    }
+
+    /**
+     * tr: Bookinqdəki qəpik kopyası. Boşdursa şöbə paketinin manat qiyməti.
+     * en: The booking's qəpik copy. When that is empty, the branch package price in manat.
+     */
+    private BigDecimal resolvedPackagePrice(Booking booking) {
+        BigDecimal stored = packagePriceAzn(booking);
+        if (stored != null && stored.signum() > 0) {
+            return stored;
+        }
+        BigDecimal catalog = catalogManat(booking.getCarePackageId());
+        return catalog != null ? catalog : stored;
+    }
+
+    /** Same package as booked. A missing booked price is filled from the catalog and written back. */
+    private PackageChoice keptWithCatalogPrice(Booking booking) {
+        BigDecimal stored = packagePriceAzn(booking);
+        if (stored != null && stored.signum() > 0) {
+            return PackageChoice.kept(booking);
+        }
+        BigDecimal catalog = catalogManat(booking.getCarePackageId());
+        if (catalog == null || catalog.signum() == 0 || booking.getCarePackageId() == null) {
+            return PackageChoice.kept(booking);
+        }
+        String name = blankToNull(booking.getPackageName());
+        if (name == null) {
+            BranchCarePackage pkg = carePackageRepository.findById(booking.getCarePackageId()).orElse(null);
+            name = pkg == null ? null : blankToNull(pkg.getName());
+        }
+        return new PackageChoice(booking.getCarePackageId(), name, catalog, true);
+    }
+
+    private BigDecimal catalogManat(Long packageId) {
+        if (packageId == null) {
+            return null;
+        }
+        BranchCarePackage pkg = carePackageRepository.findById(packageId).orElse(null);
+        if (pkg == null || pkg.getPrice() == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(pkg.getPrice()).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** Booking stores the package price in qəpik. */
