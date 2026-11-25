@@ -3,8 +3,12 @@ package com.carland.carland_service.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * tr: Owner-app rezervasyonu. slot = ranges.range_id. Para qəpik.
@@ -66,6 +70,16 @@ public class Booking {
 
     @Column(name = "price_max")
     Integer priceMax;
+
+    /**
+     * tr: GEÇİCİ. Eyni gün və şöbənin Hyper ziyarət məbləğləri. Ən erkən rezervasiyada durur.
+     *     Ekranda yalnız tamamlanmış sətirdə görünür.
+     * en: TEMPORARY. Hyper visit amounts for the same day and branch. Stored on the earliest booking.
+     *     The screen shows them only on a completed row.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "paid_amounts", columnDefinition = "jsonb")
+    List<BigDecimal> paidAmounts;
 
     @Column(nullable = false, length = 8)
     @Builder.Default

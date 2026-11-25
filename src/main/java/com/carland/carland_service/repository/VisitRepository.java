@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -109,6 +110,27 @@ public interface VisitRepository extends JpaRepository<Visit, Long> {
     List<Visit> findCommissionHyperVisits(@Param("vin") String vin,
                                           @Param("day") java.time.LocalDate day,
                                           @Param("partnerId") Long partnerId);
+
+    @Query("""
+            select v from Visit v
+            where v.bookingId = :bookingId and v.source = 'panel'
+            order by v.id
+            """)
+    List<Visit> findPanelByBookingId(@Param("bookingId") Long bookingId);
+
+    /**
+     * tr: booking_id boş Hyper ziyarətləri. Şöbə dealer ilə yoxlanır.
+     * en: Hyper visits with no booking_id. The branch is decided from the dealer.
+     */
+    @Query("""
+            select v from Visit v join v.car c
+            where upper(trim(c.vin)) = upper(trim(:vin))
+              and v.lastServiceDate = :day
+              and v.hyperRecordId is not null
+              and v.bookingId is null
+            order by v.id
+            """)
+    List<Visit> findUnlinkedHyperByVinAndDay(@Param("vin") String vin, @Param("day") LocalDate day);
 
     @Query("SELECT MIN(v.createdAt) FROM Visit v WHERE v.car.customer.userId = :userId")
     java.time.LocalDateTime findEarliestCreatedAtByCustomer(@Param("userId") Long userId);

@@ -34,6 +34,23 @@ public interface BookingRepository extends JpaRepository<Booking, Long>, JpaSpec
 
     boolean existsByRef(String ref);
 
+    /**
+     * tr: Eyni şöbə, eyni VIN, eyni təqvim günü.
+     * en: Same branch, same VIN, same calendar day.
+     */
+    @Query("""
+            select b from Booking b
+            join fetch b.range r
+            join fetch r.calendar c
+            where b.branch.id = :branchId
+              and upper(trim(b.vin)) = upper(trim(:vin))
+              and c.day = :day
+            """)
+    List<Booking> findByBranchVinAndDay(
+            @Param("branchId") Long branchId,
+            @Param("vin") String vin,
+            @Param("day") LocalDate day);
+
     boolean existsByCustomerUserIdAndBranch_Id(Long customerUserId, Long branchId);
 
     /** tr: Müşterinin ilk randevu anı. / en: The customer's earliest booking instant. */

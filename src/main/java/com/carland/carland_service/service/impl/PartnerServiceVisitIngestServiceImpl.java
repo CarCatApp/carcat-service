@@ -18,6 +18,7 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
+import com.carland.carland_service.service.BookingPaidAmountService;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
@@ -63,6 +64,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
     private final VisitWebhookSupport visitWebhookSupport;
     private final RedisCacheService redisCacheService;
     private final CommissionLedgerService commissionLedgerService;
+    private final BookingPaidAmountService bookingPaidAmountService;
 
     /**
      * tr: Webhook isteğini işler: payload'da tek ziyaret olmasını doğrular (validator exception fırlatır),
@@ -114,6 +116,7 @@ public class PartnerServiceVisitIngestServiceImpl implements PartnerServiceVisit
             visitWebhookSupport.fillPartnerIfMissing(created, partner);
             visitWebhookSupport.appendEditEvent(created, "CREATE", null, partner);
             visitRepository.saveAndFlush(created);
+            bookingPaidAmountService.syncVisit(created);
             touchedVisits.add(created);
             result.getVisits().add(buildCreatedVisitDetail(created, item.getPartnerRecordId()));
             result.setVisitsCreated(result.getVisitsCreated() + 1);

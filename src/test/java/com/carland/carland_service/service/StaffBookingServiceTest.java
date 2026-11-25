@@ -73,6 +73,7 @@ class StaffBookingServiceTest {
     @Mock BookingCompletionService bookingCompletionService;
     @Mock StaffBookingLiveService staffBookingLiveService;
     @Mock CommissionLedgerService commissionLedgerService;
+    @Mock BookingPaidAmountService bookingPaidAmountService;
     @Mock CommissionCustomerStatusRepository commissionCustomerStatusRepository;
 
     StaffBookingService service;
@@ -87,7 +88,7 @@ class StaffBookingServiceTest {
                 individualLineRepository, inspectionRepository, rangeRepository, bookingCapacityService,
                 customerRepository, carRepository, colorRepository, bookingStaffNoteService, brandRepository, bookingPushService,
                 bookingCompletionService, staffBookingLiveService, commissionLedgerService,
-                commissionCustomerStatusRepository);
+                bookingPaidAmountService, commissionCustomerStatusRepository);
         Partner hyper = Partner.builder().id(1L).name("Hyper").active(true).build();
         branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(hyper).build();
         staff = BookingStaff.builder()
@@ -133,7 +134,7 @@ class StaffBookingServiceTest {
         assertEquals("pkg:hyper-extra", out.getItems().get(0).getServiceKeys().get(0));
         assertEquals("2026-11-02T02:16:30Z", out.getItems().get(0).getCreatedAt());
         assertNull(out.getItems().get(0).getCar());
-        assertNull(out.getItems().get(0).getCustomerStatus());
+        assertEquals("-", out.getItems().get(0).getCustomerStatus());
     }
 
     @Test
@@ -152,7 +153,7 @@ class StaffBookingServiceTest {
                 .getItems().get(0).getCustomerStatus());
         assertEquals("new", service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
                 .getItems().get(0).getCustomerStatus());
-        assertNull(service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
+        assertEquals("-", service.inbox(9L, false, "pending", 7L, 1, 20, "Asia/Baku", "az")
                 .getItems().get(0).getCustomerStatus());
     }
 

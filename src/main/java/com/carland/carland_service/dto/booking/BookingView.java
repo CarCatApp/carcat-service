@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -57,6 +58,9 @@ public class BookingView {
     String serviceLabel;
     Integer priceMin;
     Integer priceMax;
+    /** tr: GEÇİCİ ödəniş siyahısı. Boş olanda yoxdur. / en: TEMPORARY paid-amount list. Absent when empty. */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    List<BigDecimal> paidAmounts;
     String currency;
     String unit;
     Integer unreadCount;

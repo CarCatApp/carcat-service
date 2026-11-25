@@ -115,6 +115,7 @@ public class StaffBookingService {
     private final BookingCompletionService bookingCompletionService;
     private final StaffBookingLiveService staffBookingLiveService;
     private final CommissionLedgerService commissionLedgerService;
+    private final BookingPaidAmountService bookingPaidAmountService;
     private final CommissionCustomerStatusRepository commissionCustomerStatusRepository;
 
     @Transactional(readOnly = true)
@@ -611,6 +612,7 @@ public class StaffBookingService {
             } else if (BookingStatus.COMPLETED.apiValue().equals(nextStatus)) {
                 notifyCompleted(booking);
                 commissionLedgerService.onCompleted(booking);
+                bookingPaidAmountService.syncBooking(booking);
             }
         }
         return viewOf(booking, timezone, acceptLanguage);
@@ -805,6 +807,7 @@ public class StaffBookingService {
                         inspection != null))
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
+                .paidAmounts(booking.getPaidAmounts())
                 .currency(booking.getCurrency() == null ? "AZN" : booking.getCurrency())
                 .unit(BookingCreateService.UNIT)
                 .unreadCount(0)

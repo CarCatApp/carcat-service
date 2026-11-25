@@ -74,6 +74,7 @@ class BookingCompletionServiceTest {
     @Mock VisitWebhookSupport visitWebhookSupport;
     @Mock DetailedPercentageService detailedPercentageService;
     @Mock RedisCacheService redisCacheService;
+    @Mock BookingPaidAmountService bookingPaidAmountService;
 
     BookingCompletionService service;
     Booking booking;
@@ -87,7 +88,7 @@ class BookingCompletionServiceTest {
                 individualServiceRepository, offeredServiceRepository, brandModelRepository,
                 brandModelServiceRepository, carRepository, carByVin, visitRepository, serviceEntityRepository, json,
                 bookingPercentageSnapshot, visitWebhookSupport, detailedPercentageService, redisCacheService,
-                bookingRepository, carePackageRepository);
+                bookingRepository, carePackageRepository, bookingPaidAmountService);
         Partner partner = Partner.builder().id(1L).name("HyperService").active(true).build();
         Branch branch = Branch.builder().id(7L).name("Xeqani").active(true).partner(partner).build();
         booking = Booking.builder().id(50L).ref("CC-042197").branch(branch).carId(5L)

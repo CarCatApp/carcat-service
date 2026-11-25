@@ -17,7 +17,9 @@ import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
+import com.carland.carland_service.service.BookingPaidAmountService;
 import com.carland.carland_service.service.HyperPercentageSyncService;
+import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
 import com.carland.carland_service.service.PartnerServiceVisitUpdateService;
 import com.carland.carland_service.service.RedisCacheService;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +60,7 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
     private final VisitWebhookSupport visitWebhookSupport;
     private final RedisCacheService redisCacheService;
     private final CommissionLedgerService commissionLedgerService;
+    private final BookingPaidAmountService bookingPaidAmountService;
 
     /**
      * tr: Güncelleme isteğini işler: payload'ı doğrular, aktif partner'ı ve VIN ile aracı bulur,
@@ -102,6 +106,8 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
                 .build();
 
         visitWebhookSupport.fillPartnerIfMissing(visit, partner);
+        LocalDate previousDay = visit.getLastServiceDate();
+        Long previousBranch = ServicedBadgeIds.resolvedBranchId(visit);
 
         int visitFieldsUpdated = applyVisitSnapshot(visit, item);
         int linesUpdated = mergeLines(visit, item, result);
@@ -115,6 +121,11 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
         visit.setUpdatedAt(LocalDateTime.now());
         visitWebhookSupport.appendEditEvent(visit, "PUT", changed, partner);
         visitRepository.saveAndFlush(visit);
+        bookingPaidAmountService.syncVisit(visit);
+        Long nextBranch = ServicedBadgeIds.resolvedBranchId(visit);
+        if (!Objects.equals(previousDay, visit.getLastServiceDate()) || !Objects.equals(previousBranch, nextBranch)) {
+            bookingPaidAmountService.syncHyperDay(car.getVin(), previousDay, previousBranch);
+        }
 
         if (changed) {
             visitWebhookSupport.recalculateAllTimeCost(car);

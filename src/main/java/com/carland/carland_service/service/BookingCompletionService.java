@@ -102,6 +102,7 @@ public class BookingCompletionService {
     private final RedisCacheService redisCacheService;
     private final BookingRepository bookingRepository;
     private final BranchCarePackageRepository carePackageRepository;
+    private final BookingPaidAmountService bookingPaidAmountService;
 
     /** Package line split: periodic lines become cards, the rest are info lines. */
     private record PackageLines(List<OfferedService> periodic, List<OfferedService> info) {
@@ -297,6 +298,7 @@ public class BookingCompletionService {
         visit.setFinalCostAmount(money(total));
         applyPackageChoice(booking, choice);
         visitRepository.saveAndFlush(visit);
+        bookingPaidAmountService.syncBooking(booking);
 
         if (car.getMileage() == null || car.getMileage() < request.getMileage()) {
             // Müştəri tarixi lastMileageUpdateAt burada dəyişmir.
