@@ -1276,7 +1276,6 @@ public class CarServiceImpl implements CarService {
                         "plateNumber is blank after trim",
                         new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage)));
             }
-            IddaPlateKey.rejectAdjacentAa(plateNumber, acceptLanguage);
 
             if (carRequest.getMileage() == null) {
                 throwAddCarFailure(logUserId,
