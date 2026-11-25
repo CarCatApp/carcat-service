@@ -18,6 +18,7 @@ import com.carland.carland_service.hyper.CarByVin;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.VisitRepository;
 import com.carland.carland_service.service.BookingPaidAmountService;
+import com.carland.carland_service.service.HyperMileageGuard;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
@@ -158,8 +159,9 @@ public class PartnerServiceVisitUpdateServiceImpl implements PartnerServiceVisit
             visit.setLastServiceDate(item.getDate());
             changed++;
         }
-        if (!Objects.equals(visit.getLastServiceMileage(), item.getMileage())) {
-            visit.setLastServiceMileage(item.getMileage());
+        Integer keptMileage = HyperMileageGuard.keepIfNotLower(visit.getLastServiceMileage(), item.getMileage());
+        if (!Objects.equals(visit.getLastServiceMileage(), keptMileage)) {
+            visit.setLastServiceMileage(keptMileage);
             changed++;
         }
         if (!Objects.equals(visit.getDealer(), item.getDealer())) {

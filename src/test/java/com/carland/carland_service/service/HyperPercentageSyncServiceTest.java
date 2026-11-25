@@ -54,6 +54,21 @@ class HyperPercentageSyncServiceTest {
     }
 
     @Test
+    void forcedReloadStillAppliesANewerVisitEvenWhenItsMileageIsLower() {
+        Percentage percentage = panelPercentage(LocalDate.of(2026, 10, 20), 73_000);
+        percentage.setPartnerRecordId("50");
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit newer = hyperVisit(2L, 80L, LocalDate.of(2026, 11, 15), 70_000);
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(newer));
+
+        service.resyncFromVisits(car, List.of(newer));
+
+        verify(percentageRepository).save(percentage);
+        assertEquals(70_000, percentage.getLastServiceKm());
+        assertEquals(LocalDate.of(2026, 11, 15), percentage.getLastServiceDate());
+    }
+
+    @Test
     void forcedReloadStillAppliesANewerVisit() {
         Percentage percentage = panelPercentage(LocalDate.of(2026, 1, 1), 10_000);
         when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
@@ -65,6 +80,46 @@ class HyperPercentageSyncServiceTest {
         verify(percentageRepository).save(percentage);
         assertEquals(LocalDate.of(2026, 10, 20), percentage.getLastServiceDate());
         assertEquals(42_580, percentage.getLastServiceKm());
+    }
+
+    @Test
+    void forcedReloadDoesNotRollSameRecordMileageBackwards() {
+        Percentage percentage = panelPercentage(LocalDate.of(2026, 11, 15), 73_000);
+        percentage.setPartnerRecordId("50");
+        percentage.setNextServiceKm(73_000);
+        percentage.setNextServiceDate(LocalDate.of(2027, 5, 15));
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit same = hyperVisit(1L, 50L, LocalDate.of(2026, 11, 15), 66_000);
+        same.getServices().get(0).setDoneKm(66_000);
+        same.getServices().get(0).setNextServiceMileage(73_000);
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(same));
+
+        service.resyncFromVisits(car, List.of(same));
+
+        verify(percentageRepository, never()).save(any());
+        verify(visitRepository).save(same);
+        assertEquals(73_000, percentage.getLastServiceKm());
+        assertEquals(73_000, percentage.getNextServiceKm());
+        assertEquals(LocalDate.of(2027, 5, 15), percentage.getNextServiceDate());
+        assertEquals(73_000, same.getLastServiceMileage());
+        assertEquals(73_000, same.getServices().get(0).getDoneKm());
+    }
+
+    @Test
+    void forcedReloadAppliesHigherMileageOnTheSameHyperRecord() {
+        Percentage percentage = panelPercentage(LocalDate.of(2026, 11, 15), 66_000);
+        percentage.setPartnerRecordId("50");
+        when(percentageRepository.findAllByCarId(5L)).thenReturn(List.of(percentage));
+        Visit same = hyperVisit(1L, 50L, LocalDate.of(2026, 11, 15), 73_000);
+        same.getServices().get(0).setNextServiceMileage(80_000);
+        when(visitRepository.findAllByCarOrderByLastServiceDateDescIdDesc(car)).thenReturn(List.of(same));
+
+        service.resyncFromVisits(car, List.of(same));
+
+        verify(percentageRepository).save(percentage);
+        verify(visitRepository, never()).save(any());
+        assertEquals(73_000, percentage.getLastServiceKm());
+        assertEquals(80_000, percentage.getNextServiceKm());
     }
 
     @Test

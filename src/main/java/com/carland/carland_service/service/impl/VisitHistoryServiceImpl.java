@@ -30,6 +30,7 @@ import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.VisitRepository;
+import com.carland.carland_service.service.HyperMileageGuard;
 import com.carland.carland_service.service.HyperPercentageSyncService;
 import com.carland.carland_service.service.ServicedBadgeIds;
 import com.carland.carland_service.service.PartnerLookupService;
@@ -651,14 +652,20 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
 
     /**
      * tr: Mevcut ziyaretin başlık alanlarını ve satır/parçalarını Hyper anlık görüntüsüyle değiştirir.
-     *     serviceCenterId/Name ve editHistory dokunulmaz (GET cache, webhook geçmişi korunur).
+     *     serviceCenterId/Name ve editHistory dokunulmaz. Kayıtlı kilometre Hyper'dan yüksekse düşürülmez.
      * en: Replaces an existing visit's header fields and lines/parts from the Hyper snapshot.
-     *     serviceCenterId/Name and editHistory are left unchanged (GET cache; webhook history preserved).
+     *     serviceCenterId/Name and editHistory are left unchanged. A stored mileage higher than Hyper's is kept.
      */
     private void applyHyperSnapshot(Visit visit, HyperServiceHistoryItemResponse item) {
         visit.setServiceType(item.getServiceType());
         visit.setLastServiceDate(item.getLastServiceDate());
-        visit.setLastServiceMileage(item.getLastServiceMileage());
+        Integer incomingMileage = item.getLastServiceMileage();
+        Integer keptMileage = HyperMileageGuard.keepIfNotLower(visit.getLastServiceMileage(), incomingMileage);
+        if (incomingMileage != null && keptMileage != null && keptMileage > incomingMileage) {
+            log.info("Keeping higher visit mileage over Hyper snapshot | recordId={} storedKm={} hyperKm={}",
+                    item.getRecordId(), keptMileage, incomingMileage);
+        }
+        visit.setLastServiceMileage(keptMileage);
         visit.setInvoiceNumber(item.getInvoiceNumber());
         visit.setDealer(item.getDealer());
         visit.setCostAmount(item.getCost() != null ? item.getCost().getAmount() : null);
@@ -668,10 +675,11 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
         visit.setServiceGroups(item.getServiceGroups() != null ? new ArrayList<>(item.getServiceGroups()) : new ArrayList<>());
         visit.setUpdatedAt(LocalDateTime.now());
         replaceVisitChildren(visit, item);
+        HyperMileageGuard.stampLinesKeptAbove(visit, incomingMileage);
         log.info("Updated existing Hyper visit | carId={} recordId={} mileage={} finalCost={}",
                 visit.getCar() != null ? visit.getCar().getCarId() : null,
                 item.getRecordId(),
-                item.getLastServiceMileage(),
+                visit.getLastServiceMileage(),
                 visit.getFinalCostAmount());
     }
 

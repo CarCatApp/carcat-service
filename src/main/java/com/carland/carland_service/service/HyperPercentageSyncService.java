@@ -61,10 +61,10 @@ public class HyperPercentageSyncService {
     /**
      * tr: Ziyaret listesini yüzdelere zorla yeniden uygular (EDITED_BY_PARTNER aynı recordId olsa bile).
      *     EDITED_BY_CUSTOMER aynı/eski visit ile ezilmez; yalnızca daha yeni partner visit gelir.
-     *     GET persist Hyper kaydını güncelledikten sonra last/next km'nin donmaması için kullanılır.
+     *     Aynı Hyper kaydı kendi next değerini tazeleyebilir; daha düşük last km karttaki son km'yi geri alamaz.
      * en: Force-reapplies the visit list onto percentages even when already EDITED_BY_PARTNER for the
      *     same recordId. EDITED_BY_CUSTOMER is kept until a newer partner visit arrives.
-     *     Used after GET persist refreshes a Hyper snapshot so last/next km do not stay frozen.
+     *     The same Hyper record may refresh its own next values; a lower last km cannot roll the card back.
      */
     public void resyncFromVisits(Car car, List<Visit> visits) {
         syncInternal(car, visits, true);
@@ -176,7 +176,7 @@ public class HyperPercentageSyncService {
                 }
             }
             // A forced history reload still must not roll a newer panel write back to an older visit.
-            // The same Hyper record may refresh its own numbers.
+            // The same Hyper record may refresh its own next values. A lower last km is refused in applyPartnerData.
             if (forceReapply && current == PercentageStatus.EDITED_BY_PARTNER
                     && !sameRecord && !isNewerThanApplied(match.visit(), percentage)) {
                 log.info(
@@ -188,7 +188,9 @@ public class HyperPercentageSyncService {
                 continue;
             }
 
-            applyPartnerData(car, percentage, match, matchedRecordId);
+            if (!applyPartnerData(car, percentage, match, matchedRecordId)) {
+                continue;
+            }
             percentageRepository.save(percentage);
             log.info("Synced percentage from Hyper | carId={}, nameEn={}, percentageId={}, recordId={}, forced={}",
                     car.getCarId(), nameEn, percentage.getId(), matchedRecordId, forceReapply);
@@ -319,12 +321,34 @@ public class HyperPercentageSyncService {
         return appliedKm == null || visitKm > appliedKm;
     }
 
-    private void applyPartnerData(Car car, Percentage percentage, HyperServiceMatch match, String matchedRecordId) {
+    /** @return false when the Hyper snapshot must not be written onto the percentage */
+    private boolean applyPartnerData(Car car, Percentage percentage, HyperServiceMatch match, String matchedRecordId) {
         Visit visit = match.visit();
         VisitServiceLine line = match.line();
 
         LocalDate lastServiceDate = doneDate(match);
         Integer lastServiceKm = doneKm(match);
+
+        // Same Hyper record must not put a corrected last km back to the lower snapshot.
+        // A newer record still applies above, including a lower mileage on that newer visit.
+        if (matchedRecordId != null
+                && matchedRecordId.equals(percentage.getPartnerRecordId())
+                && lastServiceKm != null
+                && percentage.getLastServiceKm() != null
+                && lastServiceKm < percentage.getLastServiceKm()) {
+            log.info(
+                    "Keeping local last km — Hyper snapshot is lower | carId={}, percentageId={}, recordId={}, storedKm={}, hyperKm={}",
+                    car.getCarId(),
+                    percentage.getId(),
+                    matchedRecordId,
+                    percentage.getLastServiceKm(),
+                    lastServiceKm
+            );
+            if (HyperMileageGuard.raiseVisitMileage(visit, line, percentage.getLastServiceKm())) {
+                visitRepository.save(visit);
+            }
+            return false;
+        }
 
         if (lastServiceDate != null) {
             percentage.setLastServiceDate(lastServiceDate);
@@ -386,6 +410,7 @@ public class HyperPercentageSyncService {
                 nextServiceKm, line.getNextServiceMileage() != null,
                 nextServiceDate, line.getNextServiceDate() != null,
                 intervalKm, intervalMonth);
+        return true;
     }
 
     /** Line-level next km from Hyper can be invalid; fall back to template interval when needed. */
