@@ -18,8 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * tr: Rezervasyon sohbeti canlı hattı (SSE). new_message / delivery / read / typing.
- * en: Booking chat live line (SSE). new_message / delivery / read / typing.
+ * tr: Rezervasyon sohbeti canlı hattı (SSE). new_message / delivery / read / typing / presence.
+ *     presence: bu rezervasyonun sohbet hattı. Bağlanınca her iki rolün anlık durumu gider;
+ *     son dinleyici düşünce karşı tarafa online=false gider. İstemci periyodik istek atmaz.
+ * en: Booking chat live line (SSE). new_message / delivery / read / typing / presence.
+ *     presence is this booking's chat line. On connect both roles' current state is sent;
+ *     when the last listener of a role drops, peers get online=false. Clients do not poll.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,6 +45,11 @@ public class BookingChatLiveService {
         try {
             emitter.send(SseEmitter.event().comment("open"));
             push(emitter);
+            sendSnapshot(bookingId, listener);
+            listener.announced = true;
+            if (hasRole(bookingId, listener.role)) {
+                publishPresence(bookingId, listener.role, true, listener);
+            }
         } catch (Exception ex) {
             remove(bookingId, listener);
         }
@@ -117,7 +126,59 @@ public class BookingChatLiveService {
         }
     }
 
+    private void sendSnapshot(Long bookingId, Listener listener) throws IOException {
+        sendOne(bookingId, listener, presencePayload(bookingId, "customer", hasRole(bookingId, "customer")));
+        sendOne(bookingId, listener, presencePayload(bookingId, "branch", hasRole(bookingId, "branch")));
+    }
+
+    private void publishPresence(Long bookingId, String role, boolean online, Listener skip) {
+        if (bookingId == null || role == null || role.isBlank()) {
+            return;
+        }
+        publish(bookingId, "presence", presencePayload(bookingId, role, online), skip);
+    }
+
+    private Map<String, Object> presencePayload(Long bookingId, String role, boolean online) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("event", "presence");
+        payload.put("reservationId", String.valueOf(bookingId));
+        payload.put("role", role);
+        payload.put("online", online);
+        return payload;
+    }
+
+    private void sendOne(Long bookingId, Listener listener, Map<String, Object> payload) throws IOException {
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            listener.emitter.send(SseEmitter.event().name("presence").data(json));
+            push(listener.emitter);
+        } catch (Exception ex) {
+            remove(bookingId, listener);
+            if (ex instanceof IOException io) {
+                throw io;
+            }
+            throw new IOException(ex);
+        }
+    }
+
+    private boolean hasRole(Long bookingId, String role) {
+        List<Listener> emitters = open.get(bookingId);
+        if (emitters == null || emitters.isEmpty() || role == null) {
+            return false;
+        }
+        for (Listener listener : emitters) {
+            if (role.equals(listener.role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void publish(Long bookingId, String eventName, Map<String, Object> payload) {
+        publish(bookingId, eventName, payload, null);
+    }
+
+    private void publish(Long bookingId, String eventName, Map<String, Object> payload, Listener skip) {
         List<Listener> emitters = open.get(bookingId);
         if (emitters == null || emitters.isEmpty()) {
             return;
@@ -130,6 +191,9 @@ public class BookingChatLiveService {
             return;
         }
         for (Listener listener : emitters) {
+            if (listener == skip) {
+                continue;
+            }
             try {
                 listener.emitter.send(SseEmitter.event().name(eventName).data(json));
                 push(listener.emitter);
@@ -175,12 +239,24 @@ public class BookingChatLiveService {
         if (emitters == null) {
             return;
         }
-        emitters.remove(listener);
+        boolean removed = emitters.remove(listener);
         if (emitters.isEmpty()) {
             open.remove(bookingId, emitters);
         }
+        if (!removed || !listener.announced || hasRole(bookingId, listener.role)) {
+            return;
+        }
+        publishPresence(bookingId, listener.role, false, null);
     }
 
-    private record Listener(SseEmitter emitter, String role) {
+    private static final class Listener {
+        private final SseEmitter emitter;
+        private final String role;
+        private boolean announced;
+
+        private Listener(SseEmitter emitter, String role) {
+            this.emitter = emitter;
+            this.role = role;
+        }
     }
 }
