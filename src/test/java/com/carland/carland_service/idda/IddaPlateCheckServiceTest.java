@@ -41,6 +41,7 @@ class IddaPlateCheckServiceTest {
     @Mock IddaPlateCheckRepository iddaPlateCheckRepository;
     @Mock CustomerRepository customerRepository;
     @Mock CarRepository carRepository;
+    @Mock IddaPlateCheckMailService iddaPlateCheckMailService;
 
     IddaPlateCheckService service;
 
@@ -51,7 +52,8 @@ class IddaPlateCheckServiceTest {
                 iddaPlateCheckRepository,
                 customerRepository,
                 carRepository,
-                new ObjectMapper());
+                new ObjectMapper(),
+                iddaPlateCheckMailService);
     }
 
     @Test
@@ -102,6 +104,7 @@ class IddaPlateCheckServiceTest {
         service.check("77BU669", "050", "7", "az");
         verify(digitalFinanceClient, times(2)).exchange(eq("GET"), anyString(), any(), anyString(), any());
         verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
+        verify(iddaPlateCheckMailService, times(2)).send(any());
     }
 
     @Test
@@ -155,6 +158,7 @@ class IddaPlateCheckServiceTest {
         verify(iddaPlateCheckRepository).save(saved.capture());
         assertEquals("HONDA", saved.getValue().getBrand());
         assertEquals("INSIGHT", saved.getValue().getModel());
+        verify(iddaPlateCheckMailService, times(1)).send(saved.getValue());
     }
 
     @Test
@@ -173,6 +177,7 @@ class IddaPlateCheckServiceTest {
         assertEquals(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang("az"), response.getMessage());
         verify(iddaPlateCheckRepository, never()).save(any());
         verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
+        verify(iddaPlateCheckMailService, never()).send(any());
     }
 
     @Test
@@ -209,6 +214,26 @@ class IddaPlateCheckServiceTest {
         assertEquals(MessagesLangValues.IDDA_UNAVAILABLE.getMessageByLang("en"), response.getMessage());
         verify(iddaPlateCheckRepository, never()).save(any());
         verify(carRepository, never()).findAllByVinIgnoreCase(anyString());
+        verify(iddaPlateCheckMailService, never()).send(any());
+    }
+
+    @Test
+    void code2SavesAndDoesNotMail() throws Exception {
+        customer();
+        when(iddaPlateCheckRepository
+                .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any()))
+                .thenReturn(List.of());
+        when(digitalFinanceClient.exchange(eq("GET"), anyString(), any(), anyString(), any()))
+                .thenReturn(new DigitalFinanceClient.Upstream(200, "application/json", code2()));
+        when(iddaPlateCheckRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CarResponse response = service.check("77BU669", "050", "7", "az");
+
+        assertEquals(2, response.getIddaStatusCode());
+        assertEquals("ServiceError", response.getIddaStatusName());
+        assertEquals(Boolean.TRUE, response.getIsRestrict());
+        verify(iddaPlateCheckRepository).save(any());
+        verify(iddaPlateCheckMailService, never()).send(any());
     }
 
     @Test
@@ -353,6 +378,12 @@ class IddaPlateCheckServiceTest {
     private static byte[] successJson() {
         return """
                 {"RequestIdentifier":"8ec23951-d0ae-4d7d-a6c1-0b9eb1bbff0f","Status":{"Name":"Successful","Code":0,"Message":""},"Response":{"Certificate":{"Number":"BA535286","GivenDate":"25.11.2025"},"Car":{"NumberPlate":"77BU669","Mark":"HONDA INSIGHT MINIK","BodyNumber":"19XZE4F54NE012640","ManufactoringYear":"2022","Color":"Gümüşü metallik","EngineCapacity":"1496","EngineNumber":"3513075","Type":{"Id":3,"Description":"MINIK"}}}}
+                """.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] code2() {
+        return """
+                {"RequestIdentifier":"071e6c66-9325-4359-a5f4-3b1ae609db77","Status":{"Name":"ServiceError","Code":2,"Message":"Xəta baş verdi"},"Response":null}
                 """.getBytes(StandardCharsets.UTF_8);
     }
 

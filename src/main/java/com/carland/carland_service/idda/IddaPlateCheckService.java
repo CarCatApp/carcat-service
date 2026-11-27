@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -36,6 +38,7 @@ import java.util.UUID;
  *     Eski Code 0 limite sayılır, ekrana basılmaz.
  *     Canlı: aynı müşteri + plaka ayda 1, plaka geneli ayda 2.
  *     Code 4 ve teknik HTTP hataları (timeout, host, HTTP≠2xx, bozuk gövde) hakka yazılmaz.
+ *     Code 2 mektup açmaz. Başka her status kodu committen sonra dört adrese mail gider.
  *     Yan yana iki A olan nişan (10AA000) IDDA'ya gitmez.
  *     Check araç satırı açmaz, sahip değiştirmez.
  *     Redis: bu servis carlist yazmaz. Araç yazısı IddaCarWriteService içindedir, orada evict vardır.
@@ -44,6 +47,7 @@ import java.util.UUID;
  *     An old Code 0 still counts toward the cap and is not shown.
  *     Live caps: 1 call per customer and plate, 2 calls per plate each month.
  *     Code 4 and technical HTTP failures (timeout, host, non-2xx, unreadable body) do not count.
+ *     Code 2 sends no mail. Every other status code mails four addresses after commit.
  *     A plate with two adjacent A's (10AA000) never calls IDDA.
  *     The check does not insert a car or change an owner.
  *     Redis: this service does not write carlist. Car writes and evicts live in IddaCarWriteService.
@@ -79,6 +83,7 @@ public class IddaPlateCheckService {
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
+    private final IddaPlateCheckMailService iddaPlateCheckMailService;
 
     @Transactional
     public CarResponse check(String plate, String phoneNumber, String userIdHeader, String acceptLanguage) {
@@ -135,10 +140,31 @@ public class IddaPlateCheckService {
         IddaPlateCheck row = mapRow(root, plateKey, customer, requestId, code);
         iddaPlateCheckRepository.save(row);
         log.info("IDDA plate check live plateKey={} status={} counts={}", plateKey, code, row.isCountsTowardLimit());
+        if (code != 2) {
+            mailAfterCommit(row);
+        }
         if (row.isVehicleSuccess()) {
             return toResponse(row, acceptLanguage);
         }
         return restrictedLive(row, acceptLanguage);
+    }
+
+    /**
+     * tr: Code 2 buraya girmez. Commit olmazsa mektup gitmez. Brevo plaka cevabını bekletmez.
+     * en: Code 2 does not enter here. No mail if the commit does not happen. Brevo does not hold the plate response.
+     */
+    private void mailAfterCommit(IddaPlateCheck row) {
+        Runnable send = () -> iddaPlateCheckMailService.send(row);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    send.run();
+                }
+            });
+        } else {
+            send.run();
+        }
     }
 
     /**
