@@ -70,6 +70,16 @@ public class BookingChatLiveService {
         return false;
     }
 
+    public void publishTimeProposalAfterCommit(Long bookingId, Object messageView) {
+        if (bookingId == null || messageView == null) {
+            return;
+        }
+        afterCommit(() -> publish(bookingId, "time_proposal", Map.of(
+                "event", "time_proposal",
+                "reservationId", String.valueOf(bookingId),
+                "message", messageView)));
+    }
+
     public void publishNewMessageAfterCommit(Long bookingId, Object messageView) {
         if (bookingId == null || messageView == null) {
             return;

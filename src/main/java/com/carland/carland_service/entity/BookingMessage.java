@@ -52,7 +52,7 @@ public class BookingMessage {
     @Column(name = "author_user_id")
     Long authorUserId;
 
-    /** text | image | file | audio | system */
+    /** text | image | file | audio | time_proposal | system */
     @Column(nullable = false, length = 16)
     @Builder.Default
     String kind = "text";
@@ -80,6 +80,22 @@ public class BookingMessage {
 
     Integer width;
     Integer height;
+
+    /** Saat teklifi. Kart bu alanlardan çizilir. */
+    @Column(name = "proposal_id")
+    Long proposalId;
+
+    @Column(name = "proposal_status", length = 16)
+    String proposalStatus;
+
+    @Column(name = "offer_from", length = 8)
+    String offerFrom;
+
+    @Column(name = "offer_to", length = 8)
+    String offerTo;
+
+    @Column(name = "offer_day", length = 8)
+    String offerDay;
 
     /** sent | delivered | seen */
     @Column(nullable = false, length = 16)

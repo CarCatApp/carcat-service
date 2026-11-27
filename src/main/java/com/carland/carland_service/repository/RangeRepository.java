@@ -67,4 +67,14 @@ public interface RangeRepository extends JpaRepository<Range, Long> {
 
     @Query("select r.rangeId from Range r where r.calendar.calendarId = :calendarId")
     List<Long> findIdsByCalendarId(@Param("calendarId") Long calendarId);
+
+    @Query("select r from Range r join fetch r.calendar c join fetch c.branch b "
+            + "left join fetch r.individualService left join fetch r.carePackage "
+            + "where b.id = :branchId and r.start > :now and r.start < :until "
+            + "and (r.status is null or r.status = 'AVAILABLE') "
+            + "and (r.dayHidden is null or r.dayHidden = false) "
+            + "order by r.start")
+    List<Range> findOpenRanges(@Param("branchId") Long branchId,
+                               @Param("now") OffsetDateTime now,
+                               @Param("until") OffsetDateTime until);
 }

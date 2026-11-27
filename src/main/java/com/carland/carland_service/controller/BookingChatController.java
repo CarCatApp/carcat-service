@@ -6,9 +6,12 @@ import com.carland.carland_service.dto.booking.ChatMessagesPage;
 import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
 import com.carland.carland_service.dto.booking.ChatTypingRequest;
+import com.carland.carland_service.dto.booking.TimeOfferOptions;
+import com.carland.carland_service.dto.booking.TimeOfferRequest;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.service.BookingChatService;
+import com.carland.carland_service.service.BookingTimeOfferService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class BookingChatController {
 
     private final BookingChatService bookingChatService;
+    private final BookingTimeOfferService bookingTimeOfferService;
     private final BookingStaffRequestAuth bookingStaffRequestAuth;
 
     @GetMapping("/api/v1/booking/bookings/{bookingId}/messages")
@@ -113,6 +117,24 @@ public class BookingChatController {
         return bookingChatService.ownerDownload(parseUserId(userIdHeader), bookingId, uploadId, rangeHeader);
     }
 
+    @PostMapping("/api/v1/booking/bookings/{bookingId}/time-proposals/{proposalId}/accept")
+    public ChatMessageView ownerAcceptTime(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @PathVariable Long proposalId
+    ) {
+        return bookingTimeOfferService.accept(parseUserId(userIdHeader), bookingId, proposalId);
+    }
+
+    @PostMapping("/api/v1/booking/bookings/{bookingId}/time-proposals/{proposalId}/decline")
+    public ChatMessageView ownerDeclineTime(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @PathVariable Long proposalId
+    ) {
+        return bookingTimeOfferService.decline(parseUserId(userIdHeader), bookingId, proposalId);
+    }
+
     @GetMapping(value = "/api/v1/booking/bookings/{bookingId}/messages/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter ownerLive(
             @RequestHeader("X-User-Id") String userIdHeader,
@@ -121,6 +143,35 @@ public class BookingChatController {
     ) {
         prepareSse(response);
         return bookingChatService.ownerLive(parseUserId(userIdHeader), bookingId);
+    }
+
+    @GetMapping("/api/v1/booking/staff/bookings/{bookingId}/time-options")
+    public TimeOfferOptions staffTimeOptions(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return bookingTimeOfferService.options(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId,
+                acceptLanguage);
+    }
+
+    @PostMapping("/api/v1/booking/staff/bookings/{bookingId}/time-proposals")
+    public ResponseEntity<ChatMessageView> staffProposeTime(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestBody(required = false) TimeOfferRequest body,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        ChatMessageView view = bookingTimeOfferService.propose(
+                bookingStaffRequestAuth.userId(request),
+                bookingStaffRequestAuth.mustChangePassword(request),
+                bookingId,
+                body,
+                acceptLanguage);
+        return ResponseEntity.status(HttpStatus.CREATED).body(view);
     }
 
     @GetMapping("/api/v1/booking/staff/bookings/{bookingId}/messages")

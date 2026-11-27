@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.booking.ChatMessageView;
 import com.carland.carland_service.dto.booking.ChatMessagesPage;
 import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
+import com.carland.carland_service.dto.booking.ChatTimeProposalView;
 import com.carland.carland_service.dto.booking.ChatTypingRequest;
 import com.carland.carland_service.entity.Booking;
 import com.carland.carland_service.entity.BookingChatUpload;
@@ -558,7 +559,7 @@ public class BookingChatService {
         return booking;
     }
 
-    private ChatMessageView toView(BookingMessage row) {
+    ChatMessageView toView(BookingMessage row) {
         String authorId = row.getAuthorUserId() == null
                 ? ("system".equals(row.getFromRole()) ? "system" : null)
                 : String.valueOf(row.getAuthorUserId());
@@ -590,6 +591,20 @@ public class BookingChatService {
                 .delivery(row.getDelivery())
                 .rebook(Boolean.TRUE.equals(row.getRebook()))
                 .attachment(attachment)
+                .proposal(proposalOf(row))
+                .build();
+    }
+
+    private static ChatTimeProposalView proposalOf(BookingMessage row) {
+        if (row == null || !"time_proposal".equals(row.getKind()) || row.getProposalId() == null) {
+            return null;
+        }
+        return ChatTimeProposalView.builder()
+                .id(row.getProposalId())
+                .status(row.getProposalStatus())
+                .fromTime(row.getOfferFrom())
+                .toTime(row.getOfferTo())
+                .day(row.getOfferDay())
                 .build();
     }
 

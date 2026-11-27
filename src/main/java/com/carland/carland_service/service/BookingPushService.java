@@ -261,6 +261,13 @@ public class BookingPushService {
                 default -> "Səs mesajı göndərdi";
             };
         }
+        if ("time_proposal".equals(normalized)) {
+            return switch (lang) {
+                case "en" -> "Proposed a new time";
+                case "ru" -> "Предложил новое время";
+                default -> "Yeni vaxt təklif etdi";
+            };
+        }
         return clipChat(text);
     }
 

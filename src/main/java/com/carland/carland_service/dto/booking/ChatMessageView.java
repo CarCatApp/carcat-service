@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,4 +26,6 @@ public class ChatMessageView {
     String delivery;
     Boolean rebook;
     Object attachment;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    ChatTimeProposalView proposal;
 }
