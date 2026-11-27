@@ -1,5 +1,6 @@
 package com.carland.carland_service.dto.booking;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,13 @@ public class ChatAttachmentView {
     String url;
     String fileName;
     Long sizeBytes;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    Long durationMs;
+    /** audio/mp4 for kind audio. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String mime;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String contentType;
     Integer width;
     Integer height;
     Boolean unavailable;

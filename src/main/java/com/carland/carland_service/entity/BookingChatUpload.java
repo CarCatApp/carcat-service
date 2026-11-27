@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
 
 /**
- * tr: Chat medya yüklemesi (resim/belge). Mesaja bağlanınca message_id dolar.
- * en: Chat media upload (image/file). message_id is set when attached to a message.
+ * tr: Chat medya yüklemesi (resim/belge/ses). Mesaja bağlanınca message_id dolar.
+ * en: Chat media upload (image/file/audio). message_id is set when attached to a message.
  */
 @Entity
 @Data
@@ -40,7 +40,7 @@ public class BookingChatUpload {
     @EqualsAndHashCode.Exclude
     Booking booking;
 
-    /** image | file */
+    /** image | file | audio */
     @Column(nullable = false, length = 16)
     String kind;
 
@@ -52,6 +52,10 @@ public class BookingChatUpload {
 
     @Column(name = "size_bytes", nullable = false)
     Long sizeBytes;
+
+    /** ffprobe süresi. Ses dışında boş. */
+    @Column(name = "duration_ms")
+    Long durationMs;
 
     Integer width;
     Integer height;

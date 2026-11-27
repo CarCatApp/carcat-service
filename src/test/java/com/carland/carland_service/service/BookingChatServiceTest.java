@@ -2,11 +2,14 @@ package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.booking.ChatReadRequest;
 import com.carland.carland_service.dto.booking.ChatSendRequest;
+import com.carland.carland_service.dto.booking.ChatAttachmentView;
 import com.carland.carland_service.entity.Booking;
+import com.carland.carland_service.entity.BookingChatUpload;
 import com.carland.carland_service.entity.BookingMessage;
 import com.carland.carland_service.entity.BookingStaff;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.exceptions.ConflictException;
+import com.carland.carland_service.repository.BookingChatUploadRepository;
 import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,7 @@ class BookingChatServiceTest {
 
     @Mock BookingRepository bookingRepository;
     @Mock BookingMessageRepository messageRepository;
+    @Mock BookingChatUploadRepository uploadRepository;
     @Mock BookingStaffAccess bookingStaffAccess;
     @Mock BookingChatLiveService chatLiveService;
     @Mock BookingPushService bookingPushService;
@@ -188,6 +192,48 @@ class BookingChatServiceTest {
 
         assertEquals("seen", branchMessage.getDelivery());
         assertEquals("sent", ownMessage.getDelivery());
+    }
+
+    @Test
+    void audioMessageUsesProbeDurationWhenClientDisagrees() {
+        Booking booking = Booking.builder().id(5L).status("pending").customerUserId(42L).build();
+        BookingChatUpload upload = BookingChatUpload.builder()
+                .publicId("upl_audio")
+                .kind("audio")
+                .fileName("6f1c9a20-1111-4111-8111-111111111111.m4a")
+                .contentType("audio/mp4")
+                .sizeBytes(1200L)
+                .durationMs(12_000L)
+                .build();
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+        when(messageRepository.findByBooking_IdAndClientMessageId(5L, "c-audio")).thenReturn(Optional.empty());
+        when(uploadRepository.findByBooking_IdAndPublicId(5L, "upl_audio")).thenReturn(Optional.of(upload));
+        when(messageRepository.save(any(BookingMessage.class))).thenAnswer(inv -> {
+            BookingMessage row = inv.getArgument(0);
+            row.setId(21L);
+            return row;
+        });
+        when(chatLiveService.hasPeerListener(5L, "customer")).thenReturn(true);
+
+        var view = service.ownerSend(42L, "5", ChatSendRequest.builder()
+                .clientMessageId("c-audio")
+                .kind("audio")
+                .uploadId("upl_audio")
+                .fileName("voice-from-user.mp3")
+                .durationMs(1_000L)
+                .build());
+
+        ArgumentCaptor<BookingMessage> saved = ArgumentCaptor.forClass(BookingMessage.class);
+        verify(messageRepository).save(saved.capture());
+        assertEquals("audio", saved.getValue().getKind());
+        assertEquals(12_000L, saved.getValue().getDurationMs());
+        assertEquals("6f1c9a20-1111-4111-8111-111111111111.m4a", saved.getValue().getFileName());
+        assertEquals("audio/mp4", saved.getValue().getContentType());
+        ChatAttachmentView attachment = (ChatAttachmentView) view.getAttachment();
+        assertEquals(12_000L, attachment.getDurationMs());
+        assertEquals("audio/mp4", attachment.getMime());
+        assertEquals("audio", attachment.getKind());
+        verify(chatLiveService).publishNewMessageAfterCommit(org.mockito.ArgumentMatchers.eq(5L), any());
     }
 
     @Test

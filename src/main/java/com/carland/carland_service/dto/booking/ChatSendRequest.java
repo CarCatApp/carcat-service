@@ -19,10 +19,12 @@ public class ChatSendRequest {
     String text;
     /** Client hint only; server clock wins. */
     String createdAt;
-    /** For kind image|file — from prior upload. */
+    /** For kind image|file|audio — from prior upload. */
     String uploadId;
     String fileName;
     Long sizeBytes;
+    /** Client hint for kind audio. Server keeps ffprobe when they differ. */
+    Long durationMs;
     Integer width;
     Integer height;
 }

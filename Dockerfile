@@ -1,6 +1,7 @@
 FROM eclipse-temurin:21-jdk-alpine
-# Java on Alpine skips DNS when this file is missing.
-RUN echo "hosts: files dns" > /etc/nsswitch.conf
+# ffmpeg supplies ffprobe for chat voice messages. Java on Alpine skips DNS when nsswitch is missing.
+RUN apk add --no-cache ffmpeg \
+ && echo "hosts: files dns" > /etc/nsswitch.conf
 WORKDIR /app
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

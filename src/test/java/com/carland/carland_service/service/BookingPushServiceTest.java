@@ -352,6 +352,16 @@ class BookingPushServiceTest {
     }
 
     @Test
+    void chatAudioBodyFollowsCustomerLanguage() {
+        when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
+        when(customerRepository.findByUserId(5L)).thenReturn(customer("az"));
+
+        service.chatNewMessage(sample(null), "audio", "");
+
+        verify(pushNotificationService).send(eq("Nərimanov"), eq("Səs mesajı göndərdi"), eq("tok-1"), any());
+    }
+
+    @Test
     void chatTextIsClippedAndAMissingBranchSendsNothing() {
         when(deviceTokenRepository.findByUserId(5L)).thenReturn(token());
         when(customerRepository.findByUserId(5L)).thenReturn(customer("en"));

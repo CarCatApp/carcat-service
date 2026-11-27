@@ -7,8 +7,8 @@ import lombok.experimental.FieldDefaults;
 import java.time.OffsetDateTime;
 
 /**
- * tr: Booking sohbeti (CRCT-286). Metin + resim/belge.
- * en: Booking chat (CRCT-286). Text + image/file.
+ * tr: Booking sohbeti (CRCT-286). Metin + resim/belge/ses.
+ * en: Booking chat (CRCT-286). Text + image/file/audio.
  */
 @Entity
 @Data
@@ -52,7 +52,7 @@ public class BookingMessage {
     @Column(name = "author_user_id")
     Long authorUserId;
 
-    /** text | image | file | system */
+    /** text | image | file | audio | system */
     @Column(nullable = false, length = 16)
     @Builder.Default
     String kind = "text";
@@ -61,7 +61,7 @@ public class BookingMessage {
     @Column(length = 2000)
     String body;
 
-    /** booking_chat_uploads.public_id when kind is image|file */
+    /** booking_chat_uploads.public_id when kind is image|file|audio */
     @Column(name = "upload_id", length = 40)
     String uploadId;
 
@@ -73,6 +73,10 @@ public class BookingMessage {
 
     @Column(name = "size_bytes")
     Long sizeBytes;
+
+    /** Ses süresi. Client ffprobe ile uyuşmazsa ffprobe değeri yazılır. */
+    @Column(name = "duration_ms")
+    Long durationMs;
 
     Integer width;
     Integer height;

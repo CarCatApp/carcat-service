@@ -254,6 +254,13 @@ public class BookingPushService {
                 default -> "Fayl göndərdi";
             };
         }
+        if ("audio".equals(normalized)) {
+            return switch (lang) {
+                case "en" -> "Sent a voice message";
+                case "ru" -> "Отправил голосовое сообщение";
+                default -> "Səs mesajı göndərdi";
+            };
+        }
         return clipChat(text);
     }
 

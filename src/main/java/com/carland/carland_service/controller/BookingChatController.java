@@ -93,13 +93,24 @@ public class BookingChatController {
                         parseUserId(userIdHeader), bookingId, file, kind, clientMessageId, fileName, width, height));
     }
 
+    @PostMapping(value = "/api/v1/booking/bookings/{bookingId}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatAttachmentView> ownerAudio(
+            @RequestHeader("X-User-Id") String userIdHeader,
+            @PathVariable String bookingId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                bookingChatService.ownerAudio(parseUserId(userIdHeader), bookingId, file));
+    }
+
     @GetMapping("/api/v1/booking/bookings/{bookingId}/uploads/{uploadId}/file")
     public ResponseEntity<byte[]> ownerDownload(
             @RequestHeader("X-User-Id") String userIdHeader,
             @PathVariable String bookingId,
-            @PathVariable String uploadId
+            @PathVariable String uploadId,
+            @RequestHeader(value = "Range", required = false) String rangeHeader
     ) {
-        return bookingChatService.ownerDownload(parseUserId(userIdHeader), bookingId, uploadId);
+        return bookingChatService.ownerDownload(parseUserId(userIdHeader), bookingId, uploadId, rangeHeader);
     }
 
     @GetMapping(value = "/api/v1/booking/bookings/{bookingId}/messages/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -189,17 +200,34 @@ public class BookingChatController {
                         bookingId, file, kind, clientMessageId, fileName, width, height, acceptLanguage));
     }
 
+    @PostMapping(
+            value = "/api/v1/booking/staff/bookings/{bookingId}/audio",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatAttachmentView> staffAudio(
+            HttpServletRequest request,
+            @PathVariable Long bookingId,
+            @RequestPart("file") MultipartFile file,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                bookingChatService.staffAudio(
+                        bookingStaffRequestAuth.userId(request),
+                        bookingStaffRequestAuth.mustChangePassword(request),
+                        bookingId, file, acceptLanguage));
+    }
+
     @GetMapping("/api/v1/booking/staff/bookings/{bookingId}/uploads/{uploadId}/file")
     public ResponseEntity<byte[]> staffDownload(
             HttpServletRequest request,
             @PathVariable Long bookingId,
             @PathVariable String uploadId,
+            @RequestHeader(value = "Range", required = false) String rangeHeader,
             @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage
     ) {
         return bookingChatService.staffDownload(
                 bookingStaffRequestAuth.userId(request),
                 bookingStaffRequestAuth.mustChangePassword(request),
-                bookingId, uploadId, acceptLanguage);
+                bookingId, uploadId, rangeHeader, acceptLanguage);
     }
 
     @GetMapping(

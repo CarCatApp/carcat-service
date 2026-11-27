@@ -20,8 +20,10 @@ import com.carland.carland_service.repository.BookingChatUploadRepository;
 import com.carland.carland_service.repository.BookingMessageRepository;
 import com.carland.carland_service.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -64,6 +66,9 @@ public class BookingChatService {
     private final BookingStaffAccess bookingStaffAccess;
     private final BookingChatLiveService chatLiveService;
     private final BookingPushService bookingPushService;
+
+    @Value("${chat.audio.ffprobe:ffprobe}")
+    String ffprobeCommand;
 
     @Transactional(readOnly = true)
     public ChatMessagesPage ownerMessages(Long customerUserId, String bookingKey, String cursor, Integer limit) {
@@ -153,17 +158,31 @@ public class BookingChatService {
         return storeUpload(booking, "branch", userId, file, kind, clientMessageId, fileName, width, height);
     }
 
-    @Transactional(readOnly = true)
-    public ResponseEntity<byte[]> ownerDownload(Long customerUserId, String bookingKey, String uploadId) {
+    @Transactional
+    public ChatAttachmentView ownerAudio(Long customerUserId, String bookingKey, MultipartFile file) {
         Booking booking = loadOwned(customerUserId, bookingKey);
-        return download(booking, uploadId);
+        return storeAudio(booking, "customer", customerUserId, file);
+    }
+
+    @Transactional
+    public ChatAttachmentView staffAudio(
+            Long userId, boolean mustChangePassword, Long bookingId, MultipartFile file, String acceptLanguage) {
+        Booking booking = loadStaffBooking(userId, mustChangePassword, bookingId, acceptLanguage);
+        return storeAudio(booking, "branch", userId, file);
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> ownerDownload(Long customerUserId, String bookingKey, String uploadId, String rangeHeader) {
+        Booking booking = loadOwned(customerUserId, bookingKey);
+        return download(booking, uploadId, rangeHeader);
     }
 
     @Transactional(readOnly = true)
     public ResponseEntity<byte[]> staffDownload(
-            Long userId, boolean mustChangePassword, Long bookingId, String uploadId, String acceptLanguage) {
+            Long userId, boolean mustChangePassword, Long bookingId, String uploadId, String rangeHeader,
+            String acceptLanguage) {
         Booking booking = loadStaffBooking(userId, mustChangePassword, bookingId, acceptLanguage);
-        return download(booking, uploadId);
+        return download(booking, uploadId, rangeHeader);
     }
 
     private ChatAttachmentView storeUpload(
@@ -226,7 +245,41 @@ public class BookingChatService {
         return attachmentOf(booking.getId(), upload, false);
     }
 
-    private ResponseEntity<byte[]> download(Booking booking, String uploadId) {
+    private ChatAttachmentView storeAudio(Booking booking, String fromRole, Long userId, MultipartFile file) {
+        requireOpen(booking);
+        if (file == null || file.isEmpty()) {
+            throw MissingFieldException.required("file");
+        }
+        if (file.getSize() > ChatAudioProbe.MAX_BYTES) {
+            throw new MissingFieldException("payloadTooLarge");
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException ex) {
+            throw new MissingFieldException("Failed to read file");
+        }
+        ChatAudioProbe.Result probed = ChatAudioProbe.inspect(bytes, ffprobeCommand);
+        String publicId = "upl_" + UUID.randomUUID().toString().replace("-", "");
+        String fileName = UUID.randomUUID() + ".m4a";
+        BookingChatUpload upload = BookingChatUpload.builder()
+                .publicId(publicId)
+                .booking(booking)
+                .kind("audio")
+                .fileName(fileName)
+                .contentType("audio/mp4")
+                .sizeBytes((long) bytes.length)
+                .durationMs(probed.durationMs())
+                .data(bytes)
+                .createdByRole(fromRole)
+                .createdByUserId(userId)
+                .createdAt(OffsetDateTime.now())
+                .build();
+        uploadRepository.save(upload);
+        return attachmentOf(booking.getId(), upload, false);
+    }
+
+    private ResponseEntity<byte[]> download(Booking booking, String uploadId, String rangeHeader) {
         String id = trimToNull(uploadId);
         if (id == null) {
             throw MissingFieldException.required("uploadId");
@@ -236,11 +289,30 @@ public class BookingChatService {
         if (upload.getData() == null || upload.getData().length == 0) {
             throw new ResourceNotFoundException("file unavailable");
         }
+        if ("audio".equals(upload.getKind())) {
+            return audioBody(upload.getFileName(), upload.getData(), rangeHeader);
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + sanitizeFileName(upload.getFileName()) + "\"")
                 .contentType(MediaType.parseMediaType(upload.getContentType()))
                 .contentLength(upload.getSizeBytes() == null ? upload.getData().length : upload.getSizeBytes())
                 .body(upload.getData());
+    }
+
+    private static ResponseEntity<byte[]> audioBody(String fileName, byte[] data, String rangeHeader) {
+        ChatAudioProbe.Slice slice = ChatAudioProbe.slice(data, rangeHeader);
+        String name = sanitizeFileName(fileName);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(slice.status())
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + name + "\"")
+                .contentType(MediaType.parseMediaType("audio/mp4"));
+        if (slice.contentRange() != null) {
+            response.header(HttpHeaders.CONTENT_RANGE, slice.contentRange());
+        }
+        if (slice.status() == HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE.value()) {
+            return response.body(slice.body());
+        }
+        return response.contentLength(slice.body().length).body(slice.body());
     }
 
     private ChatMessageView send(Booking booking, String fromRole, Long authorUserId, ChatSendRequest request) {
@@ -256,7 +328,7 @@ public class BookingChatService {
             throw MissingFieldException.required("clientMessageId");
         }
         String kind = request.getKind() == null ? "text" : request.getKind().trim().toLowerCase(Locale.ROOT);
-        if (!Set.of("text", "image", "file").contains(kind)) {
+        if (!Set.of("text", "image", "file", "audio").contains(kind)) {
             throw new MissingFieldException("unsupported kind");
         }
 
@@ -308,15 +380,18 @@ public class BookingChatService {
         if (upload != null) {
             builder.uploadId(upload.getPublicId())
                     .fileName(upload.getFileName())
-                    .contentType(upload.getContentType())
-                    .sizeBytes(upload.getSizeBytes())
-                    .width(upload.getWidth())
-                    .height(upload.getHeight());
-            if (request.getWidth() != null) {
-                builder.width(request.getWidth());
-            }
-            if (request.getHeight() != null) {
-                builder.height(request.getHeight());
+                    .contentType("audio".equals(kind) ? "audio/mp4" : upload.getContentType())
+                    .sizeBytes(upload.getSizeBytes());
+            if ("audio".equals(kind)) {
+                builder.durationMs(ChatAudioProbe.resolveDuration(request.getDurationMs(), upload.getDurationMs()));
+            } else {
+                builder.width(upload.getWidth()).height(upload.getHeight());
+                if (request.getWidth() != null) {
+                    builder.width(request.getWidth());
+                }
+                if (request.getHeight() != null) {
+                    builder.height(request.getHeight());
+                }
             }
         }
         BookingMessage row = messageRepository.save(builder.build());
@@ -485,8 +560,9 @@ public class BookingChatService {
                 ? ("system".equals(row.getFromRole()) ? "system" : null)
                 : String.valueOf(row.getAuthorUserId());
         ChatAttachmentView attachment = null;
-        if (row.getUploadId() != null && ("image".equals(row.getKind()) || "file".equals(row.getKind()))) {
-            attachment = ChatAttachmentView.builder()
+        if (row.getUploadId() != null && ("image".equals(row.getKind()) || "file".equals(row.getKind())
+                || "audio".equals(row.getKind()))) {
+            ChatAttachmentView.ChatAttachmentViewBuilder attachmentBuilder = ChatAttachmentView.builder()
                     .uploadId(row.getUploadId())
                     .kind(row.getKind())
                     .url(fileUrl(row.getBooking().getId(), row.getUploadId()))
@@ -494,8 +570,11 @@ public class BookingChatService {
                     .sizeBytes(row.getSizeBytes())
                     .width(row.getWidth())
                     .height(row.getHeight())
-                    .unavailable(false)
-                    .build();
+                    .unavailable(false);
+            if ("audio".equals(row.getKind())) {
+                attachmentBuilder.durationMs(row.getDurationMs()).mime("audio/mp4").contentType("audio/mp4");
+            }
+            attachment = attachmentBuilder.build();
         }
         return ChatMessageView.builder()
                 .clientMessageId(row.getClientMessageId())
@@ -518,6 +597,9 @@ public class BookingChatService {
                 .url(fileUrl(bookingId, upload.getPublicId()))
                 .fileName(upload.getFileName())
                 .sizeBytes(upload.getSizeBytes())
+                .durationMs(upload.getDurationMs())
+                .mime("audio".equals(upload.getKind()) ? "audio/mp4" : null)
+                .contentType("audio".equals(upload.getKind()) ? "audio/mp4" : null)
                 .width(upload.getWidth())
                 .height(upload.getHeight())
                 .unavailable(unavailable)
