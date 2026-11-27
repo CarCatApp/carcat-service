@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatAudioProbeTest {
 
@@ -44,6 +46,21 @@ class ChatAudioProbeTest {
                  "format":{"format_name":"mp4","duration":"301"}}
                 """)));
         assertEquals("audioTooLong", tooLong.getMessage());
+    }
+
+    @Test
+    void browserVoiceCanBeConvertedAndVideoCannot() throws Exception {
+        assertTrue(ChatAudioProbe.convertibleVoice(JSON.readTree("""
+                {"streams":[{"codec_name":"opus","codec_type":"audio"}],
+                 "format":{"format_name":"matroska,webm","duration":"3.2"}}
+                """)));
+        assertFalse(ChatAudioProbe.convertibleVoice(JSON.readTree("""
+                {"streams":[
+                   {"codec_name":"aac","codec_type":"audio"},
+                   {"codec_name":"h264","codec_type":"video"}
+                 ],
+                 "format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3"}}
+                """)));
     }
 
     @Test

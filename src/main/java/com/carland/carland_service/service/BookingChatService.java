@@ -70,6 +70,9 @@ public class BookingChatService {
     @Value("${chat.audio.ffprobe:ffprobe}")
     String ffprobeCommand;
 
+    @Value("${chat.audio.ffmpeg:ffmpeg}")
+    String ffmpegCommand;
+
     @Transactional(readOnly = true)
     public ChatMessagesPage ownerMessages(Long customerUserId, String bookingKey, String cursor, Integer limit) {
         Booking booking = loadOwned(customerUserId, bookingKey);
@@ -259,7 +262,7 @@ public class BookingChatService {
         } catch (IOException ex) {
             throw new MissingFieldException("Failed to read file");
         }
-        ChatAudioProbe.Result probed = ChatAudioProbe.inspect(bytes, ffprobeCommand);
+        ChatAudioProbe.Encoded encoded = ChatAudioProbe.normalize(bytes, ffprobeCommand, ffmpegCommand);
         String publicId = "upl_" + UUID.randomUUID().toString().replace("-", "");
         String fileName = UUID.randomUUID() + ".m4a";
         BookingChatUpload upload = BookingChatUpload.builder()
@@ -268,9 +271,9 @@ public class BookingChatService {
                 .kind("audio")
                 .fileName(fileName)
                 .contentType("audio/mp4")
-                .sizeBytes((long) bytes.length)
-                .durationMs(probed.durationMs())
-                .data(bytes)
+                .sizeBytes((long) encoded.bytes().length)
+                .durationMs(encoded.durationMs())
+                .data(encoded.bytes())
                 .createdByRole(fromRole)
                 .createdByUserId(userId)
                 .createdAt(OffsetDateTime.now())

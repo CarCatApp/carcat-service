@@ -31,52 +31,83 @@ public final class ChatAudioProbe {
     public record Result(long durationMs) {
     }
 
+    /** Bytes stored after validation. Browser Opus/WebM is converted to AAC .m4a. */
+    public record Encoded(byte[] bytes, long durationMs) {
+    }
+
     public record Slice(int status, byte[] body, String contentRange) {
     }
 
     public static Result inspect(byte[] data, String ffprobeCommand) {
+        requireSize(data);
+        return readReport(probe(data, ffprobeCommand));
+    }
+
+    /**
+     * tr: Telefondan gelen AAC .m4a olduğu gibi kalır. Tarayıcı kaydı (Opus/WebM) ffmpeg ile AAC .m4a olur.
+     * en: A phone AAC .m4a is kept. A browser recording (Opus/WebM) is converted to AAC .m4a with ffmpeg.
+     */
+    public static Encoded normalize(byte[] data, String ffprobeCommand, String ffmpegCommand) {
+        requireSize(data);
+        JsonNode report = probe(data, ffprobeCommand);
+        Long duration = measuredDuration(report);
+        if (duration != null && duration > MAX_DURATION_MS) {
+            throw new MissingFieldException("audioTooLong");
+        }
+        try {
+            Result ready = readReport(report);
+            return new Encoded(data, ready.durationMs());
+        } catch (MissingFieldException ex) {
+            if (!"unsupportedMedia".equals(ex.getMessage())) {
+                throw ex;
+            }
+        }
+        if (!convertibleVoice(report)) {
+            throw new MissingFieldException("unsupportedMedia");
+        }
+        byte[] m4a = transcode(data, ffmpegCommand);
+        Result checked = inspect(m4a, ffprobeCommand);
+        return new Encoded(m4a, checked.durationMs());
+    }
+
+    static boolean convertibleVoice(JsonNode root) {
+        JsonNode streams = root == null ? null : root.path("streams");
+        if (streams == null || !streams.isArray()) {
+            return false;
+        }
+        boolean audio = false;
+        for (JsonNode stream : streams) {
+            String type = stream.path("codec_type").asText("").toLowerCase(Locale.ROOT);
+            if ("video".equals(type) && !attachedPicture(stream)) {
+                return false;
+            }
+            if ("audio".equals(type)) {
+                audio = true;
+            }
+        }
+        return audio;
+    }
+
+    private static void requireSize(byte[] data) {
         if (data == null || data.length == 0) {
             throw new MissingFieldException("unsupportedMedia");
         }
         if (data.length > MAX_BYTES) {
             throw new MissingFieldException("payloadTooLarge");
         }
+    }
+
+    private static JsonNode probe(byte[] data, String ffprobeCommand) {
         String command = ffprobeCommand == null || ffprobeCommand.isBlank() ? "ffprobe" : ffprobeCommand.trim();
         Path temp = null;
         try {
-            temp = Files.createTempFile("chat-audio-", ".m4a");
+            temp = Files.createTempFile("chat-audio-", ".bin");
             Files.write(temp, data);
-            Process process = new ProcessBuilder(
-                    command,
-                    "-v", "error",
-                    "-print_format", "json",
-                    "-show_format",
-                    "-show_streams",
-                    temp.toAbsolutePath().toString())
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-            CompletableFuture<byte[]> output = CompletableFuture.supplyAsync(() -> {
-                try (InputStream in = process.getInputStream()) {
-                    return in.readAllBytes();
-                } catch (Exception ex) {
-                    return new byte[0];
-                }
-            });
-            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                output.cancel(true);
-                throw new IllegalStateException("ffprobe timed out");
-            }
-            if (process.exitValue() != 0) {
-                throw new MissingFieldException("unsupportedMedia");
-            }
-            return readReport(JSON.readTree(output.get(2, TimeUnit.SECONDS)));
+            byte[] output = run(command, 10, "-v", "error", "-print_format", "json", "-show_format", "-show_streams",
+                    temp.toAbsolutePath().toString());
+            return JSON.readTree(output);
         } catch (MissingFieldException | IllegalStateException ex) {
             throw ex;
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("ffprobe interrupted", ex);
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
             throw new MissingFieldException("unsupportedMedia");
         } catch (java.io.IOException ex) {
@@ -84,14 +115,91 @@ public final class ChatAudioProbe {
         } catch (Exception ex) {
             throw new MissingFieldException("unsupportedMedia");
         } finally {
-            if (temp != null) {
-                try {
-                    Files.deleteIfExists(temp);
-                } catch (Exception ignored) {
-                    // temp file is the only leftover
+            deleteTemp(temp);
+        }
+    }
+
+    private static byte[] transcode(byte[] data, String ffmpegCommand) {
+        String command = ffmpegCommand == null || ffmpegCommand.isBlank() ? "ffmpeg" : ffmpegCommand.trim();
+        Path in = null;
+        Path out = null;
+        try {
+            in = Files.createTempFile("chat-audio-in-", ".bin");
+            out = Files.createTempFile("chat-audio-out-", ".m4a");
+            Files.write(in, data);
+            run(command, 20, "-y", "-i", in.toAbsolutePath().toString(), "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "64k",
+                    "-movflags", "+faststart", out.toAbsolutePath().toString());
+            return Files.readAllBytes(out);
+        } catch (MissingFieldException | IllegalStateException ex) {
+            throw ex;
+        } catch (java.io.IOException ex) {
+            throw new IllegalStateException("ffmpeg unavailable", ex);
+        } catch (Exception ex) {
+            throw new MissingFieldException("unsupportedMedia");
+        } finally {
+            deleteTemp(in);
+            deleteTemp(out);
+        }
+    }
+
+    private static byte[] run(String command, int timeoutSeconds, String... args) throws Exception {
+        String[] cmd = new String[args.length + 1];
+        cmd[0] = command;
+        System.arraycopy(args, 0, cmd, 1, args.length);
+        Process process = new ProcessBuilder(cmd)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+        CompletableFuture<byte[]> output = CompletableFuture.supplyAsync(() -> {
+            try (InputStream in = process.getInputStream()) {
+                return in.readAllBytes();
+            } catch (Exception ex) {
+                return new byte[0];
+            }
+        });
+        boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            output.cancel(true);
+            throw new IllegalStateException(command + " timed out");
+        }
+        if (process.exitValue() != 0) {
+            throw new MissingFieldException("unsupportedMedia");
+        }
+        return output.get(2, TimeUnit.SECONDS);
+    }
+
+    private static void deleteTemp(Path temp) {
+        if (temp == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(temp);
+        } catch (Exception ignored) {
+            // temp file is the only leftover
+        }
+    }
+
+    private static Long measuredDuration(JsonNode root) {
+        if (root == null) {
+            return null;
+        }
+        Long duration = durationMs(root.path("format").path("duration"));
+        if (duration != null) {
+            return duration;
+        }
+        JsonNode streams = root.path("streams");
+        if (!streams.isArray()) {
+            return null;
+        }
+        for (JsonNode stream : streams) {
+            if ("audio".equalsIgnoreCase(stream.path("codec_type").asText(""))) {
+                duration = durationMs(stream.path("duration"));
+                if (duration != null) {
+                    return duration;
                 }
             }
         }
+        return null;
     }
 
     static Result readReport(JsonNode root) {
