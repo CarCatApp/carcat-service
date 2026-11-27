@@ -26,7 +26,7 @@ public class KiaServicePolicy {
     private final long kiaPartnerId;
     private final CarRepository carRepository;
 
-    public KiaServicePolicy(@Value("${carland.booking.kia-partner-id:12}") long kiaPartnerId,
+    public KiaServicePolicy(@Value("${carland.booking.kia-partner-id:13}") long kiaPartnerId,
                             CarRepository carRepository) {
         this.kiaPartnerId = kiaPartnerId;
         this.carRepository = carRepository;
