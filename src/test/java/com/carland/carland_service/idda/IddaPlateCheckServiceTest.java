@@ -158,7 +158,7 @@ class IddaPlateCheckServiceTest {
         verify(iddaPlateCheckRepository).save(saved.capture());
         assertEquals("HONDA", saved.getValue().getBrand());
         assertEquals("INSIGHT", saved.getValue().getModel());
-        verify(iddaPlateCheckMailService, times(1)).send(saved.getValue());
+        verify(iddaPlateCheckMailService, never()).send(any());
     }
 
     @Test
@@ -218,7 +218,7 @@ class IddaPlateCheckServiceTest {
     }
 
     @Test
-    void code2SavesAndDoesNotMail() throws Exception {
+    void code2SavesAndMails() throws Exception {
         customer();
         when(iddaPlateCheckRepository
                 .findByPlateKeyAndCountsTowardLimitTrueAndQueriedAtAfterOrderByQueriedAtDesc(anyString(), any()))
@@ -232,8 +232,9 @@ class IddaPlateCheckServiceTest {
         assertEquals(2, response.getIddaStatusCode());
         assertEquals("ServiceError", response.getIddaStatusName());
         assertEquals(Boolean.TRUE, response.getIsRestrict());
-        verify(iddaPlateCheckRepository).save(any());
-        verify(iddaPlateCheckMailService, never()).send(any());
+        ArgumentCaptor<IddaPlateCheck> saved = ArgumentCaptor.forClass(IddaPlateCheck.class);
+        verify(iddaPlateCheckRepository).save(saved.capture());
+        verify(iddaPlateCheckMailService).send(saved.getValue());
     }
 
     @Test
