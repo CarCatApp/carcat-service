@@ -10,6 +10,7 @@ import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
+import com.carland.carland_service.repository.PromoBranchRepository;
 import com.carland.carland_service.repository.PromoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,7 @@ class UserServiceImplApplyPromoTest {
     @Mock CustomerRepository customerRepository;
     @Mock NotificationRepository notificationRepository;
     @Mock PromoRepository promoRepository;
+    @Mock PromoBranchRepository promoBranchRepository;
     @InjectMocks UserServiceImpl service;
 
     @Test
@@ -145,6 +147,26 @@ class UserServiceImplApplyPromoTest {
         assertEquals("Yay", response.getPromo().getName());
         assertEquals(Promo.PERCENTAGE, response.getPromo().getDiscountType());
         assertEquals(4L, response.getPromo().getBannerId());
+    }
+
+    @Test
+    void supportPromoIsTrueOnlyForAListedBranch() {
+        Customer customer = customer();
+        customer.setPromoId(8L);
+        when(customerRepository.findByUserId(5L)).thenReturn(customer);
+        when(promoBranchRepository.existsByPromo_IdAndBranchId(8L, 4L)).thenReturn(true);
+        when(promoBranchRepository.existsByPromo_IdAndBranchId(8L, 9L)).thenReturn(false);
+
+        assertTrue(service.supportPromo(5L, 4L).isSupportPromo());
+        assertFalse(service.supportPromo(5L, 9L).isSupportPromo());
+    }
+
+    @Test
+    void supportPromoIsFalseWhenTheUserHasNoPromo() {
+        when(customerRepository.findByUserId(5L)).thenReturn(customer());
+
+        assertFalse(service.supportPromo(5L, 4L).isSupportPromo());
+        verify(promoBranchRepository, never()).existsByPromo_IdAndBranchId(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

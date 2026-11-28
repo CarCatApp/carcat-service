@@ -205,6 +205,22 @@ public class UserController {
     }
 
     /**
+     * tr: Yalnız Authorization Bearer. branchId query. Kullanıcının promo'sunu bu şube kabul ediyorsa supportPromo true.
+     *     Süre ve status bakılmaz. Token bozuksa 401.
+     * en: Authorization Bearer only. branchId is a query param. supportPromo is true when the branch accepts the user's promo.
+     *     Dates and status are ignored. 401 when the token is bad.
+     */
+    @GetMapping("/promo/branch")
+    public ResponseEntity<SupportPromoResponse> supportPromo(@RequestParam(value = "branchId", required = false) Long branchId,
+                                                             HttpServletRequest request) {
+        Long userId = bookingStaffRequestAuth.userIdFromBearer(request);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(userService.supportPromo(userId, branchId));
+    }
+
+    /**
      * tr: Body customerId + promoCode. Kod promos tablosunda kullanılabilirse hasPromo true olur ve kod yazılır.
      *     customerId, X-User-Id ile aynı aktif müşteri olmalıdır. Cevap profil ile aynıdır.
      * en: Body is customerId + promoCode. A usable row in promos sets hasPromo and stores the code.

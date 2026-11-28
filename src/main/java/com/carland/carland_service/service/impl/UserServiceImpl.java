@@ -8,6 +8,7 @@ import com.carland.carland_service.dto.response.UserPromoResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
+import com.carland.carland_service.dto.response.SupportPromoResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Notification;
@@ -24,6 +25,7 @@ import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.messaging.CustomerEnsurePublisher;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
+import com.carland.carland_service.repository.PromoBranchRepository;
 import com.carland.carland_service.repository.PromoRepository;
 import com.carland.carland_service.service.BookingMineService;
 import com.carland.carland_service.service.CustomerEnsureService;
@@ -58,6 +60,7 @@ public class UserServiceImpl implements UserService {
     private final CustomerEnsureService customerEnsureService;
     private final CustomerEnsurePublisher customerEnsurePublisher;
     private final PromoRepository promoRepository;
+    private final PromoBranchRepository promoBranchRepository;
 
     /**
      * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda message ve customerId döner.
@@ -321,6 +324,26 @@ public class UserServiceImpl implements UserService {
                 .startDate(promo.getStartDate())
                 .endDate(promo.getEndDate())
                 .build();
+    }
+
+    /**
+     * tr: promo_branches içinde bu promoId ve branchId var mı. Redis yok. Süre ve status yok.
+     * en: Whether promo_branches has this promoId and branchId. No Redis. No date or status check.
+     */
+    @Override
+    public SupportPromoResponse supportPromo(Long userId, Long branchId) {
+        if (branchId == null) {
+            throw MissingFieldException.required("branchId");
+        }
+        if (userId == null) {
+            return SupportPromoResponse.builder().supportPromo(false).build();
+        }
+        Customer customer = customerRepository.findByUserId(userId);
+        if (customer == null || customer.getPromoId() == null) {
+            return SupportPromoResponse.builder().supportPromo(false).build();
+        }
+        boolean supported = promoBranchRepository.existsByPromo_IdAndBranchId(customer.getPromoId(), branchId);
+        return SupportPromoResponse.builder().supportPromo(supported).build();
     }
 
     /**

@@ -7,6 +7,7 @@ import com.carland.carland_service.dto.response.HasPromoResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
+import com.carland.carland_service.dto.response.SupportPromoResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 
 import java.util.List;
@@ -71,5 +72,13 @@ public interface UserService {
      *     A deleted promo row leaves only the stored code.
      */
     HasPromoResponse hasPromo(Long userId);
+
+    /**
+     * tr: Token'daki müşterinin promo şube listesinde branchId var mı. Süre ve status bakılmaz.
+     *     Promo yoksa veya şube listede değilse false.
+     * en: Whether branchId is in the token customer's promo branch list. Dates and status are ignored.
+     *     False when there is no promo or the branch is not in the list.
+     */
+    SupportPromoResponse supportPromo(Long userId, Long branchId);
 
 }
