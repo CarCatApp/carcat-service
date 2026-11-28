@@ -80,8 +80,8 @@ public interface PhotoService {
     ResponseEntity<byte[]> getPartnerPhotoById(Long partnerId);
 
     /**
-     * tr: adds veya info banner fotoğrafını yazar. Eski satırı siler. Commit sonrası photo:banner:{bannerId} düşer.
-     * en: Writes the adds or info banner photo. Deletes the previous row. photo:banner:{bannerId} drops after commit.
+     * tr: adds, info veya promo banner fotoğrafını yazar. Eski satırı siler. Commit sonrası photo:banner:{bannerId} düşer.
+     * en: Writes the adds, info or promo banner photo. Deletes the previous row. photo:banner:{bannerId} drops after commit.
      */
     PhotoResponse replaceBannerPhoto(MultipartFile file, Long bannerId);
 

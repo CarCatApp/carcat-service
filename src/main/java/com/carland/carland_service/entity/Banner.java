@@ -16,9 +16,11 @@ import lombok.experimental.FieldDefaults;
 
 /**
  * tr: Admin banner. Şube satırına bağlı değil; branchId elle de yazılır.
+ *     type: service, adds, info, promo. promo info ile aynıdır; ek olarak context tutar.
  *     Silme satırı silmez, status=deactive olur. Liste yalnız active okur.
  *     active geri dönüşü admin ekranında yok; DB'de elle SQL.
  * en: Admin banner. branchId is stored on its own and can be typed by hand.
+ *     type is service, adds, info, or promo. promo matches info and also stores context.
  *     Delete sets status=deactive. The list reads active only.
  *     Turning a row active again is a manual SQL update.
  */
@@ -36,6 +38,7 @@ public class Banner {
     public static final String SERVICE = "service";
     public static final String ADDS = "adds";
     public static final String INFO = "info";
+    public static final String PROMO = "promo";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,15 +50,19 @@ public class Banner {
     @Column(nullable = false, length = 4000)
     String description;
 
-    /** tr: Yalnız service. adds ve info boş kalır. / en: Service only. Empty for adds and info. */
+    /** tr: Yalnız service. adds, info ve promo boş kalır. / en: Service only. Empty for adds, info and promo. */
     @Column(name = "branch_id", nullable = true)
     Long branchId;
 
-    /** tr: service, adds veya info. Eski satır null ise service sayılır. / en: service, adds or info. A null legacy row counts as service. */
+    /** tr: service, adds, info veya promo. Eski satır null ise service sayılır. / en: service, adds, info or promo. A null legacy row counts as service. */
     @Column(name = "banner_type", length = 16)
     String type;
 
-    /** tr: adds ve info. Boş olabilir. / en: adds and info. May be empty. */
+    /** tr: Yalnız promo. Diğer tipler boş kalır. / en: Promo only. Empty for the other types. */
+    @Column(length = 4000)
+    String context;
+
+    /** tr: adds, info ve promo. Boş olabilir. / en: adds, info and promo. May be empty. */
     @Column(length = 2000)
     String url;
 

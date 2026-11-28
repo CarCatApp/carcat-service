@@ -10,6 +10,7 @@ public class AdminBannerRow {
     String type;
     String title;
     String description;
+    String context;
     Long branchId;
     String url;
     Integer sortOrder;

@@ -330,6 +330,72 @@ class AdminBannerServiceTest {
     }
 
     @Test
+    void promoCreateStoresContextAndRequiresAPhoto() {
+        when(bannerRepository.save(any())).thenAnswer(invocation -> {
+            Banner banner = invocation.getArgument(0);
+            banner.setId(9L);
+            return banner;
+        });
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setType(Banner.PROMO);
+        body.setTitle("Yay");
+        body.setDescription("yay endirimi");
+        body.setContext("  kod YAY  ");
+        body.setUrl("https://carland.az/promo");
+        body.setSortOrder(4);
+
+        AdminBannerRow row = service.create(body, file);
+
+        assertEquals(Banner.PROMO, row.getType());
+        assertEquals("kod YAY", row.getContext());
+        assertEquals("https://carland.az/promo", row.getUrl());
+        assertEquals(null, row.getBranchId());
+        verify(photoService).replaceBannerPhoto(file, 9L);
+    }
+
+    @Test
+    void promoWithoutContextIsRejected() {
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setType(Banner.PROMO);
+        body.setTitle("Yay");
+        body.setDescription("yay endirimi");
+
+        assertThrows(MissingFieldException.class, () -> service.create(body, file));
+        verify(bannerRepository, never()).save(any());
+    }
+
+    @Test
+    void promoEditStoresContext() {
+        Banner existing = Banner.builder()
+                .id(9L)
+                .title("Yay")
+                .description("yay endirimi")
+                .context("eski")
+                .type(Banner.PROMO)
+                .url("https://carland.az/promo")
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findById(9L)).thenReturn(Optional.of(existing));
+        when(bannerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setTitle("Yay");
+        body.setDescription("yeni metn");
+        body.setContext("  yeni kod  ");
+        body.setUrl("https://carland.az/promo");
+
+        AdminBannerRow row = service.update(9L, body);
+
+        assertEquals("yeni kod", row.getContext());
+        assertEquals("yeni metn", row.getDescription());
+        assertTrue(row.getShowing());
+    }
+
+    @Test
     void addsWithoutPhotoIsRejected() {
         AdminBannerSaveRequest body = new AdminBannerSaveRequest();
         body.setType(Banner.INFO);

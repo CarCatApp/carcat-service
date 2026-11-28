@@ -80,6 +80,7 @@ public class AdminBannerController {
                                                          @RequestParam(required = false) String type,
                                                          @RequestParam(required = false) Long branchId,
                                                          @RequestParam(required = false) String url,
+                                                         @RequestParam(required = false) String context,
                                                          @RequestParam(required = false) Integer sortOrder,
                                                          @RequestParam(required = false) MultipartFile file,
                                                          HttpServletRequest request) {
@@ -92,6 +93,7 @@ public class AdminBannerController {
         body.setType(type);
         body.setBranchId(branchId);
         body.setUrl(url);
+        body.setContext(context);
         body.setSortOrder(sortOrder);
         return ResponseEntity.ok(adminBannerService.create(body, file));
     }

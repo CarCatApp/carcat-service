@@ -26,11 +26,13 @@ import java.util.Set;
 /**
  * tr: Admin banner. Redis yok. showing=true birden fazla olabilir.
  *     Sıra sortOrder küçükten büyüğe, aynı sayıda id büyük önde.
- *     service branchId ister. adds ve info fotoğraf ister, url boş kalabilir.
+ *     service branchId ister. adds, info ve promo fotoğraf ister, url boş kalabilir.
+ *     promo ayrıca context ister.
  *     Fotoğraf photo:banner:{bannerId}. Yazan replaceBannerPhoto, commit sonrası evict.
  * en: Admin banner. No Redis. More than one row may have showing=true.
  *     Order is sortOrder ascending, then larger id first.
- *     service requires branchId. adds and info require a photo; url may be empty.
+ *     service requires branchId. adds, info and promo require a photo; url may be empty.
+ *     promo also requires context.
  *     Photo key photo:banner:{bannerId}. replaceBannerPhoto evicts it after commit.
  */
 @Service
@@ -40,6 +42,7 @@ public class AdminBannerService {
     static final int TITLE_MAX = 255;
     static final int DESCRIPTION_MAX = 4000;
     static final int DESCRIPTION_MIN = 3;
+    static final int CONTEXT_MAX = 4000;
     static final int URL_MAX = 2000;
 
     private final BannerRepository bannerRepository;
@@ -109,6 +112,7 @@ public class AdminBannerService {
         Banner banner = Banner.builder()
                 .title(readTitle(body))
                 .description(readDescription(body))
+                .context(readContext(type, body == null ? null : body.getContext()))
                 .type(type)
                 .branchId(readBranchId(type, body))
                 .url(readUrl(type, body == null ? null : body.getUrl()))
@@ -127,7 +131,7 @@ public class AdminBannerService {
     public AdminBannerRow replacePhoto(Long id, MultipartFile file) {
         Banner banner = requireBanner(id);
         if (!needsPhoto(storedType(banner))) {
-            throw new InvalidStatusException("banner photo is only for adds and info");
+            throw new InvalidStatusException("banner photo is only for adds, info and promo");
         }
         photoService.replaceBannerPhoto(file, banner.getId());
         return toRow(banner);
@@ -146,12 +150,13 @@ public class AdminBannerService {
             banner.setStatus(Banner.DEACTIVE);
             return toRow(bannerRepository.save(banner));
         }
-        boolean text = body.getTitle() != null || body.getDescription() != null || body.getBranchId() != null
-                || body.getSortOrder() != null || body.getUrl() != null;
+        boolean text = body.getTitle() != null || body.getDescription() != null || body.getContext() != null
+                || body.getBranchId() != null || body.getSortOrder() != null || body.getUrl() != null;
         if (text) {
             String type = storedType(banner);
             banner.setTitle(readTitle(body));
             banner.setDescription(readDescription(body));
+            banner.setContext(readContext(type, body.getContext()));
             if (body.getSortOrder() != null) {
                 banner.setSortOrder(body.getSortOrder());
             }
@@ -186,6 +191,7 @@ public class AdminBannerService {
                 .type(storedType(banner))
                 .title(banner.getTitle())
                 .description(banner.getDescription())
+                .context(banner.getContext())
                 .branchId(banner.getBranchId())
                 .url(banner.getUrl())
                 .sortOrder(banner.getSortOrder())
@@ -200,6 +206,7 @@ public class AdminBannerService {
                 .type(storedType(banner))
                 .title(banner.getTitle())
                 .description(banner.getDescription())
+                .context(banner.getContext())
                 .branchId(banner.getBranchId())
                 .url(banner.getUrl())
                 .sortOrder(banner.getSortOrder())
@@ -216,7 +223,7 @@ public class AdminBannerService {
     }
 
     static boolean needsPhoto(String type) {
-        return Banner.ADDS.equals(type) || Banner.INFO.equals(type);
+        return Banner.ADDS.equals(type) || Banner.INFO.equals(type) || Banner.PROMO.equals(type);
     }
 
     private static String readType(String raw) {
@@ -224,10 +231,25 @@ public class AdminBannerService {
             return Banner.SERVICE;
         }
         String type = raw.trim().toLowerCase(Locale.ROOT);
-        if (!Banner.SERVICE.equals(type) && !Banner.ADDS.equals(type) && !Banner.INFO.equals(type)) {
-            throw new InvalidStatusException("type must be service, adds or info");
+        if (!Banner.SERVICE.equals(type) && !Banner.ADDS.equals(type)
+                && !Banner.INFO.equals(type) && !Banner.PROMO.equals(type)) {
+            throw new InvalidStatusException("type must be service, adds, info or promo");
         }
         return type;
+    }
+
+    private static String readContext(String type, String raw) {
+        if (!Banner.PROMO.equals(type)) {
+            return null;
+        }
+        if (raw == null || raw.isBlank()) {
+            throw MissingFieldException.required("context");
+        }
+        String context = raw.trim();
+        if (context.length() > CONTEXT_MAX) {
+            throw new MissingFieldException("context is too long");
+        }
+        return context;
     }
 
     private static String readTitle(AdminBannerSaveRequest body) {

@@ -340,9 +340,9 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
-     * tr: adds veya info banner fotoğrafını değiştirir. service tipine yazılmaz.
+     * tr: adds, info veya promo banner fotoğrafını değiştirir. service tipine yazılmaz.
      *     Redis: commit sonrası photo:banner:{bannerId} silinir. Put yok.
-     * en: Replaces the adds or info banner photo. A service banner is rejected.
+     * en: Replaces the adds, info or promo banner photo. A service banner is rejected.
      *     Redis: photo:banner:{bannerId} is deleted after commit. No put.
      */
     @Override
@@ -355,7 +355,7 @@ public class PhotoServiceImpl implements PhotoService {
                 .orElseThrow(() -> new ResourceNotFoundException("banner not found"));
         String type = banner.getType() == null || banner.getType().isBlank() ? Banner.SERVICE : banner.getType();
         if (Banner.SERVICE.equals(type)) {
-            throw new InvalidStatusException("banner photo is only for adds and info");
+            throw new InvalidStatusException("banner photo is only for adds, info and promo");
         }
         try {
             checkAttack(file, null);

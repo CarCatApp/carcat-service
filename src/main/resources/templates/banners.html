@@ -59,7 +59,7 @@
   <div class="page-head">
     <div>
       <h1>banner</h1>
-      <p class="muted">service şube ile kalır. adds və info foto + url götürür. sortOrder kiçikdən böyüyə slayt sırasıdır. showing eyni anda birdən çox ola bilər.</p>
+      <p class="muted">service şube ile kalır. adds, info və promo foto + url götürür. promo-da title və description-dan əlavə context olur. sortOrder kiçikdən böyüyə slayt sırasıdır. showing eyni anda birdən çox ola bilər.</p>
     </div>
   </div>
   <div class="error-box" id="errBox" hidden></div>
@@ -74,6 +74,7 @@
           <option value="service">service</option>
           <option value="adds">adds</option>
           <option value="info">info</option>
+          <option value="promo">promo</option>
         </select>
       </div>
       <div class="field">
@@ -87,6 +88,10 @@
       <div class="field full">
         <label for="description">description</label>
         <textarea id="description"></textarea>
+      </div>
+      <div class="field full" id="contextField" hidden>
+        <label for="context">context</label>
+        <textarea id="context"></textarea>
       </div>
       <div class="field" id="branchField">
         <label for="branchId">branchId</label>
@@ -113,6 +118,7 @@
           <th>type</th>
           <th>title</th>
           <th>description</th>
+          <th>context</th>
           <th>branchId</th>
           <th>url</th>
           <th>showing</th>
@@ -138,6 +144,10 @@
       <div class="field full">
         <label for="editDescription">description</label>
         <textarea id="editDescription"></textarea>
+      </div>
+      <div class="field full" id="editContextField" hidden>
+        <label for="editContext">context</label>
+        <textarea id="editContext"></textarea>
       </div>
       <div class="field">
         <label for="editSortOrder">sortOrder</label>
@@ -206,7 +216,11 @@
   }
 
   function isMedia(type) {
-    return type === "adds" || type === "info";
+    return type === "adds" || type === "info" || type === "promo";
+  }
+
+  function isPromo(type) {
+    return type === "promo";
   }
 
   function applyType(type) {
@@ -215,6 +229,7 @@
     document.getElementById("branchField").hidden = media;
     document.getElementById("urlField").hidden = !media;
     document.getElementById("fileField").hidden = !media;
+    document.getElementById("contextField").hidden = !isPromo(type);
   }
 
   function readFields(titleEl, descriptionEl, branchEl, type, sortEl) {
@@ -231,7 +246,14 @@
       if (!Number.isSafeInteger(branchId)) return { error: "branchId is required" };
       return { title, description, branchId, sortOrder: sort.sortOrder, type };
     }
-    return { title, description, sortOrder: sort.sortOrder, type, url: document.getElementById(sortEl.id === "editSortOrder" ? "editUrl" : "url").value.trim() };
+    const editing = sortEl.id === "editSortOrder";
+    const url = document.getElementById(editing ? "editUrl" : "url").value.trim();
+    if (!isPromo(type)) {
+      return { title, description, sortOrder: sort.sortOrder, type, url };
+    }
+    const context = document.getElementById(editing ? "editContext" : "context").value.trim();
+    if (!context) return { error: "context is required" };
+    return { title, description, context, sortOrder: sort.sortOrder, type, url };
   }
 
   function clearPick() {
@@ -268,7 +290,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
-      td.colSpan = 9;
+      td.colSpan = 10;
       td.className = "muted";
       td.textContent = "active banner yoxdur";
       tr.appendChild(td);
@@ -281,6 +303,7 @@
       tr.appendChild(textCell(row.type || "service"));
       tr.appendChild(textCell(row.title));
       tr.appendChild(textCell(row.description));
+      tr.appendChild(textCell(row.context || ""));
       tr.appendChild(textCell(row.branchId == null ? "" : String(row.branchId)));
       tr.appendChild(textCell(row.url || ""));
 
@@ -364,6 +387,7 @@
     document.getElementById("editId").value = row.id;
     document.getElementById("editTitle").value = row.title || "";
     document.getElementById("editDescription").value = row.description || "";
+    document.getElementById("editContext").value = row.context || "";
     document.getElementById("editSortOrder").value = row.sortOrder == null ? "0" : String(row.sortOrder);
     document.getElementById("editBranchId").value = row.branchId == null ? "" : String(row.branchId);
     document.getElementById("editUrl").value = row.url || "";
@@ -372,6 +396,7 @@
     document.getElementById("editBranchField").hidden = media;
     document.getElementById("editUrlField").hidden = !media;
     document.getElementById("editFileField").hidden = !media;
+    document.getElementById("editContextField").hidden = !isPromo(row.type || "service");
     editor.hidden = false;
   }
 
@@ -422,6 +447,7 @@
     data.append("sortOrder", String(fields.sortOrder));
     if (!isMedia(type)) data.append("branchId", String(fields.branchId));
     if (isMedia(type) && fields.url) data.append("url", fields.url);
+    if (isPromo(type)) data.append("context", fields.context);
     if (file) data.append("file", file);
     const saved = await api("/admin/banners", { method: "POST", body: data });
     btn.disabled = false;
@@ -457,6 +483,7 @@
     };
     if (!isMedia(type)) payload.branchId = fields.branchId;
     else payload.url = fields.url || "";
+    if (isPromo(type)) payload.context = fields.context;
     const saved = await api("/admin/banners/" + id, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

@@ -17,8 +17,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import java.sql.Types;
 
 /**
- * tr: adds ve info banner fotoğrafı. Bir bannerId için bir satır.
- * en: Photo for an adds or info banner. One row per bannerId.
+ * tr: adds, info ve promo banner fotoğrafı. Bir bannerId için bir satır.
+ * en: Photo for an adds, info or promo banner. One row per bannerId.
  */
 @Entity
 @Data

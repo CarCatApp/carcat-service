@@ -127,8 +127,8 @@ public class PhotoController {
     }
 
     /**
-     * tr: Banner fotoğrafını döner. adds ve info. bannerId path'tedir.
-     * en: Returns the banner photo. adds and info. bannerId is in the path.
+     * tr: Banner fotoğrafını döner. adds, info ve promo. bannerId path'tedir.
+     * en: Returns the banner photo. adds, info and promo. bannerId is in the path.
      */
     @GetMapping(value = "/for/banner/get/{bannerId}", produces = MediaType.ALL_VALUE)
     public ResponseEntity<byte[]> getBannerPhotoById(@PathVariable("bannerId") Long bannerId) {

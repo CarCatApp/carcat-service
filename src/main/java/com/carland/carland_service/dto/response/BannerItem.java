@@ -18,6 +18,7 @@ public class BannerItem {
     private String type;
     private String title;
     private String description;
+    private String context;
     private Long branchId;
     private String url;
     private Integer sortOrder;
