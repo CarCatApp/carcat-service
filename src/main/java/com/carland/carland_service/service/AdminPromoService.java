@@ -21,9 +21,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -111,17 +113,35 @@ public class AdminPromoService {
         return toRow(promoRepository.save(promo));
     }
 
+    /**
+     * tr: Kalan şube aynı satır kalır. Listeyi silip aynı (promo, şube) için yeni satır açmak
+     *     uk_promo_branch'i kırar: Hibernate INSERT'i DELETE'ten önce yazar (23505).
+     * en: A kept branch stays the same row. Clearing and inserting the same (promo, branch)
+     *     breaks uk_promo_branch: Hibernate flushes INSERT before DELETE (23505).
+     */
     private void replaceBranches(Promo promo, List<Long> branchIds) {
         if (promo.getBranches() == null) {
             promo.setBranches(new ArrayList<>());
         }
-        promo.getBranches().clear();
-        for (Long branchId : branchIds) {
-            promo.getBranches().add(PromoBranch.builder()
-                    .promo(promo)
-                    .branchId(branchId)
-                    .build());
+        Map<Long, PromoBranch> existing = new LinkedHashMap<>();
+        for (PromoBranch link : promo.getBranches()) {
+            if (link != null && link.getBranchId() != null) {
+                existing.putIfAbsent(link.getBranchId(), link);
+            }
         }
+        List<PromoBranch> next = new ArrayList<>();
+        for (Long branchId : branchIds) {
+            PromoBranch link = existing.remove(branchId);
+            if (link == null) {
+                link = PromoBranch.builder()
+                        .promo(promo)
+                        .branchId(branchId)
+                        .build();
+            }
+            next.add(link);
+        }
+        promo.getBranches().clear();
+        promo.getBranches().addAll(next);
     }
 
     private void ensureCodeFree(String key, Long selfId) {

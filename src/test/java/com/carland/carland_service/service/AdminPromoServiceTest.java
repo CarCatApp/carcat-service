@@ -24,6 +24,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -116,6 +118,33 @@ class AdminPromoServiceTest {
         assertEquals(Promo.DEACTIVE, row.getStatus());
         assertFalse(row.getExpired());
         assertTrue(saved.getValue().getBranches().stream().allMatch(link -> link.getPromo() == existing));
+    }
+
+    @Test
+    void updateKeepsBranchAlreadyLinked() {
+        Promo existing = Promo.builder()
+                .id(1L)
+                .branches(new ArrayList<>())
+                .build();
+        PromoBranch kept = PromoBranch.builder().id(50L).promo(existing).branchId(16L).build();
+        existing.getBranches().add(kept);
+        existing.getBranches().add(PromoBranch.builder().id(51L).promo(existing).branchId(4L).build());
+        when(promoRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(promoRepository.findByCodeKey("inmerge2026")).thenReturn(Optional.of(existing));
+        when(branchRepository.existsById(16L)).thenReturn(true);
+        when(branchRepository.existsById(8L)).thenReturn(true);
+        when(promoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminPromoSaveRequest edit = body("percentage", new BigDecimal("20"), List.of(16L, 8L));
+        edit.setStatus(Promo.ACTIVE);
+
+        service.update(1L, edit);
+
+        ArgumentCaptor<Promo> saved = ArgumentCaptor.forClass(Promo.class);
+        verify(promoRepository).save(saved.capture());
+        List<PromoBranch> links = saved.getValue().getBranches();
+        assertEquals(List.of(16L, 8L), links.stream().map(PromoBranch::getBranchId).toList());
+        assertSame(kept, links.get(0));
+        assertNull(links.get(1).getId());
     }
 
     private static AdminPromoSaveRequest body(String type, BigDecimal value, List<Long> branchIds) {
