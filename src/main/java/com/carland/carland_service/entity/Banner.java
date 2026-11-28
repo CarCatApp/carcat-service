@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+
+import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,10 +19,12 @@ import lombok.experimental.FieldDefaults;
 /**
  * tr: Admin banner. Şube satırına bağlı değil; branchId elle de yazılır.
  *     type: service, adds, info, promo. promo info ile aynıdır; ek olarak context tutar.
+ *     lang az, en veya ru. Boş eski satır az sayılır. expireDate Bakü günüdür; boşsa süresiz.
  *     Silme satırı silmez, status=deactive olur. Liste yalnız active okur.
  *     active geri dönüşü admin ekranında yok; DB'de elle SQL.
  * en: Admin banner. branchId is stored on its own and can be typed by hand.
  *     type is service, adds, info, or promo. promo matches info and also stores context.
+ *     lang is az, en, or ru. A blank legacy row counts as az. expireDate is a Baku date; blank never expires.
  *     Delete sets status=deactive. The list reads active only.
  *     Turning a row active again is a manual SQL update.
  */
@@ -39,6 +43,9 @@ public class Banner {
     public static final String ADDS = "adds";
     public static final String INFO = "info";
     public static final String PROMO = "promo";
+    public static final String AZ = "az";
+    public static final String EN = "en";
+    public static final String RU = "ru";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -70,6 +77,14 @@ public class Banner {
     @Column(name = "sort_order")
     Integer sortOrder;
 
+    /** tr: az, en veya ru. Boş eski satır az sayılır. / en: az, en, or ru. A blank legacy row counts as az. */
+    @Column(length = 8)
+    String lang;
+
+    /** tr: Bakü takvimi. Bu gün dahil görünür. Boşsa süresiz. / en: Baku calendar date. Visible through this day. Blank never expires. */
+    @Column(name = "expire_date")
+    LocalDate expireDate;
+
     @Builder.Default
     @Column(nullable = false)
     Boolean showing = false;
@@ -88,6 +103,9 @@ public class Banner {
         }
         if (type == null || type.isBlank()) {
             type = SERVICE;
+        }
+        if (lang == null || lang.isBlank()) {
+            lang = AZ;
         }
     }
 }

@@ -37,7 +37,8 @@
       border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px;
     }
     .editor-card h2 { color: #111; }
-    input[type="file"] { color: #111; }
+    input[type="file"],
+    input[type="date"] { color: #111; }
     @media (max-width: 720px) {
       .banner-grid { grid-template-columns: 1fr; }
     }
@@ -59,7 +60,7 @@
   <div class="page-head">
     <div>
       <h1>banner</h1>
-      <p class="muted">service şube ile kalır. adds, info və promo foto + url götürür. promo-da title və description-dan əlavə context olur. sortOrder kiçikdən böyüyə slayt sırasıdır. showing eyni anda birdən çox ola bilər.</p>
+      <p class="muted">service şube ile kalır. adds, info və promo foto + url götürür. promo-da context olur. Hər banner bir dildir: az, en, ru. Mobil siyahı Accept-Language ilə həmin dili qaytarır. expireDate Bakı günüdür; gün keçəndə siyahı showing-i bağlayır. Tarixi dəyişib showing-i yenidən açmaq olar.</p>
     </div>
   </div>
   <div class="error-box" id="errBox" hidden></div>
@@ -78,8 +79,20 @@
         </select>
       </div>
       <div class="field">
+        <label for="lang">lang</label>
+        <select id="lang">
+          <option value="az" selected>az</option>
+          <option value="en">en</option>
+          <option value="ru">ru</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="sortOrder">sortOrder</label>
         <input id="sortOrder" inputmode="numeric" autocomplete="off" value="0">
+      </div>
+      <div class="field">
+        <label for="expireDate">expireDate</label>
+        <input id="expireDate" type="date" autocomplete="off">
       </div>
       <div class="field full">
         <label for="title">title</label>
@@ -116,11 +129,13 @@
         <tr>
           <th>sort</th>
           <th>type</th>
+          <th>lang</th>
           <th>title</th>
           <th>description</th>
           <th>context</th>
           <th>branchId</th>
           <th>url</th>
+          <th>expireDate</th>
           <th>showing</th>
           <th>status</th>
           <th></th>
@@ -150,8 +165,20 @@
         <textarea id="editContext"></textarea>
       </div>
       <div class="field">
+        <label for="editLang">lang</label>
+        <select id="editLang">
+          <option value="az">az</option>
+          <option value="en">en</option>
+          <option value="ru">ru</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="editSortOrder">sortOrder</label>
         <input id="editSortOrder" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editExpireDate">expireDate</label>
+        <input id="editExpireDate" type="date" autocomplete="off">
       </div>
       <div class="field" id="editBranchField">
         <label for="editBranchId">branchId</label>
@@ -244,16 +271,27 @@
       if (!/^-?\d+$/.test(branchRaw)) return { error: "branchId is required" };
       const branchId = Number(branchRaw);
       if (!Number.isSafeInteger(branchId)) return { error: "branchId is required" };
-      return { title, description, branchId, sortOrder: sort.sortOrder, type };
+      return attachLocale({ title, description, branchId, sortOrder: sort.sortOrder, type }, sortEl);
     }
     const editing = sortEl.id === "editSortOrder";
     const url = document.getElementById(editing ? "editUrl" : "url").value.trim();
     if (!isPromo(type)) {
-      return { title, description, sortOrder: sort.sortOrder, type, url };
+      return attachLocale({ title, description, sortOrder: sort.sortOrder, type, url }, sortEl);
     }
     const context = document.getElementById(editing ? "editContext" : "context").value.trim();
     if (!context) return { error: "context is required" };
-    return { title, description, context, sortOrder: sort.sortOrder, type, url };
+    return attachLocale({ title, description, context, sortOrder: sort.sortOrder, type, url }, sortEl);
+  }
+
+  function attachLocale(fields, sortEl) {
+    const editing = sortEl.id === "editSortOrder";
+    const lang = document.getElementById(editing ? "editLang" : "lang").value;
+    const expireDate = document.getElementById(editing ? "editExpireDate" : "expireDate").value.trim();
+    if (lang !== "az" && lang !== "en" && lang !== "ru") return { error: "lang must be az, en or ru" };
+    if (expireDate && !/^\d{4}-\d{2}-\d{2}$/.test(expireDate)) return { error: "expireDate must be yyyy-MM-dd" };
+    fields.lang = lang;
+    fields.expireDate = expireDate || null;
+    return fields;
   }
 
   function clearPick() {
@@ -290,7 +328,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
-      td.colSpan = 10;
+      td.colSpan = 12;
       td.className = "muted";
       td.textContent = "active banner yoxdur";
       tr.appendChild(td);
@@ -301,11 +339,13 @@
       const tr = document.createElement("tr");
       tr.appendChild(textCell(row.sortOrder == null ? "" : String(row.sortOrder)));
       tr.appendChild(textCell(row.type || "service"));
+      tr.appendChild(textCell(row.lang || "az"));
       tr.appendChild(textCell(row.title));
       tr.appendChild(textCell(row.description));
       tr.appendChild(textCell(row.context || ""));
       tr.appendChild(textCell(row.branchId == null ? "" : String(row.branchId)));
       tr.appendChild(textCell(row.url || ""));
+      tr.appendChild(textCell(row.expireDate || ""));
 
       const showingTd = document.createElement("td");
       const label = document.createElement("label");
@@ -388,7 +428,9 @@
     document.getElementById("editTitle").value = row.title || "";
     document.getElementById("editDescription").value = row.description || "";
     document.getElementById("editContext").value = row.context || "";
+    document.getElementById("editLang").value = row.lang || "az";
     document.getElementById("editSortOrder").value = row.sortOrder == null ? "0" : String(row.sortOrder);
+    document.getElementById("editExpireDate").value = row.expireDate || "";
     document.getElementById("editBranchId").value = row.branchId == null ? "" : String(row.branchId);
     document.getElementById("editUrl").value = row.url || "";
     document.getElementById("editFile").value = "";
@@ -444,7 +486,9 @@
     data.append("title", fields.title);
     data.append("description", fields.description);
     data.append("type", type);
+    data.append("lang", fields.lang);
     data.append("sortOrder", String(fields.sortOrder));
+    if (fields.expireDate) data.append("expireDate", fields.expireDate);
     if (!isMedia(type)) data.append("branchId", String(fields.branchId));
     if (isMedia(type) && fields.url) data.append("url", fields.url);
     if (isPromo(type)) data.append("context", fields.context);
@@ -454,6 +498,7 @@
     if (!saved) return;
     document.getElementById("createForm").reset();
     document.getElementById("sortOrder").value = "0";
+    document.getElementById("lang").value = "az";
     applyType("service");
     clearPick();
     await loadBanners();
@@ -479,7 +524,9 @@
     const payload = {
       title: fields.title,
       description: fields.description,
-      sortOrder: fields.sortOrder
+      sortOrder: fields.sortOrder,
+      lang: fields.lang,
+      expireDate: fields.expireDate
     };
     if (!isMedia(type)) payload.branchId = fields.branchId;
     else payload.url = fields.url || "";

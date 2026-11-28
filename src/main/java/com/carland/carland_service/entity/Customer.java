@@ -47,6 +47,13 @@ public class Customer {
     @Column(name = "gender", length = 16)
     String gender;
     /**
+     * tr: Geçerli promo kodundan sonra true kalır. Boş eski satır false sayılır.
+     * en: Stays true after a valid promo code. A blank legacy row counts as false.
+     */
+    @Column(name = "has_promo")
+    @Builder.Default
+    Boolean hasPromo = false;
+    /**
      * Attempts with createdAt after this instant do not count toward the daily fail limit.
      * Null = count all of today's fails. Records themselves are never deleted on reset.
      */

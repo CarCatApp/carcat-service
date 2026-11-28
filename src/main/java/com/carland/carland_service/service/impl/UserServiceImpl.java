@@ -1,6 +1,7 @@
 package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
+import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
@@ -22,6 +23,7 @@ import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
 import com.carland.carland_service.service.BookingMineService;
 import com.carland.carland_service.service.CustomerEnsureService;
+import com.carland.carland_service.service.PromoCodes;
 import com.carland.carland_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -226,7 +228,35 @@ public class UserServiceImpl implements UserService {
                 .pin(customer.getPin())
                 .phoneNumber(customer.getPhoneNumber())
                 .verified(Boolean.TRUE.equals(customer.getSimaVerified()))
+                .hasPromo(Boolean.TRUE.equals(customer.getHasPromo()))
                 .build();
+    }
+
+    /**
+     * tr: Promo kodu inmerge2026 veya carcat2026 ile uyuşursa hasPromo true yazılır. Uyuşmazsa alan değişmez.
+     *     Redis yok. customerId header'daki X-User-Id ile aynı olmalıdır.
+     * en: Writes hasPromo when the code matches inmerge2026 or carcat2026. A mismatch leaves the field unchanged.
+     *     No Redis. customerId must equal X-User-Id.
+     */
+    @Override
+    public CustomerInformationResponse applyPromo(PromoCodeRequest request, String role, String phoneNumber,
+                                                  String userIdHeader, String acceptLanguage) {
+        if (request == null || request.getCustomerId() == null
+                || request.getPromoCode() == null || request.getPromoCode().isBlank()) {
+            throw new MissingFieldException(MessagesLangValues.MISSING_BODY.getMessageByLang(acceptLanguage));
+        }
+        Customer customer = requireActiveCustomer(role, phoneNumber, userIdHeader, acceptLanguage);
+        if (!request.getCustomerId().equals(customer.getUserId())) {
+            throw new NotMatchException("customerId does not match");
+        }
+        if (!PromoCodes.matches(request.getPromoCode())) {
+            throw new NotMatchException("promo code is not valid");
+        }
+        if (!Boolean.TRUE.equals(customer.getHasPromo())) {
+            customer.setHasPromo(true);
+            customerRepository.save(customer);
+        }
+        return toInformationResponse(customer);
     }
 
     /**

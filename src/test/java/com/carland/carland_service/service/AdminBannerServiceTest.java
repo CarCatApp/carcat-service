@@ -21,14 +21,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -104,7 +107,7 @@ class AdminBannerServiceTest {
                 .build();
         when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(banner));
 
-        List<BannerItem> rows = service.visible();
+        List<BannerItem> rows = service.visible("az");
 
         assertEquals(1, rows.size());
         assertEquals(4L, rows.get(0).getId());
@@ -129,7 +132,7 @@ class AdminBannerServiceTest {
         when(branchRepository.findByPartnerIdOrderByIdAsc(PartnerId.HYPER.getId()))
                 .thenReturn(List.of(Branch.builder().id(10L).build()));
 
-        List<BannerItem> rows = service.visibleForOldHyper();
+        List<BannerItem> rows = service.visibleForOldHyper("az");
 
         assertEquals(List.of(2L, 3L), rows.stream().map(BannerItem::getId).toList());
     }
@@ -232,7 +235,7 @@ class AdminBannerServiceTest {
                 .build();
         when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(first, second));
 
-        List<BannerItem> rows = service.visible();
+        List<BannerItem> rows = service.visible("az");
 
         assertEquals(2, rows.size());
         assertEquals(2L, rows.get(0).getId());
@@ -393,6 +396,109 @@ class AdminBannerServiceTest {
         assertEquals("yeni kod", row.getContext());
         assertEquals("yeni metn", row.getDescription());
         assertTrue(row.getShowing());
+    }
+
+    @Test
+    void visibleClosesAnExpiredBannerThenReturnsTheRest() {
+        LocalDate today = LocalDate.now(AdminBannerService.BAKU);
+        Banner expired = Banner.builder().id(1L).title("Old").description("bitdi").lang(Banner.AZ)
+                .showing(true).status(Banner.ACTIVE).expireDate(today.minusDays(1)).build();
+        Banner live = Banner.builder().id(2L).title("Live").description("davam").lang(Banner.EN)
+                .showing(true).status(Banner.ACTIVE).expireDate(today).build();
+        when(bannerRepository.findExpiredShowing(eq(Banner.ACTIVE), eq(today))).thenReturn(List.of(expired));
+        when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(live));
+
+        List<BannerItem> rows = service.visible("en");
+
+        assertFalse(expired.getShowing());
+        verify(bannerRepository).saveAll(List.of(expired));
+        assertEquals(1, rows.size());
+        assertEquals(2L, rows.get(0).getId());
+        assertEquals(today, rows.get(0).getExpireDate());
+    }
+
+    @Test
+    void visibleKeepsABlankLanguageOnAzerbaijaniAndSkipsEnglish() {
+        Banner legacy = Banner.builder().id(1L).title("Kohne").description("metn")
+                .showing(true).status(Banner.ACTIVE).build();
+        Banner english = Banner.builder().id(2L).title("Sale").description("text").lang(Banner.EN)
+                .showing(true).status(Banner.ACTIVE).build();
+        when(bannerRepository.findVisible(Banner.ACTIVE)).thenReturn(List.of(legacy, english));
+
+        List<BannerItem> rows = service.visible("az");
+
+        assertEquals(List.of(1L), rows.stream().map(BannerItem::getId).toList());
+        assertEquals(Banner.AZ, rows.get(0).getLang());
+    }
+
+    @Test
+    void createStoresLangAndExpireDate() {
+        when(bannerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        LocalDate expire = LocalDate.of(2026, 12, 1);
+        AdminBannerSaveRequest body = body("Babek", "aciqliq", 4L);
+        body.setLang(" EN ");
+        body.setExpireDate(expire);
+
+        AdminBannerRow row = service.create(body);
+
+        assertEquals(Banner.EN, row.getLang());
+        assertEquals(expire, row.getExpireDate());
+    }
+
+    @Test
+    void unknownLangIsRejected() {
+        AdminBannerSaveRequest body = body("Babek", "aciqliq", 4L);
+        body.setLang("tr");
+
+        assertThrows(InvalidStatusException.class, () -> service.create(body));
+        verify(bannerRepository, never()).save(any());
+    }
+
+    @Test
+    void expireDateCanMoveForwardAndShowingCanOpenAgain() {
+        Banner existing = stored(false);
+        existing.setExpireDate(LocalDate.now(AdminBannerService.BAKU).minusDays(1));
+        when(bannerRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(bannerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AdminBannerSaveRequest edit = body("Babek", "yeni metn", 3L);
+        edit.setExpireDate(LocalDate.now(AdminBannerService.BAKU).plusDays(2));
+
+        AdminBannerRow edited = service.update(1L, edit);
+
+        assertEquals(edit.getExpireDate(), edited.getExpireDate());
+        assertFalse(edited.getShowing());
+
+        AdminBannerSaveRequest show = new AdminBannerSaveRequest();
+        show.setShowing(true);
+        AdminBannerRow opened = service.update(1L, show);
+
+        assertTrue(opened.getShowing());
+        assertEquals(edit.getExpireDate(), opened.getExpireDate());
+    }
+
+    @Test
+    void showingCannotOpenWhileTheExpireDateHasPassed() {
+        Banner existing = stored(false);
+        existing.setExpireDate(LocalDate.now(AdminBannerService.BAKU).minusDays(1));
+        when(bannerRepository.findById(1L)).thenReturn(Optional.of(existing));
+        AdminBannerSaveRequest show = new AdminBannerSaveRequest();
+        show.setShowing(true);
+
+        assertThrows(InvalidStatusException.class, () -> service.update(1L, show));
+        verify(bannerRepository, never()).save(any());
+        assertFalse(existing.getShowing());
+    }
+
+    @Test
+    void expireDateItselfIsNotExpiredAndABlankDateNeverExpires() {
+        LocalDate today = LocalDate.of(2026, 11, 28);
+        assertFalse(AdminBannerService.isExpired(null, today));
+        assertFalse(AdminBannerService.isExpired(today, today));
+        assertFalse(AdminBannerService.isExpired(today.plusDays(1), today));
+        assertTrue(AdminBannerService.isExpired(today.minusDays(1), today));
+        assertNull(AdminBannerService.parseExpireDate("  "));
+        assertEquals(LocalDate.of(2026, 12, 1), AdminBannerService.parseExpireDate("2026-12-01"));
+        assertThrows(InvalidStatusException.class, () -> AdminBannerService.parseExpireDate("01/12/2026"));
     }
 
     @Test

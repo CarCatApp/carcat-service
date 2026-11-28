@@ -43,7 +43,7 @@ class BannerControllerTest {
 
     @Test
     void emptyWithoutTokenIs200Array() throws Exception {
-        when(adminBannerService.visible()).thenReturn(List.of());
+        when(adminBannerService.visible("az")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/banners"))
                 .andExpect(status().isOk())
@@ -54,7 +54,7 @@ class BannerControllerTest {
 
     @Test
     void brokenBearerStillReturnsTheBanner() throws Exception {
-        when(adminBannerService.visible()).thenReturn(List.of(BannerItem.builder()
+        when(adminBannerService.visible("az")).thenReturn(List.of(BannerItem.builder()
                 .id(4L)
                 .title("hyper babek prospekti")
                 .description("Yağ dəyişimi")
@@ -77,7 +77,7 @@ class BannerControllerTest {
     @Test
     void oldHyperCarUsesTheHyperBannerList() throws Exception {
         when(hyperBranchLockService.locked(15L, 9L)).thenReturn(true);
-        when(adminBannerService.visibleForOldHyper()).thenReturn(List.of());
+        when(adminBannerService.visibleForOldHyper("az")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/banners")
                         .param("carId", "15")
@@ -85,6 +85,17 @@ class BannerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("[]"));
 
-        verify(adminBannerService).visibleForOldHyper();
+        verify(adminBannerService).visibleForOldHyper("az");
+    }
+
+    @Test
+    void englishHeaderAsksForEnglishBanners() throws Exception {
+        when(adminBannerService.visible("en")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/banners").header("Accept-Language", "en-US"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        verify(adminBannerService).visible("en");
     }
 }

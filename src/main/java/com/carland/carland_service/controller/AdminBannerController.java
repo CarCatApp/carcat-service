@@ -81,6 +81,8 @@ public class AdminBannerController {
                                                          @RequestParam(required = false) Long branchId,
                                                          @RequestParam(required = false) String url,
                                                          @RequestParam(required = false) String context,
+                                                         @RequestParam(required = false) String lang,
+                                                         @RequestParam(required = false) String expireDate,
                                                          @RequestParam(required = false) Integer sortOrder,
                                                          @RequestParam(required = false) MultipartFile file,
                                                          HttpServletRequest request) {
@@ -94,6 +96,8 @@ public class AdminBannerController {
         body.setBranchId(branchId);
         body.setUrl(url);
         body.setContext(context);
+        body.setLang(lang);
+        body.setExpireDate(AdminBannerService.parseExpireDate(expireDate));
         body.setSortOrder(sortOrder);
         return ResponseEntity.ok(adminBannerService.create(body, file));
     }

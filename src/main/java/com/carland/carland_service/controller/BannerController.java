@@ -3,6 +3,7 @@ package com.carland.carland_service.controller;
 import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.service.AdminBannerService;
+import com.carland.carland_service.service.AppAnnouncementHeaders;
 import com.carland.carland_service.service.HyperBranchLockService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -21,11 +22,13 @@ import java.util.List;
 
 /**
  * tr: Mobil banner listesi. Kimlik doğrulamaz. Boş sonuç {@code 200 []}.
- *     showing=true ve status=active olanların hepsi, sortOrder küçükten büyüğe.
+ *     showing=true ve status=active olanlar, Accept-Language az/en/ru. Boş veya bilinmeyen dil az.
+ *     expireDate Bakü gününden önceyse showing kapanır, sonra liste döner.
  *     Carousel'da görünen arabanın carId'si query'de gelir. O araba köhnə Hyper ise
  *     başqa servisin branchId'si düşer.
  * en: Mobile banner list. No authentication. Empty result is {@code 200 []}.
- *     Every showing=true and status=active row, sortOrder ascending.
+ *     showing=true and status=active rows, Accept-Language az/en/ru. A blank or unknown language is az.
+ *     An expireDate before today's Baku date turns showing off, then the list returns.
  *     The carousel sends the visible car as carId. An old Hyper car drops a branchId that is not Hyper.
  */
 @Tag(name = "banners", description = "Public banner list. No JWT. Empty list is 200 [].")
@@ -41,18 +44,23 @@ public class BannerController {
     private final HyperBranchLockService hyperBranchLockService;
 
     @Operation(summary = "Visible banners",
-            description = "Public. No headers required. Every showing=true and status=active banner, "
+            description = "Public. No headers required. Every showing=true and status=active banner "
+                    + "for Accept-Language az, en, or ru (blank or unknown is az), "
                     + "ordered by sortOrder then newer id. Never 401. Empty list is 200 []. "
+                    + "An expireDate before today's Baku date sets showing=false before the list returns. "
+                    + "The expire date itself still shows. A blank expireDate never expires. "
                     + "Query carId is the car visible in the carousel, with X-User-Id. "
                     + "An old Hyper car omits banners whose branchId is not Hyper. "
                     + "Without carId the full list stays. Banners with an empty branchId stay.")
     @GetMapping(produces = JSON_UTF8)
     public ResponseEntity<List<BannerItem>> list(
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
             @RequestParam(required = false) Long carId) {
+        String lang = AppAnnouncementHeaders.language(acceptLanguage);
         List<BannerItem> items = hyperOnly(carId, userIdHeader)
-                ? adminBannerService.visibleForOldHyper()
-                : adminBannerService.visible();
+                ? adminBannerService.visibleForOldHyper(lang)
+                : adminBannerService.visible(lang);
         if (items == null) {
             items = List.of();
         }

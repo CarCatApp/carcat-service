@@ -60,7 +60,10 @@ class AdminBannerControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(">showing<")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(">status<")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"promo\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"context\"")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"context\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"lang\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("value=\"ru\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"expireDate\"")));
     }
 
     @Test

@@ -20,5 +20,6 @@ public class CustomerResponse {
     String surname;
     String status;
     LocalDate createdAt;
+    boolean hasPromo;
 
 }

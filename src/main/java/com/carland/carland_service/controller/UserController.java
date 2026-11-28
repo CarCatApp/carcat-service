@@ -1,6 +1,7 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
+import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.*;
 import com.carland.carland_service.entity.Car;
 import com.carland.carland_service.entity.Color;
@@ -64,6 +65,7 @@ public class UserController {
             customerResponse.setPhoneNumber(customer.getPhoneNumber());
             customerResponse.setStatus(customer.getStatus());
             customerResponse.setCreatedAt(customer.getCreatedAt());
+            customerResponse.setHasPromo(Boolean.TRUE.equals(customer.getHasPromo()));
             // CAR MAP
             List<CarResponseForLink> carResponses =
                     customer.getCars() != null
@@ -179,6 +181,21 @@ public class UserController {
                                           @RequestHeader("X-User-Id") String userIdHeader,
                                           @RequestHeader("Accept-Language") String acceptLanguage) {
         return userService.isPinOccupied(pin, role, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
+    /**
+     * tr: Body customerId + promoCode. Kod inmerge2026 veya carcat2026 ile uyuşursa hasPromo true olur.
+     *     customerId, X-User-Id ile aynı aktif müşteri olmalıdır. Cevap profil ile aynıdır.
+     * en: Body is customerId + promoCode. A match with inmerge2026 or carcat2026 sets hasPromo.
+     *     customerId must be the same active customer as X-User-Id. The response is the profile.
+     */
+    @PostMapping("/promo")
+    public CustomerInformationResponse applyPromo(@RequestBody PromoCodeRequest request,
+                                                  @RequestHeader("role") String role,
+                                                  @RequestHeader("phoneNumber") String phoneNumber,
+                                                  @RequestHeader("X-User-Id") String userIdHeader,
+                                                  @RequestHeader("Accept-Language") String acceptLanguage) {
+        return userService.applyPromo(request, role, phoneNumber, userIdHeader, acceptLanguage);
     }
 
     /**

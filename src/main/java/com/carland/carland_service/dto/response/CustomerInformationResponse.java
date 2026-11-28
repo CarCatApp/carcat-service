@@ -24,4 +24,6 @@ public class CustomerInformationResponse {
     String phoneNumber;
     @Schema(description = "True after SIMA KYC passed. Flutter hides the verify button.")
     boolean verified;
+    @Schema(description = "True after the customer redeemed the promo code.")
+    boolean hasPromo;
 }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -25,6 +26,13 @@ public interface BannerRepository extends JpaRepository<Banner, Long> {
                      b.id DESC
             """)
     List<Banner> findVisible(@Param("status") String status);
+
+    @Query("""
+            SELECT b FROM Banner b
+            WHERE b.status = :status AND b.showing = true
+              AND b.expireDate IS NOT NULL AND b.expireDate < :today
+            """)
+    List<Banner> findExpiredShowing(@Param("status") String status, @Param("today") LocalDate today);
 
     @Query("""
             SELECT b FROM Banner b

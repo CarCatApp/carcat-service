@@ -1,6 +1,7 @@
 package com.carland.carland_service.service;
 
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
+import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
@@ -52,5 +53,14 @@ public interface UserService {
      */
     NotificationLanguageResponse setNotificationLanguage(String lang, String role, String phoneNumber,
                                                          String userIdHeader, String acceptLanguage);
+
+    /**
+     * tr: Body'deki promo kodu inmerge2026 veya carcat2026 ile (büyük/küçük harf duymaz) uyuşursa hasPromo true olur.
+     *     customerId, X-User-Id ile aynı aktif müşteri olmalıdır. Cevap profil ile aynıdır ve hasPromo taşır.
+     * en: Sets hasPromo when the body promo code matches inmerge2026 or carcat2026 (case ignored).
+     *     customerId must be the same active customer as X-User-Id. The response is the profile and includes hasPromo.
+     */
+    CustomerInformationResponse applyPromo(PromoCodeRequest request, String role, String phoneNumber,
+                                           String userIdHeader, String acceptLanguage);
 
 }
