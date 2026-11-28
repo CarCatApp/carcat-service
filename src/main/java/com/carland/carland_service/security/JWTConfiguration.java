@@ -53,6 +53,7 @@ public class JWTConfiguration {
                         .requestMatchers("/admin", "/admin/**", "/admin/").permitAll()
                         .requestMatchers("/partner", "/partner/**").permitAll()
                         .requestMatchers("/api/v1/internal/booking/**").permitAll()
+                        .requestMatchers("/api/v1/internal/promo/**").permitAll()
                         .requestMatchers("/api/v1/car/test/**").permitAll()
                         .requestMatchers("/api/v1/app-announcements/active").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/banners", "/api/v1/banners/*").permitAll()

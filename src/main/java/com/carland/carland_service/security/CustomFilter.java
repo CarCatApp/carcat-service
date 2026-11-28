@@ -57,6 +57,11 @@ public class CustomFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (path.startsWith("/api/v1/internal/promo/") || path.contains("/api/v1/internal/promo/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         if (isClientEventOpen(path)) {
             filterChain.doFilter(request, response);
             return;
