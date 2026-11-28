@@ -116,12 +116,14 @@ class DigitalHistoryReportLoaderTest {
                 .lastServiceMileage(89128)
                 .packageName("Extra")
                 .inspectionNote("səs gəlir")
+                .notes("Yağ və filtr dəyişdirildi")
                 .finalCostAmount(new BigDecimal("385.00"))
                 .finalCostCurrency("AZN")
                 .services(List.of(
                         VisitServiceLine.builder().id(1L).kind("package").serviceName("Yağ dəyişdirilib").build(),
                         VisitServiceLine.builder().id(2L).kind("individual").serviceName("Filtr").productName("Salon filteri").productQty(new BigDecimal("1")).build(),
-                        VisitServiceLine.builder().id(3L).kind("inspection").serviceName("Diaqnostika").build()
+                        VisitServiceLine.builder().id(3L).kind("inspection").serviceName("Diaqnostika").build(),
+                        VisitServiceLine.builder().id(5L).kind("inspection").serviceName("səs gəlir").productName("Conta").productQty(new BigDecimal("1")).build()
                 ))
                 .parts(List.of())
                 .build();
@@ -156,8 +158,8 @@ class DigitalHistoryReportLoaderTest {
         assertEquals("Dövri qulluq + Təmir və diaqnostika", panelBlock.label());
         assertEquals(List.of("Yağ dəyişdirilib"), panelBlock.packageLines());
         assertEquals(List.of("Filtr · Salon filteri · 1"), panelBlock.individualLines());
-        assertEquals("səs gəlir", panelBlock.inspectionNote());
-        assertEquals(List.of("Diaqnostika"), panelBlock.inspectionLines());
+        assertEquals("Yağ və filtr dəyişdirildi", panelBlock.inspectionNote());
+        assertEquals(List.of("Diaqnostika", "Conta · 1"), panelBlock.inspectionLines());
         assertEquals("Toyota Bakı Mərkəzi", panelBlock.centerName());
 
         DigitalHistoryReport.VisitBlock hyperBlock = report.visits().get(1);
@@ -175,6 +177,9 @@ class DigitalHistoryReportLoaderTest {
         assertTrue(text.contains("BC481273"));
         assertTrue(text.contains("Filtr"));
         assertTrue(text.contains("Diaqnostika"));
+        assertTrue(text.contains("Yağ və filtr dəyişdirildi"));
+        assertTrue(text.contains("Conta"));
+        assertFalse(text.contains("səs gəlir"));
         assertTrue(text.contains("Antifriz"));
         assertTrue(text.contains("CC-2026-K7Q2M9X4TA"));
         assertTrue(text.contains("Buraxılıb"));

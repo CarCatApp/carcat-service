@@ -17,8 +17,10 @@ import java.util.Set;
 /**
  * tr: Ziyarəti PDF sətirinə çevirir. Hyper sətri Toyota kimi solda xidmət, sağda hissədir.
  *     Eyni ad iki sətir olmur. Panel sətri {@code kind} ilə qalır.
+ *     Qeyd şöbənin ziyarət qeydidir. Müştərinin book mətni sətir olmur.
  * en: Turns a visit into PDF lines. A Hyper row is service on the left and the part on the right, as on Toyota.
  *     The same name is not printed twice. A panel row still follows {@code kind}.
+ *     The note is the branch visit note. The customer's booking text is not a row.
  */
 final class DigitalHistoryVisits {
 
@@ -33,8 +35,8 @@ final class DigitalHistoryVisits {
 
     static DigitalHistoryReport.VisitBlock toBlock(Visit visit, Branch branch, Partner partner, Names names) {
         List<VisitServiceLine> lines = sortedLines(visit);
-        boolean repair = hasText(visit.getInspectionNote())
-                || lines.stream().anyMatch(line -> kind(line, "inspection"));
+        String customerNote = clean(visit.getInspectionNote());
+        boolean repair = lines.stream().anyMatch(line -> kind(line, "inspection"));
         boolean routine = hasText(visit.getPackageName())
                 || lines.stream().anyMatch(line -> kind(line, "package", "package_info", "individual", "one_time"));
         boolean panel = visit.getBookingId() != null
@@ -51,7 +53,8 @@ final class DigitalHistoryVisits {
             hyperLines(visit, lines, names, plainLines);
         } else {
             for (VisitServiceLine line : lines) {
-                String printed = lineText(line, names);
+                String hidden = kind(line, "inspection") ? customerNote : null;
+                String printed = lineText(line, names, hidden);
                 remember(seen, names.product(line));
                 if (printed == null) {
                     continue;
@@ -89,7 +92,7 @@ final class DigitalHistoryVisits {
                 clean(visit.getPackageName()),
                 List.copyOf(packageLines),
                 List.copyOf(individualLines),
-                clean(visit.getInspectionNote()),
+                clean(visit.getNotes()),
                 List.copyOf(inspectionLines),
                 List.copyOf(plainLines),
                 DigitalHistoryFormat.money(visit.getFinalCostAmount(), visit.getFinalCostCurrency()),
@@ -207,9 +210,12 @@ final class DigitalHistoryVisits {
         return false;
     }
 
-    private static String lineText(VisitServiceLine line, Names names) {
+    private static String lineText(VisitServiceLine line, Names names, String hiddenServiceName) {
         List<String> bits = new ArrayList<>();
-        add(bits, names.service(line));
+        String service = names.service(line);
+        if (!same(service, hiddenServiceName)) {
+            add(bits, service);
+        }
         add(bits, names.product(line));
         String qty = DigitalHistoryFormat.qty(line.getProductQty());
         if (!qty.isEmpty()) {
@@ -264,5 +270,9 @@ final class DigitalHistoryVisits {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static boolean same(String left, String right) {
+        return hasText(left) && hasText(right) && left.trim().equalsIgnoreCase(right.trim());
     }
 }

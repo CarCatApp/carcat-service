@@ -68,6 +68,7 @@ public record DigitalHistoryReport(
             String packageName,
             List<String> packageLines,
             List<String> individualLines,
+            /** Branch visit note ({@code visits.notes}). The customer's booking text is not copied here. */
             String inspectionNote,
             List<String> inspectionLines,
             List<String> plainLines,

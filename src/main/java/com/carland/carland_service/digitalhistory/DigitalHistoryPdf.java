@@ -1000,7 +1000,7 @@ public class DigitalHistoryPdf {
         add(rows, visit.packageLines(), false);
         add(rows, visit.individualLines(), false);
         if (!blank(visit.inspectionNote())) {
-            rows.add(new Row(visit.inspectionNote().trim(), "", true));
+            rows.add(new Row(visit.inspectionNote().trim(), "", visit.repair()));
         }
         add(rows, visit.inspectionLines(), true);
         add(rows, visit.plainLines(), false);
