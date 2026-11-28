@@ -66,6 +66,7 @@ public class UserController {
             customerResponse.setStatus(customer.getStatus());
             customerResponse.setCreatedAt(customer.getCreatedAt());
             customerResponse.setHasPromo(Boolean.TRUE.equals(customer.getHasPromo()));
+            customerResponse.setPromoCode(customer.getPromoCode());
             // CAR MAP
             List<CarResponseForLink> carResponses =
                     customer.getCars() != null
@@ -184,9 +185,9 @@ public class UserController {
     }
 
     /**
-     * tr: Body customerId + promoCode. Kod inmerge2026 veya carcat2026 ile uyuşursa hasPromo true olur.
+     * tr: Body customerId + promoCode. Kod promos tablosunda kullanılabilirse hasPromo true olur ve kod yazılır.
      *     customerId, X-User-Id ile aynı aktif müşteri olmalıdır. Cevap profil ile aynıdır.
-     * en: Body is customerId + promoCode. A match with inmerge2026 or carcat2026 sets hasPromo.
+     * en: Body is customerId + promoCode. A usable row in promos sets hasPromo and stores the code.
      *     customerId must be the same active customer as X-User-Id. The response is the profile.
      */
     @PostMapping("/promo")

@@ -9,6 +9,7 @@ import com.carland.carland_service.dto.response.PinOccupiedResponse;
 import com.carland.carland_service.dto.response.UserResponse;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Notification;
+import com.carland.carland_service.entity.Promo;
 import com.carland.carland_service.enums.MessagesLangValues;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
@@ -21,15 +22,18 @@ import com.carland.carland_service.enums.UserRoles;
 import com.carland.carland_service.messaging.CustomerEnsurePublisher;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
+import com.carland.carland_service.repository.PromoRepository;
 import com.carland.carland_service.service.BookingMineService;
 import com.carland.carland_service.service.CustomerEnsureService;
-import com.carland.carland_service.service.PromoCodes;
 import com.carland.carland_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -51,6 +55,7 @@ public class UserServiceImpl implements UserService {
     private final NotificationRepository notificationRepository;
     private final CustomerEnsureService customerEnsureService;
     private final CustomerEnsurePublisher customerEnsurePublisher;
+    private final PromoRepository promoRepository;
 
     /**
      * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda message ve customerId döner.
@@ -230,13 +235,16 @@ public class UserServiceImpl implements UserService {
                 .phoneNumber(customer.getPhoneNumber())
                 .verified(Boolean.TRUE.equals(customer.getSimaVerified()))
                 .hasPromo(Boolean.TRUE.equals(customer.getHasPromo()))
+                .promoCode(customer.getPromoCode())
                 .build();
     }
 
     /**
-     * tr: Promo kodu inmerge2026 veya carcat2026 ile uyuşursa hasPromo true yazılır. Uyuşmazsa alan değişmez.
-     *     Redis yok. customerId header'daki X-User-Id ile aynı olmalıdır.
-     * en: Writes hasPromo when the code matches inmerge2026 or carcat2026. A mismatch leaves the field unchanged.
+     * tr: Kod promos.codeKey ile aranır. usableOn değilse alan değişmez.
+     *     Aynı promo tekrar gelirse kayıt aynı kalır. Başka bir promo yazılmaz.
+     *     Redis yok. customerId, X-User-Id ile aynı olmalıdır.
+     * en: The code is looked up by promos.codeKey. A code that is not usableOn leaves the fields unchanged.
+     *     The same promo again keeps the row. A different promo is not written.
      *     No Redis. customerId must equal X-User-Id.
      */
     @Override
@@ -250,11 +258,18 @@ public class UserServiceImpl implements UserService {
         if (!request.getCustomerId().equals(customer.getUserId())) {
             throw new NotMatchException("customerId does not match");
         }
-        if (!PromoCodes.matches(request.getPromoCode())) {
+        String key = request.getPromoCode().trim().toLowerCase(Locale.ROOT);
+        Promo promo = promoRepository.findByCodeKey(key).orElse(null);
+        if (promo == null || !promo.usableOn(LocalDate.now(ZoneId.of("Asia/Baku")))) {
             throw new NotMatchException("promo code is not valid");
         }
-        if (!Boolean.TRUE.equals(customer.getHasPromo())) {
+        if (customer.getPromoId() != null && !customer.getPromoId().equals(promo.getId())) {
+            throw new NotMatchException("promo code is already set");
+        }
+        if (customer.getPromoId() == null) {
             customer.setHasPromo(true);
+            customer.setPromoId(promo.getId());
+            customer.setPromoCode(promo.getCode());
             customerRepository.save(customer);
         }
         return toInformationResponse(customer);

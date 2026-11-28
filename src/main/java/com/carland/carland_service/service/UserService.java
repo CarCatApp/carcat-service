@@ -55,10 +55,10 @@ public interface UserService {
                                                          String userIdHeader, String acceptLanguage);
 
     /**
-     * tr: Body'deki promo kodu inmerge2026 veya carcat2026 ile (büyük/küçük harf duymaz) uyuşursa hasPromo true olur.
-     *     customerId, X-User-Id ile aynı aktif müşteri olmalıdır. Cevap profil ile aynıdır ve hasPromo taşır.
-     * en: Sets hasPromo when the body promo code matches inmerge2026 or carcat2026 (case ignored).
-     *     customerId must be the same active customer as X-User-Id. The response is the profile and includes hasPromo.
+     * tr: Body'deki kod promos tablosunda kullanılabilirse hasPromo true olur ve o kod yazılır.
+     *     Kullanılabilir: status active, expired kapalı, Bakü günü başlangıç ve bitiş dahil. Büyük/küçük harf duymaz.
+     * en: Sets hasPromo and stores the code when that code is usable in the promos table.
+     *     Usable means status active, expired off, and today's Baku date inside the range. Case is ignored.
      */
     CustomerInformationResponse applyPromo(PromoCodeRequest request, String role, String phoneNumber,
                                            String userIdHeader, String acceptLanguage);

@@ -53,6 +53,12 @@ public class Customer {
     @Column(name = "has_promo")
     @Builder.Default
     Boolean hasPromo = false;
+    /** tr: Kabul edilen promo. promos.id. / en: Accepted promo. promos.id. */
+    @Column(name = "promo_id")
+    Long promoId;
+    /** tr: Kabul anındaki kod. / en: The code stored when it was accepted. */
+    @Column(name = "promo_code", length = 64)
+    String promoCode;
     /**
      * Attempts with createdAt after this instant do not count toward the daily fail limit.
      * Null = count all of today's fails. Records themselves are never deleted on reset.

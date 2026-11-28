@@ -3,20 +3,24 @@ package com.carland.carland_service.service.impl;
 import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
 import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.entity.Promo;
 import com.carland.carland_service.enums.UserStatus;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.NotMatchException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.repository.NotificationRepository;
-import com.carland.carland_service.service.PromoCodes;
+import com.carland.carland_service.repository.PromoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
@@ -29,75 +33,97 @@ class UserServiceImplApplyPromoTest {
     @Mock Helper helper;
     @Mock CustomerRepository customerRepository;
     @Mock NotificationRepository notificationRepository;
+    @Mock PromoRepository promoRepository;
     @InjectMocks UserServiceImpl service;
 
     @Test
-    void matchingCodeIgnoresCaseAndSetsHasPromo() {
+    void usableCodeIgnoresCaseAndStoresIt() {
         Customer customer = customer();
+        Promo promo = usable();
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
                 .thenReturn(customer);
-        PromoCodeRequest request = new PromoCodeRequest();
-        request.setCustomerId(5L);
-        request.setPromoCode("  " + PromoCodes.CARCAT_2026.toUpperCase(java.util.Locale.ROOT) + "  ");
+        when(promoRepository.findByCodeKey("carcat2026")).thenReturn(Optional.of(promo));
 
-        CustomerInformationResponse response = service.applyPromo(request, "USER", "+994501112233", "5", "az");
+        CustomerInformationResponse response = service.applyPromo(body(5L, "  CarCat2026  "),
+                "USER", "+994501112233", "5", "az");
 
         assertTrue(response.isHasPromo());
-        assertTrue(customer.getHasPromo());
-        assertEquals("Leyla", response.getName());
+        assertEquals("carcat2026", response.getPromoCode());
+        assertEquals(8L, customer.getPromoId());
         verify(customerRepository).save(customer);
     }
 
     @Test
-    void inmergeCodeAlsoSetsHasPromo() {
-        Customer customer = customer();
+    void expiredOrInactiveCodeIsRejected() {
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
-                .thenReturn(customer);
-        PromoCodeRequest request = new PromoCodeRequest();
-        request.setCustomerId(5L);
-        request.setPromoCode("InMerge2026");
-
-        assertTrue(service.applyPromo(request, "USER", "+994501112233", "5", "az").isHasPromo());
-        verify(customerRepository).save(customer);
-    }
-
-    @Test
-    void wrongCodeLeavesHasPromoFalse() {
-        Customer customer = customer();
-        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
-                .thenReturn(customer);
-        PromoCodeRequest request = new PromoCodeRequest();
-        request.setCustomerId(5L);
-        request.setPromoCode("nope");
+                .thenReturn(customer());
+        Promo expired = usable();
+        expired.setExpired(true);
+        when(promoRepository.findByCodeKey("carcat2026")).thenReturn(Optional.of(expired));
 
         assertThrows(NotMatchException.class,
-                () -> service.applyPromo(request, "USER", "+994501112233", "5", "az"));
-        assertFalse(Boolean.TRUE.equals(customer.getHasPromo()));
-        verify(customerRepository, never()).save(customer);
+                () -> service.applyPromo(body(5L, "carcat2026"), "USER", "+994501112233", "5", "az"));
+        verify(customerRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void aSecondDifferentCodeIsRejected() {
+        Customer customer = customer();
+        customer.setHasPromo(true);
+        customer.setPromoId(8L);
+        customer.setPromoCode("carcat2026");
+        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
+                .thenReturn(customer);
+        Promo other = usable();
+        other.setId(9L);
+        other.setCode("inmerge2026");
+        when(promoRepository.findByCodeKey("inmerge2026")).thenReturn(Optional.of(other));
+
+        assertThrows(NotMatchException.class,
+                () -> service.applyPromo(body(5L, "inmerge2026"), "USER", "+994501112233", "5", "az"));
+        verify(customerRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        assertEquals(8L, customer.getPromoId());
+    }
+
+    @Test
+    void theSameCodeAgainDoesNotWrite() {
+        Customer customer = customer();
+        customer.setHasPromo(true);
+        customer.setPromoId(8L);
+        customer.setPromoCode("carcat2026");
+        when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
+                .thenReturn(customer);
+        when(promoRepository.findByCodeKey("carcat2026")).thenReturn(Optional.of(usable()));
+
+        CustomerInformationResponse response = service.applyPromo(body(5L, "carcat2026"),
+                "USER", "+994501112233", "5", "az");
+
+        assertEquals("carcat2026", response.getPromoCode());
+        verify(customerRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void customerIdMustMatchTheCaller() {
         when(customerRepository.findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name()))
                 .thenReturn(customer());
-        PromoCodeRequest request = new PromoCodeRequest();
-        request.setCustomerId(9L);
-        request.setPromoCode(PromoCodes.INMERGE_2026);
 
         assertThrows(NotMatchException.class,
-                () -> service.applyPromo(request, "USER", "+994501112233", "5", "az"));
-        verify(customerRepository, never()).save(org.mockito.ArgumentMatchers.any());
+                () -> service.applyPromo(body(9L, "carcat2026"), "USER", "+994501112233", "5", "az"));
+        verify(promoRepository, never()).findByCodeKey(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void blankCodeIsRejected() {
-        PromoCodeRequest request = new PromoCodeRequest();
-        request.setCustomerId(5L);
-        request.setPromoCode("  ");
-
         assertThrows(MissingFieldException.class,
-                () -> service.applyPromo(request, "USER", "+994501112233", "5", "az"));
+                () -> service.applyPromo(body(5L, "  "), "USER", "+994501112233", "5", "az"));
         verify(customerRepository, never()).findByUserIdAndPhoneNumberAndStatus(5L, "+994501112233", UserStatus.ACTIVE.name());
+    }
+
+    private static PromoCodeRequest body(Long customerId, String code) {
+        PromoCodeRequest request = new PromoCodeRequest();
+        request.setCustomerId(customerId);
+        request.setPromoCode(code);
+        return request;
     }
 
     private static Customer customer() {
@@ -106,6 +132,19 @@ class UserServiceImplApplyPromoTest {
                 .phoneNumber("+994501112233")
                 .name("Leyla")
                 .status(UserStatus.ACTIVE.name())
+                .build();
+    }
+
+    private static Promo usable() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Baku"));
+        return Promo.builder()
+                .id(8L)
+                .code("carcat2026")
+                .codeKey("carcat2026")
+                .status(Promo.ACTIVE)
+                .expired(false)
+                .startDate(today.minusDays(1))
+                .endDate(today.plusDays(1))
                 .build();
     }
 }

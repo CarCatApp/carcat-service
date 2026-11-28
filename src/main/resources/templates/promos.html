@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/admin/carcat-logo.png">
+  <title>promo code — Carland Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css?v=drawer1">
+  <style>
+    .branch-picks { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+    .branch-picks .is-on,
+    .branch-picks .is-on:hover { background: #111; color: #fff; border-color: #111; }
+    .promo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+    .promo-grid .full { grid-column: 1 / -1; }
+    .pick-box {
+      display: flex; flex-wrap: wrap; gap: 8px; min-height: 48px; margin: 0;
+      padding: 8px; border: 1px solid #ebebeb; border-radius: 12px; background: #fff;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #f3f3f5; color: #111; border-radius: 999px; padding: 4px 6px 4px 12px;
+    }
+    .chip button {
+      border: 0; background: transparent; color: #111; cursor: pointer;
+      font-size: 16px; line-height: 1; padding: 0 4px;
+    }
+    .cell-text { max-width: 280px; white-space: pre-wrap; word-break: break-word; }
+    .show-switch { position: relative; display: inline-block; width: 44px; height: 26px; }
+    .show-switch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+    .show-switch i {
+      position: absolute; inset: 0; border-radius: 999px; background: #d4d4d8; pointer-events: none;
+    }
+    .show-switch i::after {
+      content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; transition: transform 0.15s ease;
+    }
+    .show-switch input:checked + i { background: #111; }
+    .show-switch input:checked + i::after { transform: translateX(18px); }
+    .editor[hidden] { display: none; }
+    .editor {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 40;
+      display: flex; align-items: flex-start; justify-content: center; padding: 48px 16px; overflow: auto;
+    }
+    .editor-card {
+      width: min(760px, 100%); background: #fff; color: #111;
+      border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px;
+    }
+    .editor-card h2, .editor-card label { color: #111; }
+    input[type="date"] { color: #111; }
+    @media (max-width: 720px) {
+      .promo-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><img src="/admin/carcat-logo.png" alt=""></span>
+    <span>Carland Admin</span>
+    <nav th:replace="~{fragments/admin-nav :: nav(active='promos')}"></nav>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-logout" href="/admin/logout">Logout</a>
+  </div>
+</header>
+<main class="container wide" id="main">
+  <div class="page-head">
+    <div>
+      <h1>promo code</h1>
+      <p class="muted">Kod böyük-kiçik fərq etmir. Mobil qəbul: status active, expired söndürülü, Bakı günü startDate və endDate arasındadır. Ən azı bir şube. Klik qutuya əlavə edir, x çıxarır.</p>
+    </div>
+  </div>
+  <div class="error-box" id="errBox" hidden></div>
+  <div class="branch-picks" id="branchPicks"></div>
+  <form id="createForm">
+    <div class="promo-grid">
+      <div class="field">
+        <label for="name">name</label>
+        <input id="name" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="code">code</label>
+        <input id="code" autocomplete="off">
+      </div>
+      <div class="field full">
+        <label for="description">description</label>
+        <textarea id="description"></textarea>
+      </div>
+      <div class="field">
+        <label for="startDate">startDate</label>
+        <input id="startDate" type="date" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="endDate">endDate</label>
+        <input id="endDate" type="date" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="discountType">discountType</label>
+        <select id="discountType">
+          <option value="percentage">percentage</option>
+          <option value="amount">amount</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="discountValue">discountValue</label>
+        <input id="discountValue" inputmode="decimal" autocomplete="off" placeholder="20 və ya 129.50">
+      </div>
+      <div class="field">
+        <label for="status">status</label>
+        <select id="status">
+          <option value="active">active</option>
+          <option value="deactive">deactive</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="expired">expired</label>
+        <label class="show-switch">
+          <input id="expired" type="checkbox" aria-label="expired">
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="field full">
+        <label>şubeler</label>
+        <div class="pick-box" id="createBox"></div>
+      </div>
+      <button class="btn btn-primary" id="createBtn" type="submit">Yarat</button>
+    </div>
+  </form>
+
+  <section style="margin-top:36px;">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+        <tr>
+          <th>code</th>
+          <th>name</th>
+          <th>discount</th>
+          <th>start</th>
+          <th>end</th>
+          <th>status</th>
+          <th>expired</th>
+          <th>şube</th>
+          <th></th>
+        </tr>
+        </thead>
+        <tbody id="promoRows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="editor" id="editor" hidden>
+  <form class="editor-card" id="editForm">
+    <h2>Düzəlt</h2>
+    <input type="hidden" id="editId">
+    <div class="branch-picks" id="editBranchPicks"></div>
+    <div class="promo-grid">
+      <div class="field">
+        <label for="editName">name</label>
+        <input id="editName" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editCode">code</label>
+        <input id="editCode" autocomplete="off">
+      </div>
+      <div class="field full">
+        <label for="editDescription">description</label>
+        <textarea id="editDescription"></textarea>
+      </div>
+      <div class="field">
+        <label for="editStartDate">startDate</label>
+        <input id="editStartDate" type="date" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editEndDate">endDate</label>
+        <input id="editEndDate" type="date" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editDiscountType">discountType</label>
+        <select id="editDiscountType">
+          <option value="percentage">percentage</option>
+          <option value="amount">amount</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="editDiscountValue">discountValue</label>
+        <input id="editDiscountValue" inputmode="decimal" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="editStatus">status</label>
+        <select id="editStatus">
+          <option value="active">active</option>
+          <option value="deactive">deactive</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="editExpired">expired</label>
+        <label class="show-switch">
+          <input id="editExpired" type="checkbox" aria-label="expired">
+          <i aria-hidden="true"></i>
+        </label>
+      </div>
+      <div class="field full">
+        <label>şubeler</label>
+        <div class="pick-box" id="editBox"></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button class="btn btn-primary" type="submit">Saxla</button>
+      <button class="btn btn-ghost" type="button" id="cancelBtn">Bağla</button>
+    </div>
+  </form>
+</div>
+<script src="/admin/admin.js?v=banner1"></script>
+<script>
+  const errBox = document.getElementById("errBox");
+  const promoRows = document.getElementById("promoRows");
+  const editor = document.getElementById("editor");
+  let picks = [];
+  let rows = [];
+  let chosenCreate = [];
+  let chosenEdit = [];
+
+  function showErr(msg) {
+    if (!msg) {
+      errBox.hidden = true;
+      errBox.textContent = "";
+      return;
+    }
+    errBox.hidden = false;
+    errBox.textContent = msg;
+  }
+
+  async function api(url, options) {
+    const headers = { Accept: "application/json", ...(options && options.headers ? options.headers : {}) };
+    const res = await fetch(url, { credentials: "same-origin", ...(options || {}), headers });
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = "/admin/";
+      return null;
+    }
+    const raw = await res.text();
+    let body = {};
+    try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { message: raw.slice(0, 180) }; }
+    if (!res.ok) {
+      showErr(body.message || body.error || ("Request failed HTTP " + res.status));
+      return null;
+    }
+    return body;
+  }
+
+  function readValue(type, raw) {
+    const text = raw.trim();
+    if (type === "percentage") {
+      if (!/^\d+(\.0+)?$/.test(text)) return { error: "percentage must be a whole number" };
+      const value = Number(text);
+      if (value < 1 || value > 100) return { error: "percentage must be from 1 to 100" };
+      return { value };
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0) return { error: "amount must be above 0" };
+    return { value: Number(text) };
+  }
+
+  function field(editing, key) {
+    const id = editing ? "edit" + key.charAt(0).toUpperCase() + key.slice(1) : key;
+    return document.getElementById(id);
+  }
+
+  function readForm(editing) {
+    const name = field(editing, "name").value.trim();
+    const code = field(editing, "code").value.trim();
+    const description = field(editing, "description").value.trim();
+    const startDate = field(editing, "startDate").value;
+    const endDate = field(editing, "endDate").value;
+    const discountType = field(editing, "discountType").value;
+    const status = field(editing, "status").value;
+    const expired = field(editing, "expired").checked;
+    const amount = readValue(discountType, field(editing, "discountValue").value);
+    if (!name) return { error: "name is required" };
+    if (!code) return { error: "code is required" };
+    if (!description) return { error: "description is required" };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return { error: "startDate is required" };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { error: "endDate is required" };
+    if (endDate < startDate) return { error: "endDate is before startDate" };
+    if (amount.error) return amount;
+    const chosen = editing ? chosenEdit : chosenCreate;
+    if (!chosen.length) return { error: "branch is required" };
+    return {
+      name, code, description, startDate, endDate, discountType, status, expired,
+      discountValue: amount.value,
+      branchIds: chosen.map((branch) => branch.id)
+    };
+  }
+
+  function renderPicks(container, chosen) {
+    container.replaceChildren();
+    if (!picks.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "şube yoxdur";
+      container.appendChild(empty);
+      return;
+    }
+    picks.forEach((branch) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-ghost";
+      btn.textContent = branch.name || String(branch.id);
+      if (chosen.some((item) => item.id === branch.id)) btn.classList.add("is-on");
+      btn.addEventListener("click", () => addBranch(chosen, branch, container));
+      container.appendChild(btn);
+    });
+  }
+
+  function renderBox(container, chosen, picksEl) {
+    container.replaceChildren();
+    chosen.forEach((branch) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      const label = document.createElement("span");
+      label.textContent = (branch.name || "şube") + " · " + branch.id;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "çıxar");
+      remove.textContent = "×";
+      remove.addEventListener("click", () => {
+        const index = chosen.findIndex((item) => item.id === branch.id);
+        if (index >= 0) chosen.splice(index, 1);
+        renderBox(container, chosen, picksEl);
+        renderPicks(picksEl, chosen);
+      });
+      chip.appendChild(label);
+      chip.appendChild(remove);
+      container.appendChild(chip);
+    });
+  }
+
+  function addBranch(chosen, branch, picksEl) {
+    if (chosen.some((item) => item.id === branch.id)) return;
+    chosen.push({ id: branch.id, name: branch.name || "" });
+    const box = picksEl.id === "editBranchPicks"
+      ? document.getElementById("editBox")
+      : document.getElementById("createBox");
+    renderBox(box, chosen, picksEl);
+    renderPicks(picksEl, chosen);
+  }
+
+  function textCell(value) {
+    const td = document.createElement("td");
+    td.className = "cell-text";
+    td.textContent = value == null ? "" : String(value);
+    return td;
+  }
+
+  function plainNumber(value) {
+    if (value == null || value === "") return "";
+    const number = Number(value);
+    return Number.isFinite(number) ? String(number) : String(value);
+  }
+
+  function discountText(row) {
+    if (row.discountType === "percentage") return plainNumber(row.discountValue) + "%";
+    return plainNumber(row.discountValue) + " AZN";
+  }
+
+  function renderRows(list) {
+    rows = list || [];
+    promoRows.replaceChildren();
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 9;
+      td.className = "muted";
+      td.textContent = "promo yoxdur";
+      tr.appendChild(td);
+      promoRows.appendChild(tr);
+      return;
+    }
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(textCell(row.code));
+      tr.appendChild(textCell(row.name));
+      tr.appendChild(textCell(discountText(row)));
+      tr.appendChild(textCell(row.startDate || ""));
+      tr.appendChild(textCell(row.endDate || ""));
+      tr.appendChild(textCell(row.status || ""));
+      tr.appendChild(textCell(row.expired === true ? "true" : "false"));
+      const names = (row.branches || []).map((branch) => (branch.name || branch.id)).join(", ");
+      tr.appendChild(textCell(names));
+      const actions = document.createElement("td");
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn-ghost";
+      edit.textContent = "Düzəlt";
+      edit.addEventListener("click", () => openEdit(row));
+      actions.appendChild(edit);
+      tr.appendChild(actions);
+      promoRows.appendChild(tr);
+    });
+  }
+
+  function openEdit(row) {
+    showErr("");
+    document.getElementById("editId").value = row.id;
+    document.getElementById("editName").value = row.name || "";
+    document.getElementById("editCode").value = row.code || "";
+    document.getElementById("editDescription").value = row.description || "";
+    document.getElementById("editStartDate").value = row.startDate || "";
+    document.getElementById("editEndDate").value = row.endDate || "";
+    document.getElementById("editDiscountType").value = row.discountType || "percentage";
+    document.getElementById("editDiscountValue").value = plainNumber(row.discountValue);
+    document.getElementById("editStatus").value = row.status || "active";
+    document.getElementById("editExpired").checked = row.expired === true;
+    chosenEdit = (row.branches || []).map((branch) => ({ id: branch.id, name: branch.name || "" }));
+    renderPicks(document.getElementById("editBranchPicks"), chosenEdit);
+    renderBox(document.getElementById("editBox"), chosenEdit, document.getElementById("editBranchPicks"));
+    editor.hidden = false;
+  }
+
+  async function loadBranches() {
+    const data = await api("/admin/promos/branches");
+    if (!data) return;
+    picks = Array.isArray(data) ? data : [];
+    renderPicks(document.getElementById("branchPicks"), chosenCreate);
+  }
+
+  async function loadPromos() {
+    const data = await api("/admin/promos/items");
+    if (!data) return;
+    renderRows(Array.isArray(data) ? data : []);
+  }
+
+  document.getElementById("createForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = readForm(false);
+    if (fields.error) {
+      showErr(fields.error);
+      return;
+    }
+    showErr("");
+    const btn = document.getElementById("createBtn");
+    btn.disabled = true;
+    const saved = await api("/admin/promos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields)
+    });
+    btn.disabled = false;
+    if (!saved) return;
+    document.getElementById("createForm").reset();
+    document.getElementById("status").value = "active";
+    chosenCreate = [];
+    renderBox(document.getElementById("createBox"), chosenCreate, document.getElementById("branchPicks"));
+    renderPicks(document.getElementById("branchPicks"), chosenCreate);
+    await loadPromos();
+  });
+
+  document.getElementById("editForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = readForm(true);
+    if (fields.error) {
+      showErr(fields.error);
+      return;
+    }
+    showErr("");
+    const id = document.getElementById("editId").value;
+    const saved = await api("/admin/promos/" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields)
+    });
+    if (!saved) return;
+    editor.hidden = true;
+    await loadPromos();
+  });
+
+  document.getElementById("cancelBtn").addEventListener("click", () => {
+    editor.hidden = true;
+  });
+
+  loadBranches();
+  loadPromos();
+</script>
+</body>
+</html>

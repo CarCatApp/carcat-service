@@ -21,5 +21,6 @@ public class CustomerResponse {
     String status;
     LocalDate createdAt;
     boolean hasPromo;
+    String promoCode;
 
 }
