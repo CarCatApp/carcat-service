@@ -1,6 +1,9 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.BannerItem;
+import com.carland.carland_service.entity.Banner;
+import com.carland.carland_service.entity.Customer;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.security.CustomFilter;
 import com.carland.carland_service.security.JWTConfiguration;
 import com.carland.carland_service.service.AdminBannerService;
@@ -40,6 +43,9 @@ class BannerControllerTest {
 
     @MockitoBean
     private FeatureFlagService featureFlagService;
+
+    @MockitoBean
+    private CustomerRepository customerRepository;
 
     @Test
     void emptyWithoutTokenIs200Array() throws Exception {
@@ -97,5 +103,33 @@ class BannerControllerTest {
                 .andExpect(content().json("[]"));
 
         verify(adminBannerService).visible("en");
+    }
+
+    @Test
+    void promoBannerIsHiddenWhenHasPromoIsFalse() throws Exception {
+        when(adminBannerService.visible("az")).thenReturn(List.of(
+                BannerItem.builder().id(1L).type(Banner.SERVICE).title("Servis").description("yag").showing(true).status("active").build(),
+                BannerItem.builder().id(2L).type(Banner.PROMO).title("Promo").description("kod").showing(true).status("active").build()
+        ));
+        when(customerRepository.findByUserId(9L)).thenReturn(Customer.builder().userId(9L).hasPromo(false).build());
+
+        mockMvc.perform(get("/api/v1/banners").header("X-User-Id", "9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].type").value("service"));
+    }
+
+    @Test
+    void promoBannerStaysWhenHasPromoIsTrue() throws Exception {
+        when(adminBannerService.visible("az")).thenReturn(List.of(
+                BannerItem.builder().id(2L).type(Banner.PROMO).title("Promo").description("kod").showing(true).status("active").build()
+        ));
+        when(customerRepository.findByUserId(9L)).thenReturn(Customer.builder().userId(9L).hasPromo(true).build());
+
+        mockMvc.perform(get("/api/v1/banners").header("X-User-Id", "9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].type").value("promo"));
     }
 }

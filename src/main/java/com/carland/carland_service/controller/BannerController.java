@@ -1,7 +1,10 @@
 package com.carland.carland_service.controller;
 
 import com.carland.carland_service.dto.response.BannerItem;
+import com.carland.carland_service.entity.Banner;
+import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.service.AdminBannerService;
 import com.carland.carland_service.service.AppAnnouncementHeaders;
 import com.carland.carland_service.service.HyperBranchLockService;
@@ -24,11 +27,13 @@ import java.util.List;
  * tr: Mobil banner listesi. Kimlik doğrulamaz. Boş sonuç {@code 200 []}.
  *     showing=true ve status=active olanlar, Accept-Language az/en/ru. Boş veya bilinmeyen dil az.
  *     expireDate Bakü gününden önceyse showing kapanır, sonra liste döner.
+ *     hasPromo true değilse type=promo düşer.
  *     Carousel'da görünen arabanın carId'si query'de gelir. O araba köhnə Hyper ise
  *     başqa servisin branchId'si düşer.
  * en: Mobile banner list. No authentication. Empty result is {@code 200 []}.
  *     showing=true and status=active rows, Accept-Language az/en/ru. A blank or unknown language is az.
  *     An expireDate before today's Baku date turns showing off, then the list returns.
+ *     A type=promo banner is omitted unless the customer hasPromo is true.
  *     The carousel sends the visible car as carId. An old Hyper car drops a branchId that is not Hyper.
  */
 @Tag(name = "banners", description = "Public banner list. No JWT. Empty list is 200 [].")
@@ -42,6 +47,7 @@ public class BannerController {
 
     private final AdminBannerService adminBannerService;
     private final HyperBranchLockService hyperBranchLockService;
+    private final CustomerRepository customerRepository;
 
     @Operation(summary = "Visible banners",
             description = "Public. No headers required. Every showing=true and status=active banner "
@@ -49,6 +55,7 @@ public class BannerController {
                     + "ordered by sortOrder then newer id. Never 401. Empty list is 200 []. "
                     + "An expireDate before today's Baku date sets showing=false before the list returns. "
                     + "The expire date itself still shows. A blank expireDate never expires. "
+                    + "type=promo is returned only when X-User-Id belongs to a customer whose hasPromo is true. "
                     + "Query carId is the car visible in the carousel, with X-User-Id. "
                     + "An old Hyper car omits banners whose branchId is not Hyper. "
                     + "Without carId the full list stays. Banners with an empty branchId stay.")
@@ -64,10 +71,29 @@ public class BannerController {
         if (items == null) {
             items = List.of();
         }
+        if (!hasPromo(userIdHeader)) {
+            items = items.stream()
+                    .filter(item -> item == null || !Banner.PROMO.equals(item.getType()))
+                    .toList();
+        }
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(JSON_UTF8))
                 .cacheControl(CacheControl.noStore())
                 .body(items);
+    }
+
+    private boolean hasPromo(String userIdHeader) {
+        if (userIdHeader == null || userIdHeader.isBlank()) {
+            return false;
+        }
+        Long userId;
+        try {
+            userId = Long.valueOf(userIdHeader.trim());
+        } catch (NumberFormatException ex) {
+            return false;
+        }
+        Customer customer = customerRepository.findByUserId(userId);
+        return customer != null && Boolean.TRUE.equals(customer.getHasPromo());
     }
 
     private boolean hyperOnly(Long carId, String userIdHeader) {
