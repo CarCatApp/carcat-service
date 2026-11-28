@@ -38,7 +38,8 @@
     }
     .editor-card h2 { color: #111; }
     input[type="file"],
-    input[type="date"] { color: #111; }
+    input[type="date"],
+    select { color: #111; }
     @media (max-width: 720px) {
       .banner-grid { grid-template-columns: 1fr; }
     }
@@ -106,6 +107,10 @@
         <label for="context">context</label>
         <textarea id="context"></textarea>
       </div>
+      <div class="field full" id="promoField" hidden>
+        <label for="promoId">promo</label>
+        <select id="promoId"></select>
+      </div>
       <div class="field" id="branchField">
         <label for="branchId">branchId</label>
         <input id="branchId" inputmode="numeric" autocomplete="off">
@@ -129,6 +134,7 @@
         <tr>
           <th>sort</th>
           <th>type</th>
+          <th>promo</th>
           <th>lang</th>
           <th>title</th>
           <th>description</th>
@@ -163,6 +169,10 @@
       <div class="field full" id="editContextField" hidden>
         <label for="editContext">context</label>
         <textarea id="editContext"></textarea>
+      </div>
+      <div class="field full" id="editPromoField" hidden>
+        <label for="editPromoId">promo</label>
+        <select id="editPromoId"></select>
       </div>
       <div class="field">
         <label for="editLang">lang</label>
@@ -257,6 +267,7 @@
     document.getElementById("urlField").hidden = !media;
     document.getElementById("fileField").hidden = !media;
     document.getElementById("contextField").hidden = !isPromo(type);
+    document.getElementById("promoField").hidden = !isPromo(type);
   }
 
   function readFields(titleEl, descriptionEl, branchEl, type, sortEl) {
@@ -280,7 +291,10 @@
     }
     const context = document.getElementById(editing ? "editContext" : "context").value.trim();
     if (!context) return { error: "context is required" };
-    return attachLocale({ title, description, context, sortOrder: sort.sortOrder, type, url }, sortEl);
+    const promoRaw = document.getElementById(editing ? "editPromoId" : "promoId").value;
+    if (!/^\d+$/.test(promoRaw)) return { error: "promo is required" };
+    const promoId = Number(promoRaw);
+    return attachLocale({ title, description, context, promoId, sortOrder: sort.sortOrder, type, url }, sortEl);
   }
 
   function attachLocale(fields, sortEl) {
@@ -328,7 +342,7 @@
     if (!rows.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
-      td.colSpan = 12;
+      td.colSpan = 13;
       td.className = "muted";
       td.textContent = "active banner yoxdur";
       tr.appendChild(td);
@@ -339,6 +353,7 @@
       const tr = document.createElement("tr");
       tr.appendChild(textCell(row.sortOrder == null ? "" : String(row.sortOrder)));
       tr.appendChild(textCell(row.type || "service"));
+      tr.appendChild(textCell(promoName(row.promoId)));
       tr.appendChild(textCell(row.lang || "az"));
       tr.appendChild(textCell(row.title));
       tr.appendChild(textCell(row.description));
@@ -438,7 +453,10 @@
     document.getElementById("editBranchField").hidden = media;
     document.getElementById("editUrlField").hidden = !media;
     document.getElementById("editFileField").hidden = !media;
-    document.getElementById("editContextField").hidden = !isPromo(row.type || "service");
+    const promoType = isPromo(row.type || "service");
+    document.getElementById("editContextField").hidden = !promoType;
+    document.getElementById("editPromoField").hidden = !promoType;
+    fillPromoSelect(document.getElementById("editPromoId"), row.promoId);
     editor.hidden = false;
   }
 
@@ -491,7 +509,10 @@
     if (fields.expireDate) data.append("expireDate", fields.expireDate);
     if (!isMedia(type)) data.append("branchId", String(fields.branchId));
     if (isMedia(type) && fields.url) data.append("url", fields.url);
-    if (isPromo(type)) data.append("context", fields.context);
+    if (isPromo(type)) {
+      data.append("context", fields.context);
+      data.append("promoId", String(fields.promoId));
+    }
     if (file) data.append("file", file);
     const saved = await api("/admin/banners", { method: "POST", body: data });
     btn.disabled = false;
@@ -530,7 +551,10 @@
     };
     if (!isMedia(type)) payload.branchId = fields.branchId;
     else payload.url = fields.url || "";
-    if (isPromo(type)) payload.context = fields.context;
+    if (isPromo(type)) {
+      payload.context = fields.context;
+      payload.promoId = fields.promoId;
+    }
     const saved = await api("/admin/banners/" + id, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -552,8 +576,39 @@
     editor.hidden = true;
   });
 
+  let promos = [];
+
+  function fillPromoSelect(select, selected) {
+    const current = selected == null ? "" : String(selected);
+    select.replaceChildren();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "seç";
+    select.appendChild(empty);
+    promos.forEach((promo) => {
+      const option = document.createElement("option");
+      option.value = String(promo.id);
+      option.textContent = promo.name || "";
+      select.appendChild(option);
+    });
+    select.value = promos.some((promo) => String(promo.id) === current) ? current : "";
+  }
+
+  function promoName(id) {
+    if (id == null) return "";
+    const promo = promos.find((item) => item.id === id);
+    return promo && promo.name ? promo.name : String(id);
+  }
+
+  async function loadPromos() {
+    const data = await api("/admin/promos/items");
+    promos = Array.isArray(data) ? data : [];
+    fillPromoSelect(document.getElementById("promoId"), "");
+  }
+
   applyType("service");
   loadBranches();
+  loadPromos();
   loadBanners();
 </script>
 </body>

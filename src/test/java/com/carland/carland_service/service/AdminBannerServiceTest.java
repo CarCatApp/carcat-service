@@ -7,11 +7,14 @@ import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.enums.PartnerId;
+import com.carland.carland_service.exceptions.AlreadyExistsException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BannerRepository;
 import com.carland.carland_service.repository.BranchRepository;
+import com.carland.carland_service.repository.PromoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,12 +46,13 @@ class AdminBannerServiceTest {
     @Mock BannerRepository bannerRepository;
     @Mock BranchRepository branchRepository;
     @Mock PhotoService photoService;
+    @Mock PromoRepository promoRepository;
 
     AdminBannerService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminBannerService(bannerRepository, branchRepository, photoService);
+        service = new AdminBannerService(bannerRepository, branchRepository, photoService, promoRepository);
     }
 
     @Test
@@ -346,16 +350,71 @@ class AdminBannerServiceTest {
         body.setTitle("Yay");
         body.setDescription("yay endirimi");
         body.setContext("  kod YAY  ");
+        body.setPromoId(3L);
         body.setUrl("https://carland.az/promo");
         body.setSortOrder(4);
+        when(promoRepository.existsById(3L)).thenReturn(true);
+        when(bannerRepository.findByPromoId(3L)).thenReturn(Optional.empty());
 
         AdminBannerRow row = service.create(body, file);
 
         assertEquals(Banner.PROMO, row.getType());
         assertEquals("kod YAY", row.getContext());
+        assertEquals(3L, row.getPromoId());
         assertEquals("https://carland.az/promo", row.getUrl());
         assertEquals(null, row.getBranchId());
         verify(photoService).replaceBannerPhoto(file, 9L);
+    }
+
+    @Test
+    void visibleByIdReturnsOneShowingBanner() {
+        Banner banner = Banner.builder()
+                .id(4L)
+                .title("Yay")
+                .description("endirim")
+                .type(Banner.PROMO)
+                .promoId(3L)
+                .showing(true)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findById(4L)).thenReturn(Optional.of(banner));
+
+        BannerItem item = service.visibleById(4L);
+
+        assertEquals(4L, item.getId());
+        assertEquals(3L, item.getPromoId());
+        assertEquals(Banner.PROMO, item.getType());
+    }
+
+    @Test
+    void visibleByIdRejectsAClosedBanner() {
+        Banner banner = Banner.builder()
+                .id(4L)
+                .title("Yay")
+                .description("endirim")
+                .showing(false)
+                .status(Banner.ACTIVE)
+                .build();
+        when(bannerRepository.findById(4L)).thenReturn(Optional.of(banner));
+
+        assertThrows(ResourceNotFoundException.class, () -> service.visibleById(4L));
+    }
+
+    @Test
+    void aPromoCannotSitOnTwoBanners() {
+        MultipartFile file = org.mockito.Mockito.mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(promoRepository.existsById(3L)).thenReturn(true);
+        when(bannerRepository.findByPromoId(3L)).thenReturn(Optional.of(Banner.builder().id(1L).build()));
+        AdminBannerSaveRequest body = new AdminBannerSaveRequest();
+        body.setType(Banner.PROMO);
+        body.setTitle("Yay");
+        body.setDescription("yay endirimi");
+        body.setContext("kod");
+        body.setPromoId(3L);
+
+        assertThrows(AlreadyExistsException.class, () -> service.create(body, file));
+        verify(bannerRepository, never()).save(any());
     }
 
     @Test
@@ -378,6 +437,7 @@ class AdminBannerServiceTest {
                 .title("Yay")
                 .description("yay endirimi")
                 .context("eski")
+                .promoId(3L)
                 .type(Banner.PROMO)
                 .url("https://carland.az/promo")
                 .showing(true)
@@ -389,11 +449,15 @@ class AdminBannerServiceTest {
         body.setTitle("Yay");
         body.setDescription("yeni metn");
         body.setContext("  yeni kod  ");
+        body.setPromoId(7L);
         body.setUrl("https://carland.az/promo");
+        when(promoRepository.existsById(7L)).thenReturn(true);
+        when(bannerRepository.findByPromoId(7L)).thenReturn(Optional.empty());
 
         AdminBannerRow row = service.update(9L, body);
 
         assertEquals("yeni kod", row.getContext());
+        assertEquals(7L, row.getPromoId());
         assertEquals("yeni metn", row.getDescription());
         assertTrue(row.getShowing());
     }

@@ -7,10 +7,12 @@ import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
 import com.carland.carland_service.enums.PartnerId;
+import com.carland.carland_service.exceptions.AlreadyExistsException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.MissingFieldException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BannerRepository;
+import com.carland.carland_service.repository.PromoRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,13 +32,13 @@ import java.util.Set;
  * tr: Admin banner. Redis yok. showing=true birden fazla olabilir.
  *     Sıra sortOrder küçükten büyüğe, aynı sayıda id büyük önde.
  *     service branchId ister. adds, info ve promo fotoğraf ister, url boş kalabilir.
- *     promo ayrıca context ister. lang az, en, ru. Boş eski satır az.
+ *     promo ayrıca context ve tek promoId ister. Aynı promo ikinci banner'a yazılmaz. lang az, en, ru. Boş eski satır az.
  *     Liste dönmeden expireDate'i Bakü gününden önce olan showing kapanır, sonra liste döner.
  *     Fotoğraf photo:banner:{bannerId}. Yazan replaceBannerPhoto, commit sonrası evict.
  * en: Admin banner. No Redis. More than one row may have showing=true.
  *     Order is sortOrder ascending, then larger id first.
  *     service requires branchId. adds, info and promo require a photo; url may be empty.
- *     promo also requires context. lang is az, en, or ru. A blank legacy row is az.
+ *     promo also requires context and one promoId. The same promo cannot sit on a second banner. lang is az, en, or ru. A blank legacy row is az.
  *     Before a list returns, showing is turned off when expireDate is before today's Baku date.
  *     Photo key photo:banner:{bannerId}. replaceBannerPhoto evicts it after commit.
  */
@@ -54,6 +56,24 @@ public class AdminBannerService {
     private final BannerRepository bannerRepository;
     private final BranchRepository branchRepository;
     private final PhotoService photoService;
+    private final PromoRepository promoRepository;
+
+    /**
+     * tr: Tek banner. status=active ve showing=true. Yoksa veya kapalıysa 404.
+     *     Çağrıdan önce süresi geçen showing kapanır.
+     * en: One banner. status=active and showing=true. Missing or closed is 404.
+     *     A passed expire date turns showing off before the read.
+     */
+    @Transactional
+    public BannerItem visibleById(Long id) {
+        closeExpired();
+        Banner banner = bannerRepository.findById(id == null ? -1L : id)
+                .orElseThrow(() -> new ResourceNotFoundException("banner not found"));
+        if (!Banner.ACTIVE.equals(banner.getStatus()) || !Boolean.TRUE.equals(banner.getShowing())) {
+            throw new ResourceNotFoundException("banner not found");
+        }
+        return toItem(banner);
+    }
 
     @Transactional
     public List<BannerItem> visible(String lang) {
@@ -126,6 +146,7 @@ public class AdminBannerService {
                 .title(readTitle(body))
                 .description(readDescription(body))
                 .context(readContext(type, body == null ? null : body.getContext()))
+                .promoId(readPromoId(type, body == null ? null : body.getPromoId(), null))
                 .lang(readLang(body == null ? null : body.getLang()))
                 .expireDate(body == null ? null : body.getExpireDate())
                 .type(type)
@@ -166,8 +187,8 @@ public class AdminBannerService {
             return toRow(bannerRepository.save(banner));
         }
         boolean text = body.getTitle() != null || body.getDescription() != null || body.getContext() != null
-                || body.getBranchId() != null || body.getSortOrder() != null || body.getUrl() != null
-                || body.getLang() != null || body.getExpireDate() != null;
+                || body.getPromoId() != null || body.getBranchId() != null || body.getSortOrder() != null
+                || body.getUrl() != null || body.getLang() != null || body.getExpireDate() != null;
         if (text) {
             String type = storedType(banner);
             banner.setTitle(readTitle(body));
@@ -183,8 +204,10 @@ public class AdminBannerService {
             if (Banner.SERVICE.equals(type)) {
                 banner.setBranchId(readBranchId(type, body));
                 banner.setUrl(null);
+                banner.setPromoId(null);
             } else {
                 banner.setBranchId(null);
+                banner.setPromoId(readPromoId(type, body.getPromoId(), banner.getId()));
                 if (body.getUrl() != null) {
                     banner.setUrl(readUrl(type, body.getUrl()));
                 }
@@ -216,6 +239,7 @@ public class AdminBannerService {
                 .title(banner.getTitle())
                 .description(banner.getDescription())
                 .context(banner.getContext())
+                .promoId(banner.getPromoId())
                 .expireDate(banner.getExpireDate())
                 .branchId(banner.getBranchId())
                 .url(banner.getUrl())
@@ -233,6 +257,7 @@ public class AdminBannerService {
                 .title(banner.getTitle())
                 .description(banner.getDescription())
                 .context(banner.getContext())
+                .promoId(banner.getPromoId())
                 .expireDate(banner.getExpireDate())
                 .branchId(banner.getBranchId())
                 .url(banner.getUrl())
@@ -309,6 +334,24 @@ public class AdminBannerService {
             throw new InvalidStatusException("type must be service, adds, info or promo");
         }
         return type;
+    }
+
+    private Long readPromoId(String type, Long promoId, Long selfId) {
+        if (!Banner.PROMO.equals(type)) {
+            return null;
+        }
+        if (promoId == null) {
+            throw MissingFieldException.required("promoId");
+        }
+        if (!promoRepository.existsById(promoId)) {
+            throw new ResourceNotFoundException("promo not found");
+        }
+        bannerRepository.findByPromoId(promoId).ifPresent(other -> {
+            if (selfId == null || !selfId.equals(other.getId())) {
+                throw new AlreadyExistsException("promo is already linked to a banner");
+            }
+        });
+        return promoId;
     }
 
     private static String readContext(String type, String raw) {

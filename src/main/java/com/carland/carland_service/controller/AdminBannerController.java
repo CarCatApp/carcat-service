@@ -81,6 +81,7 @@ public class AdminBannerController {
                                                          @RequestParam(required = false) Long branchId,
                                                          @RequestParam(required = false) String url,
                                                          @RequestParam(required = false) String context,
+                                                         @RequestParam(required = false) Long promoId,
                                                          @RequestParam(required = false) String lang,
                                                          @RequestParam(required = false) String expireDate,
                                                          @RequestParam(required = false) Integer sortOrder,
@@ -96,6 +97,7 @@ public class AdminBannerController {
         body.setBranchId(branchId);
         body.setUrl(url);
         body.setContext(context);
+        body.setPromoId(promoId);
         body.setLang(lang);
         body.setExpireDate(AdminBannerService.parseExpireDate(expireDate));
         body.setSortOrder(sortOrder);

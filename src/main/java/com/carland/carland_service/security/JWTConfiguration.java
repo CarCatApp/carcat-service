@@ -55,7 +55,7 @@ public class JWTConfiguration {
                         .requestMatchers("/api/v1/internal/booking/**").permitAll()
                         .requestMatchers("/api/v1/car/test/**").permitAll()
                         .requestMatchers("/api/v1/app-announcements/active").permitAll()
-                        .requestMatchers("/api/v1/banners").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/banners", "/api/v1/banners/*").permitAll()
                         .requestMatchers("/api/v1/client-events").permitAll()
                         .requestMatchers("/api/v1/internal/client-events/**").permitAll()
                         .requestMatchers(HttpMethod.GET, DigitalHistoryPaths.PDF).permitAll()

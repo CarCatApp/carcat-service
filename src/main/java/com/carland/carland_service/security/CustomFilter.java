@@ -123,8 +123,13 @@ public class CustomFilter extends OncePerRequestFilter {
      * en: Mobile banner list. A missing Bearer must not become 401.
      */
     private static boolean isBannerList(String path) {
-        return "/api/v1/banners".equals(path)
-                || (path != null && path.endsWith("/api/v1/banners"));
+        if (path == null) {
+            return false;
+        }
+        if ("/api/v1/banners".equals(path) || path.endsWith("/api/v1/banners")) {
+            return true;
+        }
+        return path.matches(".*/api/v1/banners/\\d+");
     }
 
     /**

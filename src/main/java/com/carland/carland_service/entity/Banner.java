@@ -69,6 +69,10 @@ public class Banner {
     @Column(length = 4000)
     String context;
 
+    /** tr: Yalnız promo tipi. Bir banner bir promo. / en: Promo type only. One banner, one promo. */
+    @Column(name = "promo_id", unique = true)
+    Long promoId;
+
     /** tr: adds, info ve promo. Boş olabilir. / en: adds, info and promo. May be empty. */
     @Column(length = 2000)
     String url;

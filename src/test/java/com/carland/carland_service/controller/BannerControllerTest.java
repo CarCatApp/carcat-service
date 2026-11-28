@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import com.carland.carland_service.exceptions.CustomExceptionHandler;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = BannerController.class)
 @AutoConfigureMockMvc
-@Import({JWTConfiguration.class, CustomFilter.class})
+@Import({JWTConfiguration.class, CustomFilter.class, CustomExceptionHandler.class})
 class BannerControllerTest {
 
     @Autowired
@@ -103,6 +104,41 @@ class BannerControllerTest {
                 .andExpect(content().json("[]"));
 
         verify(adminBannerService).visible("en");
+    }
+
+    @Test
+    void oneBannerReturnsTheSameObject() throws Exception {
+        when(adminBannerService.visibleById(4L)).thenReturn(BannerItem.builder()
+                .id(4L)
+                .type(Banner.PROMO)
+                .promoId(3L)
+                .title("Yay")
+                .description("endirim")
+                .showing(true)
+                .status("active")
+                .build());
+        when(customerRepository.findByUserId(9L)).thenReturn(Customer.builder().userId(9L).hasPromo(true).build());
+
+        mockMvc.perform(get("/api/v1/banners/4").header("X-User-Id", "9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(4))
+                .andExpect(jsonPath("$.promoId").value(3))
+                .andExpect(jsonPath("$.type").value("promo"));
+    }
+
+    @Test
+    void onePromoBannerIsHiddenWithoutHasPromo() throws Exception {
+        when(adminBannerService.visibleById(4L)).thenReturn(BannerItem.builder()
+                .id(4L)
+                .type(Banner.PROMO)
+                .title("Yay")
+                .description("endirim")
+                .showing(true)
+                .status("active")
+                .build());
+
+        mockMvc.perform(get("/api/v1/banners/4"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

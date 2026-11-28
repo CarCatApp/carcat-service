@@ -4,6 +4,7 @@ import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.exceptions.MissingFieldException;
+import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.CustomerRepository;
 import com.carland.carland_service.service.AdminBannerService;
 import com.carland.carland_service.service.AppAnnouncementHeaders;
@@ -16,6 +17,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -80,6 +82,28 @@ public class BannerController {
                 .contentType(MediaType.parseMediaType(JSON_UTF8))
                 .cacheControl(CacheControl.noStore())
                 .body(items);
+    }
+
+    /**
+     * tr: Tek banner. Liste ile aynı nesne. Kapalı, silinmiş veya promo ve hasPromo değilse 404.
+     * en: One banner. Same object as the list. 404 when closed, missing, or a promo the customer cannot see.
+     */
+    @Operation(summary = "One visible banner",
+            description = "Public. Same fields as the list item, including promoId. "
+                    + "404 when the banner is missing, not active, or not showing. "
+                    + "A type=promo banner is 404 unless X-User-Id has hasPromo true.")
+    @GetMapping(value = "/{id}", produces = JSON_UTF8)
+    public ResponseEntity<BannerItem> one(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader) {
+        BannerItem item = adminBannerService.visibleById(id);
+        if (item != null && Banner.PROMO.equals(item.getType()) && !hasPromo(userIdHeader)) {
+            throw new ResourceNotFoundException("banner not found");
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(JSON_UTF8))
+                .cacheControl(CacheControl.noStore())
+                .body(item);
     }
 
     private boolean hasPromo(String userIdHeader) {

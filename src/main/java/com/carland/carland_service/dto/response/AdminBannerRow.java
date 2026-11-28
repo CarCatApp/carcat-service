@@ -14,6 +14,7 @@ public class AdminBannerRow {
     String title;
     String description;
     String context;
+    Long promoId;
     LocalDate expireDate;
     Long branchId;
     String url;

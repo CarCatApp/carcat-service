@@ -22,6 +22,7 @@ public class BannerItem {
     private String title;
     private String description;
     private String context;
+    private Long promoId;
     private LocalDate expireDate;
     private Long branchId;
     private String url;

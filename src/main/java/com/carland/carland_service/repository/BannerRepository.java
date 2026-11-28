@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BannerRepository extends JpaRepository<Banner, Long> {
@@ -17,6 +18,8 @@ public interface BannerRepository extends JpaRepository<Banner, Long> {
     List<Banner> findByStatusAndShowingOrderByIdDesc(String status, Boolean showing);
 
     List<Banner> findByShowingTrueOrderByIdDesc();
+
+    Optional<Banner> findByPromoId(Long promoId);
 
     @Query("""
             SELECT b FROM Banner b

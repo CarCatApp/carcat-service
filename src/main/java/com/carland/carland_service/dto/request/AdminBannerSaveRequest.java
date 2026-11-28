@@ -9,6 +9,7 @@ public class AdminBannerSaveRequest {
     String title;
     String description;
     String context;
+    Long promoId;
     String type;
     String lang;
     LocalDate expireDate;
