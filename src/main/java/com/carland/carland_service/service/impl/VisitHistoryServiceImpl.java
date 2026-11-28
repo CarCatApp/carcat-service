@@ -452,9 +452,28 @@ public class VisitHistoryServiceImpl implements VisitHistoryService {
                 .packagePrice(visit.getPackagePrice() == null ? null : toMoney(visit.getPackagePrice(), visit.getCostCurrency()))
                 .discountPercent(visit.getDiscountPercent())
                 .discount(discountOf(visit))
-                .inspectionNote(visit.getInspectionNote())
+                .inspectionNote(historyInspectionNote(visit))
                 .notes(visit.getNotes())
                 .build();
+    }
+
+    /**
+     * tr: Panel ziyaretinde tamir kutusuna şubenin tamamlama notu gider. Müşterinin book metni gitmez.
+     *     Hyper satırında eski inspection notu durur.
+     * en: A panel visit puts the branch completion note in the repair box. The customer's booking text stays out.
+     *     A Hyper row keeps its stored inspection note.
+     */
+    static String historyInspectionNote(Visit visit) {
+        if (visit == null) {
+            return null;
+        }
+        boolean panel = visit.getBookingId() != null
+                || (visit.getSource() != null && "panel".equalsIgnoreCase(visit.getSource().trim()));
+        if (panel) {
+            String note = visit.getNotes();
+            return note == null || note.isBlank() ? null : note.trim();
+        }
+        return visit.getInspectionNote();
     }
 
     /**

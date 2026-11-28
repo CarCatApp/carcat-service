@@ -55,7 +55,8 @@ public class VisitHistoryItemResponse {
     /*
      * Partner panel ("Xidməti tamamla") visits only. Mobile "Service summary":
      * Package = packageName/packagePrice, Individual services = services[kind in (package, individual, one_time)],
-     * Products = parts, Inspection & repair = inspectionNote + services[kind = inspection],
+     * Products = parts, Inspection & repair = inspectionNote + services[kind = inspection].
+     * On a panel visit inspectionNote is the branch completion note (visits.notes), not the customer's booking text.
      * Subtotal = cost, Discount = discount, Total = amount.
      */
 
@@ -67,6 +68,7 @@ public class VisitHistoryItemResponse {
     private BigDecimal discountPercent;
     /** cost − amount (all discounts together). */
     private MoneyResponse discount;
+    /** Panel: branch completion note. Hyper: stored inspection note. */
     private String inspectionNote;
     /** Operator note for the whole visit (panel completion). */
     private String notes;

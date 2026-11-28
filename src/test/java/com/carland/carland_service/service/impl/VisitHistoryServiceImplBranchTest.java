@@ -63,7 +63,10 @@ class VisitHistoryServiceImplBranchTest {
         Branch babek = Branch.builder().id(10L).name("Hyper Service")
                 .address("Babək pr. 43A").lat(40.40).lng(49.85).build();
         Visit panel = Visit.builder().id(1L).car(car).source("panel").branchId(22L)
-                .serviceCenterId(4L).serviceCenterName("Auto Zone").build();
+                .serviceCenterId(4L).serviceCenterName("Auto Zone")
+                .inspectionNote("müştəri notu")
+                .notes("şöbə tamamlama notu")
+                .build();
         Visit hyper = Visit.builder().id(2L).car(car).hyperRecordId(90L).serviceCenterId(1L)
                 .serviceCenterName("HyperService").build();
 
@@ -95,6 +98,8 @@ class VisitHistoryServiceImplBranchTest {
         assertEquals(40.45, detailed.getLat());
         assertEquals(49.75, detailed.getLng());
         assertEquals(4L, detailed.getServiceCenterId());
+        assertEquals("şöbə tamamlama notu", detailed.getInspectionNote());
+        assertEquals("şöbə tamamlama notu", detailed.getNotes());
 
         VisitHistoryItemResponse fromHyper = response.getItems().get(1);
         assertEquals(10L, fromHyper.getBranchId());
