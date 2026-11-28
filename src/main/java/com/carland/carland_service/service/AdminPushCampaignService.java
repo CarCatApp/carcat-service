@@ -44,7 +44,8 @@ public class AdminPushCampaignService {
 
     private static final int TITLE_MAX = 100;
     private static final int BODY_MAX = 300;
-    private static final int PHONE_MAX = 2000;
+    /** Count cap. The column is text, so the list is not cut by a character limit. */
+    private static final int PHONE_MAX = 10_000;
 
     private final DeviceTokenRepository deviceTokenRepository;
     private final CustomerRepository customerRepository;

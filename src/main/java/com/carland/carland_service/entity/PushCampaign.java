@@ -60,8 +60,13 @@ public class PushCampaign {
     @Column(name = "filter_engine_type_name", length = 64)
     String filterEngineTypeName;
 
-    /** Newline-separated +994… phones; when set, demographic filters are ignored. */
-    @Column(name = "filter_phones", length = 8000)
+    /**
+     * tr: Satır satır +994… numaralar. Doluysa diğer filtreler yok sayılır.
+     *     Kolon text; karakter sınırı yok. Adet sınırı 10_000, servistedir.
+     * en: One +994… number per line. When set, the other filters are ignored.
+     *     Column is text; no character cap. The 10_000 count cap is in the service.
+     */
+    @Column(name = "filter_phones", columnDefinition = "text")
     String filterPhones;
 
     @Column(nullable = false, length = 16)
