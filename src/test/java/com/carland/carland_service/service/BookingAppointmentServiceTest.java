@@ -98,8 +98,12 @@ class BookingAppointmentServiceTest {
             saved.setId(100L);
             return saved;
         });
+        BookingAppointmentRequest body = request();
+        body.setPromoCode(" carcat2026 ");
+        body.setDiscountType("percentage");
+        body.setDiscountValue(new java.math.BigDecimal("20"));
 
-        BookingAppointmentResponse response = service.create(7L, request(), 3L, "az");
+        BookingAppointmentResponse response = service.create(7L, body, 3L, "az");
 
         assertEquals(100L, response.getBookingId());
         assertEquals("auto_accepted", response.getStatus());
@@ -118,6 +122,9 @@ class BookingAppointmentServiceTest {
         ArgumentCaptor<Booking> saved = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).save(saved.capture());
         assertNotNull(saved.getValue().getAcceptedTime());
+        assertEquals("carcat2026", saved.getValue().getPromoCode());
+        assertEquals("percentage", saved.getValue().getDiscountType());
+        assertEquals(new java.math.BigDecimal("20.00"), saved.getValue().getDiscountValue());
         verify(vehicleSnapshot).capture(any(Booking.class), any(Car.class), eq("az"));
         verify(bookingPushService).accepted(any());
         verify(commissionCustomerStatusService).schedule(100L);

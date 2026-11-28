@@ -228,6 +228,9 @@ public class BookingCreateService {
                 .priceMin(booking.getPriceMin())
                 .priceMax(booking.getPriceMax())
                 .currency("AZN")
+                .promoCode(booking.getPromoCode())
+                .discountType(booking.getDiscountType())
+                .discountValue(booking.getDiscountValue())
                 .unit(UNIT)
                 .unreadCount(0)
                 .build();

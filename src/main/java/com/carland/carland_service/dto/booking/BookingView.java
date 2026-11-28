@@ -62,6 +62,13 @@ public class BookingView {
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     List<BigDecimal> paidAmounts;
     String currency;
+    /** tr: Promo ile gelen rezervasyon. Boşsa işaret yok. / en: Booking that arrived with a promo. Blank means no mark. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String promoCode;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String discountType;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    BigDecimal discountValue;
     String unit;
     Integer unreadCount;
     /** tr: Rezervasyon satırının yazıldığı an. / en: When the booking row was saved. */

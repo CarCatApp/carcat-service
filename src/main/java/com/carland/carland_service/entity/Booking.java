@@ -85,6 +85,17 @@ public class Booking {
     @Builder.Default
     String currency = "AZN";
 
+    /** tr: Book anında gönderilen promo. Boşsa indirim yok. / en: Promo sent at booking time. Blank means no discount. */
+    @Column(name = "promo_code", length = 64)
+    String promoCode;
+
+    /** tr: percentage veya amount. Olduğu gibi yazılır. / en: percentage or amount. Stored as sent. */
+    @Column(name = "discount_type", length = 16)
+    String discountType;
+
+    @Column(name = "discount_value", precision = 12, scale = 2)
+    BigDecimal discountValue;
+
     @Column(length = 32)
     String vin;
 

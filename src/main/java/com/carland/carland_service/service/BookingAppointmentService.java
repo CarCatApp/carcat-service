@@ -36,6 +36,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -152,6 +154,9 @@ public class BookingAppointmentService {
                 .carePackageId(selection.packageId())
                 .packageName(packageName(selection.packageId()))
                 .packagePrice(selection.packageId() == null ? null : packageQepik)
+                .promoCode(clip(body.getPromoCode(), 64))
+                .discountType(clip(body.getDiscountType(), 16))
+                .discountValue(money(body.getDiscountValue()))
                 .build();
         vehicleSnapshot.capture(booking, car, lang);
         booking = bookingRepository.save(booking);
@@ -373,6 +378,24 @@ public class BookingAppointmentService {
             }
         }
         throw new ConflictException("ref_retry");
+    }
+
+    private static String clip(String raw, int max) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
+    }
+
+    private static BigDecimal money(BigDecimal raw) {
+        if (raw == null) {
+            return null;
+        }
+        return raw.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static String day(Calendar calendar) {
