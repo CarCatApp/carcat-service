@@ -52,7 +52,7 @@ public class FeatureFlagMeController {
      *     HIDDEN when X-App-Version is below the minimum or the row is missing.
      */
     @Operation(summary = "Public promo flag",
-            description = "No JWT. No role header. Reads PROMO_CODE for USER. "
+            description = "No JWT. No role header. Reads PROMOCODE_BEFORE_REGISTER for USER. "
                     + "Send X-App-Version. Missing flag, missing USER state, or a low version is HIDDEN.")
     @GetMapping("/public/promo")
     public PublicPromoFlagResponse publicPromo(

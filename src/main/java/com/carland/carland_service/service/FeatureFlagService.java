@@ -19,8 +19,8 @@ public interface FeatureFlagService {
     FeatureFlagMeItem me(String roleHeader, String appVersionHeader);
 
     /**
-     * tr: PROMO_CODE flag'inin USER durumu. Satır yoksa veya sürüm yetmezse HIDDEN.
-     * en: USER state of the PROMO_CODE flag. HIDDEN when the row is missing or the version is too low.
+     * tr: PROMOCODE_BEFORE_REGISTER flag'inin USER durumu. Satır yoksa veya sürüm yetmezse HIDDEN.
+     * en: USER state of PROMOCODE_BEFORE_REGISTER. HIDDEN when the row is missing or the version is too low.
      */
     PublicPromoFlagResponse publicPromo(String appVersionHeader);
 

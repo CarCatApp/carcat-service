@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class FeatureFlagServiceImpl implements FeatureFlagService {
 
-    public static final String PROMO_CODE = "PROMO_CODE";
+    public static final String PROMO_CODE = "PROMOCODE_BEFORE_REGISTER";
     private static final String AUDIT_VERSION_NA = "n/a";
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
     private static final UserRoles[] GRID_ROLES = {
