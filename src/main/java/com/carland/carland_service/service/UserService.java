@@ -3,6 +3,7 @@ package com.carland.carland_service.service;
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
+import com.carland.carland_service.dto.response.HasPromoResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
@@ -62,5 +63,13 @@ public interface UserService {
      */
     CustomerInformationResponse applyPromo(PromoCodeRequest request, String role, String phoneNumber,
                                            String userIdHeader, String acceptLanguage);
+
+    /**
+     * tr: Token'daki userId için hasPromo ve bağlı promo. Müşteri yoksa veya alan boşsa false ve promo null.
+     *     Promo satırı silinmişse yalnız kayıtlı kod kalır.
+     * en: hasPromo and the linked promo for the token userId. False and a null promo when the customer is missing or the field is blank.
+     *     A deleted promo row leaves only the stored code.
+     */
+    HasPromoResponse hasPromo(Long userId);
 
 }

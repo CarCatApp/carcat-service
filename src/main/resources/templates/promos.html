@@ -68,7 +68,7 @@
   <div class="page-head">
     <div>
       <h1>promo code</h1>
-      <p class="muted">Kod böyük-kiçik fərq etmir. Mobil qəbul: status active, expired söndürülü, Bakı günü startDate və endDate arasındadır. Ən azı bir şube. Klik qutuya əlavə edir, x çıxarır.</p>
+      <p class="muted">Kod böyük-kiçik fərq etmir. Mobil qəbul: status active, expired söndürülü, Bakı günü startDate və endDate arasındadır. Ən azı bir şube. Klik seçir, eyni şubəyə yenidən klik və ya x çıxarır.</p>
     </div>
   </div>
   <div class="error-box" id="errBox" hidden></div>
@@ -307,7 +307,7 @@
       btn.className = "btn btn-ghost";
       btn.textContent = branch.name || String(branch.id);
       if (chosen.some((item) => item.id === branch.id)) btn.classList.add("is-on");
-      btn.addEventListener("click", () => addBranch(chosen, branch, container));
+      btn.addEventListener("click", () => toggleBranch(chosen, branch, container));
       container.appendChild(btn);
     });
   }
@@ -335,9 +335,10 @@
     });
   }
 
-  function addBranch(chosen, branch, picksEl) {
-    if (chosen.some((item) => item.id === branch.id)) return;
-    chosen.push({ id: branch.id, name: branch.name || "" });
+  function toggleBranch(chosen, branch, picksEl) {
+    const index = chosen.findIndex((item) => item.id === branch.id);
+    if (index >= 0) chosen.splice(index, 1);
+    else chosen.push({ id: branch.id, name: branch.name || "" });
     const box = picksEl.id === "editBranchPicks"
       ? document.getElementById("editBox")
       : document.getElementById("createBox");

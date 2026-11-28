@@ -9,8 +9,10 @@ import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.repository.CarRepository;
 import com.carland.carland_service.repository.ColorRepository;
 import com.carland.carland_service.repository.CustomerRepository;
+import com.carland.carland_service.security.BookingStaffRequestAuth;
 import com.carland.carland_service.service.UserService;
 import com.carland.carland_service.util.PlateNumbers;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,8 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -37,6 +41,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final BookingStaffRequestAuth bookingStaffRequestAuth;
 
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
@@ -182,6 +187,21 @@ public class UserController {
                                           @RequestHeader("X-User-Id") String userIdHeader,
                                           @RequestHeader("Accept-Language") String acceptLanguage) {
         return userService.isPinOccupied(pin, role, phoneNumber, userIdHeader, acceptLanguage);
+    }
+
+    /**
+     * tr: Yalnız Authorization Bearer. hasPromo ve bağlı promo. false ise promo null.
+     *     role, phoneNumber ve X-User-Id gerekmez. Token yok veya bozuksa 401.
+     * en: Authorization Bearer only. hasPromo true or false for the token userId.
+     *     role, phoneNumber and X-User-Id are not required. 401 when the token is missing or bad.
+     */
+    @GetMapping("/promo")
+    public ResponseEntity<HasPromoResponse> hasPromo(HttpServletRequest request) {
+        Long userId = bookingStaffRequestAuth.userIdFromBearer(request);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(userService.hasPromo(userId));
     }
 
     /**

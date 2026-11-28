@@ -33,7 +33,22 @@ public class BookingStaffRequestAuth {
         if (claims == null) {
             return null;
         }
-        Object raw = claims.get("userId");
+        return userIdClaim(claims.get("userId"));
+    }
+
+    /**
+     * tr: Yalnız Authorization Bearer access token. X-User-Id okunmaz. Token yok veya imza bozuksa null.
+     * en: Authorization Bearer access token only. X-User-Id is ignored. Null when the token is missing or the signature is bad.
+     */
+    public Long userIdFromBearer(HttpServletRequest request) {
+        Claims claims = parseBearer(request);
+        if (claims == null) {
+            return null;
+        }
+        return userIdClaim(claims.get("userId"));
+    }
+
+    private static Long userIdClaim(Object raw) {
         if (raw instanceof Number number) {
             return number.longValue();
         }

@@ -3,6 +3,8 @@ package com.carland.carland_service.service.impl;
 import com.carland.carland_service.dto.request.CustomerInformationRequest;
 import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
+import com.carland.carland_service.dto.response.HasPromoResponse;
+import com.carland.carland_service.dto.response.UserPromoResponse;
 import com.carland.carland_service.dto.response.NotificationLanguageResponse;
 import com.carland.carland_service.dto.response.NotificationResponse;
 import com.carland.carland_service.dto.response.PinOccupiedResponse;
@@ -273,6 +275,51 @@ public class UserServiceImpl implements UserService {
             customerRepository.save(customer);
         }
         return toInformationResponse(customer);
+    }
+
+    /**
+     * tr: customers.user_id ile hasPromo ve promo_id satırı. Redis yok. Null false sayılır.
+     *     Satır yoksa customers.promo_code kalır.
+     * en: hasPromo and the promo_id row by customers.user_id. No Redis. Null counts as false.
+     *     A missing row keeps customers.promo_code.
+     */
+    @Override
+    public HasPromoResponse hasPromo(Long userId) {
+        if (userId == null) {
+            return HasPromoResponse.builder().hasPromo(false).build();
+        }
+        Customer customer = customerRepository.findByUserId(userId);
+        if (customer == null || !Boolean.TRUE.equals(customer.getHasPromo())) {
+            return HasPromoResponse.builder().hasPromo(false).build();
+        }
+        Promo promo = customer.getPromoId() == null
+                ? null
+                : promoRepository.findById(customer.getPromoId()).orElse(null);
+        return HasPromoResponse.builder()
+                .hasPromo(true)
+                .promo(toUserPromo(promo, customer.getPromoCode()))
+                .build();
+    }
+
+    private static UserPromoResponse toUserPromo(Promo promo, String storedCode) {
+        if (promo == null) {
+            if (storedCode == null || storedCode.isBlank()) {
+                return null;
+            }
+            return UserPromoResponse.builder().code(storedCode).build();
+        }
+        return UserPromoResponse.builder()
+                .id(promo.getId())
+                .code(promo.getCode())
+                .name(promo.getName())
+                .description(promo.getDescription())
+                .discountType(promo.getDiscountType())
+                .discountValue(promo.getDiscountValue())
+                .status(promo.getStatus())
+                .expired(Boolean.TRUE.equals(promo.getExpired()))
+                .startDate(promo.getStartDate())
+                .endDate(promo.getEndDate())
+                .build();
     }
 
     /**

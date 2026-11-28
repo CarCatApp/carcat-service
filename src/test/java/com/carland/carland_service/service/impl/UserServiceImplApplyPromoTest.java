@@ -2,6 +2,7 @@ package com.carland.carland_service.service.impl;
 
 import com.carland.carland_service.dto.request.PromoCodeRequest;
 import com.carland.carland_service.dto.response.CustomerInformationResponse;
+import com.carland.carland_service.dto.response.HasPromoResponse;
 import com.carland.carland_service.entity.Customer;
 import com.carland.carland_service.entity.Promo;
 import com.carland.carland_service.enums.UserStatus;
@@ -16,11 +17,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
@@ -110,6 +113,36 @@ class UserServiceImplApplyPromoTest {
         assertThrows(NotMatchException.class,
                 () -> service.applyPromo(body(9L, "carcat2026"), "USER", "+994501112233", "5", "az"));
         verify(promoRepository, never()).findByCodeKey(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void hasPromoIsFalseWhenTheCustomerIsMissingOrUnset() {
+        when(customerRepository.findByUserId(5L)).thenReturn(null);
+        HasPromoResponse missing = service.hasPromo(5L);
+        assertFalse(missing.isHasPromo());
+        assertEquals(null, missing.getPromo());
+
+        when(customerRepository.findByUserId(5L)).thenReturn(customer());
+        assertFalse(service.hasPromo(5L).isHasPromo());
+
+        Customer redeemed = customer();
+        redeemed.setHasPromo(true);
+        redeemed.setPromoId(8L);
+        redeemed.setPromoCode("carcat2026");
+        Promo promo = usable();
+        promo.setName("Yay");
+        promo.setDescription("yay endirimi");
+        promo.setDiscountType(Promo.PERCENTAGE);
+        promo.setDiscountValue(new BigDecimal("20.00"));
+        when(customerRepository.findByUserId(5L)).thenReturn(redeemed);
+        when(promoRepository.findById(8L)).thenReturn(Optional.of(promo));
+
+        HasPromoResponse response = service.hasPromo(5L);
+        assertTrue(response.isHasPromo());
+        assertEquals(8L, response.getPromo().getId());
+        assertEquals("carcat2026", response.getPromo().getCode());
+        assertEquals("Yay", response.getPromo().getName());
+        assertEquals(Promo.PERCENTAGE, response.getPromo().getDiscountType());
     }
 
     @Test
