@@ -6,6 +6,7 @@ import com.carland.carland_service.dto.response.AdminBannerRow;
 import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.Promo;
 import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
@@ -157,6 +158,7 @@ public class AdminBannerService {
                 .status(Banner.ACTIVE)
                 .build();
         banner = bannerRepository.save(banner);
+        linkPromo(banner, null);
         if (needsPhoto(type)) {
             photoService.replaceBannerPhoto(file, banner.getId());
         }
@@ -191,6 +193,7 @@ public class AdminBannerService {
                 || body.getUrl() != null || body.getLang() != null || body.getExpireDate() != null;
         if (text) {
             String type = storedType(banner);
+            Long previousPromoId = banner.getPromoId();
             banner.setTitle(readTitle(body));
             banner.setDescription(readDescription(body));
             banner.setContext(readContext(type, body.getContext()));
@@ -212,6 +215,9 @@ public class AdminBannerService {
                     banner.setUrl(readUrl(type, body.getUrl()));
                 }
             }
+            bannerRepository.save(banner);
+            linkPromo(banner, previousPromoId);
+            return toRow(banner);
         } else if (body.getShowing() != null) {
             if (Boolean.TRUE.equals(body.getShowing()) && isExpired(banner.getExpireDate(), LocalDate.now(BAKU))) {
                 throw new InvalidStatusException("expireDate has passed");
@@ -352,6 +358,25 @@ public class AdminBannerService {
             }
         });
         return promoId;
+    }
+
+    private void linkPromo(Banner banner, Long previousPromoId) {
+        Long next = banner.getPromoId();
+        if (previousPromoId != null && !previousPromoId.equals(next)) {
+            promoRepository.findById(previousPromoId).ifPresent(old -> {
+                if (banner.getId() != null && banner.getId().equals(old.getBannerId())) {
+                    old.setBannerId(null);
+                    promoRepository.save(old);
+                }
+            });
+        }
+        if (next == null) {
+            return;
+        }
+        promoRepository.findById(next).ifPresent(promo -> {
+            promo.setBannerId(banner.getId());
+            promoRepository.save(promo);
+        });
     }
 
     private static String readContext(String type, String raw) {

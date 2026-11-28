@@ -79,6 +79,10 @@ public class Promo {
     @Column(nullable = false)
     Boolean expired = false;
 
+    /** tr: Bu promo'ya bağlı tek banner. banners.id. / en: The one banner linked to this promo. banners.id. */
+    @Column(name = "banner_id", unique = true)
+    Long bannerId;
+
     @Builder.Default
     @OneToMany(mappedBy = "promo", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude

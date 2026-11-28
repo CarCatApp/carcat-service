@@ -6,12 +6,12 @@ import com.carland.carland_service.dto.response.AdminBannerRow;
 import com.carland.carland_service.dto.response.BannerItem;
 import com.carland.carland_service.entity.Banner;
 import com.carland.carland_service.entity.Branch;
+import com.carland.carland_service.entity.Promo;
 import com.carland.carland_service.enums.PartnerId;
 import com.carland.carland_service.exceptions.AlreadyExistsException;
 import com.carland.carland_service.exceptions.InvalidStatusException;
 import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.exceptions.MissingFieldException;
-import com.carland.carland_service.exceptions.ResourceNotFoundException;
 import com.carland.carland_service.repository.BannerRepository;
 import com.carland.carland_service.repository.BranchRepository;
 import com.carland.carland_service.repository.PromoRepository;
@@ -355,12 +355,15 @@ class AdminBannerServiceTest {
         body.setSortOrder(4);
         when(promoRepository.existsById(3L)).thenReturn(true);
         when(bannerRepository.findByPromoId(3L)).thenReturn(Optional.empty());
+        Promo linked = Promo.builder().id(3L).build();
+        when(promoRepository.findById(3L)).thenReturn(Optional.of(linked));
 
         AdminBannerRow row = service.create(body, file);
 
         assertEquals(Banner.PROMO, row.getType());
         assertEquals("kod YAY", row.getContext());
         assertEquals(3L, row.getPromoId());
+        assertEquals(9L, linked.getBannerId());
         assertEquals("https://carland.az/promo", row.getUrl());
         assertEquals(null, row.getBranchId());
         verify(photoService).replaceBannerPhoto(file, 9L);

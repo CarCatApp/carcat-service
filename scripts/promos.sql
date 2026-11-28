@@ -24,3 +24,10 @@ CREATE TABLE IF NOT EXISTS promo_branches (
 
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS promo_id BIGINT;
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS promo_code VARCHAR(64);
+ALTER TABLE promos ADD COLUMN IF NOT EXISTS banner_id BIGINT;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_promos_banner_id ON promos (banner_id) WHERE banner_id IS NOT NULL;
+UPDATE promos p
+SET banner_id = b.id
+FROM banners b
+WHERE b.promo_id = p.id
+  AND p.banner_id IS NULL;

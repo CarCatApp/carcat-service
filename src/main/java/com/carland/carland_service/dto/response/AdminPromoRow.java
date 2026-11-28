@@ -11,6 +11,7 @@ import java.util.List;
 @Builder
 public class AdminPromoRow {
     Long id;
+    Long bannerId;
     String name;
     String description;
     String code;

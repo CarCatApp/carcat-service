@@ -14,6 +14,7 @@ import java.time.LocalDate;
 @Builder
 public class UserPromoResponse {
     Long id;
+    Long bannerId;
     String code;
     String name;
     String description;

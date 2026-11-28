@@ -310,6 +310,7 @@ public class UserServiceImpl implements UserService {
         }
         return UserPromoResponse.builder()
                 .id(promo.getId())
+                .bannerId(promo.getBannerId())
                 .code(promo.getCode())
                 .name(promo.getName())
                 .description(promo.getDescription())

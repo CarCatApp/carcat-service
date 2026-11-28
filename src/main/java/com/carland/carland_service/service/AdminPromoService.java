@@ -157,6 +157,7 @@ public class AdminPromoService {
         }
         return AdminPromoRow.builder()
                 .id(promo.getId())
+                .bannerId(promo.getBannerId())
                 .name(promo.getName())
                 .description(promo.getDescription())
                 .code(promo.getCode())

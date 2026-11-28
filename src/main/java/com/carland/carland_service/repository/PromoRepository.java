@@ -13,4 +13,6 @@ public interface PromoRepository extends JpaRepository<Promo, Long> {
     List<Promo> findAllByOrderByIdDesc();
 
     Optional<Promo> findByCodeKey(String codeKey);
+
+    Optional<Promo> findByBannerId(Long bannerId);
 }

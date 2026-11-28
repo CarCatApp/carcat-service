@@ -134,6 +134,7 @@ class UserServiceImplApplyPromoTest {
         promo.setDescription("yay endirimi");
         promo.setDiscountType(Promo.PERCENTAGE);
         promo.setDiscountValue(new BigDecimal("20.00"));
+        promo.setBannerId(4L);
         when(customerRepository.findByUserId(5L)).thenReturn(redeemed);
         when(promoRepository.findById(8L)).thenReturn(Optional.of(promo));
 
@@ -143,6 +144,7 @@ class UserServiceImplApplyPromoTest {
         assertEquals("carcat2026", response.getPromo().getCode());
         assertEquals("Yay", response.getPromo().getName());
         assertEquals(Promo.PERCENTAGE, response.getPromo().getDiscountType());
+        assertEquals(4L, response.getPromo().getBannerId());
     }
 
     @Test
