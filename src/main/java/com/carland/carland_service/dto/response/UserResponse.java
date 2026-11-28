@@ -15,4 +15,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class UserResponse {
     String message;
+    /** tr: customers.user_id. İstekteki X-User-Id. / en: customers.user_id. The request X-User-Id. */
+    Long customerId;
 }

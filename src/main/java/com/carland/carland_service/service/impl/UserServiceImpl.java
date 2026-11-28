@@ -53,8 +53,8 @@ public class UserServiceImpl implements UserService {
     private final CustomerEnsurePublisher customerEnsurePublisher;
 
     /**
-     * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda mesajlı UserResponse döner.
-     * en: Adds user details: checks/creates the customer by role. Name and surname are not written here. Throws MissingFieldException if userId, role, phoneNumber, or timezone is missing; returns a UserResponse with a success message.
+     * tr: Kullanıcı detaylarını ekler: role göre müşteriyi kontrol eder/oluşturur. Ad ve soyad burada yazılmaz. userId, role, phoneNumber veya timezone eksikse MissingFieldException fırlatır; başarıda message ve customerId döner.
+     * en: Adds user details: checks/creates the customer by role. Name and surname are not written here. Throws MissingFieldException if userId, role, phoneNumber, or timezone is missing; returns message and customerId.
      */
     @Override
     public UserResponse userAddDetails(Long userId, String role, String phoneNumber,
@@ -81,6 +81,7 @@ public class UserServiceImpl implements UserService {
 
         return UserResponse.builder()
                 .message(MessagesLangValues.SUCCESS.getMessageByLang(acceptLanguage))
+                .customerId(userId)
                 .build();
     }
 
