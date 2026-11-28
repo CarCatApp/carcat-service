@@ -1,5 +1,6 @@
 package com.carland.carland_service.controller;
 
+import com.carland.carland_service.dto.response.PublicPromoFlagResponse;
 import com.carland.carland_service.service.FeatureFlagService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,5 +43,20 @@ public class FeatureFlagMeController {
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ex.getMessage()));
         }
+    }
+
+    /**
+     * tr: Giriş öncesi promo kutusu. Token ve role yok. Sunucu USER satırını okur.
+     *     X-App-Version minimumun altındaysa veya satır yoksa HIDDEN.
+     * en: Pre-login promo field. No token and no role. The server reads the USER row.
+     *     HIDDEN when X-App-Version is below the minimum or the row is missing.
+     */
+    @Operation(summary = "Public promo flag",
+            description = "No JWT. No role header. Reads PROMO_CODE for USER. "
+                    + "Send X-App-Version. Missing flag, missing USER state, or a low version is HIDDEN.")
+    @GetMapping("/public/promo")
+    public PublicPromoFlagResponse publicPromo(
+            @RequestHeader(value = "X-App-Version", required = false) String appVersion) {
+        return featureFlagService.publicPromo(appVersion);
     }
 }

@@ -84,6 +84,7 @@ public class CustomFilter extends OncePerRequestFilter {
                         || path.equals("/api/v1/group/by/get/brand/list/with/models")
                         || isAppAnnouncementActive(path)
                         || isBannerList(path)
+                        || isPublicPromoFlag(path)
                         || DigitalHistoryPaths.isPdf(path)
                         || DigitalHistoryPaths.isVerify(path);
 
@@ -122,6 +123,15 @@ public class CustomFilter extends OncePerRequestFilter {
      * tr: Mobil banner listesi. Bearer yoksa da 401 yazılmaz.
      * en: Mobile banner list. A missing Bearer must not become 401.
      */
+    /**
+     * tr: Giriş öncesi promo kutusu. Bearer yoksa da 401 yazılmaz.
+     * en: Pre-login promo field. A missing Bearer must not become 401.
+     */
+    private static boolean isPublicPromoFlag(String path) {
+        return "/api/v1/feature-flags/public/promo".equals(path)
+                || (path != null && path.endsWith("/api/v1/feature-flags/public/promo"));
+    }
+
     private static boolean isBannerList(String path) {
         if (path == null) {
             return false;

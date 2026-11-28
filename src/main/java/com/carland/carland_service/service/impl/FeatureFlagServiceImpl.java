@@ -8,6 +8,7 @@ import com.carland.carland_service.util.SemVer;
 import com.carland.carland_service.dto.response.FeatureFlagEndpointView;
 import com.carland.carland_service.dto.response.FeatureFlagMeGroup;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
+import com.carland.carland_service.dto.response.PublicPromoFlagResponse;
 import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.entity.FeatureFlagEndpoint;
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class FeatureFlagServiceImpl implements FeatureFlagService {
 
+    public static final String PROMO_CODE = "PROMO_CODE";
     private static final String AUDIT_VERSION_NA = "n/a";
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
     private static final UserRoles[] GRID_ROLES = {
@@ -95,6 +97,33 @@ public class FeatureFlagServiceImpl implements FeatureFlagService {
                 .appVersion(clientVersion)
                 .evaluatedAt(Instant.now().toString())
                 .flags(out)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PublicPromoFlagResponse publicPromo(String appVersionHeader) {
+        FeatureFlag flag = flagRepository.findByName(PROMO_CODE).orElse(null);
+        if (flag == null || flag.getDeletedAt() != null) {
+            return hiddenPromo();
+        }
+        if (!SemVer.isAtLeast(blankToNull(appVersionHeader), minOf(flag))) {
+            return hiddenPromo();
+        }
+        FeatureFlagRoleState row = roleStateRepository.findFirstByFlagAndRole(flag, UserRoles.USER).orElse(null);
+        if (row == null || row.getState() == null) {
+            return hiddenPromo();
+        }
+        return PublicPromoFlagResponse.builder()
+                .name(PROMO_CODE)
+                .state(row.getState())
+                .build();
+    }
+
+    private static PublicPromoFlagResponse hiddenPromo() {
+        return PublicPromoFlagResponse.builder()
+                .name(PROMO_CODE)
+                .state(FeatureFlagState.HIDDEN)
                 .build();
     }
 

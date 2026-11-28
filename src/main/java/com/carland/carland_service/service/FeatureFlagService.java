@@ -5,6 +5,7 @@ import com.carland.carland_service.dto.request.FeatureFlagEndpointWriteRequest;
 import com.carland.carland_service.dto.request.FeatureFlagStateUpdateRequest;
 import com.carland.carland_service.dto.request.FeatureFlagWriteRequest;
 import com.carland.carland_service.dto.response.FeatureFlagMeItem;
+import com.carland.carland_service.dto.response.PublicPromoFlagResponse;
 import com.carland.carland_service.entity.FeatureFlag;
 import com.carland.carland_service.entity.FeatureFlagAudit;
 import com.carland.carland_service.entity.FeatureFlagEndpoint;
@@ -16,6 +17,12 @@ import java.util.Map;
 public interface FeatureFlagService {
 
     FeatureFlagMeItem me(String roleHeader, String appVersionHeader);
+
+    /**
+     * tr: PROMO_CODE flag'inin USER durumu. Satır yoksa veya sürüm yetmezse HIDDEN.
+     * en: USER state of the PROMO_CODE flag. HIDDEN when the row is missing or the version is too low.
+     */
+    PublicPromoFlagResponse publicPromo(String appVersionHeader);
 
     Map<String, Object> adminSnapshot();
 
